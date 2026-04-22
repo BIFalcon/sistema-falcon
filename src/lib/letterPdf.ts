@@ -53,14 +53,26 @@ async function loadImage(url: string | null): Promise<HTMLImageElement | null> {
   });
 }
 
-function imageToDataUrl(img: HTMLImageElement, maxWidth = 1600): string {
+/**
+ * Converte HTMLImageElement em DataURL.
+ * `format = "png"` preserva canal alfa (logos PNG transparentes).
+ * `format = "jpeg"` é menor — usado apenas para fotos opacas (capa/destaques).
+ */
+function imageToDataUrl(
+  img: HTMLImageElement,
+  maxWidth = 1600,
+  format: "png" | "jpeg" = "jpeg",
+): string {
   const canvas = document.createElement("canvas");
   const scale = Math.min(1, maxWidth / img.naturalWidth);
   canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
   const ctx = canvas.getContext("2d")!;
+  // Para PNG, NÃO pintar fundo branco/preto: deixar transparente.
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85);
+  return format === "png"
+    ? canvas.toDataURL("image/png")
+    : canvas.toDataURL("image/jpeg", 0.85);
 }
 
 function fmtBRL0(v: number | null | undefined): string {
@@ -93,19 +105,21 @@ function drawPageHeader(
   falconLogo: string | null,
   brandLogo: string | null,
 ) {
-  // logos esquerda/direita
-  if (falconLogo) doc.addImage(falconLogo, "JPEG", 14, 10, 28, 14, undefined, "FAST");
-  if (brandLogo) doc.addImage(brandLogo, "JPEG", SIZE - 14 - 28, 10, 28, 14, undefined, "FAST");
+  // logos esquerda/direita — PNG preserva transparência
+  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 28, 14, undefined, "FAST");
+  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 28, 10, 28, 14, undefined, "FAST");
   // título central
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(NAVY);
-  doc.text(title.toUpperCase(), SIZE / 2, 18, { align: "center", charSpace: 1.2 });
-  // sublinhado dourado
+  const titleUpper = title.toUpperCase();
+  doc.text(titleUpper, SIZE / 2, 18, { align: "center", charSpace: 1.2 });
+  // sublinhado dourado — mesma largura do título (incluindo charSpace ≈ 1.2pt extra por char)
   doc.setDrawColor(GOLD);
   doc.setLineWidth(1.2);
-  const tw = doc.getTextWidth(title.toUpperCase()) + 4;
-  doc.line(SIZE / 2 - tw / 4, 22, SIZE / 2 + tw / 4, 22);
+  const charSpaceMm = (1.2 / 2.83465) * Math.max(0, titleUpper.length - 1);
+  const tw = doc.getTextWidth(titleUpper) + charSpaceMm;
+  doc.line(SIZE / 2 - tw / 2, 22, SIZE / 2 + tw / 2, 22);
 }
 
 /* ───────────────── Gráficos via Canvas 2D ───────────────── */
