@@ -113,7 +113,12 @@ export function AppSidebar() {
                       <SidebarMenuButton asChild isActive={active}>
                         <NavLink to={item.url} end={item.end}>
                           <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
+                          <span className="flex-1">{item.title}</span>
+                          {!collapsed && (item as { soon?: boolean }).soon && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sidebar-accent/20 text-sidebar-foreground/60">
+                              Em breve
+                            </span>
+                          )}
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
