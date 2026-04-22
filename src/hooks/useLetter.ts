@@ -265,3 +265,9 @@ export async function getLetterPdfSignedUrl(path: string): Promise<string | null
   if (error) return null;
   return data?.signedUrl ?? null;
 }
+
+export async function downloadLetterPdfBlob(path: string): Promise<Blob> {
+  const { data, error } = await supabase.storage.from("investor-letters").download(path);
+  if (error || !data) throw error ?? new Error("Falha ao baixar PDF");
+  return data;
+}

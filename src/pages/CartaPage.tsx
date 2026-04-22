@@ -15,7 +15,7 @@ import {
   useGenerateLetterAi,
   useLetterHighlights,
   useLetterVersions,
-  getLetterPdfSignedUrl,
+  downloadLetterPdfBlob,
 } from "@/hooks/useLetter";
 import { useDreIndicators } from "@/hooks/useDre";
 import { useHotel, useFalconLogo } from "@/hooks/useHotelAssets";
@@ -196,23 +196,20 @@ export default function CartaPage() {
 
   async function handleDownloadPdf() {
     if (!letter?.pdf_url) return;
-    const url = await getLetterPdfSignedUrl(letter.pdf_url);
-    if (!url) return toast.error("Não foi possível gerar link");
     const filename = letter.pdf_url.split("/").pop() ?? "carta-investidor.pdf";
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("fetch failed");
-      const blob = await res.blob();
+      const blob = await downloadLetterPdfBlob(letter.pdf_url);
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = filename;
+      a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    } catch {
-      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível baixar o PDF");
     }
   }
 
