@@ -14,6 +14,261 @@ export type Database = {
   }
   public: {
     Tables: {
+      approvals: {
+        Row: {
+          approved_by: string
+          closing_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          stage: Database["public"]["Enums"]["closing_stage"]
+          status: Database["public"]["Enums"]["closing_status"]
+        }
+        Insert: {
+          approved_by: string
+          closing_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          stage: Database["public"]["Enums"]["closing_stage"]
+          status: Database["public"]["Enums"]["closing_status"]
+        }
+        Update: {
+          approved_by?: string
+          closing_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          stage?: Database["public"]["Enums"]["closing_stage"]
+          status?: Database["public"]["Enums"]["closing_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closing_status_log: {
+        Row: {
+          changed_by: string | null
+          closing_id: string
+          created_at: string
+          field: string
+          id: string
+          new_value: Database["public"]["Enums"]["closing_status"]
+          old_value: Database["public"]["Enums"]["closing_status"] | null
+        }
+        Insert: {
+          changed_by?: string | null
+          closing_id: string
+          created_at?: string
+          field: string
+          id?: string
+          new_value: Database["public"]["Enums"]["closing_status"]
+          old_value?: Database["public"]["Enums"]["closing_status"] | null
+        }
+        Update: {
+          changed_by?: string | null
+          closing_id?: string
+          created_at?: string
+          field?: string
+          id?: string
+          new_value?: Database["public"]["Enums"]["closing_status"]
+          old_value?: Database["public"]["Enums"]["closing_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_status_log_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closings: {
+        Row: {
+          carta_approved_at: string | null
+          carta_started_at: string | null
+          created_at: string
+          dre_approved_at: string | null
+          dre_started_at: string | null
+          envio_sent_at: string | null
+          financeiro_resolved_at: string | null
+          financeiro_started_at: string | null
+          hotel_id: string
+          id: string
+          month: number
+          status_carta: Database["public"]["Enums"]["closing_status"]
+          status_dre: Database["public"]["Enums"]["closing_status"]
+          status_envio: Database["public"]["Enums"]["closing_status"]
+          status_financeiro: Database["public"]["Enums"]["closing_status"]
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          carta_approved_at?: string | null
+          carta_started_at?: string | null
+          created_at?: string
+          dre_approved_at?: string | null
+          dre_started_at?: string | null
+          envio_sent_at?: string | null
+          financeiro_resolved_at?: string | null
+          financeiro_started_at?: string | null
+          hotel_id: string
+          id?: string
+          month: number
+          status_carta?: Database["public"]["Enums"]["closing_status"]
+          status_dre?: Database["public"]["Enums"]["closing_status"]
+          status_envio?: Database["public"]["Enums"]["closing_status"]
+          status_financeiro?: Database["public"]["Enums"]["closing_status"]
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          carta_approved_at?: string | null
+          carta_started_at?: string | null
+          created_at?: string
+          dre_approved_at?: string | null
+          dre_started_at?: string | null
+          envio_sent_at?: string | null
+          financeiro_resolved_at?: string | null
+          financeiro_started_at?: string | null
+          hotel_id?: string
+          id?: string
+          month?: number
+          status_carta?: Database["public"]["Enums"]["closing_status"]
+          status_dre?: Database["public"]["Enums"]["closing_status"]
+          status_envio?: Database["public"]["Enums"]["closing_status"]
+          status_financeiro?: Database["public"]["Enums"]["closing_status"]
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closings_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          author_id: string
+          closing_id: string
+          content: string
+          created_at: string
+          id: string
+          stage: Database["public"]["Enums"]["closing_stage"]
+        }
+        Insert: {
+          author_id: string
+          closing_id: string
+          content: string
+          created_at?: string
+          id?: string
+          stage: Database["public"]["Enums"]["closing_stage"]
+        }
+        Update: {
+          author_id?: string
+          closing_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          stage?: Database["public"]["Enums"]["closing_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dre_parsed_lines: {
+        Row: {
+          closing_id: string
+          created_at: string
+          id: string
+          line_label: string
+          line_type: string
+          line_value: number | null
+          version_number: number
+        }
+        Insert: {
+          closing_id: string
+          created_at?: string
+          id?: string
+          line_label: string
+          line_type?: string
+          line_value?: number | null
+          version_number: number
+        }
+        Update: {
+          closing_id?: string
+          created_at?: string
+          id?: string
+          line_label?: string
+          line_type?: string
+          line_value?: number | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_parsed_lines_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dre_versions: {
+        Row: {
+          author_id: string
+          closing_id: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          version_number: number
+        }
+        Insert: {
+          author_id: string
+          closing_id: string
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          version_number: number
+        }
+        Update: {
+          author_id?: string
+          closing_id?: string
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_versions_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           active: boolean
@@ -131,6 +386,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
+      is_hotel_allowed: {
+        Args: { _hotel_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_master: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
@@ -142,6 +402,20 @@ export type Database = {
         | "ri"
         | "financeiro"
         | "gg"
+      closing_stage: "dre" | "carta" | "financeiro" | "envio"
+      closing_status:
+        | "nao_iniciado"
+        | "em_andamento"
+        | "pendente"
+        | "aprovado"
+        | "devolvido"
+        | "aguardando_comentarios"
+        | "aguardando_controladoria"
+        | "aguardando_gop"
+        | "aguardando_fernando"
+        | "aguardando_gg"
+        | "nao_aplicavel"
+        | "sem_distribuicao"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -277,6 +551,21 @@ export const Constants = {
         "ri",
         "financeiro",
         "gg",
+      ],
+      closing_stage: ["dre", "carta", "financeiro", "envio"],
+      closing_status: [
+        "nao_iniciado",
+        "em_andamento",
+        "pendente",
+        "aprovado",
+        "devolvido",
+        "aguardando_comentarios",
+        "aguardando_controladoria",
+        "aguardando_gop",
+        "aguardando_fernando",
+        "aguardando_gg",
+        "nao_aplicavel",
+        "sem_distribuicao",
       ],
     },
   },
