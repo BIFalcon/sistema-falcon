@@ -40,8 +40,6 @@ const navGroups = [
     label: "Operação",
     items: [
       { title: "Fechamento", url: "/fechamento", icon: ClipboardList },
-      { title: "Carta ao Investidor", url: "/carta", icon: Mail },
-      { title: "Financeiro", url: "/financeiro", icon: Wallet },
       { title: "Contas a Pagar", url: "/contas-pagar", icon: ArrowUpCircle, soon: true },
       { title: "Contas a Receber", url: "/contas-receber", icon: ArrowDownCircle, soon: true },
     ],
