@@ -3,7 +3,9 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
+import DashboardPage from "./pages/DashboardPage";
+import FechamentoPage from "./pages/FechamentoPage";
+import EmBreve from "./pages/EmBreve";
 import NotFound from "./pages/NotFound.tsx";
 import LoginPage from "./pages/LoginPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -32,11 +34,19 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/fechamento" element={<FechamentoPage />} />
               <Route path="/dre" element={<DrePage />} />
               <Route path="/carta" element={<CartaPage />} />
               <Route path="/financeiro" element={<FinanceiroPage />} />
               <Route path="/hoteis" element={<HoteisPage />} />
+              <Route path="/contas-pagar" element={<EmBreve />} />
+              <Route path="/contas-receber" element={<EmBreve />} />
+              <Route path="/indicadores" element={<EmBreve />} />
+              <Route path="/metas" element={<EmBreve />} />
+              <Route path="/rh" element={<EmBreve />} />
+              <Route path="/controladoria" element={<EmBreve />} />
+              <Route path="/configuracoes" element={<EmBreve />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

@@ -4,10 +4,15 @@ import {
   FileSpreadsheet,
   Mail,
   Wallet,
-  Send,
   TrendingUp,
   Settings,
   Hotel,
+  ClipboardList,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Target,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,25 +37,29 @@ const navGroups = [
     items: [{ title: "Dashboard", url: "/", icon: LayoutDashboard, end: true }],
   },
   {
-    label: "Workflow de Fechamento",
+    label: "Operação",
     items: [
-      { title: "DRE", url: "/dre", icon: FileSpreadsheet },
+      { title: "Fechamento", url: "/fechamento", icon: ClipboardList },
       { title: "Carta ao Investidor", url: "/carta", icon: Mail },
       { title: "Financeiro", url: "/financeiro", icon: Wallet },
-      { title: "Envio", url: "/envio", icon: Send },
+      { title: "Contas a Pagar", url: "/contas-pagar", icon: ArrowUpCircle, soon: true },
+      { title: "Contas a Receber", url: "/contas-receber", icon: ArrowDownCircle, soon: true },
     ],
   },
   {
     label: "Análise",
     items: [
-      { title: "Performance (SLA)", url: "/performance", icon: TrendingUp },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, soon: true },
+      { title: "Metas GG", url: "/metas", icon: Target, soon: true },
     ],
   },
   {
-    label: "Sistema",
+    label: "Gestão",
     items: [
+      { title: "RH & People", url: "/rh", icon: Users, soon: true },
+      { title: "Controladoria", url: "/controladoria", icon: ShieldCheck, soon: true },
       { title: "Hotéis", url: "/hoteis", icon: Hotel },
-      { title: "Configurações", url: "/configuracoes", icon: Settings },
+      { title: "Configurações", url: "/configuracoes", icon: Settings, soon: true },
     ],
   },
 ];
@@ -104,7 +113,12 @@ export function AppSidebar() {
                       <SidebarMenuButton asChild isActive={active}>
                         <NavLink to={item.url} end={item.end}>
                           <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
+                          <span className="flex-1">{item.title}</span>
+                          {!collapsed && (item as { soon?: boolean }).soon && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sidebar-accent/20 text-sidebar-foreground/60">
+                              Em breve
+                            </span>
+                          )}
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
