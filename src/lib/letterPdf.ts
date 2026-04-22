@@ -575,17 +575,47 @@ function drawDreTable(
   lines: { label: string; value: number | null }[],
   monthLabel: string,
 ) {
-  type Group = { label: string; rx: RegExp[]; emphasis?: boolean };
-  const groups: Group[] = [
-    { label: "Receita Bruta Total", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i] },
-    { label: "(–) Deduções", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es/i, /^total\s+de\s+dedu/i] },
-    { label: "(=) Receita Líquida", rx: [/^\(?=\)?\s*receita\s+l[íi]quida/i, /^receita\s+l[íi]quida\s+total/i] },
-    { label: "(–) Despesas Fixas", rx: [/^\(?\-?\)?\s*despesas?\s+fixas?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+fixas?/i] },
-    { label: "(–) Despesas Variáveis", rx: [/^\(?\-?\)?\s*despesas?\s+vari[áa]veis?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+vari[áa]veis?/i] },
-    { label: "(=) GOP / Resultado Operacional", rx: [/^\(?=\)?\s*resultado\s+operacional\s+bruto/i, /\bgop\b/i], emphasis: true },
-    { label: "EBITDA", rx: [/ebitda/i] },
-    { label: "(=) Lucro Líquido", rx: [/^\(?=\)?\s*lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i], emphasis: true },
-    { label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i], emphasis: true },
+  type Row =
+    | { kind: "section"; label: string }
+    | { kind: "item"; label: string; rx: RegExp[] }
+    | { kind: "total"; label: string; rx: RegExp[] }
+    | { kind: "highlight"; label: string; rx: RegExp[] };
+
+  const rows: Row[] = [
+    { kind: "section", label: "RECEITAS" },
+    { kind: "item", label: "Receita Bruta de Serviços", rx: [/receita\s+bruta\s+(de\s+)?servi[çc]os/i, /^receita\s+(de\s+)?hospedagem/i] },
+    { kind: "item", label: "Receita Bruta A&B", rx: [/^receita\s+bruta\s+a&b/i, /^receita\s+(de\s+)?a&b/i, /alimentos?\s+e\s+bebidas?/i] },
+    { kind: "item", label: "Receita Financeira Líquida", rx: [/receita\s+financeira/i] },
+    { kind: "item", label: "Outras Receitas", rx: [/^outras\s+receitas/i] },
+    { kind: "total", label: "RECEITA BRUTA TOTAL", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i, /^receita\s+total\s+bruta/i] },
+    { kind: "item", label: "(–) Impostos s/ vendas e serviços", rx: [/impostos?\s+s\/?\s*vendas/i, /impostos?\s+sobre\s+(vendas|servi)/i] },
+    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
+    { kind: "total", label: "RECEITA LÍQUIDA TOTAL", rx: [/^receita\s+l[íi]quida\s+total/i, /^receita\s+total\s+l[íi]quida/i, /^\(?=\)?\s*receita\s+l[íi]quida/i] },
+
+    { kind: "section", label: "DESPESAS FIXAS" },
+    { kind: "item", label: "Despesas com Pessoal", rx: [/despesas?\s+com\s+pessoal/i, /^pessoal/i] },
+    { kind: "item", label: "(–) Custo das Mercadorias Vendidas", rx: [/custo\s+das?\s+mercadorias/i, /^cmv/i] },
+    { kind: "item", label: "Despesas Operacionais", rx: [/despesas?\s+operacionais/i] },
+    { kind: "item", label: "Despesas com Prestadores de Serviços", rx: [/prestadores?\s+de\s+servi[çc]os/i] },
+    { kind: "total", label: "DESPESAS FIXAS TOTAIS", rx: [/^despesas?\s+fixas?\s+totais?/i, /^total\s+de\s+despesas?\s+fixas?/i, /^total\s+despesas?\s+fixas?/i] },
+
+    { kind: "section", label: "DESPESAS VARIÁVEIS" },
+    { kind: "item", label: "Custos de Hospedagem", rx: [/custos?\s+de\s+hospedagem/i] },
+    { kind: "item", label: "Despesas de Utilidades", rx: [/utilidades/i] },
+    { kind: "item", label: "Despesas com Manutenção", rx: [/manuten[çc][ãa]o/i] },
+    { kind: "item", label: "Despesas com Vendas", rx: [/despesas?\s+com\s+vendas/i, /^vendas/i] },
+    { kind: "item", label: "Taxas Accor", rx: [/taxas?\s+accor/i] },
+    { kind: "item", label: "Taxas de Administração", rx: [/taxas?\s+de\s+administra/i, /administra[çc][ãa]o/i] },
+    { kind: "item", label: "Despesas Financeiras", rx: [/despesas?\s+financeiras/i] },
+    { kind: "total", label: "DESPESAS VARIÁVEIS TOTAL", rx: [/^despesas?\s+vari[áa]veis?\s+(totais?|total)/i, /^total\s+de?\s*despesas?\s+vari[áa]veis?/i] },
+    { kind: "total", label: "DESPESAS TOTAIS", rx: [/^despesas?\s+totais$/i, /^total\s+(geral\s+)?(de\s+)?despesas/i, /^total\s+das?\s+despesas/i] },
+
+    { kind: "section", label: "RESULTADO" },
+    { kind: "total", label: "Resultado Operacional Bruto (GOP)", rx: [/resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
+    { kind: "item", label: "Total dos Gastos de Propriedade", rx: [/gastos?\s+de\s+propriedade/i, /total\s+gastos?\s+(de\s+)?propriedade/i] },
+    { kind: "total", label: "Resultado Operacional Líquido", rx: [/resultado\s+operacional\s+l[íi]quido/i] },
+    { kind: "total", label: "Lucro Líquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
+    { kind: "highlight", label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
   ];
 
   const findValue = (rxs: RegExp[]): number | null => {
@@ -596,45 +626,63 @@ function drawDreTable(
     return null;
   };
 
+  const fmtVal = (v: number | null) =>
+    v == null
+      ? "—"
+      : v < 0
+        ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
+        : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
   const x0 = 12, x1 = SIZE - 12;
-  let y = 38;
+  let y = 30;
   // header navy
   doc.setFillColor(NAVY);
-  doc.rect(x0, y, x1 - x0, 8, "F");
+  doc.rect(x0, y, x1 - x0, 7, "F");
   doc.setTextColor("#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("DRE — RESUMO", x0 + 4, y + 5.3);
-  doc.text(monthLabel, x1 - 4, y + 5.3, { align: "right" });
-  y += 8;
+  doc.setFontSize(8.5);
+  doc.text("DEMONSTRATIVO DE RESULTADOS", x0 + 3, y + 4.6);
+  doc.text(monthLabel.toUpperCase(), x1 - 3, y + 4.6, { align: "right" });
+  y += 7;
 
-  doc.setTextColor(TEXT);
-  for (const g of groups) {
-    const v = findValue(g.rx);
-    const rowH = g.emphasis ? 9 : 7.5;
-    if (g.emphasis) {
-      doc.setFillColor("#F4F1EA"); // bege suave para destaque
+  for (const r of rows) {
+    if (r.kind === "section") {
+      const rowH = 5.6;
+      doc.setFillColor("#E5E7EB");
       doc.rect(x0, y, x1 - x0, rowH, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9.5);
+      doc.setFontSize(7.6);
+      doc.setTextColor(NAVY);
+      doc.text(r.label, x0 + 3, y + rowH - 1.6);
+      y += rowH;
+      continue;
+    }
+    const v = findValue(r.rx);
+    const rowH = r.kind === "highlight" ? 6.4 : 5.4;
+    if (r.kind === "highlight") {
+      doc.setFillColor("#FEF3C7"); // amarelo destaque
+      doc.rect(x0, y, x1 - x0, rowH, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.4);
+      doc.setTextColor(NAVY);
+    } else if (r.kind === "total") {
+      doc.setFillColor("#F3F4F6");
+      doc.rect(x0, y, x1 - x0, rowH, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.8);
       doc.setTextColor(NAVY);
     } else {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(7.6);
       doc.setTextColor(TEXT);
       doc.setDrawColor(BORDER);
-      doc.setLineWidth(0.2);
+      doc.setLineWidth(0.15);
       doc.line(x0, y + rowH, x1, y + rowH);
     }
-    doc.text(g.label, x0 + 4, y + rowH - 2.5);
-    const valStr =
-      v == null
-        ? "—"
-        : v < 0
-          ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
-          : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    doc.text(valStr, x1 - 4, y + rowH - 2.5, { align: "right" });
+    doc.text(r.label, x0 + (r.kind === "item" ? 6 : 3), y + rowH - 1.6);
+    doc.text(fmtVal(v), x1 - 3, y + rowH - 1.6, { align: "right" });
     y += rowH;
+    if (y > SIZE - 12) break; // proteção contra overflow
   }
 }
 
