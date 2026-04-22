@@ -207,7 +207,12 @@ export async function parseDreExcel(
     if (!row || row.every((c) => c == null || c === "")) return;
     const label = rowLabel(row);
     if (!label) return;
-    const value = rowValueAt(row, monthCol);
+    let value = rowValueAt(row, monthCol);
+    // CONFINS: "UHs Pool: 280" — extrai o número embutido no rótulo
+    if (value == null) {
+      const m = label.match(/(\d{2,5})\s*$/);
+      if (m) value = Number(m[1]);
+    }
     lines.push({ row: idx + 1, label, value });
     for (const ind of INDICATORS) {
       if (indicators[ind.key]) continue;
