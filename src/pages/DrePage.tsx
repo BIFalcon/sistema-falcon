@@ -13,6 +13,7 @@ import { CommentsThread } from "@/components/closings/CommentsThread";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { DreStageStepper } from "@/components/closings/DreStageStepper";
 import { StatusBadge } from "@/components/closings/StatusBadge";
+import { DreIndicatorsPanel } from "@/components/closings/DreIndicatorsPanel";
 import { MONTHS_PT, STATUS_LABELS } from "@/lib/constants";
 import { ArrowLeft, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -59,7 +60,10 @@ export default function DrePage() {
     }
     try {
       const r = await upload.mutateAsync({ closingId: resolvedId, file, userId: user.id });
-      toast.success(`Versão v${r.version} enviada${r.isFirst ? " (primeira)" : ""}`);
+      toast.success(`Versão v${r.version} enviada — modelo detectado: ${r.template}${r.isFirst ? " (primeira)" : ""}`);
+      if (r.warnings?.length) {
+        toast.warning(`Atenção no parsing: ${r.warnings.join("; ")}`);
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao enviar arquivo");
     }
@@ -125,6 +129,8 @@ export default function DrePage() {
       <Card className="p-5 shadow-soft">
         <DreStageStepper status={closing.status_dre} />
       </Card>
+
+      <DreIndicatorsPanel closingId={closing.id} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* COL 1-2: Upload + versões + ações */}

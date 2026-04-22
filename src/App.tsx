@@ -9,6 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SemPermissaoPage from "./pages/SemPermissaoPage";
 import DrePage from "./pages/DrePage";
+import CartaPage from "./pages/CartaPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route element={<ProtectedLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/dre" element={<DrePage />} />
+              <Route path="/carta" element={<CartaPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
