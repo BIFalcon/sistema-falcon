@@ -108,20 +108,19 @@ function drawPageHeader(
   brandLogo: string | null,
 ) {
   // logos esquerda/direita — PNG preserva transparência
-  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 28, 14, undefined, "FAST");
-  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 28, 10, 28, 14, undefined, "FAST");
-  // título central
+  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 26, 13, undefined, "FAST");
+  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 26, 10, 26, 13, undefined, "FAST");
+  // título central (sem charSpace para alinhar perfeitamente com a régua dourada)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(NAVY);
   const titleUpper = title.toUpperCase();
-  doc.text(titleUpper, SIZE / 2, 18, { align: "center", charSpace: 1.2 });
-  // sublinhado dourado — mesma largura do título (incluindo charSpace ≈ 1.2pt extra por char)
+  doc.text(titleUpper, SIZE / 2, 18, { align: "center" });
+  // sublinhado dourado centralizado, exatamente da largura do título
   doc.setDrawColor(GOLD);
   doc.setLineWidth(1.2);
-  const charSpaceMm = (1.2 / 2.83465) * Math.max(0, titleUpper.length - 1);
-  const tw = doc.getTextWidth(titleUpper) + charSpaceMm;
-  doc.line(SIZE / 2 - tw / 2, 22, SIZE / 2 + tw / 2, 22);
+  const tw = doc.getTextWidth(titleUpper);
+  doc.line(SIZE / 2 - tw / 2, 21.4, SIZE / 2 + tw / 2, 21.4);
 }
 
 /* ───────────────── Gráficos via Canvas 2D ───────────────── */
