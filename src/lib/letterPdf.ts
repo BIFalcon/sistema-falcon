@@ -341,6 +341,7 @@ function drawLineChart(
 export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const {
     letter, closing, hotel, hotelCoverUrl, brandLogoUrl, falconLogoUrl, highlights,
+    previousIndicators = {},
   } = input;
 
   // resolve URLs assinadas das fotos dos destaques (se vierem como path)
@@ -364,6 +365,19 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
+
+  // Lógica de exibição dos meses:
+  //  - Mostrar pelo menos Jan..Jun (6 meses) e até o mês corrente quando passar de Jun.
+  //  - Série Realizado é truncada após o mês corrente (linha/barra para no último valor).
+  //  - Série Ano Anterior mantém todos os meses no intervalo visível.
+  const visibleMonths = Math.max(6, closing.month);
+  const trimmedCurrent = history.current.slice(0, visibleMonths).map((d) => ({
+    ...d,
+    ocupacao: d.month <= closing.month ? d.ocupacao : null,
+    adr: d.month <= closing.month ? d.adr : null,
+    receita_bruta_total: d.month <= closing.month ? d.receita_bruta_total : null,
+  }));
+  const trimmedPrevious = history.previous.slice(0, visibleMonths);
 
   // Linhas DRE para a tabela
   const dreLines = await fetchDreLines(closing.id);
