@@ -40,35 +40,56 @@ export interface ParsedDre {
   template: DreTemplate;
   sheetUsed: string;
   indicators: Record<IndicatorKey, IndicatorHit | null>;
-  // todas as linhas significativas (rótulo + valor mais à direita) — útil para storage
   lines: { row: number; label: string; value: number | null }[];
   warnings: string[];
+  monthColumnIndex: number | null;
+  monthHeaderLabel: string | null;
 }
 
-const INDICATORS: { key: IndicatorKey; rx: RegExp }[] = [
-  { key: "ocupacao", rx: /taxa\s+de\s+ocupa/i },
-  { key: "adr", rx: /di[áa]ria\s+m[ée]dia(?!\s+l[íi]quida)/i },
-  { key: "revpar", rx: /revpar/i },
-  { key: "roomnights", rx: /^roomnights$|apartamentos\s+ocupados|^room\s*nights?$/i },
-  { key: "uhs_total", rx: /^n[úu]mero\s+de\s+apartamentos$|^uhs?\s+pool/i },
-  { key: "uhs_disponiveis", rx: /n[úu]mero\s+de\s+apartamentos\s+dispon|uhs?\s+dispon/i },
-  { key: "receita_hospedagem", rx: /^receita\s+(de\s+)?(bruta\s+)?(de\s+)?hospedagem/i },
-  { key: "receita_ab", rx: /receita\s+bruta\s+a&b|receitas?\s+(de\s+)?alimentos?\s+e\s+bebidas?|^receita\s+a&b/i },
-  { key: "receita_bruta_total", rx: /receita\s+(total\s+)?bruta(\s+total)?$|^receita\s+bruta\s+total$/i },
-  { key: "receita_liquida_total", rx: /receita\s+(total\s+)?l[íi]quida(\s+total)?|receita\s+l[íi]quida\s+total/i },
-  { key: "gop", rx: /\bgop\b|resultado\s+operacional\s+bruto/i },
-  { key: "ebitda", rx: /ebitda/i },
-  { key: "lucro_liquido", rx: /lucro\s+l[íi]quido|resultado\s+l[íi]quido(\s+do\s+exerc)?/i },
+/**
+ * Indicadores em ordem de prioridade. Cada indicador tem um conjunto de regex
+ * para tentar bater com o rótulo da linha (mais à esquerda da linha).
+ * Os regex foram construídos a partir das planilhas reais dos 4 modelos.
+ */
+const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
+  { key: "uhs_total", rx: [/^n[úu]mero\s+de\s+apartamentos$/i, /^n[úu]mero\s+de\s+apartamentos\s+no/i, /^uhs?\s+pool/i] },
+  { key: "uhs_disponiveis", rx: [/n[úu]mero\s+de\s+apartamentos\s+dispon/i, /^apartamentos\s+dispon[íi]veis/i, /uhs?\s+dispon/i] },
+  { key: "roomnights", rx: [/^roomnights$/i, /^room\s*nights?$/i, /^apartamentos\s+ocupados/i] },
+  { key: "ocupacao", rx: [/taxa\s+de\s+ocupa/i] },
+  { key: "adr", rx: [/^di[áa]ria\s+m[ée]dia\s+bruta/i, /^di[áa]ria\s+m[ée]dia(\s+\(em\s+r\$\))?$/i, /^di[áa]ria\s+m[ée]dia(?!\s+l[íi]quida)/i] },
+  { key: "revpar", rx: [/^revpar\s+total/i, /^revpar\s+hospedagem/i, /^revpar(\s+\(em\s+r\$\))?$/i, /revpar/i] },
+  { key: "receita_hospedagem", rx: [/^receita\s+(de\s+)?hospedagem/i] },
+  { key: "receita_ab", rx: [/^receita\s+(bruta\s+)?a&b/i, /^receita\s+de\s+a&b/i, /^receitas?\s+(de\s+)?alimentos?\s+e\s+bebidas?/i] },
+  { key: "receita_bruta_total", rx: [/^receita\s+bruta\s+total/i, /^receita\s+total\s+bruta/i, /^total\s+das?\s+receitas?\s+brutas?/i] },
+  { key: "receita_liquida_total", rx: [/^receita\s+l[íi]quida\s+total/i, /^receita\s+total\s+l[íi]quida/i, /^\(=\)\s*receita\s+l[íi]quida/i, /^receita\s+l[íi]quida(?:\s|$)/i] },
+  { key: "gop", rx: [/^resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
+  { key: "ebitda", rx: [/ebitda/i] },
+  { key: "lucro_liquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido\s+do\s+exerc/i, /^resultado\s+l[íi]quido/i] },
 ];
 
+/**
+ * Identifica o template a partir das abas existentes.
+ * Mapeamento validado com planilhas reais (Modelo_-_Demais, Modelo_Mercure,
+ * Modelo_Manhattan, Modelo_Confins).
+ */
 function detectTemplate(sheetNames: string[]): DreTemplate {
-  const has = (s: string) => sheetNames.some((n) => n.toLowerCase().includes(s));
-  if (has("pool - dre colunado") || has("pool - balanço") || has("rds")) return "MERCURE";
-  if (has("painel pool") || has("dre_mensal_aeb") || has("painel condom")) return "MANHATTAN";
-  if (has("irpj.csll") || has("ajuste julho 2023") || has("lucro presumido")) return "CONFINS";
+  const lower = sheetNames.map((n) => n.toLowerCase());
+  const has = (s: string) => lower.some((n) => n.includes(s));
+  // MANHATTAN: aba "DRE COLUNADO POOL" + várias abas com sufixos _COND/_POOL
+  if (has("dre colunado pool") || has("dre_colunado_cond") || has("painel pool")) return "MANHATTAN";
+  // MERCURE: aba "POOL - DRE COLUNADO"
+  if (has("pool - dre colunado") || has("pool - balanço patrimonial")) return "MERCURE";
+  // CONFINS: muitas abas "Ajuste <mês>" + "Lucro Presumido"
+  const ajusteCount = lower.filter((n) => n.startsWith("ajuste ")).length;
+  if (ajusteCount >= 5 || has("lucro presumido") || has("irpj.csll.l.presumido")) return "CONFINS";
   return "DEFAULT";
 }
 
+/**
+ * Seleciona a aba que contém a DRE colunada com indicadores e valores mensais.
+ * SEMPRE prefere a aba "crua" (não "Carta DRE") porque ela tem os números
+ * mensais nas colunas, enquanto "Carta DRE" agrega trimestres / acumulados.
+ */
 function pickSheet(wb: XLSX.WorkBook, template: DreTemplate): string {
   const names = wb.SheetNames;
   const lower = names.map((n) => n.toLowerCase());
@@ -76,51 +97,93 @@ function pickSheet(wb: XLSX.WorkBook, template: DreTemplate): string {
     const i = lower.findIndex(test);
     return i >= 0 ? names[i] : null;
   };
-  if (template === "MERCURE") return find((n) => n.includes("carta dre")) ?? find((n) => n.includes("dre")) ?? names[0];
-  if (template === "MANHATTAN") return find((n) => n.includes("cartas dre")) ?? find((n) => n === "dre" || n.includes("dre colunado pool")) ?? names[0];
-  if (template === "CONFINS") return find((n) => n === "dre") ?? find((n) => n.includes("dre")) ?? names[0];
-  // DEFAULT: prefere "Carta DRE" (mais limpa) senão "DRE"
-  return find((n) => n.includes("carta dre")) ?? find((n) => n === "dre") ?? find((n) => n.includes("dre")) ?? names[0];
+  if (template === "MANHATTAN") {
+    return find((n) => n === "dre colunado pool") ?? find((n) => n.includes("dre colunado pool")) ?? find((n) => n === "dre") ?? names[0];
+  }
+  if (template === "MERCURE") {
+    return find((n) => n === "pool - dre colunado") ?? find((n) => n.includes("dre colunado")) ?? names[0];
+  }
+  if (template === "CONFINS") {
+    return find((n) => n === "dre") ?? find((n) => n.includes("dre") && !n.includes("old") && !n.includes("carta")) ?? names[0];
+  }
+  // DEFAULT: aba "DRE" (não "DRE (3)" nem "Carta DRE")
+  return find((n) => n === "dre") ?? find((n) => n.includes("dre") && !n.includes("(") && !n.includes("carta")) ?? names[0];
 }
 
-function rowToValues(row: unknown[]): { label: string | null; value: number | null } {
-  let label: string | null = null;
-  let value: number | null = null;
-  // label = primeira string não-vazia
-  for (const cell of row) {
-    if (typeof cell === "string" && cell.trim().length > 0) {
-      label = cell.trim();
-      break;
-    }
-  }
-  // value = último número finito da linha
-  for (let i = row.length - 1; i >= 0; i--) {
-    const c = row[i];
-    if (typeof c === "number" && Number.isFinite(c) && c !== 0) {
-      value = c;
-      break;
-    }
-  }
-  // se todos forem zero, devolve 0
-  if (value == null) {
-    for (let i = row.length - 1; i >= 0; i--) {
-      if (typeof row[i] === "number") {
-        value = row[i] as number;
-        break;
+/** Nomes dos meses em PT-BR para detectar o cabeçalho de meses. */
+const MONTH_NAMES = [
+  "janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
+/**
+ * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
+ * coluna correspondente ao mês alvo (1=Jan ... 12=Dez), além do label.
+ */
+function findMonthColumn(
+  rows: unknown[][],
+  targetMonth: number,
+): { headerRow: number; colIndex: number; label: string } | null {
+  const targetName = MONTH_NAMES[targetMonth === 3 ? 2 : targetMonth - 1] ?? "";
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === "string") {
+        const norm = cell.trim().toLowerCase();
+        if (norm === targetName || norm.startsWith(targetName)) {
+          return { headerRow: r, colIndex: c, label: cell.trim() };
+        }
+      }
+      // CONFINS: cabeçalho com Date object (ex.: 2026-01-01)
+      if (cell instanceof Date) {
+        if (cell.getMonth() + 1 === targetMonth) {
+          return { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
+        }
       }
     }
   }
-  return { label, value };
+  return null;
 }
 
-export async function parseDreExcel(file: File): Promise<ParsedDre> {
+/** Extrai label da linha (primeira string não-vazia). */
+function rowLabel(row: unknown[]): string | null {
+  for (const cell of row) {
+    if (typeof cell === "string" && cell.trim().length > 0) return cell.trim();
+  }
+  return null;
+}
+
+/**
+ * Retorna o valor da linha para uma coluna específica. Se a coluna estiver
+ * vazia, faz fallback para o último número finito não-zero da linha.
+ */
+function rowValueAt(row: unknown[], colIndex: number | null): number | null {
+  if (colIndex != null) {
+    const c = row[colIndex];
+    if (typeof c === "number" && Number.isFinite(c)) return c;
+  }
+  for (let i = row.length - 1; i >= 0; i--) {
+    const c = row[i];
+    if (typeof c === "number" && Number.isFinite(c) && c !== 0) return c;
+  }
+  return null;
+}
+
+export async function parseDreExcel(
+  file: File,
+  opts: { targetMonth?: number } = {},
+): Promise<ParsedDre> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: false });
+  // cellDates: true para que CONFINS (datas no header) gere objetos Date
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
   const template = detectTemplate(wb.SheetNames);
   const sheetName = pickSheet(wb, template);
   const ws = wb.Sheets[sheetName];
   if (!ws) throw new Error(`Aba não encontrada (${sheetName})`);
-  const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: null });
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+    header: 1, blankrows: false, defval: null, raw: true,
+  });
 
   const indicators: Record<IndicatorKey, IndicatorHit | null> = {
     ocupacao: null, adr: null, revpar: null, roomnights: null,
@@ -132,25 +195,42 @@ export async function parseDreExcel(file: File): Promise<ParsedDre> {
   const lines: ParsedDre["lines"] = [];
   const warnings: string[] = [];
 
+  // Localiza a coluna do mês alvo. Se não informado, último mês com dado é usado (fallback).
+  const targetMonth = opts.targetMonth;
+  const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth) : null;
+  const monthCol = monthInfo?.colIndex ?? null;
+  if (targetMonth && !monthInfo) {
+    warnings.push(`Coluna do mês ${targetMonth} não localizada no cabeçalho — usando fallback.`);
+  }
+
   rows.forEach((row, idx) => {
     if (!row || row.every((c) => c == null || c === "")) return;
-    const { label, value } = rowToValues(row);
+    const label = rowLabel(row);
     if (!label) return;
+    const value = rowValueAt(row, monthCol);
     lines.push({ row: idx + 1, label, value });
     for (const ind of INDICATORS) {
       if (indicators[ind.key]) continue;
-      if (ind.rx.test(label)) {
+      if (ind.rx.some((rx) => rx.test(label))) {
         indicators[ind.key] = { key: ind.key, label, value, row: idx + 1, sheet: sheetName };
       }
     }
   });
 
-  // sanity warnings
-  if (!indicators.gop) warnings.push("GOP não localizado.");
+  if (!indicators.gop) warnings.push("GOP / Resultado Operacional Bruto não localizado.");
   if (!indicators.receita_bruta_total) warnings.push("Receita Bruta Total não localizada.");
   if (!indicators.ocupacao) warnings.push("Taxa de Ocupação não localizada.");
+  if (!indicators.lucro_liquido) warnings.push("Lucro Líquido não localizado.");
 
-  return { template, sheetUsed: sheetName, indicators, lines, warnings };
+  return {
+    template,
+    sheetUsed: sheetName,
+    indicators,
+    lines,
+    warnings,
+    monthColumnIndex: monthCol,
+    monthHeaderLabel: monthInfo?.label ?? null,
+  };
 }
 
 export const INDICATOR_LABELS: Record<IndicatorKey, string> = {
