@@ -4,12 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 export interface InvestorLetter {
   id: string;
   closing_id: string;
+  // Campos legados (mantidos no banco, ocultos na UI)
   highlight_market: string | null;
   highlight_operations: string | null;
   highlight_revenue: string | null;
   highlight_costs: string | null;
   highlight_outlook: string | null;
   custom_notes: string | null;
+  // Novos campos
+  reserve_fund: number | null;
+  rps_score: number | null;
+  operational_comment: string | null;
+  last_ai_instruction: string | null;
+  ai_version_number: number;
+  // IA
   ai_intro: string | null;
   ai_market_context: string | null;
   ai_operational: string | null;
@@ -18,12 +26,43 @@ export interface InvestorLetter {
   ai_closing: string | null;
   ai_model: string | null;
   ai_generated_at: string | null;
+  // PDF
   pdf_url: string | null;
   pdf_generated_at: string | null;
   pdf_version: number;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface LetterHighlight {
+  id: string;
+  letter_id: string;
+  closing_id: string;
+  title: string;
+  note: string | null;
+  photo_url: string | null;
+  sort_order: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LetterVersion {
+  id: string;
+  letter_id: string;
+  closing_id: string;
+  version_number: number;
+  ai_intro: string | null;
+  ai_market_context: string | null;
+  ai_operational: string | null;
+  ai_financial: string | null;
+  ai_outlook: string | null;
+  ai_closing: string | null;
+  ai_model: string | null;
+  instruction: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export function useLetter(closingId: string | null | undefined) {
@@ -81,20 +120,143 @@ export function useUpdateLetter() {
   });
 }
 
+/* ─────────── Destaques ─────────── */
+
+export function useLetterHighlights(letterId: string | null | undefined) {
+  return useQuery({
+    enabled: !!letterId,
+    queryKey: ["letter-highlights", letterId],
+    queryFn: async (): Promise<LetterHighlight[]> => {
+      if (!letterId) return [];
+      const { data, error } = await supabase
+        .from("letter_highlights")
+        .select("*")
+        .eq("letter_id", letterId)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as LetterHighlight[];
+    },
+  });
+}
+
+export function useCreateHighlight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      letterId: string;
+      closingId: string;
+      userId: string;
+      title: string;
+      note?: string | null;
+      photo_url?: string | null;
+      sort_order: number;
+    }) => {
+      const { data, error } = await supabase
+        .from("letter_highlights")
+        .insert({
+          letter_id: input.letterId,
+          closing_id: input.closingId,
+          created_by: input.userId,
+          title: input.title,
+          note: input.note ?? null,
+          photo_url: input.photo_url ?? null,
+          sort_order: input.sort_order,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as LetterHighlight;
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["letter-highlights", v.letterId] }),
+  });
+}
+
+export function useUpdateHighlight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; letterId: string; patch: Partial<LetterHighlight> }) => {
+      const { error } = await supabase
+        .from("letter_highlights")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(input.patch as any)
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["letter-highlights", v.letterId] }),
+  });
+}
+
+export function useDeleteHighlight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; letterId: string; photo_url: string | null }) => {
+      if (input.photo_url) {
+        await supabase.storage.from("letter-highlights").remove([input.photo_url]).catch(() => {});
+      }
+      const { error } = await supabase.from("letter_highlights").delete().eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["letter-highlights", v.letterId] }),
+  });
+}
+
+export async function uploadHighlightPhoto(closingId: string, file: File): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `${closingId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("letter-highlights")
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function getHighlightPhotoUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from("letter-highlights").createSignedUrl(path, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+/* ─────────── Versões IA ─────────── */
+
+export function useLetterVersions(letterId: string | null | undefined) {
+  return useQuery({
+    enabled: !!letterId,
+    queryKey: ["letter-versions", letterId],
+    queryFn: async (): Promise<LetterVersion[]> => {
+      if (!letterId) return [];
+      const { data, error } = await supabase
+        .from("letter_versions")
+        .select("*")
+        .eq("letter_id", letterId)
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as LetterVersion[];
+    },
+  });
+}
+
 /**
- * Chama edge function que usa Lovable AI para gerar a narrativa da carta.
+ * Chama edge function que usa Lovable AI para (re)gerar a narrativa.
+ * Aceita instrução adicional opcional para regeneração com comentário.
  */
 export function useGenerateLetterAi() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { closingId: string; letterId: string }) => {
+    mutationFn: async (input: { closingId: string; letterId: string; instruction?: string }) => {
       const { data, error } = await supabase.functions.invoke("generate-letter", {
-        body: { closing_id: input.closingId, letter_id: input.letterId },
+        body: {
+          closing_id: input.closingId,
+          letter_id: input.letterId,
+          instruction: input.instruction ?? null,
+        },
       });
       if (error) throw error;
-      return data as { ok: boolean; model: string };
+      return data as { ok: boolean; model: string; version: number };
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["letter", v.closingId] }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["letter", v.closingId] });
+      qc.invalidateQueries({ queryKey: ["letter-versions", v.letterId] });
+    },
   });
 }
 
