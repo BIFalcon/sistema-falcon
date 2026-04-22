@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeFileName } from "@/lib/constants";
+import { parseDreExcel } from "@/lib/dreParser";
 
 export interface DreVersion {
   id: string;
@@ -67,6 +68,37 @@ export function useUploadDre() {
       });
       if (insErr) throw insErr;
 
+      // Parse Excel client-side e persiste linhas/indicadores
+      let parseWarnings: string[] = [];
+      let template = "DEFAULT";
+      try {
+        const parsed = await parseDreExcel(file);
+        template = parsed.template;
+        parseWarnings = parsed.warnings;
+        // Persist key indicators + raw lines (limita a 200 linhas para não estourar)
+        const indicatorRows = Object.values(parsed.indicators)
+          .filter((i): i is NonNullable<typeof i> => !!i)
+          .map((i) => ({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[${i.key}] ${i.label}`,
+            line_type: "indicator",
+            line_value: i.value,
+          }));
+        const otherRows = parsed.lines.slice(0, 200).map((l) => ({
+          closing_id: closingId,
+          version_number: nextVersion,
+          line_label: l.label,
+          line_type: "line",
+          line_value: l.value,
+        }));
+        if (indicatorRows.length || otherRows.length) {
+          await supabase.from("dre_parsed_lines").insert([...indicatorRows, ...otherRows]);
+        }
+      } catch (parseErr) {
+        parseWarnings.push(parseErr instanceof Error ? parseErr.message : "Falha no parsing");
+      }
+
       // Avança status se ainda estava nao_iniciado
       const { data: c } = await supabase
         .from("closings")
@@ -81,12 +113,41 @@ export function useUploadDre() {
           .eq("id", closingId);
       }
 
-      return { version: nextVersion, isFirst };
+      return { version: nextVersion, isFirst, template, warnings: parseWarnings };
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["dre-versions", vars.closingId] });
       qc.invalidateQueries({ queryKey: ["closing", vars.closingId] });
       qc.invalidateQueries({ queryKey: ["closings"] });
+      qc.invalidateQueries({ queryKey: ["dre-indicators", vars.closingId] });
+    },
+  });
+}
+
+/**
+ * Lê os indicadores parseados da última versão do DRE.
+ */
+export interface DreIndicatorRow {
+  line_label: string;
+  line_value: number | null;
+  version_number: number;
+}
+export function useDreIndicators(closingId: string | null | undefined) {
+  return useQuery({
+    enabled: !!closingId,
+    queryKey: ["dre-indicators", closingId],
+    queryFn: async (): Promise<DreIndicatorRow[]> => {
+      if (!closingId) return [];
+      const { data, error } = await supabase
+        .from("dre_parsed_lines")
+        .select("line_label, line_value, version_number, line_type")
+        .eq("closing_id", closingId)
+        .eq("line_type", "indicator")
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      // mantém só a versão mais recente
+      const top = data?.[0]?.version_number;
+      return ((data ?? []).filter((r) => r.version_number === top)) as DreIndicatorRow[];
     },
   });
 }
