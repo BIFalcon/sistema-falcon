@@ -58,8 +58,33 @@ Deno.serve(async (req) => {
 
     const top = indicators.data?.[0]?.version_number;
     const inds = (indicators.data ?? []).filter((r) => r.version_number === top);
-    const indicatorText = inds.map((i) => `- ${i.line_label}: ${i.line_value}`).join("\n")
-      || "Indicadores não disponíveis";
+    // Separa correntes ([key]) de previous ([prev_key]) e ignora séries mensais
+    type Row = { line_label: string; line_value: number | null };
+    const cur = new Map<string, Row>();
+    const prev = new Map<string, Row>();
+    for (const r of inds as Row[]) {
+      if (r.line_label.startsWith("[series_")) continue;
+      const mp = /^\[prev_(\w+)\]/.exec(r.line_label);
+      if (mp) { prev.set(mp[1], r); continue; }
+      const m = /^\[(\w+)\]/.exec(r.line_label);
+      if (m) cur.set(m[1], r);
+    }
+    const fmt = (v: number | null) => v == null ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+    const pct = (a: number | null, b: number | null) => {
+      if (a == null || b == null || b === 0) return "—";
+      const v = ((a - b) / Math.abs(b)) * 100;
+      const sign = v >= 0 ? "+" : "";
+      return `${sign}${v.toFixed(1)}%`;
+    };
+    const compRows: string[] = [];
+    for (const [k, r] of cur) {
+      const p = prev.get(k);
+      const lbl = r.line_label.replace(/^\[\w+\]\s*/, "").trim();
+      compRows.push(
+        `- ${lbl}: ${fmt(r.line_value)} | Ano anterior: ${fmt(p?.line_value ?? null)} | Variação: ${pct(r.line_value, p?.line_value ?? null)}`,
+      );
+    }
+    const indicatorText = compRows.join("\n") || "Indicadores não disponíveis";
 
     const months = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     const monthName = months[(closing.data.month ?? 1) - 1];
@@ -72,16 +97,17 @@ Deno.serve(async (req) => {
     const rps = letter.data.rps_score != null ? String(letter.data.rps_score) : "—";
 
     const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}).
-Escreva em português do Brasil, tom executivo, sóbrio e SUCINTO, voltado a investidores.
+Escreva em português do Brasil, tom executivo, sóbrio, direto e SUCINTO, voltado a investidores.
 
-REGRAS DE CONTEÚDO (IMPORTANTES):
-- Os Comentários do Mês na Carta TÊM NO MÁXIMO 3 PARÁGRAFOS CURTOS (2 a 4 frases cada).
-- NÃO repita números (ocupação, ADR, RevPAR, receita, fundo de reserva, RPS) que já aparecem nos slides de Indicadores — eles são exibidos em cards/gráficos.
-- Foque em: contexto operacional do mês (eventos, mercado, sazonalidade, ações da gestão) e perspectivas para os próximos meses.
-- Sem markdown, sem listas, sem títulos.
+REGRAS DE CONTEÚDO (OBRIGATÓRIAS):
+- Devolva no MÁXIMO 3 parágrafos curtos (2 a 4 frases cada). intro/operational/outlook.
+- O parágrafo "operational" DEVE OBRIGATORIAMENTE incluir comparativos entre o mês atual e o mesmo mês do ano anterior para: Receita Bruta Total, Diária Média (ADR), Taxa de Ocupação e RevPAR — citando o valor absoluto do mês atual e a variação percentual entre parênteses (ex.: "Receita Bruta de R$ 540 mil (+12,4%) frente ao mesmo mês do ano anterior").
+- NÃO repita os mesmos números sem adicionar contexto/análise: explique brevemente o que motivou a variação (eventos, sazonalidade, mix, ações da gestão).
+- O parágrafo "intro" abre o mês com contexto curto. O parágrafo "outlook" traz perspectivas para os próximos meses.
+- Sem markdown, sem listas, sem títulos, sem emojis.
 
 Devolva ESTRITAMENTE um JSON válido com as chaves: intro, market_context, operational, financial, outlook, closing.
-Cada valor é um parágrafo curto (2 a 4 frases). intro/operational/outlook são os 3 parágrafos principais; market_context, financial e closing podem ser strings vazias se não houver conteúdo qualitativo relevante além do que já está nos indicadores.`;
+Use intro, operational e outlook como os 3 parágrafos principais. market_context, financial e closing devem ser strings vazias.`;
 
     let userPrompt = `Período: ${monthName} de ${closing.data.year}.
 

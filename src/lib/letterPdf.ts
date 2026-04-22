@@ -38,6 +38,8 @@ export interface LetterPdfInput {
   falconLogoUrl: string | null;
   highlights: LetterHighlight[];
   indicators: Partial<Record<IndicatorKey, number | null>>;
+  /** Indicadores do mesmo mês do ano anterior (lidos da aba "ANO ANTERIOR"). */
+  previousIndicators?: Partial<Record<IndicatorKey, number | null>>;
 }
 
 /* ───────────────── Utilidades de carregamento ───────────────── */
@@ -106,20 +108,19 @@ function drawPageHeader(
   brandLogo: string | null,
 ) {
   // logos esquerda/direita — PNG preserva transparência
-  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 28, 14, undefined, "FAST");
-  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 28, 10, 28, 14, undefined, "FAST");
-  // título central
+  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 26, 13, undefined, "FAST");
+  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 26, 10, 26, 13, undefined, "FAST");
+  // título central (sem charSpace para alinhar perfeitamente com a régua dourada)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(NAVY);
   const titleUpper = title.toUpperCase();
-  doc.text(titleUpper, SIZE / 2, 18, { align: "center", charSpace: 1.2 });
-  // sublinhado dourado — mesma largura do título (incluindo charSpace ≈ 1.2pt extra por char)
+  doc.text(titleUpper, SIZE / 2, 18, { align: "center" });
+  // sublinhado dourado centralizado, exatamente da largura do título
   doc.setDrawColor(GOLD);
   doc.setLineWidth(1.2);
-  const charSpaceMm = (1.2 / 2.83465) * Math.max(0, titleUpper.length - 1);
-  const tw = doc.getTextWidth(titleUpper) + charSpaceMm;
-  doc.line(SIZE / 2 - tw / 2, 22, SIZE / 2 + tw / 2, 22);
+  const tw = doc.getTextWidth(titleUpper);
+  doc.line(SIZE / 2 - tw / 2, 21.4, SIZE / 2 + tw / 2, 21.4);
 }
 
 /* ───────────────── Gráficos via Canvas 2D ───────────────── */
@@ -340,6 +341,7 @@ function drawLineChart(
 export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const {
     letter, closing, hotel, hotelCoverUrl, brandLogoUrl, falconLogoUrl, highlights,
+    previousIndicators = {},
   } = input;
 
   // resolve URLs assinadas das fotos dos destaques (se vierem como path)
@@ -363,6 +365,19 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
+
+  // Lógica de exibição dos meses:
+  //  - Mostrar pelo menos Jan..Jun (6 meses) e até o mês corrente quando passar de Jun.
+  //  - Série Realizado é truncada após o mês corrente (linha/barra para no último valor).
+  //  - Série Ano Anterior mantém todos os meses no intervalo visível.
+  const visibleMonths = Math.max(6, closing.month);
+  const trimmedCurrent = history.current.slice(0, visibleMonths).map((d) => ({
+    ...d,
+    ocupacao: d.month <= closing.month ? d.ocupacao : null,
+    adr: d.month <= closing.month ? d.adr : null,
+    receita_bruta_total: d.month <= closing.month ? d.receita_bruta_total : null,
+  }));
+  const trimmedPrevious = history.previous.slice(0, visibleMonths);
 
   // Linhas DRE para a tabela
   const dreLines = await fetchDreLines(closing.id);
@@ -401,12 +416,12 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   doc.roundedRect(12, card1Y, cardW, cardH, 2, 2, "S");
-  const occChart = drawBarChart("Taxa de Ocupação", history.current, history.previous, "ocupacao", (v) => `${Math.round(v)}%`, { w: cardW - 6, h: cardH - 6 });
+  const occChart = drawBarChart("Taxa de Ocupação", trimmedCurrent, trimmedPrevious, "ocupacao", (v) => `${Math.round(v)}%`, { w: cardW - 6, h: cardH - 6 });
   doc.addImage(occChart, "PNG", 15, card1Y + 3, cardW - 6, cardH - 6);
 
   const card2Y = card1Y + cardH + 6;
   doc.roundedRect(12, card2Y, cardW, cardH, 2, 2, "S");
-  const adrChart = drawLineChart("Diária Média", history.current, history.previous, "adr", (v) => `R$ ${Math.round(v)}`, { w: cardW - 6, h: cardH - 6 });
+  const adrChart = drawLineChart("Diária Média", trimmedCurrent, trimmedPrevious, "adr", (v) => `R$ ${Math.round(v)}`, { w: cardW - 6, h: cardH - 6 });
   doc.addImage(adrChart, "PNG", 15, card2Y + 3, cardW - 6, cardH - 6);
 
   /* ───── 3. INDICADORES — Receita Bruta + Cards ───── */
@@ -415,41 +430,48 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   const recH = 88;
   doc.roundedRect(12, 30, cardW, recH, 2, 2, "S");
-  const recChart = drawLineChart("Receita Total Bruta", history.current, history.previous, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
+  const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
   doc.addImage(recChart, "PNG", 15, 33, cardW - 6, recH - 6);
 
-  // dois cards lado a lado
+  // dois cards lado a lado — borda na MESMA cor do gráfico (BORDER cinza claro)
   const cw = (SIZE - 30) / 2, ch = 64, cy = 30 + recH + 8;
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.4);
   // Fundo de Reserva
   doc.roundedRect(12, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(13);
-  doc.text("Fundo de Reserva", 12 + cw / 2, cy + 14, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 32, { align: "center" });
-  // ícone $ em círculo
+  doc.setFontSize(11);
+  doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
+  // ícone $ em círculo (maior)
   doc.setFillColor(NAVY);
-  doc.circle(12 + cw / 2, cy + 50, 5, "F");
+  doc.circle(12 + cw / 2, cy + 26, 7, "F");
   doc.setTextColor("#FFFFFF");
-  doc.setFontSize(9);
-  doc.text("$", 12 + cw / 2, cy + 51.5, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("$", 12 + cw / 2, cy + 28.4, { align: "center" });
+  // valor (maior)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(NAVY);
+  doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 50, { align: "center" });
 
   // RPS
   const rx = 12 + cw + 6;
+  doc.setDrawColor(BORDER);
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(13);
-  doc.text("RPS", rx + cw / 2, cy + 14, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(11);
+  doc.text("RPS", rx + cw / 2, cy + 12, { align: "center" });
+  // estrela navy maior (manter cor do gráfico, não dourada)
+  doc.setFillColor(NAVY);
+  drawStar(doc, rx + cw / 2, cy + 26, 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(NAVY);
   const rpsTxt = letter.rps_score != null ? `${letter.rps_score}%` : "—";
-  doc.text(rpsTxt, rx + cw / 2, cy + 32, { align: "center" });
-  // estrela dourada (simples)
-  doc.setFillColor(GOLD);
-  drawStar(doc, rx + cw / 2, cy + 50, 4);
+  doc.text(rpsTxt, rx + cw / 2, cy + 50, { align: "center" });
 
   /* ───── 4. COMENTÁRIOS DO MÊS ───── */
   addPage(doc);
@@ -502,12 +524,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   /* ───── 6. DEMONSTRATIVO DE RESULTADOS ───── */
   addPage(doc);
   drawPageHeader(doc, "Demonstrativo de Resultados", falconData, brandData);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED);
-  doc.text("RESUMO", SIZE / 2, 28, { align: "center" });
-
-  drawDreTable(doc, dreLines, MONTHS_PT[closing.month - 1]);
+  drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`);
 
   /* ───── 7. ENCERRAMENTO ───── */
   addPage(doc);
@@ -517,17 +534,19 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     doc.setFillColor(NAVY); doc.rect(0, 0, SIZE, 138, "F");
   }
   doc.setFillColor("#FFFFFF"); doc.rect(0, 138, SIZE, SIZE - 138, "F");
+  // Faixa decorativa entre foto e bloco de texto (igual à capa)
+  drawDecorativeStripe(doc, 16, 144, SIZE - 32);
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
-  doc.text("Obrigado!", 16, 156);
+  doc.text("Obrigado!", 16, 160);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(TEXT);
-  doc.text("www.falconhoteis.com.br", 16, 168);
-  doc.text("(31) 3500-5431", 16, 174);
-  doc.text("R. Bernardo Guimarães, 245, B.", 16, 180);
-  doc.text("Funcionários, Belo Horizonte - MG", 16, 186);
+  doc.text("www.falconhoteis.com.br", 16, 170);
+  doc.text("(31) 3500-5431", 16, 176);
+  doc.text("R. Bernardo Guimarães, 245, B.", 16, 182);
+  doc.text("Funcionários, Belo Horizonte - MG", 16, 188);
   if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
   if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
   doc.setFontSize(7);
@@ -551,17 +570,47 @@ function drawDreTable(
   lines: { label: string; value: number | null }[],
   monthLabel: string,
 ) {
-  type Group = { label: string; rx: RegExp[]; emphasis?: boolean };
-  const groups: Group[] = [
-    { label: "Receita Bruta Total", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i] },
-    { label: "(–) Deduções", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es/i, /^total\s+de\s+dedu/i] },
-    { label: "(=) Receita Líquida", rx: [/^\(?=\)?\s*receita\s+l[íi]quida/i, /^receita\s+l[íi]quida\s+total/i] },
-    { label: "(–) Despesas Fixas", rx: [/^\(?\-?\)?\s*despesas?\s+fixas?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+fixas?/i] },
-    { label: "(–) Despesas Variáveis", rx: [/^\(?\-?\)?\s*despesas?\s+vari[áa]veis?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+vari[áa]veis?/i] },
-    { label: "(=) GOP / Resultado Operacional", rx: [/^\(?=\)?\s*resultado\s+operacional\s+bruto/i, /\bgop\b/i], emphasis: true },
-    { label: "EBITDA", rx: [/ebitda/i] },
-    { label: "(=) Lucro Líquido", rx: [/^\(?=\)?\s*lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i], emphasis: true },
-    { label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i], emphasis: true },
+  type Row =
+    | { kind: "section"; label: string }
+    | { kind: "item"; label: string; rx: RegExp[] }
+    | { kind: "total"; label: string; rx: RegExp[] }
+    | { kind: "highlight"; label: string; rx: RegExp[] };
+
+  const rows: Row[] = [
+    { kind: "section", label: "RECEITAS" },
+    { kind: "item", label: "Receita Bruta de Serviços", rx: [/receita\s+bruta\s+(de\s+)?servi[çc]os/i, /^receita\s+(de\s+)?hospedagem/i] },
+    { kind: "item", label: "Receita Bruta A&B", rx: [/^receita\s+bruta\s+a&b/i, /^receita\s+(de\s+)?a&b/i, /alimentos?\s+e\s+bebidas?/i] },
+    { kind: "item", label: "Receita Financeira Líquida", rx: [/receita\s+financeira/i] },
+    { kind: "item", label: "Outras Receitas", rx: [/^outras\s+receitas/i] },
+    { kind: "total", label: "RECEITA BRUTA TOTAL", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i, /^receita\s+total\s+bruta/i] },
+    { kind: "item", label: "(–) Impostos s/ vendas e serviços", rx: [/impostos?\s+s\/?\s*vendas/i, /impostos?\s+sobre\s+(vendas|servi)/i] },
+    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
+    { kind: "total", label: "RECEITA LÍQUIDA TOTAL", rx: [/^receita\s+l[íi]quida\s+total/i, /^receita\s+total\s+l[íi]quida/i, /^\(?=\)?\s*receita\s+l[íi]quida/i] },
+
+    { kind: "section", label: "DESPESAS FIXAS" },
+    { kind: "item", label: "Despesas com Pessoal", rx: [/despesas?\s+com\s+pessoal/i, /^pessoal/i] },
+    { kind: "item", label: "(–) Custo das Mercadorias Vendidas", rx: [/custo\s+das?\s+mercadorias/i, /^cmv/i] },
+    { kind: "item", label: "Despesas Operacionais", rx: [/despesas?\s+operacionais/i] },
+    { kind: "item", label: "Despesas com Prestadores de Serviços", rx: [/prestadores?\s+de\s+servi[çc]os/i] },
+    { kind: "total", label: "DESPESAS FIXAS TOTAIS", rx: [/^despesas?\s+fixas?\s+totais?/i, /^total\s+de\s+despesas?\s+fixas?/i, /^total\s+despesas?\s+fixas?/i] },
+
+    { kind: "section", label: "DESPESAS VARIÁVEIS" },
+    { kind: "item", label: "Custos de Hospedagem", rx: [/custos?\s+de\s+hospedagem/i] },
+    { kind: "item", label: "Despesas de Utilidades", rx: [/utilidades/i] },
+    { kind: "item", label: "Despesas com Manutenção", rx: [/manuten[çc][ãa]o/i] },
+    { kind: "item", label: "Despesas com Vendas", rx: [/despesas?\s+com\s+vendas/i, /^vendas/i] },
+    { kind: "item", label: "Taxas Accor", rx: [/taxas?\s+accor/i] },
+    { kind: "item", label: "Taxas de Administração", rx: [/taxas?\s+de\s+administra/i, /administra[çc][ãa]o/i] },
+    { kind: "item", label: "Despesas Financeiras", rx: [/despesas?\s+financeiras/i] },
+    { kind: "total", label: "DESPESAS VARIÁVEIS TOTAL", rx: [/^despesas?\s+vari[áa]veis?\s+(totais?|total)/i, /^total\s+de?\s*despesas?\s+vari[áa]veis?/i] },
+    { kind: "total", label: "DESPESAS TOTAIS", rx: [/^despesas?\s+totais$/i, /^total\s+(geral\s+)?(de\s+)?despesas/i, /^total\s+das?\s+despesas/i] },
+
+    { kind: "section", label: "RESULTADO" },
+    { kind: "total", label: "Resultado Operacional Bruto (GOP)", rx: [/resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
+    { kind: "item", label: "Total dos Gastos de Propriedade", rx: [/gastos?\s+de\s+propriedade/i, /total\s+gastos?\s+(de\s+)?propriedade/i] },
+    { kind: "total", label: "Resultado Operacional Líquido", rx: [/resultado\s+operacional\s+l[íi]quido/i] },
+    { kind: "total", label: "Lucro Líquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
+    { kind: "highlight", label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
   ];
 
   const findValue = (rxs: RegExp[]): number | null => {
@@ -572,45 +621,63 @@ function drawDreTable(
     return null;
   };
 
+  const fmtVal = (v: number | null) =>
+    v == null
+      ? "—"
+      : v < 0
+        ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
+        : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
   const x0 = 12, x1 = SIZE - 12;
-  let y = 38;
+  let y = 30;
   // header navy
   doc.setFillColor(NAVY);
-  doc.rect(x0, y, x1 - x0, 8, "F");
+  doc.rect(x0, y, x1 - x0, 7, "F");
   doc.setTextColor("#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("DRE — RESUMO", x0 + 4, y + 5.3);
-  doc.text(monthLabel, x1 - 4, y + 5.3, { align: "right" });
-  y += 8;
+  doc.setFontSize(8.5);
+  doc.text("DEMONSTRATIVO DE RESULTADOS", x0 + 3, y + 4.6);
+  doc.text(monthLabel.toUpperCase(), x1 - 3, y + 4.6, { align: "right" });
+  y += 7;
 
-  doc.setTextColor(TEXT);
-  for (const g of groups) {
-    const v = findValue(g.rx);
-    const rowH = g.emphasis ? 9 : 7.5;
-    if (g.emphasis) {
-      doc.setFillColor("#F4F1EA"); // bege suave para destaque
+  for (const r of rows) {
+    if (r.kind === "section") {
+      const rowH = 5.6;
+      doc.setFillColor("#E5E7EB");
       doc.rect(x0, y, x1 - x0, rowH, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9.5);
+      doc.setFontSize(7.6);
+      doc.setTextColor(NAVY);
+      doc.text(r.label, x0 + 3, y + rowH - 1.6);
+      y += rowH;
+      continue;
+    }
+    const v = findValue(r.rx);
+    const rowH = r.kind === "highlight" ? 6.4 : 5.4;
+    if (r.kind === "highlight") {
+      doc.setFillColor("#FEF3C7"); // amarelo destaque
+      doc.rect(x0, y, x1 - x0, rowH, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.4);
+      doc.setTextColor(NAVY);
+    } else if (r.kind === "total") {
+      doc.setFillColor("#F3F4F6");
+      doc.rect(x0, y, x1 - x0, rowH, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.8);
       doc.setTextColor(NAVY);
     } else {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(7.6);
       doc.setTextColor(TEXT);
       doc.setDrawColor(BORDER);
-      doc.setLineWidth(0.2);
+      doc.setLineWidth(0.15);
       doc.line(x0, y + rowH, x1, y + rowH);
     }
-    doc.text(g.label, x0 + 4, y + rowH - 2.5);
-    const valStr =
-      v == null
-        ? "—"
-        : v < 0
-          ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
-          : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    doc.text(valStr, x1 - 4, y + rowH - 2.5, { align: "right" });
+    doc.text(r.label, x0 + (r.kind === "item" ? 6 : 3), y + rowH - 1.6);
+    doc.text(fmtVal(v), x1 - 3, y + rowH - 1.6, { align: "right" });
     y += rowH;
+    if (y > SIZE - 12) break; // proteção contra overflow
   }
 }
 

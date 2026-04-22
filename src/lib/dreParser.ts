@@ -52,6 +52,11 @@ export interface ParsedDre {
    */
   currentSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
   previousSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
+  /**
+   * Indicadores do MESMO MÊS do ano anterior (lidos da aba "ANO ANTERIOR"),
+   * para exibir lado a lado na Carta (ex.: "Ocupação 55% / Ano anterior 39%").
+   */
+  previousIndicators: Partial<Record<IndicatorKey, number | null>>;
 }
 
 /**
@@ -118,11 +123,41 @@ function pickSheet(wb: XLSX.WorkBook, template: DreTemplate): string {
   return find((n) => n === "dre") ?? find((n) => n.includes("dre") && !n.includes("(") && !n.includes("carta")) ?? names[0];
 }
 
-/** Nomes dos meses em PT-BR para detectar o cabeçalho de meses. */
-const MONTH_NAMES = [
-  "janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+/**
+ * Nomes (e abreviações) dos meses em PT-BR para detectar o cabeçalho.
+ * Cada mês tem múltiplas variantes aceitas — qualquer prefixo por 3 letras
+ * (jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez) também bate.
+ */
+const MONTH_VARIANTS: string[][] = [
+  ["janeiro", "jan"],
+  ["fevereiro", "fev"],
+  ["março", "marco", "mar"],
+  ["abril", "abr"],
+  ["maio", "mai"],
+  ["junho", "jun"],
+  ["julho", "jul"],
+  ["agosto", "ago"],
+  ["setembro", "set"],
+  ["outubro", "out"],
+  ["novembro", "nov"],
+  ["dezembro", "dez"],
 ];
+
+function matchMonth(norm: string, targetMonth: number): boolean {
+  const variants = MONTH_VARIANTS[targetMonth - 1] ?? [];
+  for (const v of variants) {
+    if (norm === v) return true;
+    if (norm.startsWith(v + "/")) return true;     // "abr/24"
+    if (norm.startsWith(v + "-")) return true;     // "abr-24"
+    if (norm.startsWith(v + " ")) return true;     // "abril 2024"
+    // Aceita o nome completo como prefixo (cobre "abril/24" e "abril 2024")
+    if (v.length >= 4 && norm.startsWith(v)) return true;
+  }
+  // Aceita prefixo de 3 letras isolado (ex.: "abr" antes de algum sufixo qualquer)
+  const short = variants.find((v) => v.length === 3);
+  if (short && norm.length <= 8 && norm.startsWith(short)) return true;
+  return false;
+}
 
 /**
  * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
@@ -132,14 +167,13 @@ function findMonthColumn(
   rows: unknown[][],
   targetMonth: number,
 ): { headerRow: number; colIndex: number; label: string } | null {
-  const targetName = MONTH_NAMES[targetMonth === 3 ? 2 : targetMonth - 1] ?? "";
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
       if (typeof cell === "string") {
         const norm = cell.trim().toLowerCase();
-        if (norm === targetName || norm.startsWith(targetName)) {
+        if (matchMonth(norm, targetMonth)) {
           return { headerRow: r, colIndex: c, label: cell.trim() };
         }
       }
@@ -270,6 +304,7 @@ export async function parseDreExcel(
   // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
   let previousSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
+  let previousIndicators: Partial<Record<IndicatorKey, number | null>> = {};
   if (prevSheetName) {
     const prevWs = wb.Sheets[prevSheetName];
     if (prevWs) {
@@ -277,6 +312,25 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+      // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
+      // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
+      if (targetMonth) {
+        const prevMonthInfo = findMonthColumn(prevRows, targetMonth);
+        const prevMonthCol = prevMonthInfo?.colIndex ?? null;
+        const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
+        for (const k of allKeys) {
+          const rxs = INDICATORS.find((i) => i.key === k)?.rx ?? [];
+          for (const row of prevRows) {
+            const lbl = rowLabel(row ?? []);
+            if (!lbl) continue;
+            if (rxs.some((rx) => rx.test(lbl))) {
+              const v = rowValueAt(row, prevMonthCol);
+              previousIndicators[k] = typeof v === "number" ? v : null;
+              break;
+            }
+          }
+        }
+      }
     }
   } else {
     warnings.push('Aba "ANO ANTERIOR" não localizada — gráficos comparativos sem série prévia.');
@@ -292,6 +346,7 @@ export async function parseDreExcel(
     monthHeaderLabel: monthInfo?.label ?? null,
     currentSeries,
     previousSeries,
+    previousIndicators,
   };
 }
 

@@ -121,9 +121,22 @@ export function useUploadDre() {
         };
         pushSeries("cur", parsed.currentSeries);
         pushSeries("prev", parsed.previousSeries);
-        if (indicatorRows.length || otherRows.length || seriesRows.length) {
+        // Indicadores do mesmo mês do ano anterior (p/ painel "Indicadores
+        // extraídos" e prompt da IA): persistidos com prefixo [prev_<key>].
+        const prevIndicatorRows: typeof indicatorRows = [];
+        for (const [k, v] of Object.entries(parsed.previousIndicators ?? {})) {
+          if (v == null) continue;
+          prevIndicatorRows.push({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[prev_${k}]`,
+            line_type: "indicator",
+            line_value: v,
+          });
+        }
+        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length) {
           await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows,
+            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows,
           ]);
         }
 
@@ -229,7 +242,12 @@ export function useDreIndicators(closingId: string | null | undefined) {
       if (error) throw error;
       // mantém só a versão mais recente
       const top = data?.[0]?.version_number;
-      return ((data ?? []).filter((r) => r.version_number === top)) as DreIndicatorRow[];
+      // Filtra também as linhas de séries mensais (que poluiriam o painel),
+      // mantendo apenas indicadores do mês corrente ([key]) e do ano
+      // anterior ([prev_key]). Cada linha de série tem prefixo [series_…].
+      return ((data ?? [])
+        .filter((r) => r.version_number === top)
+        .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
     },
   });
 }
