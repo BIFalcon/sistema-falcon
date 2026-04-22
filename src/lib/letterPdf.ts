@@ -354,10 +354,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     ...highlightPhotoUrls.map((u) => loadImage(u)),
   ]);
 
-  const coverData = coverImg ? imageToDataUrl(coverImg, 1800) : null;
-  const brandData = brandLogoImg ? imageToDataUrl(brandLogoImg, 600) : null;
-  const falconData = falconLogoImg ? imageToDataUrl(falconLogoImg, 600) : null;
-  const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200) : null);
+  const coverData = coverImg ? imageToDataUrl(coverImg, 1800, "jpeg") : null;
+  // Logos como PNG (preserva transparência — sem fundo preto/branco)
+  const brandData = brandLogoImg ? imageToDataUrl(brandLogoImg, 800, "png") : null;
+  const falconData = falconLogoImg ? imageToDataUrl(falconLogoImg, 800, "png") : null;
+  const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
@@ -377,17 +378,19 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   }
   // bloco branco inferior
   doc.setFillColor("#FFFFFF"); doc.rect(0, 138, SIZE, SIZE - 138, "F");
+  // Faixa decorativa (tracinhos azul/cinza alternados) entre foto e título
+  drawDecorativeStripe(doc, 16, 144, SIZE - 32);
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
-  doc.text("Carta ao investidor", 16, 156);
+  doc.text("Carta ao investidor", 16, 160);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(MUTED);
-  doc.text(monthYear, 16, 164);
-  // logos rodapé direita
-  if (brandData) doc.addImage(brandData, "JPEG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "JPEG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  doc.text(monthYear, 16, 168);
+  // logos rodapé direita — PNG (transparente)
+  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
+  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
 
   /* ───── 2. INDICADORES — Ocupação + ADR ───── */
   addPage(doc);
