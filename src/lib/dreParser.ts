@@ -157,11 +157,19 @@ function rowLabel(row: unknown[]): string | null {
 /**
  * Retorna o valor da linha para uma coluna específica. Se a coluna estiver
  * vazia, faz fallback para o último número finito não-zero da linha.
+ *
+ * IMPORTANTE: o fallback SÓ é usado quando `colIndex` é null (não foi possível
+ * localizar a coluna do mês). Quando temos a coluna correta, devolvemos
+ * exatamente o valor dela — inclusive 0 ou null — para evitar que o parser
+ * pegue valores de colunas "Média"/"Total" por engano.
  */
 function rowValueAt(row: unknown[], colIndex: number | null): number | null {
   if (colIndex != null) {
     const c = row[colIndex];
     if (typeof c === "number" && Number.isFinite(c)) return c;
+    // Coluna localizada mas célula vazia/string → não cai em fallback,
+    // pois isso traria valores de outros meses (ex.: coluna "Média").
+    return null;
   }
   for (let i = row.length - 1; i >= 0; i--) {
     const c = row[i];
