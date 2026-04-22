@@ -71,7 +71,17 @@ Deno.serve(async (req) => {
     const reserveFund = letter.data.reserve_fund != null ? `R$ ${Number(letter.data.reserve_fund).toLocaleString("pt-BR")}` : "—";
     const rps = letter.data.rps_score != null ? String(letter.data.rps_score) : "—";
 
-    const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}). Escreva em português do Brasil, tom executivo, sóbrio e objetivo, voltado a investidores. Não invente números — use exclusivamente o que está nos indicadores e nos destaques fornecidos. Devolva ESTRITAMENTE um JSON válido com as chaves: intro, market_context, operational, financial, outlook, closing. Cada valor é um parágrafo de 3 a 5 frases (sem markdown, sem listas).`;
+    const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}).
+Escreva em português do Brasil, tom executivo, sóbrio e SUCINTO, voltado a investidores.
+
+REGRAS DE CONTEÚDO (IMPORTANTES):
+- Os Comentários do Mês na Carta TÊM NO MÁXIMO 3 PARÁGRAFOS CURTOS (2 a 4 frases cada).
+- NÃO repita números (ocupação, ADR, RevPAR, receita, fundo de reserva, RPS) que já aparecem nos slides de Indicadores — eles são exibidos em cards/gráficos.
+- Foque em: contexto operacional do mês (eventos, mercado, sazonalidade, ações da gestão) e perspectivas para os próximos meses.
+- Sem markdown, sem listas, sem títulos.
+
+Devolva ESTRITAMENTE um JSON válido com as chaves: intro, market_context, operational, financial, outlook, closing.
+Cada valor é um parágrafo curto (2 a 4 frases). intro/operational/outlook são os 3 parágrafos principais; market_context, financial e closing podem ser strings vazias se não houver conteúdo qualitativo relevante além do que já está nos indicadores.`;
 
     let userPrompt = `Período: ${monthName} de ${closing.data.year}.
 

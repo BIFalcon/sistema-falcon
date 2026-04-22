@@ -527,8 +527,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.text("(31) 3500-5431", 16, 174);
   doc.text("R. Bernardo Guimarães, 245, B.", 16, 180);
   doc.text("Funcionários, Belo Horizonte - MG", 16, 186);
-  if (brandData) doc.addImage(brandData, "JPEG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "JPEG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
+  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
   doc.setFontSize(7);
   doc.setTextColor(MUTED);
   doc.text(`v${(letter.pdf_version ?? 0) + 1}`, SIZE - 10, SIZE - 4, { align: "right" });
@@ -592,6 +592,23 @@ function drawStar(doc: jsPDF, cx: number, cy: number, r: number) {
   if (anyDoc.lines) {
     const linesArr = points.slice(1).concat([points[0]]).map((p, i) => [p[0] - points[i][0], p[1] - points[i][1]]);
     anyDoc.lines(linesArr, points[0][0], points[0][1], [1, 1], "F", true);
+  }
+}
+
+/**
+ * Faixa decorativa de tracinhos curtos alternando azul-marinho e cinza,
+ * usada na capa entre a foto do hotel e o título "Carta ao investidor".
+ */
+function drawDecorativeStripe(doc: jsPDF, x: number, y: number, width: number) {
+  const dashLen = 4;
+  const gap = 2;
+  const total = dashLen + gap;
+  const count = Math.floor(width / total);
+  doc.setLineWidth(1.4);
+  for (let i = 0; i < count; i++) {
+    const sx = x + i * total;
+    doc.setDrawColor(i % 2 === 0 ? NAVY : "#9CA3AF");
+    doc.line(sx, y, sx + dashLen, y);
   }
 }
 
