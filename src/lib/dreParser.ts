@@ -44,6 +44,14 @@ export interface ParsedDre {
   warnings: string[];
   monthColumnIndex: number | null;
   monthHeaderLabel: string | null;
+  /**
+   * Séries mensais Jan-Dez (1..12) por indicador, extraídas:
+   * - `currentSeries`: da própria aba DRE do ano corrente (12 colunas mensais)
+   * - `previousSeries`: da aba "ANO ANTERIOR" quando existir
+   * Usadas pelos gráficos comparativos da Carta ao Investidor.
+   */
+  currentSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
+  previousSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
 }
 
 /**
@@ -254,6 +262,26 @@ export async function parseDreExcel(
   if (!indicators.ocupacao) warnings.push("Taxa de Ocupação não localizada.");
   if (!indicators.lucro_liquido) warnings.push("Lucro Líquido não localizado.");
 
+  // ─── Séries mensais Jan-Dez para gráficos da Carta ───
+  // Chaves de interesse para os gráficos:
+  const SERIES_KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
+  const currentSeries = extractMonthlySeries(rows, SERIES_KEYS);
+
+  // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
+  const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
+  let previousSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
+  if (prevSheetName) {
+    const prevWs = wb.Sheets[prevSheetName];
+    if (prevWs) {
+      const prevRows: unknown[][] = XLSX.utils.sheet_to_json(prevWs, {
+        header: 1, blankrows: false, defval: null, raw: true,
+      });
+      previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+    }
+  } else {
+    warnings.push('Aba "ANO ANTERIOR" não localizada — gráficos comparativos sem série prévia.');
+  }
+
   return {
     template,
     sheetUsed: sheetName,
@@ -262,7 +290,47 @@ export async function parseDreExcel(
     warnings,
     monthColumnIndex: monthCol,
     monthHeaderLabel: monthInfo?.label ?? null,
+    currentSeries,
+    previousSeries,
   };
+}
+
+/**
+ * Extrai, para cada indicador-chave, a série Jan-Dez (12 valores) percorrendo
+ * os cabeçalhos de meses na planilha. Quando uma coluna mensal não existir,
+ * o slot fica `null` (gráfico ignora).
+ */
+function extractMonthlySeries(
+  rows: unknown[][],
+  keys: IndicatorKey[],
+): Partial<Record<IndicatorKey, (number | null)[]>> {
+  // Mapeia mês (1..12) → colIndex
+  const monthCols = new Map<number, number>();
+  for (let m = 1; m <= 12; m++) {
+    const info = findMonthColumn(rows, m);
+    if (info) monthCols.set(m, info.colIndex);
+  }
+  if (monthCols.size === 0) return {};
+  const out: Partial<Record<IndicatorKey, (number | null)[]>> = {};
+  for (const key of keys) {
+    const rxs = INDICATORS.find((i) => i.key === key)?.rx ?? [];
+    if (!rxs.length) continue;
+    // Acha 1ª linha com label que bata o regex
+    let hitRow: unknown[] | null = null;
+    for (const row of rows) {
+      const label = rowLabel(row ?? []);
+      if (!label) continue;
+      if (rxs.some((rx) => rx.test(label))) { hitRow = row; break; }
+    }
+    if (!hitRow) continue;
+    const series: (number | null)[] = new Array(12).fill(null);
+    for (const [m, c] of monthCols) {
+      const cell = hitRow[c];
+      if (typeof cell === "number" && Number.isFinite(cell)) series[m - 1] = cell;
+    }
+    out[key] = series;
+  }
+  return out;
 }
 
 export const INDICATOR_LABELS: Record<IndicatorKey, string> = {

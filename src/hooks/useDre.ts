@@ -97,8 +97,34 @@ export function useUploadDre() {
           line_type: "line",
           line_value: l.value,
         }));
-        if (indicatorRows.length || otherRows.length) {
-          await supabase.from("dre_parsed_lines").insert([...indicatorRows, ...otherRows]);
+        // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
+        // comparativos da Carta. Persistidas como indicadores extras com prefixo
+        // [series_<scope>_<key>_<mes>] (mes 1..12).
+        const seriesRows: typeof indicatorRows = [];
+        const pushSeries = (
+          scope: "cur" | "prev",
+          map: typeof parsed.currentSeries,
+        ) => {
+          for (const [k, arr] of Object.entries(map ?? {})) {
+            if (!arr) continue;
+            arr.forEach((v, i) => {
+              if (v == null) return;
+              seriesRows.push({
+                closing_id: closingId,
+                version_number: nextVersion,
+                line_label: `[series_${scope}_${k}_${i + 1}]`,
+                line_type: "indicator",
+                line_value: v,
+              });
+            });
+          }
+        };
+        pushSeries("cur", parsed.currentSeries);
+        pushSeries("prev", parsed.previousSeries);
+        if (indicatorRows.length || otherRows.length || seriesRows.length) {
+          await supabase.from("dre_parsed_lines").insert([
+            ...indicatorRows, ...otherRows, ...seriesRows,
+          ]);
         }
 
         // === Estimativa de distribuição ===
