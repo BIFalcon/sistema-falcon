@@ -112,7 +112,10 @@ export default function CartaPage() {
   if (!closing) return <div className="text-sm text-muted-foreground">Carregando…</div>;
 
   const indicatorMap: Partial<Record<IndicatorKey, number | null>> = {};
+  const prevIndicatorMap: Partial<Record<IndicatorKey, number | null>> = {};
   for (const r of indicators) {
+    const mp = /^\[prev_(\w+)\]/.exec(r.line_label);
+    if (mp) { prevIndicatorMap[mp[1] as IndicatorKey] = r.line_value; continue; }
     const m = /^\[(\w+)\]/.exec(r.line_label);
     if (m) indicatorMap[m[1] as IndicatorKey] = r.line_value;
   }
@@ -182,6 +185,7 @@ export default function CartaPage() {
         falconLogoUrl: falconLogoUrl ?? null,
         highlights,
         indicators: indicatorMap,
+        previousIndicators: prevIndicatorMap,
       });
       const version = (letter.pdf_version ?? 0) + 1;
       const path = `${closing.id}/v${version}_carta_${sanitizeFileName(hotel?.name ?? closing.hotel_id)}.pdf`;
