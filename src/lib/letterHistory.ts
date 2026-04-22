@@ -70,7 +70,7 @@ export async function fetchLetterHistory(
     const mo = Number(m[3]);
     if (!KEYS.includes(key) || mo < 1 || mo > 12) continue;
     const target = scope === "cur" ? current : previous;
-    (target[mo - 1] as Record<string, number | null>)[key] = r.line_value;
+    (target[mo - 1] as unknown as Record<string, number | null>)[key] = r.line_value;
   }
   return { current, previous };
 }
