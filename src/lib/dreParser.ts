@@ -211,6 +211,20 @@ export async function parseDreExcel(
     warnings.push(`Coluna do mês ${targetMonth} não localizada no cabeçalho — usando fallback.`);
   }
 
+  // Identifica colunas de "Média/Total/Acumulado" no cabeçalho para EVITAR
+  // que o fallback de rowValueAt as utilize quando monthCol falha.
+  const aggregateCols = new Set<number>();
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === "string") {
+        const norm = cell.trim().toLowerCase();
+        if (/^(m[ée]dia|total|acumulado|ano|ytd)\b/.test(norm)) aggregateCols.add(c);
+      }
+    }
+  }
+
   rows.forEach((row, idx) => {
     if (!row || row.every((c) => c == null || c === "")) return;
     const label = rowLabel(row);
