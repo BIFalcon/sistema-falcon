@@ -5,6 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import LoginPage from "./pages/LoginPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SemPermissaoPage from "./pages/SemPermissaoPage";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 
 const queryClient = new QueryClient();
 
@@ -14,11 +19,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            {/* Públicas */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/sem-permissao" element={<SemPermissaoPage />} />
+
+            {/* Protegidas */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/" element={<Index />} />
+            </Route>
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
