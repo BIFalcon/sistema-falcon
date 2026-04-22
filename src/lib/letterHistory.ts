@@ -14,23 +14,35 @@ export interface MonthDatum {
 }
 
 export interface LetterHistory {
-  /** 6 meses (do mês atual − 5 ao mês atual) — ano corrente */
+  /** 12 meses Jan–Dez do ano da DRE corrente */
   current: MonthDatum[];
-  /** mesmos 6 meses do ano anterior */
+  /** 12 meses Jan–Dez do ano anterior (lidos da aba "ANO ANTERIOR") */
   previous: MonthDatum[];
 }
 
 const KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
 
-function emptyDatum(month: number): MonthDatum {
-  return { month, ocupacao: null, adr: null, receita_bruta_total: null };
+function emptyYear(): MonthDatum[] {
+  return Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1, ocupacao: null, adr: null, receita_bruta_total: null,
+  }));
 }
 
-async function fetchIndicatorsFor(
+/**
+ * Carrega séries Jan–Dez (current = ano da DRE; previous = aba "ANO ANTERIOR")
+ * a partir das linhas persistidas em `dre_parsed_lines` com prefixo
+ * `[series_<cur|prev>_<key>_<mes>]`. Quando essas linhas não existem (ex.: DREs
+ * antigos, parser legacy), retorna 12 slots vazios.
+ */
+export async function fetchLetterHistory(
   hotelId: string,
   year: number,
   month: number,
-): Promise<Partial<Record<IndicatorKey, number | null>>> {
+): Promise<LetterHistory> {
+  const current = emptyYear();
+  const previous = emptyYear();
+
+  // Pega o closing do mês corrente (que carrega a DRE com séries persistidas)
   const { data: closing } = await supabase
     .from("closings")
     .select("id")
@@ -38,63 +50,27 @@ async function fetchIndicatorsFor(
     .eq("year", year)
     .eq("month", month)
     .maybeSingle();
-  if (!closing?.id) return {};
+  if (!closing?.id) return { current, previous };
+
   const { data: lines } = await supabase
     .from("dre_parsed_lines")
     .select("line_label, line_value, version_number")
     .eq("closing_id", closing.id)
     .eq("line_type", "indicator")
     .order("version_number", { ascending: false });
-  if (!lines || lines.length === 0) return {};
+  if (!lines || lines.length === 0) return { current, previous };
   const top = lines[0].version_number;
-  const out: Partial<Record<IndicatorKey, number | null>> = {};
+
+  const rx = /^\[series_(cur|prev)_(\w+)_(\d{1,2})\]$/;
   for (const r of lines.filter((l) => l.version_number === top)) {
-    const m = /^\[(\w+)\]/.exec(r.line_label);
-    if (m && KEYS.includes(m[1] as IndicatorKey)) {
-      out[m[1] as IndicatorKey] = r.line_value;
-    }
-  }
-  return out;
-}
-
-function rangeMonths(year: number, month: number): { y: number; m: number }[] {
-  const arr: { y: number; m: number }[] = [];
-  let y = year;
-  let m = month;
-  for (let i = 5; i >= 0; i--) {
-    arr.unshift({ y, m });
-    m -= 1;
-    if (m === 0) { m = 12; y -= 1; }
-  }
-  // restaurar ordem cronológica
-  return arr.reverse().reverse();
-}
-
-export async function fetchLetterHistory(
-  hotelId: string,
-  year: number,
-  month: number,
-): Promise<LetterHistory> {
-  const months = rangeMonths(year, month);
-
-  const current: MonthDatum[] = [];
-  const previous: MonthDatum[] = [];
-
-  for (const { y, m } of months) {
-    const cur = await fetchIndicatorsFor(hotelId, y, m);
-    const prev = await fetchIndicatorsFor(hotelId, y - 1, m);
-    current.push({
-      month: m,
-      ocupacao: cur.ocupacao ?? null,
-      adr: cur.adr ?? null,
-      receita_bruta_total: cur.receita_bruta_total ?? null,
-    });
-    previous.push({
-      month: m,
-      ocupacao: prev.ocupacao ?? null,
-      adr: prev.adr ?? null,
-      receita_bruta_total: prev.receita_bruta_total ?? null,
-    });
+    const m = rx.exec(r.line_label);
+    if (!m) continue;
+    const scope = m[1] as "cur" | "prev";
+    const key = m[2] as IndicatorKey;
+    const mo = Number(m[3]);
+    if (!KEYS.includes(key) || mo < 1 || mo > 12) continue;
+    const target = scope === "cur" ? current : previous;
+    (target[mo - 1] as Record<string, number | null>)[key] = r.line_value;
   }
   return { current, previous };
 }
