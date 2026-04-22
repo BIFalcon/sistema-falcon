@@ -293,6 +293,92 @@ export type Database = {
         }
         Relationships: []
       }
+      investor_letters: {
+        Row: {
+          ai_closing: string | null
+          ai_financial: string | null
+          ai_generated_at: string | null
+          ai_intro: string | null
+          ai_market_context: string | null
+          ai_model: string | null
+          ai_operational: string | null
+          ai_outlook: string | null
+          closing_id: string
+          created_at: string
+          created_by: string
+          custom_notes: string | null
+          highlight_costs: string | null
+          highlight_market: string | null
+          highlight_operations: string | null
+          highlight_outlook: string | null
+          highlight_revenue: string | null
+          id: string
+          pdf_generated_at: string | null
+          pdf_url: string | null
+          pdf_version: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ai_closing?: string | null
+          ai_financial?: string | null
+          ai_generated_at?: string | null
+          ai_intro?: string | null
+          ai_market_context?: string | null
+          ai_model?: string | null
+          ai_operational?: string | null
+          ai_outlook?: string | null
+          closing_id: string
+          created_at?: string
+          created_by: string
+          custom_notes?: string | null
+          highlight_costs?: string | null
+          highlight_market?: string | null
+          highlight_operations?: string | null
+          highlight_outlook?: string | null
+          highlight_revenue?: string | null
+          id?: string
+          pdf_generated_at?: string | null
+          pdf_url?: string | null
+          pdf_version?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ai_closing?: string | null
+          ai_financial?: string | null
+          ai_generated_at?: string | null
+          ai_intro?: string | null
+          ai_market_context?: string | null
+          ai_model?: string | null
+          ai_operational?: string | null
+          ai_outlook?: string | null
+          closing_id?: string
+          created_at?: string
+          created_by?: string
+          custom_notes?: string | null
+          highlight_costs?: string | null
+          highlight_market?: string | null
+          highlight_operations?: string | null
+          highlight_outlook?: string | null
+          highlight_revenue?: string | null
+          id?: string
+          pdf_generated_at?: string | null
+          pdf_url?: string | null
+          pdf_version?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_letters_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: true
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
