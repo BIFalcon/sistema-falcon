@@ -416,12 +416,12 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   doc.roundedRect(12, card1Y, cardW, cardH, 2, 2, "S");
-  const occChart = drawBarChart("Taxa de Ocupação", history.current, history.previous, "ocupacao", (v) => `${Math.round(v)}%`, { w: cardW - 6, h: cardH - 6 });
+  const occChart = drawBarChart("Taxa de Ocupação", trimmedCurrent, trimmedPrevious, "ocupacao", (v) => `${Math.round(v)}%`, { w: cardW - 6, h: cardH - 6 });
   doc.addImage(occChart, "PNG", 15, card1Y + 3, cardW - 6, cardH - 6);
 
   const card2Y = card1Y + cardH + 6;
   doc.roundedRect(12, card2Y, cardW, cardH, 2, 2, "S");
-  const adrChart = drawLineChart("Diária Média", history.current, history.previous, "adr", (v) => `R$ ${Math.round(v)}`, { w: cardW - 6, h: cardH - 6 });
+  const adrChart = drawLineChart("Diária Média", trimmedCurrent, trimmedPrevious, "adr", (v) => `R$ ${Math.round(v)}`, { w: cardW - 6, h: cardH - 6 });
   doc.addImage(adrChart, "PNG", 15, card2Y + 3, cardW - 6, cardH - 6);
 
   /* ───── 3. INDICADORES — Receita Bruta + Cards ───── */
@@ -430,41 +430,48 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   const recH = 88;
   doc.roundedRect(12, 30, cardW, recH, 2, 2, "S");
-  const recChart = drawLineChart("Receita Total Bruta", history.current, history.previous, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
+  const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
   doc.addImage(recChart, "PNG", 15, 33, cardW - 6, recH - 6);
 
-  // dois cards lado a lado
+  // dois cards lado a lado — borda na MESMA cor do gráfico (BORDER cinza claro)
   const cw = (SIZE - 30) / 2, ch = 64, cy = 30 + recH + 8;
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.4);
   // Fundo de Reserva
   doc.roundedRect(12, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(13);
-  doc.text("Fundo de Reserva", 12 + cw / 2, cy + 14, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 32, { align: "center" });
-  // ícone $ em círculo
+  doc.setFontSize(11);
+  doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
+  // ícone $ em círculo (maior)
   doc.setFillColor(NAVY);
-  doc.circle(12 + cw / 2, cy + 50, 5, "F");
+  doc.circle(12 + cw / 2, cy + 26, 7, "F");
   doc.setTextColor("#FFFFFF");
-  doc.setFontSize(9);
-  doc.text("$", 12 + cw / 2, cy + 51.5, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("$", 12 + cw / 2, cy + 28.4, { align: "center" });
+  // valor (maior)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(NAVY);
+  doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 50, { align: "center" });
 
   // RPS
   const rx = 12 + cw + 6;
+  doc.setDrawColor(BORDER);
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(13);
-  doc.text("RPS", rx + cw / 2, cy + 14, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(11);
+  doc.text("RPS", rx + cw / 2, cy + 12, { align: "center" });
+  // estrela navy maior (manter cor do gráfico, não dourada)
+  doc.setFillColor(NAVY);
+  drawStar(doc, rx + cw / 2, cy + 26, 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(NAVY);
   const rpsTxt = letter.rps_score != null ? `${letter.rps_score}%` : "—";
-  doc.text(rpsTxt, rx + cw / 2, cy + 32, { align: "center" });
-  // estrela dourada (simples)
-  doc.setFillColor(GOLD);
-  drawStar(doc, rx + cw / 2, cy + 50, 4);
+  doc.text(rpsTxt, rx + cw / 2, cy + 50, { align: "center" });
 
   /* ───── 4. COMENTÁRIOS DO MÊS ───── */
   addPage(doc);
