@@ -10,6 +10,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SemPermissaoPage from "./pages/SemPermissaoPage";
 import DrePage from "./pages/DrePage";
 import CartaPage from "./pages/CartaPage";
+import FinanceiroPage from "./pages/FinanceiroPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/dre" element={<DrePage />} />
               <Route path="/carta" element={<CartaPage />} />
+              <Route path="/financeiro" element={<FinanceiroPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
