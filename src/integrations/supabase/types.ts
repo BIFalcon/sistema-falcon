@@ -300,6 +300,8 @@ export type Database = {
         Row: {
           active: boolean
           brand: string
+          brand_logo_url: string | null
+          cover_url: string | null
           created_at: string
           id: string
           name: string
@@ -307,6 +309,8 @@ export type Database = {
         Insert: {
           active?: boolean
           brand: string
+          brand_logo_url?: string | null
+          cover_url?: string | null
           created_at?: string
           id: string
           name: string
@@ -314,6 +318,8 @@ export type Database = {
         Update: {
           active?: boolean
           brand?: string
+          brand_logo_url?: string | null
+          cover_url?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -565,6 +571,27 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string | null
         }
         Relationships: []
       }
