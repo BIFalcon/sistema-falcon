@@ -1,6 +1,6 @@
-// Edge function: gera a narrativa da Carta ao Investidor usando Lovable AI Gateway.
-// Recebe { closing_id, letter_id }. Carrega highlights + indicadores DRE
-// e devolve textos por seção, salvos diretamente em investor_letters.
+// Edge function: gera narrativa da Carta ao Investidor (Lovable AI Gateway).
+// Recebe { closing_id, letter_id, instruction? }. Sempre cria uma nova versão
+// em public.letter_versions e atualiza investor_letters com o último texto.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 const corsHeaders = {
@@ -11,6 +11,7 @@ const corsHeaders = {
 interface Body {
   closing_id: string;
   letter_id: string;
+  instruction?: string;
 }
 
 const MODEL = "google/gemini-2.5-flash";
@@ -28,23 +29,26 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: auth } } },
     );
 
-    // Valida o JWT via getClaims() (suporta as novas chaves ES256/HS256 do Supabase).
     const token = auth.replace(/^Bearer\s+/i, "");
     const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims?.sub) {
-      return json({ error: "Usuário inválido" }, 401);
-    }
+    if (claimsErr || !claimsData?.claims?.sub) return json({ error: "Usuário inválido" }, 401);
     const userId = claimsData.claims.sub as string;
 
-    const { closing_id, letter_id } = (await req.json()) as Body;
+    const { closing_id, letter_id, instruction } = (await req.json()) as Body;
     if (!closing_id || !letter_id) return json({ error: "Parâmetros ausentes" }, 400);
 
-    // Carrega contexto
     const closing = await supabase.from("closings").select("*").eq("id", closing_id).maybeSingle();
     if (closing.error || !closing.data) return json({ error: "Fechamento não encontrado" }, 404);
     const hotel = await supabase.from("hotels").select("*").eq("id", closing.data.hotel_id).maybeSingle();
     const letter = await supabase.from("investor_letters").select("*").eq("id", letter_id).maybeSingle();
     if (letter.error || !letter.data) return json({ error: "Carta não encontrada" }, 404);
+
+    const highlights = await supabase
+      .from("letter_highlights")
+      .select("title, note")
+      .eq("letter_id", letter_id)
+      .order("sort_order", { ascending: true });
+
     const indicators = await supabase
       .from("dre_parsed_lines")
       .select("line_label, line_value, version_number")
@@ -54,16 +58,41 @@ Deno.serve(async (req) => {
 
     const top = indicators.data?.[0]?.version_number;
     const inds = (indicators.data ?? []).filter((r) => r.version_number === top);
-    const indicatorText = inds
-      .map((i) => `- ${i.line_label}: ${i.line_value}`)
-      .join("\n") || "Indicadores não disponíveis";
+    const indicatorText = inds.map((i) => `- ${i.line_label}: ${i.line_value}`).join("\n")
+      || "Indicadores não disponíveis";
 
     const months = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     const monthName = months[(closing.data.month ?? 1) - 1];
 
+    const highlightsText = (highlights.data ?? []).length > 0
+      ? (highlights.data ?? []).map((h, i) => `${i + 1}. ${h.title}${h.note ? ` — ${h.note}` : ""}`).join("\n")
+      : "Nenhum destaque informado.";
+
+    const reserveFund = letter.data.reserve_fund != null ? `R$ ${Number(letter.data.reserve_fund).toLocaleString("pt-BR")}` : "—";
+    const rps = letter.data.rps_score != null ? String(letter.data.rps_score) : "—";
+
     const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}). Escreva em português do Brasil, tom executivo, sóbrio e objetivo, voltado a investidores. Não invente números — use exclusivamente o que está nos indicadores e nos destaques fornecidos. Devolva ESTRITAMENTE um JSON válido com as chaves: intro, market_context, operational, financial, outlook, closing. Cada valor é um parágrafo de 3 a 5 frases (sem markdown, sem listas).`;
 
-    const userPrompt = `Período: ${monthName} de ${closing.data.year}.\n\nINDICADORES DA DRE:\n${indicatorText}\n\nDESTAQUES DO GERENTE (use como base, parafraseie quando útil):\n- Mercado: ${letter.data.highlight_market || "—"}\n- Operações: ${letter.data.highlight_operations || "—"}\n- Receitas: ${letter.data.highlight_revenue || "—"}\n- Custos: ${letter.data.highlight_costs || "—"}\n- Perspectivas: ${letter.data.highlight_outlook || "—"}\n- Notas: ${letter.data.custom_notes || "—"}\n\nGere o JSON.`;
+    let userPrompt = `Período: ${monthName} de ${closing.data.year}.
+
+INDICADORES DA DRE:
+${indicatorText}
+
+INDICADORES ADICIONAIS:
+- Fundo de Reserva: ${reserveFund}
+- Nota RPS: ${rps}
+
+DESTAQUES DO MÊS (informados pelo GG/GOP):
+${highlightsText}
+
+COMENTÁRIO OPERACIONAL:
+${letter.data.operational_comment || "—"}
+
+Gere o JSON.`;
+
+    if (instruction && instruction.trim()) {
+      userPrompt += `\n\nINSTRUÇÃO ADICIONAL DO USUÁRIO PARA ESTA REGENERAÇÃO:\n${instruction.trim()}`;
+    }
 
     const aiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!aiKey) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
@@ -98,6 +127,25 @@ Deno.serve(async (req) => {
       return json({ error: "IA retornou JSON inválido" }, 500);
     }
 
+    const nextVersion = (letter.data.ai_version_number ?? 0) + 1;
+
+    // Salva snapshot no histórico
+    const ver = await supabase.from("letter_versions").insert({
+      letter_id,
+      closing_id,
+      version_number: nextVersion,
+      ai_intro: parsed.intro ?? null,
+      ai_market_context: parsed.market_context ?? null,
+      ai_operational: parsed.operational ?? null,
+      ai_financial: parsed.financial ?? null,
+      ai_outlook: parsed.outlook ?? null,
+      ai_closing: parsed.closing ?? null,
+      ai_model: MODEL,
+      instruction: instruction?.trim() || null,
+      created_by: userId,
+    });
+    if (ver.error) return json({ error: ver.error.message }, 500);
+
     const upd = await supabase
       .from("investor_letters")
       .update({
@@ -109,12 +157,14 @@ Deno.serve(async (req) => {
         ai_closing: parsed.closing ?? null,
         ai_model: MODEL,
         ai_generated_at: new Date().toISOString(),
+        ai_version_number: nextVersion,
+        last_ai_instruction: instruction?.trim() || null,
         updated_by: userId,
       })
       .eq("id", letter_id);
     if (upd.error) return json({ error: upd.error.message }, 500);
 
-    return json({ ok: true, model: MODEL });
+    return json({ ok: true, model: MODEL, version: nextVersion });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "Erro interno" }, 500);
   }

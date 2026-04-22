@@ -2,19 +2,30 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
-import { useLetter, useEnsureLetter, useUpdateLetter, useGenerateLetterAi, getLetterPdfSignedUrl } from "@/hooks/useLetter";
+import {
+  useLetter,
+  useEnsureLetter,
+  useUpdateLetter,
+  useGenerateLetterAi,
+  useLetterHighlights,
+  useLetterVersions,
+  getLetterPdfSignedUrl,
+} from "@/hooks/useLetter";
 import { useDreIndicators } from "@/hooks/useDre";
 import { CartaStageStepper } from "@/components/closings/CartaStageStepper";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { CommentsThread } from "@/components/closings/CommentsThread";
 import { StatusBadge } from "@/components/closings/StatusBadge";
+import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
+import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
-import { ArrowLeft, Sparkles, FileDown, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, FileDown, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +55,8 @@ export default function CartaPage() {
 
   const { data: closing } = useClosing(resolvedId);
   const { data: letter } = useLetter(resolvedId);
+  const { data: highlights = [] } = useLetterHighlights(letter?.id);
+  const { data: versions = [] } = useLetterVersions(letter?.id);
   const { data: indicators = [] } = useDreIndicators(resolvedId);
 
   const hotel = useMemo(
@@ -53,7 +66,7 @@ export default function CartaPage() {
 
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
-  const [generating, setGenerating] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Garante a row de letter quando faltar
   useEffect(() => {
@@ -63,22 +76,16 @@ export default function CartaPage() {
   }, [resolvedId, user?.id, letter, skip]); // eslint-disable-line
 
   const [draft, setDraft] = useState({
-    highlight_market: "",
-    highlight_operations: "",
-    highlight_revenue: "",
-    highlight_costs: "",
-    highlight_outlook: "",
-    custom_notes: "",
+    reserve_fund: "" as string,
+    rps_score: "" as string,
+    operational_comment: "" as string,
   });
   useEffect(() => {
     if (letter) {
       setDraft({
-        highlight_market: letter.highlight_market ?? "",
-        highlight_operations: letter.highlight_operations ?? "",
-        highlight_revenue: letter.highlight_revenue ?? "",
-        highlight_costs: letter.highlight_costs ?? "",
-        highlight_outlook: letter.highlight_outlook ?? "",
-        custom_notes: letter.custom_notes ?? "",
+        reserve_fund: letter.reserve_fund != null ? String(letter.reserve_fund) : "",
+        rps_score: letter.rps_score != null ? String(letter.rps_score) : "",
+        operational_comment: letter.operational_comment ?? "",
       });
     }
   }, [letter?.id]); // eslint-disable-line
@@ -101,31 +108,57 @@ export default function CartaPage() {
     if (m) indicatorMap[m[1] as IndicatorKey] = r.line_value;
   }
 
-  async function handleSave() {
-    if (!letter) return;
+  function validate(): string | null {
+    const reserve = draft.reserve_fund.replace(",", ".").trim();
+    const rps = draft.rps_score.replace(",", ".").trim();
+    if (!reserve) return "Informe o Fundo de Reserva";
+    if (Number.isNaN(Number(reserve))) return "Fundo de Reserva inválido";
+    if (!rps) return "Informe a Nota RPS";
+    if (Number.isNaN(Number(rps))) return "Nota RPS inválida";
+    if (highlights.length === 0) return "Adicione pelo menos um destaque do mês";
+    const empty = highlights.find((h) => !h.title.trim());
+    if (empty) return "Todos os destaques precisam ter um título";
+    return null;
+  }
+
+  async function handleSaveAndGenerate() {
+    if (!letter || !resolvedId) return;
+    const err = validate();
+    if (err) {
+      toast.error(err);
+      return;
+    }
     try {
-      await updateLetter.mutateAsync({ id: letter.id, closingId: resolvedId!, patch: draft });
-      toast.success("Destaques salvos");
+      await updateLetter.mutateAsync({
+        id: letter.id,
+        closingId: resolvedId,
+        patch: {
+          reserve_fund: Number(draft.reserve_fund.replace(",", ".")),
+          rps_score: Number(draft.rps_score.replace(",", ".")),
+          operational_comment: draft.operational_comment || null,
+        },
+      });
+      toast.success("Formulário salvo. Gerando narrativa…");
+      const r = await genAi.mutateAsync({ closingId: resolvedId, letterId: letter.id });
+      toast.success(`Narrativa v${r.version} gerada (${r.model})`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar/gerar");
     }
   }
 
-  async function handleGenerateAi() {
+  async function handleRegenerate(instruction?: string) {
     if (!letter || !resolvedId) return;
     try {
-      // salva primeiro
-      await updateLetter.mutateAsync({ id: letter.id, closingId: resolvedId, patch: draft });
-      const r = await genAi.mutateAsync({ closingId: resolvedId, letterId: letter.id });
-      toast.success(`Narrativa gerada (${r.model})`);
+      const r = await genAi.mutateAsync({ closingId: resolvedId, letterId: letter.id, instruction });
+      toast.success(`Narrativa v${r.version} gerada`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro na IA");
+      toast.error(e instanceof Error ? e.message : "Erro ao regenerar");
     }
   }
 
   async function handleGeneratePdf() {
     if (!letter || !closing) return;
-    setGenerating(true);
+    setGeneratingPdf(true);
     try {
       const blob = await generateLetterPdf({ letter, closing, hotel, indicators: indicatorMap });
       const version = (letter.pdf_version ?? 0) + 1;
@@ -144,7 +177,7 @@ export default function CartaPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao gerar PDF");
     } finally {
-      setGenerating(false);
+      setGeneratingPdf(false);
     }
   }
 
@@ -182,40 +215,85 @@ export default function CartaPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="p-5 shadow-soft">
-              <h3 className="text-sm font-semibold uppercase tracking-wider mb-4">Destaques (preenchidos pelo GG/GOP)</h3>
-              <div className="space-y-3">
-                {[
-                  ["highlight_market", "Mercado e ambiente competitivo"],
-                  ["highlight_operations", "Destaques operacionais"],
-                  ["highlight_revenue", "Receitas"],
-                  ["highlight_costs", "Custos e despesas"],
-                  ["highlight_outlook", "Perspectivas e próximos passos"],
-                  ["custom_notes", "Notas adicionais"],
-                ].map(([key, label]) => (
-                  <div key={key} className="space-y-1">
-                    <Label className="text-xs">{label}</Label>
-                    <Textarea
-                      rows={3}
-                      value={(draft as Record<string, string>)[key]}
-                      disabled={!canEdit}
-                      onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                      placeholder="Resumo do mês…"
-                    />
-                  </div>
-                ))}
+            <Card className="p-5 shadow-soft space-y-5">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Formulário da carta</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Preencha os campos abaixo. Ao salvar, a narrativa é gerada automaticamente pela IA.
+                </p>
               </div>
-              <div className="flex flex-wrap gap-2 mt-4">
-                <Button size="sm" onClick={handleSave} disabled={!canEdit || !letter} className="gap-2">
-                  <Save className="h-4 w-4" /> Salvar destaques
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Fundo de Reserva (R$) <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    inputMode="decimal"
+                    value={draft.reserve_fund}
+                    disabled={!canEdit}
+                    onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: e.target.value }))}
+                    placeholder="Ex.: 25000"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Nota RPS <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    inputMode="decimal"
+                    value={draft.rps_score}
+                    disabled={!canEdit}
+                    onChange={(e) => setDraft((d) => ({ ...d, rps_score: e.target.value }))}
+                    placeholder="Ex.: 8.7"
+                  />
+                </div>
+              </div>
+
+              {letter && (
+                <HighlightsEditor
+                  letterId={letter.id}
+                  closingId={closing.id}
+                  userId={user!.id}
+                  highlights={highlights}
+                  canEdit={canEdit}
+                />
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs">Comentário operacional / observações gerais (opcional)</Label>
+                <Textarea
+                  rows={3}
+                  value={draft.operational_comment}
+                  disabled={!canEdit}
+                  onChange={(e) => setDraft((d) => ({ ...d, operational_comment: e.target.value }))}
+                  placeholder="Observações gerais do mês…"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <Button
+                  size="sm"
+                  onClick={handleSaveAndGenerate}
+                  disabled={!canEdit || !letter || genAi.isPending || updateLetter.isPending}
+                  className="gap-2"
+                >
+                  {genAi.isPending || updateLetter.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {genAi.isPending ? "Gerando narrativa…" : "Salvar e gerar narrativa"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleGenerateAi} disabled={!canEdit || !letter || genAi.isPending} className="gap-2">
-                  {genAi.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {genAi.isPending ? "Gerando narrativa…" : "Gerar narrativa com IA"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={!letter || generating} className="gap-2">
-                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                  {generating ? "Gerando PDF…" : "Gerar PDF"}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGeneratePdf}
+                  disabled={!letter || generatingPdf || !letter?.ai_intro}
+                  className="gap-2"
+                >
+                  {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  {generatingPdf ? "Gerando PDF…" : "Gerar PDF"}
                 </Button>
                 {letter?.pdf_url && (
                   <Button size="sm" variant="ghost" onClick={handleDownloadPdf} className="gap-2">
@@ -225,26 +303,12 @@ export default function CartaPage() {
               </div>
             </Card>
 
-            {letter?.ai_intro && (
-              <Card className="p-5 shadow-soft">
-                <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Prévia da narrativa (IA)</h3>
-                <div className="space-y-3 text-sm text-foreground/90">
-                  {[
-                    ["Introdução", letter.ai_intro],
-                    ["Contexto de mercado", letter.ai_market_context],
-                    ["Operacional", letter.ai_operational],
-                    ["Financeiro", letter.ai_financial],
-                    ["Perspectivas", letter.ai_outlook],
-                    ["Encerramento", letter.ai_closing],
-                  ].map(([t, body]) => body ? (
-                    <div key={t}>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{t}</p>
-                      <p className="leading-relaxed">{body}</p>
-                    </div>
-                  ) : null)}
-                </div>
-              </Card>
-            )}
+            <AiNarrativePanel
+              versions={versions}
+              isGenerating={genAi.isPending}
+              canEdit={!!canEdit && !!letter}
+              onRegenerate={handleRegenerate}
+            />
 
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Ações do estágio</h3>
