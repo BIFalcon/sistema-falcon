@@ -95,9 +95,18 @@ export type Database = {
           carta_approved_at: string | null
           carta_started_at: string | null
           created_at: string
+          distribution_decided_at: string | null
+          distribution_decided_by: string | null
+          distribution_decision: string | null
+          distribution_notes: string | null
           dre_approved_at: string | null
           dre_started_at: string | null
           envio_sent_at: string | null
+          estimated_at: string | null
+          estimated_distribution: number | null
+          estimated_email_sent_at: string | null
+          estimated_lines: Json | null
+          final_distribution: number | null
           financeiro_resolved_at: string | null
           financeiro_started_at: string | null
           hotel_id: string
@@ -114,9 +123,18 @@ export type Database = {
           carta_approved_at?: string | null
           carta_started_at?: string | null
           created_at?: string
+          distribution_decided_at?: string | null
+          distribution_decided_by?: string | null
+          distribution_decision?: string | null
+          distribution_notes?: string | null
           dre_approved_at?: string | null
           dre_started_at?: string | null
           envio_sent_at?: string | null
+          estimated_at?: string | null
+          estimated_distribution?: number | null
+          estimated_email_sent_at?: string | null
+          estimated_lines?: Json | null
+          final_distribution?: number | null
           financeiro_resolved_at?: string | null
           financeiro_started_at?: string | null
           hotel_id: string
@@ -133,9 +151,18 @@ export type Database = {
           carta_approved_at?: string | null
           carta_started_at?: string | null
           created_at?: string
+          distribution_decided_at?: string | null
+          distribution_decided_by?: string | null
+          distribution_decision?: string | null
+          distribution_notes?: string | null
           dre_approved_at?: string | null
           dre_started_at?: string | null
           envio_sent_at?: string | null
+          estimated_at?: string | null
+          estimated_distribution?: number | null
+          estimated_email_sent_at?: string | null
+          estimated_lines?: Json | null
+          final_distribution?: number | null
           financeiro_resolved_at?: string | null
           financeiro_started_at?: string | null
           hotel_id?: string
