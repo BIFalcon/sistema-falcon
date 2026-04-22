@@ -2,6 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
+import {
+  estimateDistribution,
+  buildHistoryEntry,
+  type HistoryEntry,
+} from "@/lib/dreEstimator";
 
 export interface DreVersion {
   id: string;
@@ -94,6 +99,57 @@ export function useUploadDre() {
         }));
         if (indicatorRows.length || otherRows.length) {
           await supabase.from("dre_parsed_lines").insert([...indicatorRows, ...otherRows]);
+        }
+
+        // === Estimativa de distribuição ===
+        // Buscar até 3 fechamentos aprovados anteriores do mesmo hotel para
+        // construir o histórico. Só roda se tivermos hotel_id do closing atual.
+        const { data: cur } = await supabase
+          .from("closings")
+          .select("hotel_id, month, year")
+          .eq("id", closingId)
+          .maybeSingle();
+        if (cur) {
+          // pega últimos 3 closings aprovados do mesmo hotel anteriores ao atual
+          const { data: prevClosings } = await supabase
+            .from("closings")
+            .select("id, year, month")
+            .eq("hotel_id", cur.hotel_id)
+            .eq("status_dre", "aprovado")
+            .or(
+              `year.lt.${cur.year},and(year.eq.${cur.year},month.lt.${cur.month})`,
+            )
+            .order("year", { ascending: false })
+            .order("month", { ascending: false })
+            .limit(3);
+
+          const history: HistoryEntry[] = [];
+          if (prevClosings && prevClosings.length > 0) {
+            for (const pc of prevClosings) {
+              const { data: lines } = await supabase
+                .from("dre_parsed_lines")
+                .select("line_label, line_value, version_number")
+                .eq("closing_id", pc.id)
+                .eq("line_type", "indicator")
+                .order("version_number", { ascending: false });
+              if (!lines || lines.length === 0) continue;
+              const topVersion = lines[0].version_number;
+              const topRows = lines.filter((l) => l.version_number === topVersion);
+              history.push(buildHistoryEntry(topRows));
+            }
+          }
+
+          const estimate = estimateDistribution(parsed, history);
+          await supabase
+            .from("closings")
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .update({
+              estimated_distribution: estimate.estimated_distribution,
+              estimated_lines: estimate.lines as unknown as object,
+              estimated_at: new Date().toISOString(),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any)
+            .eq("id", closingId);
         }
       } catch (parseErr) {
         parseWarnings.push(parseErr instanceof Error ? parseErr.message : "Falha no parsing");
