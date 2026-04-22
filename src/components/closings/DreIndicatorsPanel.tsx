@@ -15,14 +15,17 @@ export function DreIndicatorsPanel({ closingId }: { closingId: string }) {
   if (isLoading) return null;
   if (data.length === 0) return null;
 
-  // line_label tem prefixo "[key] Label original"
-  const map = new Map<IndicatorKey, number | null>();
+  // Indicadores correntes: [key] Label   |   Ano anterior: [prev_key]
+  const cur = new Map<IndicatorKey, number | null>();
+  const prev = new Map<IndicatorKey, number | null>();
   for (const row of data) {
+    const mp = /^\[prev_(\w+)\]/.exec(row.line_label);
+    if (mp) { prev.set(mp[1] as IndicatorKey, row.line_value); continue; }
     const m = /^\[(\w+)\]/.exec(row.line_label);
-    if (m) map.set(m[1] as IndicatorKey, row.line_value);
+    if (m) cur.set(m[1] as IndicatorKey, row.line_value);
   }
 
-  const visible = ORDER.filter((k) => map.has(k));
+  const visible = ORDER.filter((k) => cur.has(k));
   if (visible.length === 0) return null;
 
   return (
@@ -36,8 +39,13 @@ export function DreIndicatorsPanel({ closingId }: { closingId: string }) {
           <div key={k} className="rounded-md border border-border bg-secondary/30 p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{INDICATOR_LABELS[k]}</p>
             <p className="text-lg font-semibold text-foreground tabular-nums">
-              {formatIndicator(k, map.get(k) ?? null)}
+              {formatIndicator(k, cur.get(k) ?? null)}
             </p>
+            {prev.has(k) && (
+              <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">
+                Ano anterior: <span className="font-medium text-foreground/70">{formatIndicator(k, prev.get(k) ?? null)}</span>
+              </p>
+            )}
           </div>
         ))}
       </div>
