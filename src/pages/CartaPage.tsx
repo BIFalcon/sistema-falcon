@@ -173,7 +173,16 @@ export default function CartaPage() {
     }
     setGeneratingPdf(true);
     try {
-      const blob = await generateLetterPdf({ letter, closing, hotel, indicators: indicatorMap });
+      const blob = await generateLetterPdf({
+        letter,
+        closing,
+        hotel,
+        hotelCoverUrl: hotelRow?.cover_url ?? null,
+        brandLogoUrl: hotelRow?.brand_logo_url ?? null,
+        falconLogoUrl: falconLogoUrl ?? null,
+        highlights,
+        indicators: indicatorMap,
+      });
       const version = (letter.pdf_version ?? 0) + 1;
       const path = `${closing.id}/v${version}_carta_${sanitizeFileName(hotel?.name ?? closing.hotel_id)}.pdf`;
       const up = await supabase.storage.from("investor-letters").upload(path, blob, {
