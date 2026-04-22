@@ -163,7 +163,11 @@ function rowLabel(row: unknown[]): string | null {
  * exatamente o valor dela — inclusive 0 ou null — para evitar que o parser
  * pegue valores de colunas "Média"/"Total" por engano.
  */
-function rowValueAt(row: unknown[], colIndex: number | null): number | null {
+function rowValueAt(
+  row: unknown[],
+  colIndex: number | null,
+  excludeCols?: Set<number>,
+): number | null {
   if (colIndex != null) {
     const c = row[colIndex];
     if (typeof c === "number" && Number.isFinite(c)) return c;
@@ -172,6 +176,7 @@ function rowValueAt(row: unknown[], colIndex: number | null): number | null {
     return null;
   }
   for (let i = row.length - 1; i >= 0; i--) {
+    if (excludeCols?.has(i)) continue;
     const c = row[i];
     if (typeof c === "number" && Number.isFinite(c) && c !== 0) return c;
   }
