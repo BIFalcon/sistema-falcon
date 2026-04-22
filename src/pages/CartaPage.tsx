@@ -18,6 +18,7 @@ import {
   getLetterPdfSignedUrl,
 } from "@/hooks/useLetter";
 import { useDreIndicators } from "@/hooks/useDre";
+import { useHotel, useFalconLogo } from "@/hooks/useHotelAssets";
 import { CartaStageStepper } from "@/components/closings/CartaStageStepper";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { CommentsThread } from "@/components/closings/CommentsThread";
@@ -25,7 +26,7 @@ import { StatusBadge } from "@/components/closings/StatusBadge";
 import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
 import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
-import { ArrowLeft, FileDown, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +59,8 @@ export default function CartaPage() {
   const { data: highlights = [] } = useLetterHighlights(letter?.id);
   const { data: versions = [] } = useLetterVersions(letter?.id);
   const { data: indicators = [] } = useDreIndicators(resolvedId);
+  const { data: hotelRow } = useHotel(closing?.hotel_id);
+  const { data: falconLogoUrl } = useFalconLogo();
 
   const hotel = useMemo(
     () => allowedHotels.find((h) => h.id === closing?.hotel_id) ?? null,
@@ -67,6 +70,12 @@ export default function CartaPage() {
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const missingAssets: string[] = [];
+  if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
+  if (hotelRow && !hotelRow.brand_logo_url) missingAssets.push("Logo da bandeira");
+  if (!falconLogoUrl) missingAssets.push("Logo Falcon institucional");
+  const assetsReady = missingAssets.length === 0;
 
   // Garante a row de letter quando faltar
   useEffect(() => {
@@ -158,6 +167,10 @@ export default function CartaPage() {
 
   async function handleGeneratePdf() {
     if (!letter || !closing) return;
+    if (!assetsReady) {
+      toast.error(`Configure os assets antes: ${missingAssets.join(", ")}`);
+      return;
+    }
     setGeneratingPdf(true);
     try {
       const blob = await generateLetterPdf({ letter, closing, hotel, indicators: indicatorMap });
@@ -289,7 +302,7 @@ export default function CartaPage() {
                   size="sm"
                   variant="outline"
                   onClick={handleGeneratePdf}
-                  disabled={!letter || generatingPdf || !letter?.ai_intro}
+                  disabled={!letter || generatingPdf || !letter?.ai_intro || !assetsReady}
                   className="gap-2"
                 >
                   {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
@@ -301,6 +314,27 @@ export default function CartaPage() {
                   </Button>
                 )}
               </div>
+              {!assetsReady && hotelRow && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-xs">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">Geração de PDF bloqueada — assets faltando:</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {missingAssets.map((m) => <li key={m}>{m}</li>)}
+                    </ul>
+                    <p>
+                      Configure em{" "}
+                      <button
+                        type="button"
+                        onClick={() => navigate("/hoteis")}
+                        className="underline font-semibold hover:no-underline"
+                      >
+                        Hotéis
+                      </button>.
+                    </p>
+                  </div>
+                </div>
+              )}
             </Card>
 
             <AiNarrativePanel

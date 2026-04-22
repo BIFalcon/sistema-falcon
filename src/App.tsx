@@ -11,6 +11,7 @@ import SemPermissaoPage from "./pages/SemPermissaoPage";
 import DrePage from "./pages/DrePage";
 import CartaPage from "./pages/CartaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
+import HoteisPage from "./pages/HoteisPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/dre" element={<DrePage />} />
               <Route path="/carta" element={<CartaPage />} />
               <Route path="/financeiro" element={<FinanceiroPage />} />
+              <Route path="/hoteis" element={<HoteisPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
