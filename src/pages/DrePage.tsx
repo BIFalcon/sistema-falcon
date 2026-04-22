@@ -59,7 +59,12 @@ export default function DrePage() {
       return;
     }
     try {
-      const r = await upload.mutateAsync({ closingId: resolvedId, file, userId: user.id });
+      const r = await upload.mutateAsync({
+        closingId: resolvedId,
+        file,
+        userId: user.id,
+        month: closing?.month ?? month,
+      });
       toast.success(`Versão v${r.version} enviada — modelo detectado: ${r.template}${r.isFirst ? " (primeira)" : ""}`);
       if (r.warnings?.length) {
         toast.warning(`Atenção no parsing: ${r.warnings.join("; ")}`);
