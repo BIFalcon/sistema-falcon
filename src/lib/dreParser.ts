@@ -52,6 +52,11 @@ export interface ParsedDre {
    */
   currentSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
   previousSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
+  /**
+   * Indicadores do MESMO MÊS do ano anterior (lidos da aba "ANO ANTERIOR"),
+   * para exibir lado a lado na Carta (ex.: "Ocupação 55% / Ano anterior 39%").
+   */
+  previousIndicators: Partial<Record<IndicatorKey, number | null>>;
 }
 
 /**
