@@ -539,17 +539,19 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     doc.setFillColor(NAVY); doc.rect(0, 0, SIZE, 138, "F");
   }
   doc.setFillColor("#FFFFFF"); doc.rect(0, 138, SIZE, SIZE - 138, "F");
+  // Faixa decorativa entre foto e bloco de texto (igual à capa)
+  drawDecorativeStripe(doc, 16, 144, SIZE - 32);
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
-  doc.text("Obrigado!", 16, 156);
+  doc.text("Obrigado!", 16, 160);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(TEXT);
-  doc.text("www.falconhoteis.com.br", 16, 168);
-  doc.text("(31) 3500-5431", 16, 174);
-  doc.text("R. Bernardo Guimarães, 245, B.", 16, 180);
-  doc.text("Funcionários, Belo Horizonte - MG", 16, 186);
+  doc.text("www.falconhoteis.com.br", 16, 170);
+  doc.text("(31) 3500-5431", 16, 176);
+  doc.text("R. Bernardo Guimarães, 245, B.", 16, 182);
+  doc.text("Funcionários, Belo Horizonte - MG", 16, 188);
   if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
   if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
   doc.setFontSize(7);
