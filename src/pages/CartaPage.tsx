@@ -18,6 +18,7 @@ import {
   getLetterPdfSignedUrl,
 } from "@/hooks/useLetter";
 import { useDreIndicators } from "@/hooks/useDre";
+import { useHotel, useFalconLogo } from "@/hooks/useHotelAssets";
 import { CartaStageStepper } from "@/components/closings/CartaStageStepper";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { CommentsThread } from "@/components/closings/CommentsThread";
@@ -25,7 +26,7 @@ import { StatusBadge } from "@/components/closings/StatusBadge";
 import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
 import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
-import { ArrowLeft, FileDown, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
