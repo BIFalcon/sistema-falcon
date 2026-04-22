@@ -304,6 +304,7 @@ export async function parseDreExcel(
   // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
   let previousSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
+  let previousIndicators: Partial<Record<IndicatorKey, number | null>> = {};
   if (prevSheetName) {
     const prevWs = wb.Sheets[prevSheetName];
     if (prevWs) {
@@ -311,6 +312,25 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+      // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
+      // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
+      if (targetMonth) {
+        const prevMonthInfo = findMonthColumn(prevRows, targetMonth);
+        const prevMonthCol = prevMonthInfo?.colIndex ?? null;
+        const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
+        for (const k of allKeys) {
+          const rxs = INDICATORS.find((i) => i.key === k)?.rx ?? [];
+          for (const row of prevRows) {
+            const lbl = rowLabel(row ?? []);
+            if (!lbl) continue;
+            if (rxs.some((rx) => rx.test(lbl))) {
+              const v = rowValueAt(row, prevMonthCol);
+              previousIndicators[k] = typeof v === "number" ? v : null;
+              break;
+            }
+          }
+        }
+      }
     }
   } else {
     warnings.push('Aba "ANO ANTERIOR" não localizada — gráficos comparativos sem série prévia.');
@@ -326,6 +346,7 @@ export async function parseDreExcel(
     monthHeaderLabel: monthInfo?.label ?? null,
     currentSeries,
     previousSeries,
+    previousIndicators,
   };
 }
 
