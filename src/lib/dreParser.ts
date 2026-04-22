@@ -234,7 +234,7 @@ export async function parseDreExcel(
     if (!row || row.every((c) => c == null || c === "")) return;
     const label = rowLabel(row);
     if (!label) return;
-    let value = rowValueAt(row, monthCol);
+    let value = rowValueAt(row, monthCol, aggregateCols);
     // CONFINS: "UHs Pool: 280" — extrai o número embutido no rótulo
     if (value == null) {
       const m = label.match(/(\d{2,5})\s*$/);
