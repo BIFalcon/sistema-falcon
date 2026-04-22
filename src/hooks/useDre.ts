@@ -38,8 +38,8 @@ export function useDreVersions(closingId: string | null | undefined) {
 export function useUploadDre() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { closingId: string; file: File; userId: string }) => {
-      const { closingId, file, userId } = input;
+    mutationFn: async (input: { closingId: string; file: File; userId: string; month: number }) => {
+      const { closingId, file, userId, month } = input;
 
       const { data: existing, error: errVer } = await supabase
         .from("dre_versions")
@@ -72,7 +72,7 @@ export function useUploadDre() {
       let parseWarnings: string[] = [];
       let template = "DEFAULT";
       try {
-        const parsed = await parseDreExcel(file);
+        const parsed = await parseDreExcel(file, { targetMonth: month });
         template = parsed.template;
         parseWarnings = parsed.warnings;
         // Persist key indicators + raw lines (limita a 200 linhas para não estourar)
