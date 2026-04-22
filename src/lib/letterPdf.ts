@@ -524,12 +524,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   /* ───── 6. DEMONSTRATIVO DE RESULTADOS ───── */
   addPage(doc);
   drawPageHeader(doc, "Demonstrativo de Resultados", falconData, brandData);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED);
-  doc.text("RESUMO", SIZE / 2, 28, { align: "center" });
-
-  drawDreTable(doc, dreLines, MONTHS_PT[closing.month - 1]);
+  drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`);
 
   /* ───── 7. ENCERRAMENTO ───── */
   addPage(doc);
