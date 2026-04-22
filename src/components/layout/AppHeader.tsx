@@ -1,0 +1,123 @@
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { LogOut, User as UserIcon } from "lucide-react";
+import { useFilters } from "@/contexts/FilterContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { MONTHS_PT } from "@/lib/constants";
+import { useEffect } from "react";
+
+export function AppHeader() {
+  const { hotelId, month, year, setHotelId, setMonth, setYear } = useFilters();
+  const { allowedHotels, profile, signOut, isMaster } = useAuth();
+
+  // Garante que o hotel selecionado é permitido (ou null = todos quando master)
+  useEffect(() => {
+    if (hotelId && !allowedHotels.find((h) => h.id === hotelId)) {
+      setHotelId(allowedHotels[0]?.id ?? null);
+    }
+    if (!hotelId && !isMaster && allowedHotels.length === 1) {
+      setHotelId(allowedHotels[0].id);
+    }
+  }, [allowedHotels, hotelId, isMaster, setHotelId]);
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+
+  return (
+    <header className="h-16 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-30">
+      <SidebarTrigger className="text-foreground" />
+
+      <div className="h-6 w-px bg-border mx-1" />
+
+      <div className="flex items-center gap-2 flex-1">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden md:inline">
+          Filtros
+        </span>
+
+        <Select
+          value={hotelId ?? "__all__"}
+          onValueChange={(v) => setHotelId(v === "__all__" ? null : v)}
+        >
+          <SelectTrigger className="w-[220px] h-9">
+            <SelectValue placeholder="Hotel" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            {isMaster && <SelectItem value="__all__">Todos os hotéis</SelectItem>}
+            {allowedHotels.map((h) => (
+              <SelectItem key={h.id} value={h.id}>
+                {h.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Mês" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            {MONTHS_PT.map((m, i) => (
+              <SelectItem key={i} value={String(i + 1)}>
+                {m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+          <SelectTrigger className="w-[100px] h-9">
+            <SelectValue placeholder="Ano" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            {years.map((y) => (
+              <SelectItem key={y} value={String(y)}>
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="gap-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <UserIcon className="h-4 w-4" />
+            </div>
+            <span className="hidden md:inline text-sm font-medium">
+              {profile?.display_name ?? profile?.email}
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56 bg-popover">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-0.5">
+              <p className="text-sm font-medium">{profile?.display_name ?? "Usuário"}</p>
+              <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  );
+}
