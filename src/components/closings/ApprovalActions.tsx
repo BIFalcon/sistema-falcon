@@ -153,9 +153,9 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
       <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Devolver DRE</DialogTitle>
+            <DialogTitle>Devolver {isCarta ? "Carta" : "DRE"}</DialogTitle>
             <DialogDescription>
-              A DRE retornará para <strong>{prevStatus && STATUS_LABELS[prevStatus]}</strong>. O comentário é obrigatório e ficará registrado.
+              {isCarta ? "A Carta" : "A DRE"} retornará para <strong>{prevStatus && STATUS_LABELS[prevStatus]}</strong>. O comentário é obrigatório e ficará registrado.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
