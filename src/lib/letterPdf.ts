@@ -176,7 +176,8 @@ function drawBarChart(
   const barW = groupW * 0.32;
   const gap = groupW * 0.06;
 
-  ctx.font = `${3 * px}px Helvetica, Arial`;
+  // Para 12 meses, fontes menores para os valores em cima das barras
+  ctx.font = `${2.4 * px}px Helvetica, Arial`;
   ctx.textAlign = "center";
 
   for (let i = 0; i < n; i++) {
@@ -192,7 +193,7 @@ function drawBarChart(
       ctx.fillRect(cx - barW - gap / 2, y0 + h - bh, barW, bh);
       // label valor
       ctx.fillStyle = NAVY;
-      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
       ctx.fillText(formatter(cVal), cx - barW / 2 - gap / 2, y0 + h - bh - 1.5 * px);
     }
     if (pVal != null) {
@@ -200,13 +201,13 @@ function drawBarChart(
       ctx.fillStyle = "#9CA3AF";
       ctx.fillRect(cx + gap / 2, y0 + h - bh, barW, bh);
       ctx.fillStyle = "#6B7280";
-      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.font = `${2.2 * px}px Helvetica, Arial`;
       ctx.fillText(formatter(pVal), cx + barW / 2 + gap / 2, y0 + h - bh - 1.5 * px);
     }
-    // mês
+    // mês (3 letras para caber 12 colunas)
     ctx.fillStyle = TEXT;
-    ctx.font = `${3 * px}px Helvetica, Arial`;
-    ctx.fillText(MONTHS_PT[current[i].month - 1], cx, y0 + h + 4 * px);
+    ctx.font = `${2.6 * px}px Helvetica, Arial`;
+    ctx.fillText(MONTHS_PT[current[i].month - 1].slice(0, 3), cx, y0 + h + 4 * px);
   }
 
   // legenda
@@ -289,32 +290,32 @@ function drawLineChart(
   ctx.stroke();
 
   // pontos + valores
-  ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+  ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
   ctx.textAlign = "center";
   current.forEach((d, i) => {
     const v = d[field] as number | null;
     if (v == null) return;
     const x = x0 + i * stepX, y = yFor(v);
     ctx.fillStyle = NAVY;
-    ctx.beginPath(); ctx.arc(x, y, 1.6 * px, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, 1.2 * px, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = NAVY;
-    ctx.fillText(formatter(v), x, y - 3 * px);
+    ctx.fillText(formatter(v), x, y - 2.5 * px);
   });
-  ctx.font = `${3 * px}px Helvetica, Arial`;
+  ctx.font = `${2.2 * px}px Helvetica, Arial`;
   previous.forEach((d, i) => {
     const v = d[field] as number | null;
     if (v == null) return;
     const x = x0 + i * stepX, y = yFor(v);
     ctx.fillStyle = "#6B7280";
-    ctx.fillText(formatter(v), x, y + 5 * px);
+    ctx.fillText(formatter(v), x, y + 4 * px);
   });
 
-  // labels mês
+  // labels mês (3 letras p/ Jan-Dez)
   ctx.fillStyle = TEXT;
-  ctx.font = `${3 * px}px Helvetica, Arial`;
+  ctx.font = `${2.6 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1], x, y0 + h + 4 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 4 * px);
   });
 
   // legenda
