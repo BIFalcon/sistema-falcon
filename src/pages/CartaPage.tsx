@@ -315,7 +315,7 @@ export default function CartaPage() {
                 )}
               </div>
               {!assetsReady && hotelRow && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 text-xs dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-xs">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <div className="space-y-1">
                     <p className="font-semibold">Geração de PDF bloqueada — assets faltando:</p>
