@@ -330,6 +330,7 @@ export type Database = {
           ai_model: string | null
           ai_operational: string | null
           ai_outlook: string | null
+          ai_version_number: number
           closing_id: string
           created_at: string
           created_by: string
@@ -340,9 +341,13 @@ export type Database = {
           highlight_outlook: string | null
           highlight_revenue: string | null
           id: string
+          last_ai_instruction: string | null
+          operational_comment: string | null
           pdf_generated_at: string | null
           pdf_url: string | null
           pdf_version: number
+          reserve_fund: number | null
+          rps_score: number | null
           updated_at: string
           updated_by: string | null
         }
@@ -355,6 +360,7 @@ export type Database = {
           ai_model?: string | null
           ai_operational?: string | null
           ai_outlook?: string | null
+          ai_version_number?: number
           closing_id: string
           created_at?: string
           created_by: string
@@ -365,9 +371,13 @@ export type Database = {
           highlight_outlook?: string | null
           highlight_revenue?: string | null
           id?: string
+          last_ai_instruction?: string | null
+          operational_comment?: string | null
           pdf_generated_at?: string | null
           pdf_url?: string | null
           pdf_version?: number
+          reserve_fund?: number | null
+          rps_score?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -380,6 +390,7 @@ export type Database = {
           ai_model?: string | null
           ai_operational?: string | null
           ai_outlook?: string | null
+          ai_version_number?: number
           closing_id?: string
           created_at?: string
           created_by?: string
@@ -390,9 +401,13 @@ export type Database = {
           highlight_outlook?: string | null
           highlight_revenue?: string | null
           id?: string
+          last_ai_instruction?: string | null
+          operational_comment?: string | null
           pdf_generated_at?: string | null
           pdf_url?: string | null
           pdf_version?: number
+          reserve_fund?: number | null
+          rps_score?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -402,6 +417,126 @@ export type Database = {
             columns: ["closing_id"]
             isOneToOne: true
             referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      letter_highlights: {
+        Row: {
+          closing_id: string
+          created_at: string
+          created_by: string
+          id: string
+          letter_id: string
+          note: string | null
+          photo_url: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          closing_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          letter_id: string
+          note?: string | null
+          photo_url?: string | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          closing_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          letter_id?: string
+          note?: string | null
+          photo_url?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "letter_highlights_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "letter_highlights_letter_id_fkey"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "investor_letters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      letter_versions: {
+        Row: {
+          ai_closing: string | null
+          ai_financial: string | null
+          ai_intro: string | null
+          ai_market_context: string | null
+          ai_model: string | null
+          ai_operational: string | null
+          ai_outlook: string | null
+          closing_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          instruction: string | null
+          letter_id: string
+          version_number: number
+        }
+        Insert: {
+          ai_closing?: string | null
+          ai_financial?: string | null
+          ai_intro?: string | null
+          ai_market_context?: string | null
+          ai_model?: string | null
+          ai_operational?: string | null
+          ai_outlook?: string | null
+          closing_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instruction?: string | null
+          letter_id: string
+          version_number: number
+        }
+        Update: {
+          ai_closing?: string | null
+          ai_financial?: string | null
+          ai_intro?: string | null
+          ai_market_context?: string | null
+          ai_model?: string | null
+          ai_operational?: string | null
+          ai_outlook?: string | null
+          closing_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instruction?: string | null
+          letter_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "letter_versions_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "letter_versions_letter_id_fkey"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "investor_letters"
             referencedColumns: ["id"]
           },
         ]
