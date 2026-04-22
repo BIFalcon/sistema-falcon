@@ -538,44 +538,78 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
 /* ───────────────── DRE Table ───────────────── */
 
-function drawDreTable(doc: jsPDF, lines: { label: string; value: number | null }[], monthLabel: string) {
+/**
+ * DRE resumida: mostra somente os totais por categoria (Receita Bruta,
+ * Deduções, Receita Líquida, Despesas Fixas, Despesas Variáveis, GOP/Resultado,
+ * EBITDA, Lucro Líquido) e a Distribuição por UH em destaque.
+ * Os matchers buscam dentro das linhas extraídas da DRE pelo parser; se o
+ * rótulo equivalente não existir naquele template, a linha é omitida.
+ */
+function drawDreTable(
+  doc: jsPDF,
+  lines: { label: string; value: number | null }[],
+  monthLabel: string,
+) {
+  type Group = { label: string; rx: RegExp[]; emphasis?: boolean };
+  const groups: Group[] = [
+    { label: "Receita Bruta Total", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i] },
+    { label: "(–) Deduções", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es/i, /^total\s+de\s+dedu/i] },
+    { label: "(=) Receita Líquida", rx: [/^\(?=\)?\s*receita\s+l[íi]quida/i, /^receita\s+l[íi]quida\s+total/i] },
+    { label: "(–) Despesas Fixas", rx: [/^\(?\-?\)?\s*despesas?\s+fixas?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+fixas?/i] },
+    { label: "(–) Despesas Variáveis", rx: [/^\(?\-?\)?\s*despesas?\s+vari[áa]veis?\s+(totais?|do\s+m[êe]s|operacionais)?/i, /^total\s+de\s+despesas?\s+vari[áa]veis?/i] },
+    { label: "(=) GOP / Resultado Operacional", rx: [/^\(?=\)?\s*resultado\s+operacional\s+bruto/i, /\bgop\b/i], emphasis: true },
+    { label: "EBITDA", rx: [/ebitda/i] },
+    { label: "(=) Lucro Líquido", rx: [/^\(?=\)?\s*lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i], emphasis: true },
+    { label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i], emphasis: true },
+  ];
+
+  const findValue = (rxs: RegExp[]): number | null => {
+    for (const l of lines) {
+      const lbl = l.label.replace(/^\[\w+\]\s*/, "").trim();
+      if (rxs.some((rx) => rx.test(lbl))) return l.value;
+    }
+    return null;
+  };
+
   const x0 = 12, x1 = SIZE - 12;
-  let y = 36;
-  // header
+  let y = 38;
+  // header navy
   doc.setFillColor(NAVY);
-  doc.rect(x0, y, x1 - x0, 7, "F");
+  doc.rect(x0, y, x1 - x0, 8, "F");
   doc.setTextColor("#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("DRE", x0 + 4, y + 4.7);
-  doc.text(monthLabel, x1 - 4, y + 4.7, { align: "right" });
-  y += 7;
+  doc.setFontSize(9);
+  doc.text("DRE — RESUMO", x0 + 4, y + 5.3);
+  doc.text(monthLabel, x1 - 4, y + 5.3, { align: "right" });
+  y += 8;
 
-  doc.setFontSize(7.5);
   doc.setTextColor(TEXT);
-
-  const isTotal = (label: string) => /^(receita\s+(bruta|l[íi]quida)\s+total|dedu[çc][õo]es|despesas?\s+(fixas?|vari[áa]veis?|totais?)|resultado|total)/i.test(label.trim());
-
-  for (const line of lines) {
-    if (y > SIZE - 14) break;
-    const totalRow = isTotal(line.label);
-    if (totalRow) {
-      doc.setDrawColor(BORDER);
-      doc.setLineWidth(0.2);
-      doc.line(x0, y, x1, y);
+  for (const g of groups) {
+    const v = findValue(g.rx);
+    const rowH = g.emphasis ? 9 : 7.5;
+    if (g.emphasis) {
+      doc.setFillColor("#F4F1EA"); // bege suave para destaque
+      doc.rect(x0, y, x1 - x0, rowH, "F");
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(NAVY);
     } else {
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(TEXT);
+      doc.setDrawColor(BORDER);
+      doc.setLineWidth(0.2);
+      doc.line(x0, y + rowH, x1, y + rowH);
     }
-    const label = line.label.length > 70 ? line.label.slice(0, 70) + "…" : line.label;
-    doc.text(label, x0 + (totalRow ? 3 : 8), y + 3.5);
-    const val = line.value == null
-      ? "-"
-      : (line.value < 0
-        ? `(${Math.abs(line.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
-        : line.value.toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
-    doc.text(val, x1 - 3, y + 3.5, { align: "right" });
-    y += 4.5;
+    doc.text(g.label, x0 + 4, y + rowH - 2.5);
+    const valStr =
+      v == null
+        ? "—"
+        : v < 0
+          ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
+          : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    doc.text(valStr, x1 - 4, y + rowH - 2.5, { align: "right" });
+    y += rowH;
   }
 }
 
