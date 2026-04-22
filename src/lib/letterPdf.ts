@@ -38,6 +38,8 @@ export interface LetterPdfInput {
   falconLogoUrl: string | null;
   highlights: LetterHighlight[];
   indicators: Partial<Record<IndicatorKey, number | null>>;
+  /** Indicadores do mesmo mês do ano anterior (lidos da aba "ANO ANTERIOR"). */
+  previousIndicators?: Partial<Record<IndicatorKey, number | null>>;
 }
 
 /* ───────────────── Utilidades de carregamento ───────────────── */
