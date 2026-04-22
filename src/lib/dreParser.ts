@@ -44,6 +44,14 @@ export interface ParsedDre {
   warnings: string[];
   monthColumnIndex: number | null;
   monthHeaderLabel: string | null;
+  /**
+   * Séries mensais Jan-Dez (1..12) por indicador, extraídas:
+   * - `currentSeries`: da própria aba DRE do ano corrente (12 colunas mensais)
+   * - `previousSeries`: da aba "ANO ANTERIOR" quando existir
+   * Usadas pelos gráficos comparativos da Carta ao Investidor.
+   */
+  currentSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
+  previousSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
 }
 
 /**
