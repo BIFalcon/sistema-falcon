@@ -59,6 +59,8 @@ export default function CartaPage() {
   const { data: highlights = [] } = useLetterHighlights(letter?.id);
   const { data: versions = [] } = useLetterVersions(letter?.id);
   const { data: indicators = [] } = useDreIndicators(resolvedId);
+  const { data: hotelRow } = useHotel(closing?.hotel_id);
+  const { data: falconLogoUrl } = useFalconLogo();
 
   const hotel = useMemo(
     () => allowedHotels.find((h) => h.id === closing?.hotel_id) ?? null,
@@ -68,6 +70,12 @@ export default function CartaPage() {
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const missingAssets: string[] = [];
+  if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
+  if (hotelRow && !hotelRow.brand_logo_url) missingAssets.push("Logo da bandeira");
+  if (!falconLogoUrl) missingAssets.push("Logo Falcon institucional");
+  const assetsReady = missingAssets.length === 0;
 
   // Garante a row de letter quando faltar
   useEffect(() => {
@@ -159,6 +167,10 @@ export default function CartaPage() {
 
   async function handleGeneratePdf() {
     if (!letter || !closing) return;
+    if (!assetsReady) {
+      toast.error(`Configure os assets antes: ${missingAssets.join(", ")}`);
+      return;
+    }
     setGeneratingPdf(true);
     try {
       const blob = await generateLetterPdf({ letter, closing, hotel, indicators: indicatorMap });
