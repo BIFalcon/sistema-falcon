@@ -1,7 +1,7 @@
 // Edge function: gera a narrativa da Carta ao Investidor usando Lovable AI Gateway.
 // Recebe { closing_id, letter_id }. Carrega highlights + indicadores DRE
 // e devolve textos por seção, salvos diretamente em investor_letters.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,13 +28,13 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: auth } } },
     );
 
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: auth } } },
-    );
-    const { data: u } = await userClient.auth.getUser();
-    if (!u?.user) return json({ error: "Usuário inválido" }, 401);
+    // Valida o JWT via getClaims() (suporta as novas chaves ES256/HS256 do Supabase).
+    const token = auth.replace(/^Bearer\s+/i, "");
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims?.sub) {
+      return json({ error: "Usuário inválido" }, 401);
+    }
+    const userId = claimsData.claims.sub as string;
 
     const { closing_id, letter_id } = (await req.json()) as Body;
     if (!closing_id || !letter_id) return json({ error: "Parâmetros ausentes" }, 400);
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
         ai_closing: parsed.closing ?? null,
         ai_model: MODEL,
         ai_generated_at: new Date().toISOString(),
-        updated_by: u.user.id,
+        updated_by: userId,
       })
       .eq("id", letter_id);
     if (upd.error) return json({ error: upd.error.message }, 500);
