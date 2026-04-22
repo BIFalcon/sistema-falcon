@@ -2,11 +2,10 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FileSpreadsheet,
+  Mail,
   Wallet,
+  Send,
   TrendingUp,
-  Target,
-  Users,
-  ClipboardCheck,
   Settings,
   Hotel,
 } from "lucide-react";
@@ -33,20 +32,18 @@ const navGroups = [
     items: [{ title: "Dashboard", url: "/", icon: LayoutDashboard, end: true }],
   },
   {
-    label: "Operação",
+    label: "Workflow de Fechamento",
     items: [
-      { title: "Fechamento", url: "/fechamento", icon: FileSpreadsheet },
-      { title: "Contas a Pagar", url: "/contas-pagar", icon: Wallet },
-      { title: "Contas a Receber", url: "/contas-receber", icon: Wallet },
+      { title: "DRE", url: "/dre", icon: FileSpreadsheet },
+      { title: "Carta ao Investidor", url: "/carta", icon: Mail },
+      { title: "Financeiro", url: "/financeiro", icon: Wallet },
+      { title: "Envio", url: "/envio", icon: Send },
     ],
   },
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp },
-      { title: "Metas GG", url: "/metas", icon: Target },
-      { title: "RH & People", url: "/rh", icon: Users },
-      { title: "Controladoria", url: "/controladoria", icon: ClipboardCheck },
+      { title: "Performance (SLA)", url: "/performance", icon: TrendingUp },
     ],
   },
   {

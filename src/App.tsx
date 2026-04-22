@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import LoginPage from "./pages/LoginPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SemPermissaoPage from "./pages/SemPermissaoPage";
+import DrePage from "./pages/DrePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 
@@ -29,6 +30,7 @@ const App = () => (
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
               <Route path="/" element={<Index />} />
+              <Route path="/dre" element={<DrePage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
