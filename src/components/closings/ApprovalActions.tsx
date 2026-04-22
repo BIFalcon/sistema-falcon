@@ -23,11 +23,14 @@ import {
   DRE_NEXT_STATUS,
   DRE_PREV_STATUS,
   DRE_STAGE_APPROVER,
+  CARTA_NEXT_STATUS,
+  CARTA_PREV_STATUS,
+  CARTA_STAGE_APPROVER,
 } from "@/lib/constants";
 
 interface Props {
   closingId: string;
-  stage: ClosingStage; // por enquanto, "dre"
+  stage: ClosingStage; // "dre" | "carta"
   currentStatus: ClosingStatus;
   onChanged?: () => void;
 }
@@ -46,14 +49,21 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
   const [returnOpen, setReturnOpen] = useState(false);
   const [returnNote, setReturnNote] = useState("");
 
-  const requiredRole = DRE_STAGE_APPROVER[currentStatus];
+  const isCarta = stage === "carta";
+  const APPROVER = isCarta ? CARTA_STAGE_APPROVER : DRE_STAGE_APPROVER;
+  const NEXT = isCarta ? CARTA_NEXT_STATUS : DRE_NEXT_STATUS;
+  const PREV = isCarta ? CARTA_PREV_STATUS : DRE_PREV_STATUS;
+  const FIELD = isCarta ? "status_carta" : "status_dre";
+
+  const requiredRole = APPROVER[currentStatus];
   const canApprove =
     isMaster ||
-    (currentStatus === "aguardando_comentarios" && (roles.includes("gg" as AppRole) || roles.includes("gop" as AppRole))) ||
+    (!isCarta && currentStatus === "aguardando_comentarios" &&
+      (roles.includes("gg" as AppRole) || roles.includes("gop" as AppRole))) ||
     (requiredRole !== null && roles.includes(requiredRole));
 
-  const nextStatus = DRE_NEXT_STATUS[currentStatus];
-  const prevStatus = DRE_PREV_STATUS[currentStatus];
+  const nextStatus = NEXT[currentStatus];
+  const prevStatus = PREV[currentStatus];
 
   async function handleApprove() {
     if (!user || !nextStatus) return;
@@ -66,7 +76,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
       });
       await updateStatus.mutateAsync({
         closingId,
-        field: "status_dre",
+        field: FIELD,
         value: nextStatus,
       });
       toast.success(`Avançado para "${STATUS_LABELS[nextStatus]}"`);
@@ -92,10 +102,10 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
       });
       await updateStatus.mutateAsync({
         closingId,
-        field: "status_dre",
+        field: FIELD,
         value: prevStatus ?? "devolvido",
       });
-      toast.success("DRE devolvida ao estágio anterior");
+      toast.success(`${isCarta ? "Carta" : "DRE"} devolvida ao estágio anterior`);
       setReturnOpen(false);
       setReturnNote("");
       onChanged?.();
@@ -104,7 +114,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     }
   }
 
-  if (currentStatus === "aprovado" || currentStatus === "nao_iniciado") {
+  if (currentStatus === "aprovado" || currentStatus === "nao_iniciado" || currentStatus === "nao_aplicavel") {
     return null;
   }
 

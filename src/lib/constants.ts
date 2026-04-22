@@ -131,6 +131,35 @@ export const DRE_PREV_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
   aprovado: "aguardando_fernando",
 };
 
+// ====== Workflow da Carta ao Investidor ======
+// Fluxo: GG redige/edita -> aprova -> Fernando revisa -> aprovado
+export const CARTA_NEXT_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
+  nao_iniciado: "aguardando_gg",
+  aguardando_gg: "aguardando_fernando",
+  aguardando_fernando: "aprovado",
+  devolvido: "aguardando_gg",
+};
+
+export const CARTA_PREV_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
+  aguardando_fernando: "aguardando_gg",
+  aprovado: "aguardando_fernando",
+};
+
+export const CARTA_STAGE_APPROVER: Record<ClosingStatus, AppRole | null> = {
+  aguardando_gg: "gg",
+  aguardando_fernando: "fernando",
+  nao_iniciado: null,
+  em_andamento: null,
+  pendente: null,
+  aprovado: null,
+  devolvido: null,
+  aguardando_comentarios: null,
+  aguardando_controladoria: null,
+  aguardando_gop: null,
+  nao_aplicavel: null,
+  sem_distribuicao: null,
+};
+
 // SLA por estágio (horas)
 export const SLA_HOURS = {
   dre: 48,
