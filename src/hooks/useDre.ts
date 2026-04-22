@@ -242,7 +242,12 @@ export function useDreIndicators(closingId: string | null | undefined) {
       if (error) throw error;
       // mantém só a versão mais recente
       const top = data?.[0]?.version_number;
-      return ((data ?? []).filter((r) => r.version_number === top)) as DreIndicatorRow[];
+      // Filtra também as linhas de séries mensais (que poluiriam o painel),
+      // mantendo apenas indicadores do mês corrente ([key]) e do ano
+      // anterior ([prev_key]). Cada linha de série tem prefixo [series_…].
+      return ((data ?? [])
+        .filter((r) => r.version_number === top)
+        .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
     },
   });
 }
