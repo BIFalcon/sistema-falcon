@@ -291,32 +291,47 @@ function drawLineChart(
   ctx.stroke();
 
   // pontos + valores
-  ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
+  // Posicionamento dinâmico: o maior valor do mês fica acima da linha,
+  // o menor abaixo. Vale para ambas as séries.
   ctx.textAlign = "center";
+  // Desenha pontos atuais
   current.forEach((d, i) => {
     const v = d[field] as number | null;
     if (v == null) return;
     const x = x0 + i * stepX, y = yFor(v);
     ctx.fillStyle = NAVY;
-    ctx.beginPath(); ctx.arc(x, y, 1.2 * px, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = NAVY;
-    ctx.fillText(formatter(v), x, y - 2.5 * px);
+    ctx.beginPath(); ctx.arc(x, y, 1.6 * px, 0, Math.PI * 2); ctx.fill();
   });
-  ctx.font = `${2.2 * px}px Helvetica, Arial`;
-  previous.forEach((d, i) => {
-    const v = d[field] as number | null;
-    if (v == null) return;
-    const x = x0 + i * stepX, y = yFor(v);
-    ctx.fillStyle = "#6B7280";
-    ctx.fillText(formatter(v), x, y + 4 * px);
-  });
+  // Rótulos posicionados dinamicamente por mês
+  for (let i = 0; i < current.length; i++) {
+    const cv = current[i][field] as number | null;
+    const pv = previous[i]?.[field] as number | null | undefined;
+    const x = x0 + i * stepX;
+    if (cv != null) {
+      const y = yFor(cv);
+      const above = pv == null ? true : cv >= pv;
+      ctx.fillStyle = NAVY;
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.textBaseline = above ? "bottom" : "top";
+      ctx.fillText(formatter(cv), x, above ? y - 2.4 * px : y + 2.4 * px);
+    }
+    if (pv != null) {
+      const y = yFor(pv);
+      const above = cv == null ? true : pv > cv;
+      ctx.fillStyle = "#6B7280";
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.textBaseline = above ? "bottom" : "top";
+      ctx.fillText(formatter(pv), x, above ? y - 2.4 * px : y + 2.4 * px);
+    }
+  }
+  ctx.textBaseline = "alphabetic";
 
   // labels mês (3 letras p/ Jan-Dez)
   ctx.fillStyle = TEXT;
-  ctx.font = `${2.6 * px}px Helvetica, Arial`;
+  ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 4 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 5 * px);
   });
 
   // legenda
