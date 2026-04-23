@@ -98,8 +98,15 @@ export default function ContasPagarPage() {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [notifySelected, setNotifySelected] = useState<Set<string>>(new Set());
   const [notifying, setNotifying] = useState(false);
+  const [notifyCats, setNotifyCats] = useState({
+    notApproved: true,
+    noDoc: true,
+    overdue: true,
+    divergent: true,
+  });
+  const [notifyHideTrivial, setNotifyHideTrivial] = useState(true);
+  const [notifyHideNd, setNotifyHideNd] = useState(false);
 
   const docsByEntry = useMemo(() => {
     const map = new Map<string, ApDocument>();
@@ -254,15 +261,45 @@ export default function ContasPagarPage() {
   }
 
   function openNotify() {
-    setNotifySelected(new Set(issueEntries.map((e) => e.id)));
+    setNotifyCats({ notApproved: true, noDoc: true, overdue: true, divergent: true });
+    setNotifyHideTrivial(true);
+    setNotifyHideNd(false);
     setNotifyOpen(true);
   }
 
+  // Categoria por entry (independentes — uma entry pode ter várias)
+  function entryFlags(e: ApEntry) {
+    const overdue = !!e.omie_situation?.toLowerCase().includes("atras");
+    const noApproval = e.gg_approval !== "approved";
+    const noDoc = !e.primary_document_id;
+    const doc = docsByEntry.get(e.id);
+    const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01;
+    return { overdue, noApproval, noDoc, divergent };
+  }
+
+  const notifyEntries = useMemo(() => {
+    return issueEntries.filter((e) => {
+      const f = entryFlags(e);
+      const matches =
+        (notifyCats.notApproved && f.noApproval) ||
+        (notifyCats.noDoc && f.noDoc) ||
+        (notifyCats.overdue && f.overdue) ||
+        (notifyCats.divergent && f.divergent);
+      if (!matches) return false;
+      if (notifyHideTrivial && Number(e.amount || 0) < 1) return false;
+      if (notifyHideNd) {
+        const isNd = !e.document_number || e.document_number.trim() === "" || e.document_number.toUpperCase() === "N/D";
+        if (isNd) return false;
+      }
+      return true;
+    });
+  }, [issueEntries, notifyCats, notifyHideTrivial, notifyHideNd, docsByEntry]);
+
   async function sendNotify() {
-    if (!hotelId || notifySelected.size === 0) return;
+    if (!hotelId || notifyEntries.length === 0) return;
     setNotifying(true);
     try {
-      const r = await notifyGgPendencies({ hotelId, entryIds: Array.from(notifySelected) });
+      const r = await notifyGgPendencies({ hotelId, entryIds: notifyEntries.map((e) => e.id) });
       if (r.recipients === 0) {
         toast.warning("Nenhum GG cadastrado para este hotel.");
       } else {
