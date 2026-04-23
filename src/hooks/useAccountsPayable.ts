@@ -228,6 +228,41 @@ export function useApEntries(hotelId: string | null) {
   });
 }
 
+/** Busca lançamentos AP de todos os hotéis acessíveis ao usuário (RLS aplica). */
+export function useAllApEntries(enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: ["ap-entries-all"],
+    queryFn: async (): Promise<ApEntry[]> => {
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("*")
+        .is("archived_at", null)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(10000);
+      if (error) throw error;
+      return (data ?? []) as ApEntry[];
+    },
+  });
+}
+
+/** Saldos bancários do dia para todos os hotéis acessíveis. */
+export function useAllTodayBankBalances(enabled = true) {
+  const today = new Date().toISOString().slice(0, 10);
+  return useQuery({
+    enabled,
+    queryKey: ["ap-balances-all", today],
+    queryFn: async (): Promise<ApBankBalance[]> => {
+      const { data, error } = await supabase
+        .from("ap_bank_balance")
+        .select("*")
+        .eq("balance_date", today);
+      if (error) throw error;
+      return (data ?? []) as ApBankBalance[];
+    },
+  });
+}
+
 export function useTodayBankBalance(hotelId: string | null) {
   const today = new Date().toISOString().slice(0, 10);
   return useQuery({
