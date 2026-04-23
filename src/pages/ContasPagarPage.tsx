@@ -78,9 +78,17 @@ export default function ContasPagarPage() {
   const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
 
   const { data: lastUpload } = useLatestApUpload(hotelId);
-  const { data: entries = [], isLoading: entriesLoading } = useApEntries(hotelId);
+  const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
   const { data: balance } = useTodayBankBalance(hotelId);
   const { data: documents = [] } = useApDocuments(hotelId);
+  // Separa entries em ATIVOS (do relatório atual) + ARQUIVADOS (sumiram do último upload).
+  // Distribuição de Lucros entra numa lista própria (mas continua "ativa").
+  const allEntries = allEntriesRaw;
+  const activeEntries = useMemo(() => allEntries.filter((e) => !e.archived_at), [allEntries]);
+  const archivedEntries = useMemo(() => allEntries.filter((e) => !!e.archived_at), [allEntries]);
+  const distributionEntries = useMemo(() => activeEntries.filter((e) => e.is_distribution), [activeEntries]);
+  const entries = useMemo(() => activeEntries.filter((e) => !e.is_distribution), [activeEntries]);
+
   const upsertBalance = useUpsertBankBalance();
   const setApproval = useSetEntryApproval();
   const linkDoc = useLinkDocumentToEntry();
