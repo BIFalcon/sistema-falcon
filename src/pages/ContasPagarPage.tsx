@@ -491,8 +491,11 @@ export default function ContasPagarPage() {
                     <EntryRow
                       key={e.id}
                       entry={e}
+                      doc={docsByEntry.get(e.id) ?? null}
                       sourceSystem={sourceSystem}
                       canApprove={canApprove}
+                      canManage={canManage}
+                      onLink={() => setLinkEntry(e)}
                       onApprove={async (approval) => {
                         if (!user) return;
                         try {
