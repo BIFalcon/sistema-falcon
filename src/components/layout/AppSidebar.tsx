@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   ChevronRight,
   LayoutGrid,
+  Gauge,
 } from "lucide-react";
 import {
   Sidebar,
@@ -69,6 +70,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail },
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet },
           { title: "Envio", url: "/fechamento/envio", icon: Send, soon: true },
+          { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge },
         ],
       },
     ],

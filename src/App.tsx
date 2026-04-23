@@ -13,6 +13,7 @@ import DrePage from "./pages/DrePage";
 import CartaPage from "./pages/CartaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import EnvioPage from "./pages/EnvioPage";
+import PerformanceSlaPage from "./pages/PerformanceSlaPage";
 import HoteisPage from "./pages/HoteisPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/fechamento/carta" element={<CartaPage />} />
               <Route path="/fechamento/financeiro" element={<FinanceiroPage />} />
               <Route path="/fechamento/envio" element={<EnvioPage />} />
+              <Route path="/fechamento/performance" element={<PerformanceSlaPage />} />
 
               {/* Compat: rotas antigas */}
               <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
