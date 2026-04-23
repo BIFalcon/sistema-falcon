@@ -40,6 +40,8 @@ export interface ApEntry {
   gg_approval_at: string | null;
   gg_approval_notes: string | null;
   primary_document_id: string | null;
+  is_distribution: boolean;
+  archived_at: string | null;
 }
 
 export interface ApBankBalance {
