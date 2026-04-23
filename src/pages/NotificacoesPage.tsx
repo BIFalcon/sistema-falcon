@@ -111,9 +111,9 @@ export default function NotificacoesPage() {
         </Button>
       </div>
 
-      <Card className="p-4 shadow-soft border-amber-500/30 bg-amber-500/5">
+      <Card className="p-4 shadow-soft border-warning/30 bg-warning/5">
         <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+          <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
           <div className="text-sm">
             <p className="font-medium text-foreground mb-1">
               Domínio de e-mail aguardando configuração
