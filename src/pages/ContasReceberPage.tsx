@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +58,14 @@ function fullName(e: { first_name: string | null; last_name: string | null }) {
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster } = useAuth();
+  const { hasRole, isMaster, userHotels } = useAuth();
   const isManager = isMaster || hasRole("financeiro");
+  // Quem vê todos os hotéis: master, financeiro, controladoria, ri
+  const seesAllHotels =
+    isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
+  // GG/GOP: somente os hotéis da sua cartela
+  const isGgOnly = !seesAllHotels && hasRole("gg");
+  const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);
   const [tab, setTab] = useState<"to_invoice" | "open_folio">("to_invoice");
 
   return (
@@ -78,10 +84,20 @@ export default function ContasReceberPage() {
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
-          <ToInvoiceSection isManager={isManager} />
+          <ToInvoiceSection
+            isManager={isManager}
+            seesAllHotels={seesAllHotels}
+            restrictedHotelIds={restrictedHotelIds}
+            isGgOnly={isGgOnly}
+          />
         </TabsContent>
         <TabsContent value="open_folio" className="mt-5">
-          <OpenFolioSection isManager={isManager} />
+          <OpenFolioSection
+            isManager={isManager}
+            seesAllHotels={seesAllHotels}
+            restrictedHotelIds={restrictedHotelIds}
+            isGgOnly={isGgOnly}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -90,9 +106,31 @@ export default function ContasReceberPage() {
 
 /* ════════════════════ A FATURAR ════════════════════ */
 
-function ToInvoiceSection({ isManager }: { isManager: boolean }) {
-  const { data: hotels = [] } = useAllHotels();
-  const [hotelId, setHotelId] = useState<string>("");
+function ToInvoiceSection({
+  isManager,
+  seesAllHotels,
+  restrictedHotelIds,
+  isGgOnly,
+}: {
+  isManager: boolean;
+  seesAllHotels: boolean;
+  restrictedHotelIds: string[] | null;
+  isGgOnly: boolean;
+}) {
+  const { data: allHotels = [] } = useAllHotels();
+  const hotels = useMemo(
+    () => (seesAllHotels ? allHotels : allHotels.filter((h) => restrictedHotelIds?.includes(h.id))),
+    [allHotels, seesAllHotels, restrictedHotelIds],
+  );
+  // GG vê apenas o próprio hotel — auto seleciona e esconde o seletor
+  const initialHotelId = isGgOnly && hotels.length === 1 ? hotels[0].id : "";
+  const [hotelId, setHotelId] = useState<string>(initialHotelId);
+  // Mantém hotelId sincronizado quando a lista de hotéis carrega tardiamente
+  useEffect(() => {
+    if (isGgOnly && !hotelId && hotels.length === 1) {
+      setHotelId(hotels[0].id);
+    }
+  }, [isGgOnly, hotelId, hotels]);
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
@@ -104,55 +142,75 @@ function ToInvoiceSection({ isManager }: { isManager: boolean }) {
   const { data: contracts } = useClientContracts(hotelId || null);
 
   const hotelName = (id: string | null) =>
-    id ? hotels.find((h) => h.id === id)?.name ?? id : "—";
+    id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
+
+  // Para o ranking consolidado, restringe entradas aos hotéis visíveis quando não master
+  const visibleEntries = useMemo(() => {
+    if (seesAllHotels) return entries;
+    const allowed = new Set(restrictedHotelIds ?? []);
+    return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
+  }, [entries, seesAllHotels, restrictedHotelIds]);
 
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
 
       <Card className="p-5 shadow-soft space-y-4">
-        <div className="flex items-end gap-3 flex-wrap">
-          <div className="flex-1 min-w-[220px]">
-            <Label className="text-xs">Hotel</Label>
-            <Select value={hotelId || "all"} onValueChange={(v) => { setHotelId(v === "all" ? "" : v); setDrillMonth(null); setDrillDay(null); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos (consolidado)</SelectItem>
-                {hotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {!isGgOnly && (
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex-1 min-w-[220px]">
+              <Label className="text-xs">Hotel</Label>
+              <Select value={hotelId || "all"} onValueChange={(v) => { setHotelId(v === "all" ? "" : v); setDrillMonth(null); setDrillDay(null); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {seesAllHotels && <SelectItem value="all">Todos (consolidado)</SelectItem>}
+                  {hotels.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {hotelId && (
+              <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Contratos do hotel
+              </Button>
+            )}
           </div>
-          {hotelId && (
+        )}
+        {isGgOnly && hotelId && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-xs text-muted-foreground">Hotel</p>
+              <p className="text-sm font-semibold">{hotelName(hotelId)}</p>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Contratos do hotel
             </Button>
-          )}
-        </div>
+          </div>
+        )}
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : entries.length === 0 ? (
+        ) : visibleEntries.length === 0 ? (
           <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
         ) : !hotelId ? (
-          <ConsolidatedRanking entries={entries} hotelName={hotelName} />
+          <ConsolidatedRanking entries={visibleEntries} hotelName={hotelName} />
         ) : drillDay ? (
           <DayBreakdown
-            entries={entries.filter((e) => e.transaction_date === drillDay)}
+            entries={visibleEntries.filter((e) => e.transaction_date === drillDay)}
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
           />
         ) : drillMonth ? (
           <MonthBreakdown
-            entries={entries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
+            entries={visibleEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
             month={drillMonth}
             onPickDay={setDrillDay}
             onBack={() => setDrillMonth(null)}
           />
         ) : (
-          <MonthlyOverview entries={entries} onPickMonth={setDrillMonth} />
+          <MonthlyOverview entries={visibleEntries} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
@@ -381,16 +439,40 @@ function ConsolidatedRanking({
 
 /* ════════════════════ OPEN FOLIO ════════════════════ */
 
-function OpenFolioSection({ isManager }: { isManager: boolean }) {
+function OpenFolioSection({
+  isManager,
+  seesAllHotels,
+  restrictedHotelIds,
+  isGgOnly,
+}: {
+  isManager: boolean;
+  seesAllHotels: boolean;
+  restrictedHotelIds: string[] | null;
+  isGgOnly: boolean;
+}) {
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
   const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
+  const allowedSet = useMemo(
+    () => (seesAllHotels ? null : new Set(restrictedHotelIds ?? [])),
+    [seesAllHotels, restrictedHotelIds],
+  );
+  const visibleEntries = useMemo(
+    () => (allowedSet ? entries.filter((e) => e.hotel_id && allowedSet.has(e.hotel_id)) : entries),
+    [entries, allowedSet],
+  );
+  // GG: auto-seleciona o único hotel da cartela e esconde a lista
+  useEffect(() => {
+    if (isGgOnly && !selectedHotel && restrictedHotelIds && restrictedHotelIds.length === 1) {
+      setSelectedHotel(restrictedHotelIds[0]);
+    }
+  }, [isGgOnly, selectedHotel, restrictedHotelIds]);
 
   const summaries = useMemo(() => {
     const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
-    for (const e of entries) {
+    for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
       const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0 };
       cur.count++;
@@ -411,11 +493,11 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [entries, hotels]);
+  }, [visibleEntries, hotels]);
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
-    return entries
+    return visibleEntries
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
@@ -425,7 +507,7 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
         return d > 90;
       })
       .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0));
-  }, [entries, selectedHotel, agingFilter]);
+  }, [visibleEntries, selectedHotel, agingFilter]);
 
   return (
     <div className="space-y-5">
@@ -441,6 +523,7 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
           agingFilter={agingFilter}
           setAgingFilter={setAgingFilter}
           onBack={() => setSelectedHotel(null)}
+          hideBack={isGgOnly}
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
@@ -488,6 +571,7 @@ function HotelOpenFolioDetail({
   agingFilter,
   setAgingFilter,
   onBack,
+  hideBack,
 }: {
   hotelId: string;
   hotelName: string;
@@ -495,6 +579,7 @@ function HotelOpenFolioDetail({
   agingFilter: "all" | "fresh" | "mid" | "old";
   setAgingFilter: (v: "all" | "fresh" | "mid" | "old") => void;
   onBack: () => void;
+  hideBack?: boolean;
 }) {
   const { data: notes = [] } = useOpenFolioNotes(hotelId);
   const [noteFor, setNoteFor] = useState<OpenFolioEntry | null>(null);
@@ -513,9 +598,11 @@ function HotelOpenFolioDetail({
     <Card className="p-5 shadow-soft space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Button>
+          {!hideBack && (
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+          )}
           <h3 className="text-sm font-semibold">{hotelName}</h3>
         </div>
         <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
