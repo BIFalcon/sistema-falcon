@@ -15,6 +15,7 @@ import FinanceiroPage from "./pages/FinanceiroPage";
 import EnvioPage from "./pages/EnvioPage";
 import HoteisPage from "./pages/HoteisPage";
 import UsuariosPage from "./pages/UsuariosPage";
+import NotificacoesPage from "./pages/NotificacoesPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -63,6 +64,7 @@ const App = () => (
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<UsuariosPage />} />
               <Route path="/configuracoes/hoteis" element={<HoteisPage />} />
+              <Route path="/configuracoes/notificacoes" element={<NotificacoesPage />} />
               <Route path="/configuracoes/assets" element={<EmBreve />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
             </Route>
