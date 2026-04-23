@@ -547,6 +547,92 @@ export type Database = {
           },
         ]
       }
+      notification_queue: {
+        Row: {
+          body_md: string
+          closing_id: string
+          created_at: string
+          dispatched_at: string | null
+          error_message: string | null
+          event: Database["public"]["Enums"]["notification_event"]
+          hotel_id: string
+          id: string
+          link_url: string
+          payload: Json
+          recipient_email: string | null
+          recipient_role: string | null
+          recipient_user_id: string
+          scheduled_at: string
+          status: Database["public"]["Enums"]["notification_status"]
+          subject: string
+        }
+        Insert: {
+          body_md: string
+          closing_id: string
+          created_at?: string
+          dispatched_at?: string | null
+          error_message?: string | null
+          event: Database["public"]["Enums"]["notification_event"]
+          hotel_id: string
+          id?: string
+          link_url: string
+          payload?: Json
+          recipient_email?: string | null
+          recipient_role?: string | null
+          recipient_user_id: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["notification_status"]
+          subject: string
+        }
+        Update: {
+          body_md?: string
+          closing_id?: string
+          created_at?: string
+          dispatched_at?: string | null
+          error_message?: string | null
+          event?: Database["public"]["Enums"]["notification_event"]
+          hotel_id?: string
+          id?: string
+          link_url?: string
+          payload?: Json
+          recipient_email?: string | null
+          recipient_role?: string | null
+          recipient_user_id?: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["notification_status"]
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_unsubscribes: {
+        Row: {
+          created_at: string
+          event: Database["public"]["Enums"]["notification_event"] | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event?: Database["public"]["Enums"]["notification_event"] | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: Database["public"]["Enums"]["notification_event"] | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -680,6 +766,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      enqueue_workflow_notification: {
+        Args: {
+          _body_md: string
+          _closing_id: string
+          _event: Database["public"]["Enums"]["notification_event"]
+          _hotel_id: string
+          _link_url: string
+          _payload?: Json
+          _recipients: Json
+          _subject: string
+        }
+        Returns: number
+      }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -695,6 +794,33 @@ export type Database = {
       }
       is_master: { Args: { _user_id: string }; Returns: boolean }
       is_protected_user: { Args: { _user_id: string }; Returns: boolean }
+      is_unsubscribed: {
+        Args: {
+          _event: Database["public"]["Enums"]["notification_event"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      month_pt: { Args: { _m: number }; Returns: string }
+      users_with_role_for_hotel: {
+        Args: {
+          _hotel_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: {
+          display_name: string
+          email: string
+          user_id: string
+        }[]
+      }
+      users_with_role_global: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: {
+          display_name: string
+          email: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       app_role:
@@ -719,6 +845,20 @@ export type Database = {
         | "aguardando_gg"
         | "nao_aplicavel"
         | "sem_distribuicao"
+      notification_event:
+        | "dre_first_preview"
+        | "dre_comment"
+        | "dre_new_preview"
+        | "dre_controladoria_approved"
+        | "dre_gop_approved"
+        | "dre_fernando_approved"
+        | "dre_returned"
+        | "carta_gg_approved"
+        | "carta_comment"
+        | "carta_gop_approved"
+        | "carta_fernando_approved"
+        | "carta_returned"
+      notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
     CompositeTypes: {
@@ -871,6 +1011,21 @@ export const Constants = {
         "nao_aplicavel",
         "sem_distribuicao",
       ],
+      notification_event: [
+        "dre_first_preview",
+        "dre_comment",
+        "dre_new_preview",
+        "dre_controladoria_approved",
+        "dre_gop_approved",
+        "dre_fernando_approved",
+        "dre_returned",
+        "carta_gg_approved",
+        "carta_comment",
+        "carta_gop_approved",
+        "carta_fernando_approved",
+        "carta_returned",
+      ],
+      notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
     },
   },
