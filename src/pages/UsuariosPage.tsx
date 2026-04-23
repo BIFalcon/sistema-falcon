@@ -98,8 +98,6 @@ export default function UsuariosPage() {
   const { hasRole, isMaster } = useAuth();
   const canManage = hasRole("processos") || isMaster;
 
-  if (!canManage) return <Navigate to="/" replace />;
-
   const { data: users = [], isLoading } = useManagedUsers();
   const { data: hotels = [] } = useAllHotels();
 
@@ -117,6 +115,8 @@ export default function UsuariosPage() {
         u.roles.some((r) => r.includes(q)),
     );
   }, [users, search]);
+
+  if (!canManage) return <Navigate to="/" replace />;
 
   return (
     <div className="space-y-6 max-w-[1400px]">

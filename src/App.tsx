@@ -14,6 +14,7 @@ import CartaPage from "./pages/CartaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import EnvioPage from "./pages/EnvioPage";
 import HoteisPage from "./pages/HoteisPage";
+import UsuariosPage from "./pages/UsuariosPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -60,7 +61,7 @@ const App = () => (
               <Route path="/controladoria" element={<EmBreve />} />
 
               {/* Configurações */}
-              <Route path="/configuracoes/usuarios" element={<EmBreve />} />
+              <Route path="/configuracoes/usuarios" element={<UsuariosPage />} />
               <Route path="/configuracoes/hoteis" element={<HoteisPage />} />
               <Route path="/configuracoes/assets" element={<EmBreve />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />

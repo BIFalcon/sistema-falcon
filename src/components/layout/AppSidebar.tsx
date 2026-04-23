@@ -101,7 +101,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Configurações",
     items: [
-      { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, soon: true },
+      { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
       { title: "Assets", url: "/configuracoes/assets", icon: ImageIcon, soon: true },
     ],
