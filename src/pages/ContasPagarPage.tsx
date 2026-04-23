@@ -342,53 +342,35 @@ export default function ContasPagarPage() {
       </div>
 
       {/* Seletor de hotel */}
-      <Card className="p-5 shadow-soft">
-        <div className="flex items-end gap-4 flex-wrap">
-          <div className="flex-1 min-w-[280px]">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-              Hotel
-            </label>
-            <Select value={hotelId ?? ""} onValueChange={(v) => setHotelId(v || null)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um hotel para começar…" />
-              </SelectTrigger>
-              <SelectContent>
-                {hotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>
-                    <span className="flex items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5" />
-                      {h.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {hotel && (
+        <Card className="p-4 shadow-soft flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-accent" />
+            <span className="text-sm font-semibold">{hotel.name}</span>
           </div>
-          {hotel && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Sistema financeiro:</span>
-              {sourceSystem ? (
-                <Badge variant="outline" className="uppercase">{sourceSystem}</Badge>
-              ) : (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Não configurado
-                </Badge>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Sistema financeiro:</span>
+            {sourceSystem ? (
+              <Badge variant="outline" className="uppercase">{sourceSystem}</Badge>
+            ) : (
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="h-3 w-3" /> Não configurado
+              </Badge>
+            )}
+          </div>
+          {!sourceSystem && (
+            <p className="text-xs text-amber-600 flex items-center gap-1 w-full">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Configure o sistema financeiro deste hotel em <strong>Configurações → Hotéis</strong> antes de importar.
+            </p>
           )}
-        </div>
-        {hotel && !sourceSystem && (
-          <p className="text-xs text-amber-600 mt-3 flex items-center gap-1">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Configure o sistema financeiro deste hotel em <strong>Configurações → Hotéis</strong> antes de importar.
-          </p>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {!hotelId && (
         <Card className="p-12 text-center text-muted-foreground shadow-soft">
           <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Selecione um hotel para visualizar os lançamentos.</p>
+          <p className="text-sm">Selecione um hotel no filtro do topo para visualizar os lançamentos.</p>
         </Card>
       )}
 
