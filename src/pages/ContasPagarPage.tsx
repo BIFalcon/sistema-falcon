@@ -212,6 +212,12 @@ export default function ContasPagarPage() {
     return c;
   }, [entries]);
 
+  // Total a pagar de Distribuição de Lucros (independente de período)
+  const distributionTotal = useMemo(
+    () => distributionEntries.reduce((s, e) => s + Number(e.amount || 0), 0),
+    [distributionEntries],
+  );
+
   const issueCounts = useMemo(() => {
     let notApproved = 0, noDoc = 0, overdue = 0, divergent = 0;
     entries.forEach((e) => {
