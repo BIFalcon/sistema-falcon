@@ -177,8 +177,8 @@ function drawBarChart(
   const barW = groupW * 0.32;
   const gap = groupW * 0.06;
 
-  // Para 12 meses, fontes menores para os valores em cima das barras
-  ctx.font = `${2.4 * px}px Helvetica, Arial`;
+  // Fontes maiores para legibilidade
+  ctx.font = `${3.4 * px}px Helvetica, Arial`;
   ctx.textAlign = "center";
 
   for (let i = 0; i < n; i++) {
@@ -194,21 +194,21 @@ function drawBarChart(
       ctx.fillRect(cx - barW - gap / 2, y0 + h - bh, barW, bh);
       // label valor
       ctx.fillStyle = NAVY;
-      ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(cVal), cx - barW / 2 - gap / 2, y0 + h - bh - 1.5 * px);
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(cVal), cx - barW / 2 - gap / 2, y0 + h - bh - 1.8 * px);
     }
     if (pVal != null) {
       const bh = (pVal / max) * h;
       ctx.fillStyle = "#9CA3AF";
       ctx.fillRect(cx + gap / 2, y0 + h - bh, barW, bh);
       ctx.fillStyle = "#6B7280";
-      ctx.font = `${2.2 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(pVal), cx + barW / 2 + gap / 2, y0 + h - bh - 1.5 * px);
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(pVal), cx + barW / 2 + gap / 2, y0 + h - bh - 1.8 * px);
     }
     // mês (3 letras para caber 12 colunas)
     ctx.fillStyle = TEXT;
-    ctx.font = `${2.6 * px}px Helvetica, Arial`;
-    ctx.fillText(MONTHS_PT[current[i].month - 1].slice(0, 3), cx, y0 + h + 4 * px);
+    ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
+    ctx.fillText(MONTHS_PT[current[i].month - 1].slice(0, 3), cx, y0 + h + 5 * px);
   }
 
   // legenda
