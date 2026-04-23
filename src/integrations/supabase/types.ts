@@ -14,6 +14,254 @@ export type Database = {
   }
   public: {
     Tables: {
+      ap_bank_balance: {
+        Row: {
+          amount: number
+          balance_date: string
+          created_at: string
+          hotel_id: string
+          id: string
+          informed_by: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          balance_date: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          informed_by: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          balance_date?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          informed_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_bank_balance_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_documents: {
+        Row: {
+          entry_id: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          hotel_id: string
+          id: string
+          mime_type: string | null
+          upload_id: string | null
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          entry_id?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          hotel_id: string
+          id?: string
+          mime_type?: string | null
+          upload_id?: string | null
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          entry_id?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          hotel_id?: string
+          id?: string
+          mime_type?: string | null
+          upload_id?: string | null
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_documents_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "ap_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_documents_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_documents_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "ap_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_entries: {
+        Row: {
+          amount: number
+          category: string | null
+          cnpj: string | null
+          created_at: string
+          description: string | null
+          document_number: string | null
+          due_date: string | null
+          entry_key: string
+          gg_approval: Database["public"]["Enums"]["ap_entry_approval"]
+          gg_approval_at: string | null
+          gg_approval_by: string | null
+          gg_approval_notes: string | null
+          hotel_id: string
+          id: string
+          interest_fees: number | null
+          observation: string | null
+          omie_situation: string | null
+          payment_method: string | null
+          primary_document_id: string | null
+          raw: Json
+          source_system: Database["public"]["Enums"]["financial_system"]
+          supplier: string
+          updated_at: string
+          upload_id: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          cnpj?: string | null
+          created_at?: string
+          description?: string | null
+          document_number?: string | null
+          due_date?: string | null
+          entry_key: string
+          gg_approval?: Database["public"]["Enums"]["ap_entry_approval"]
+          gg_approval_at?: string | null
+          gg_approval_by?: string | null
+          gg_approval_notes?: string | null
+          hotel_id: string
+          id?: string
+          interest_fees?: number | null
+          observation?: string | null
+          omie_situation?: string | null
+          payment_method?: string | null
+          primary_document_id?: string | null
+          raw?: Json
+          source_system: Database["public"]["Enums"]["financial_system"]
+          supplier: string
+          updated_at?: string
+          upload_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          cnpj?: string | null
+          created_at?: string
+          description?: string | null
+          document_number?: string | null
+          due_date?: string | null
+          entry_key?: string
+          gg_approval?: Database["public"]["Enums"]["ap_entry_approval"]
+          gg_approval_at?: string | null
+          gg_approval_by?: string | null
+          gg_approval_notes?: string | null
+          hotel_id?: string
+          id?: string
+          interest_fees?: number | null
+          observation?: string | null
+          omie_situation?: string | null
+          payment_method?: string | null
+          primary_document_id?: string | null
+          raw?: Json
+          source_system?: Database["public"]["Enums"]["financial_system"]
+          supplier?: string
+          updated_at?: string
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "ap_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_uploads: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number | null
+          hotel_id: string
+          id: string
+          kind: string
+          metadata: Json
+          parse_error: string | null
+          parsed_entries_count: number | null
+          source_system: Database["public"]["Enums"]["financial_system"]
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          hotel_id: string
+          id?: string
+          kind: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_entries_count?: number | null
+          source_system: Database["public"]["Enums"]["financial_system"]
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          hotel_id?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_entries_count?: number | null
+          source_system?: Database["public"]["Enums"]["financial_system"]
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_uploads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approvals: {
         Row: {
           approved_by: string
@@ -303,6 +551,9 @@ export type Database = {
           brand_logo_url: string | null
           cover_url: string | null
           created_at: string
+          financial_system:
+            | Database["public"]["Enums"]["financial_system"]
+            | null
           id: string
           name: string
         }
@@ -312,6 +563,9 @@ export type Database = {
           brand_logo_url?: string | null
           cover_url?: string | null
           created_at?: string
+          financial_system?:
+            | Database["public"]["Enums"]["financial_system"]
+            | null
           id: string
           name: string
         }
@@ -321,6 +575,9 @@ export type Database = {
           brand_logo_url?: string | null
           cover_url?: string | null
           created_at?: string
+          financial_system?:
+            | Database["public"]["Enums"]["financial_system"]
+            | null
           id?: string
           name?: string
         }
@@ -787,6 +1044,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_ap_manager: { Args: { _user_id: string }; Returns: boolean }
       is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
       is_hotel_allowed: {
         Args: { _hotel_id: string; _user_id: string }
@@ -823,6 +1081,7 @@ export type Database = {
       }
     }
     Enums: {
+      ap_entry_approval: "pending" | "approved" | "rejected"
       app_role:
         | "processos"
         | "fernando"
@@ -845,6 +1104,7 @@ export type Database = {
         | "aguardando_gg"
         | "nao_aplicavel"
         | "sem_distribuicao"
+      financial_system: "totvs" | "omie"
       notification_event:
         | "dre_first_preview"
         | "dre_comment"
@@ -987,6 +1247,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ap_entry_approval: ["pending", "approved", "rejected"],
       app_role: [
         "processos",
         "fernando",
@@ -1011,6 +1272,7 @@ export const Constants = {
         "nao_aplicavel",
         "sem_distribuicao",
       ],
+      financial_system: ["totvs", "omie"],
       notification_event: [
         "dre_first_preview",
         "dre_comment",

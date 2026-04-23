@@ -23,6 +23,9 @@ import {
 } from "@/hooks/useHotelAssets";
 import { Building2, Image as ImageIcon, Search, Upload, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 export default function HoteisPage() {
   const { hasRole, user } = useAuth();
@@ -343,6 +346,38 @@ function HotelAssetSheet({
                   Apenas usuários com perfil <strong>Processos</strong> podem editar assets.
                 </p>
               )}
+
+              {/* Sistema Financeiro */}
+              <div className="space-y-2 border-t pt-4">
+                <h4 className="text-sm font-semibold">Sistema Financeiro</h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Define qual ERP é usado para gerar o relatório de Contas a Pagar.
+                </p>
+                <Select
+                  value={hotel.financial_system ?? ""}
+                  disabled={!canEdit}
+                  onValueChange={async (v) => {
+                    try {
+                      await update.mutateAsync({
+                        id: hotel.id,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        patch: { financial_system: v as any },
+                      });
+                      toast.success("Sistema financeiro atualizado");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Não configurado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="totvs">TOTVS</SelectItem>
+                    <SelectItem value="omie">OMIE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </>
         )}
