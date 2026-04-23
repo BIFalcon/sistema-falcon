@@ -127,9 +127,56 @@ export default function ContasPagarPage() {
         if (!overdue && !noApproval && !noDoc) return false;
       }
       if (category !== "all" && e.category !== category) return false;
+      if (hideTrivial && Number(e.amount || 0) < 1) return false;
       return true;
     });
-  }, [entries, period, status, category]);
+  }, [entries, period, status, category, hideTrivial]);
+
+  // Agrupa lançamentos N/D (sem nº doc) do mesmo fornecedor + mesma data em uma única linha
+  type DisplayRow =
+    | { kind: "single"; entry: ApEntry }
+    | { kind: "group"; supplier: string; due: string | null; entries: ApEntry[]; amount: number };
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    if (!groupNd) return filtered.map((e) => ({ kind: "single" as const, entry: e }));
+    const groups = new Map<string, ApEntry[]>();
+    const singles: ApEntry[] = [];
+    for (const e of filtered) {
+      const isNd = !e.document_number || e.document_number.trim() === "" || e.document_number.toUpperCase() === "N/D";
+      if (isNd) {
+        const key = `${e.supplier}|${e.due_date ?? ""}`;
+        const arr = groups.get(key) ?? [];
+        arr.push(e);
+        groups.set(key, arr);
+      } else {
+        singles.push(e);
+      }
+    }
+    const rows: DisplayRow[] = singles.map((e) => ({ kind: "single", entry: e }));
+    for (const [key, arr] of groups) {
+      if (arr.length === 1) {
+        rows.push({ kind: "single", entry: arr[0] });
+      } else {
+        const [supplier, due] = key.split("|");
+        rows.push({
+          kind: "group",
+          supplier,
+          due: due || null,
+          entries: arr,
+          amount: arr.reduce((s, x) => s + Number(x.amount || 0), 0),
+        });
+      }
+    }
+    // ordena por vencimento asc
+    rows.sort((a, b) => {
+      const da = a.kind === "single" ? a.entry.due_date : a.due;
+      const db = b.kind === "single" ? b.entry.due_date : b.due;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da.localeCompare(db);
+    });
+    return rows;
+  }, [filtered, groupNd]);
 
   const totalToPayToday = useMemo(
     () => entries.filter((e) => isWithinPeriod(e.due_date, "today")).reduce((s, e) => s + Number(e.amount || 0), 0),
