@@ -35,14 +35,14 @@ export function ClosingTable({ hotelId, month, year }: Props) {
   async function startClosing(hid: string) {
     try {
       const c = await ensure.mutateAsync({ hotelId: hid, month, year });
-      navigate(`/dre?closing=${c.id}`);
+      navigate(`/fechamento/dre?closing=${c.id}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao iniciar fechamento");
     }
   }
 
   function openClosing(c: ClosingRow) {
-    navigate(`/dre?closing=${c.id}`);
+    navigate(`/fechamento/dre?closing=${c.id}`);
   }
 
   if (visibleHotels.length === 0) {
