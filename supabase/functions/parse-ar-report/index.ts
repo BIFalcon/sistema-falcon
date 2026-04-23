@@ -203,8 +203,19 @@ Deno.serve(async (req) => {
     const form = await req.formData();
     const file = form.get("file") as File | null;
     const kind = String(form.get("kind") ?? "") as "to_invoice" | "open_folio";
+    const rawEntries = String(form.get("entries") ?? "[]");
     if (!file || !["to_invoice", "open_folio"].includes(kind)) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsedEntries: ToInvoicePayload[] | OpenFolioPayload[] = [];
+    try {
+      parsedEntries = JSON.parse(rawEntries);
+      if (!Array.isArray(parsedEntries)) throw new Error("invalid_entries");
+    } catch {
+      return new Response(JSON.stringify({ error: "invalid_entries" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -247,7 +258,7 @@ Deno.serve(async (req) => {
     let inserted = 0;
 
     if (kind === "to_invoice") {
-      result = parseToInvoice(arrayBuf, hotelMap, uploadRow.id);
+      result = mapToInvoiceEntries(parsedEntries as ToInvoicePayload[], hotelMap, uploadRow.id);
       // upsert acumulativo por entry_key
       if (result.entries.length) {
         const chunkSize = 500;
@@ -261,7 +272,7 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      result = parseOpenFolio(arrayBuf, hotelMap, uploadRow.id);
+      result = mapOpenFolioEntries(parsedEntries as OpenFolioPayload[], hotelMap, uploadRow.id);
       // SUBSTITUIÇÃO completa
       await admin.from("ar_open_folio_entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       if (result.entries.length) {
