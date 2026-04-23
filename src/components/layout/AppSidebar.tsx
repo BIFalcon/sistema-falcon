@@ -14,7 +14,6 @@ import {
   Hotel,
   Settings,
   UserCog,
-  Image as ImageIcon,
   ChevronRight,
   LayoutGrid,
   Gauge,
