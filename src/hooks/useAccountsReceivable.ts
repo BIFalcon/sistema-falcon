@@ -115,6 +115,7 @@ export function useOpenFolioEntries() {
       const { data, error } = await supabase
         .from("ar_open_folio_entries")
         .select("id,hotel_id,property_name_raw,confirmation_number,reservation_status,first_name,last_name,balance,arrival_date,departure_date,extraction_date,days_open,expected_payment_date,archived_at")
+        .is("archived_at", null)
         .order("balance", { ascending: false })
         .limit(5000);
       if (error) throw error;
