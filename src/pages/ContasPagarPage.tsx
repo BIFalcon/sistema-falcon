@@ -455,6 +455,15 @@ export default function ContasPagarPage() {
                 <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
                 <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
               </div>
+              {distributionEntries.length > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-accent font-semibold">Distribuição de Lucros</p>
+                    <p className="text-xs text-muted-foreground">{distributionEntries.length} lançamento(s) — listagem separada abaixo</p>
+                  </div>
+                  <p className="text-base font-bold">{fmtBRL(distributionTotal)}</p>
+                </div>
+              )}
             </Card>
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Problemas identificados</h3>
