@@ -35,7 +35,7 @@ const fmtDate = (s: string | null) => {
 const fmtDateTime = (s: string) =>
   new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
-type Period = "today" | "tomorrow" | "this_week" | "next_week" | "next_month" | "all";
+type Period = "today" | "tomorrow" | "this_week" | "next_week" | "next_month" | "overdue" | "all";
 type StatusFilter = "all" | "pending" | "approved" | "issues";
 
 function isWithinPeriod(due: string | null, period: Period): boolean {
@@ -46,6 +46,7 @@ function isWithinPeriod(due: string | null, period: Period): boolean {
   const d = new Date(due + "T00:00:00");
   const diffDays = Math.floor((d.getTime() - today.getTime()) / 86400000);
   switch (period) {
+    case "overdue": return diffDays < 0;
     case "today": return diffDays === 0;
     case "tomorrow": return diffDays === 1;
     case "this_week": {
