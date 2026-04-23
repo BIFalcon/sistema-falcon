@@ -61,6 +61,7 @@ export type Database = {
           hotel_id: string
           id: string
           mime_type: string | null
+          nf_amount: number | null
           upload_id: string | null
           uploaded_at: string
           uploaded_by: string
@@ -73,6 +74,7 @@ export type Database = {
           hotel_id: string
           id?: string
           mime_type?: string | null
+          nf_amount?: number | null
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by: string
@@ -85,6 +87,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           mime_type?: string | null
+          nf_amount?: number | null
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by?: string
