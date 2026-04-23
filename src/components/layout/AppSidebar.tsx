@@ -50,6 +50,7 @@ type LeafItem = {
   icon: React.ComponentType<{ className?: string }>;
   soon?: boolean;
   end?: boolean;
+  requireMaster?: boolean;
 };
 
 type GroupItem = LeafItem & {
@@ -70,7 +71,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail },
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet },
           { title: "Envio", url: "/fechamento/envio", icon: Send, soon: true },
-          { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge },
+          { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge, requireMaster: true },
         ],
       },
     ],
@@ -167,6 +168,7 @@ export function AppSidebar() {
                   const parentActive = isActiveUrl(item.url, false);
 
                   if (!hasChildren) {
+                    if (item.requireMaster && !isMaster && !roles.includes("processos")) return null;
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild isActive={isActiveUrl(item.url, item.end)}>
@@ -200,7 +202,9 @@ export function AppSidebar() {
                         {!collapsed && (
                           <CollapsibleContent>
                             <SidebarMenuSub>
-                              {item.children!.map((child) => (
+                              {item.children!
+                                .filter((child) => !(child.requireMaster && !isMaster && !roles.includes("processos")))
+                                .map((child) => (
                                 <SidebarMenuSubItem key={child.url}>
                                   <SidebarMenuSubButton
                                     asChild
