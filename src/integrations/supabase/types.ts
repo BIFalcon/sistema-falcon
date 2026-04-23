@@ -303,6 +303,283 @@ export type Database = {
           },
         ]
       }
+      ar_client_contracts: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          created_at: string
+          created_by: string
+          hotel_id: string
+          id: string
+          notes: string | null
+          payment_term_days: number
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          created_at?: string
+          created_by: string
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          payment_term_days: number
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          created_at?: string
+          created_by?: string
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          payment_term_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_client_contracts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_open_folio_entries: {
+        Row: {
+          arrival_date: string | null
+          balance: number | null
+          confirmation_number: string | null
+          created_at: string
+          days_open: number | null
+          departure_date: string | null
+          extraction_date: string | null
+          first_name: string | null
+          hotel_id: string | null
+          id: string
+          last_name: string | null
+          property_name_raw: string
+          raw: Json
+          reservation_status: string | null
+          upload_id: string
+        }
+        Insert: {
+          arrival_date?: string | null
+          balance?: number | null
+          confirmation_number?: string | null
+          created_at?: string
+          days_open?: number | null
+          departure_date?: string | null
+          extraction_date?: string | null
+          first_name?: string | null
+          hotel_id?: string | null
+          id?: string
+          last_name?: string | null
+          property_name_raw: string
+          raw?: Json
+          reservation_status?: string | null
+          upload_id: string
+        }
+        Update: {
+          arrival_date?: string | null
+          balance?: number | null
+          confirmation_number?: string | null
+          created_at?: string
+          days_open?: number | null
+          departure_date?: string | null
+          extraction_date?: string | null
+          first_name?: string | null
+          hotel_id?: string | null
+          id?: string
+          last_name?: string | null
+          property_name_raw?: string
+          raw?: Json
+          reservation_status?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_open_folio_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_open_folio_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "ar_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_open_folio_notes: {
+        Row: {
+          author_id: string
+          confirmation_number: string
+          created_at: string
+          hotel_id: string
+          id: string
+          note: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          confirmation_number: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          note: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          confirmation_number?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_open_folio_notes_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_to_invoice_entries: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          account_type: string | null
+          amount: number | null
+          ar_open: number | null
+          confirmation_number: string | null
+          created_at: string
+          departure_date: string | null
+          entry_key: string
+          hotel_id: string | null
+          id: string
+          invoice_number: string | null
+          invoice_status: string | null
+          original_amount: number | null
+          paid: number | null
+          property_name_raw: string
+          raw: Json
+          reservation_status: string | null
+          transaction_date: string | null
+          upload_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          amount?: number | null
+          ar_open?: number | null
+          confirmation_number?: string | null
+          created_at?: string
+          departure_date?: string | null
+          entry_key: string
+          hotel_id?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
+          original_amount?: number | null
+          paid?: number | null
+          property_name_raw: string
+          raw?: Json
+          reservation_status?: string | null
+          transaction_date?: string | null
+          upload_id: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          amount?: number | null
+          ar_open?: number | null
+          confirmation_number?: string | null
+          created_at?: string
+          departure_date?: string | null
+          entry_key?: string
+          hotel_id?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
+          original_amount?: number | null
+          paid?: number | null
+          property_name_raw?: string
+          raw?: Json
+          reservation_status?: string | null
+          transaction_date?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_to_invoice_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_to_invoice_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "ar_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_uploads: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          kind: string
+          metadata: Json
+          parse_error: string | null
+          parsed_rows_count: number | null
+          unmapped_properties: Json
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          kind: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_rows_count?: number | null
+          unmapped_properties?: Json
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_rows_count?: number | null
+          unmapped_properties?: Json
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       closing_status_log: {
         Row: {
           changed_by: string | null
@@ -559,6 +836,7 @@ export type Database = {
             | null
           id: string
           name: string
+          opera_property_name: string | null
         }
         Insert: {
           active?: boolean
@@ -571,6 +849,7 @@ export type Database = {
             | null
           id: string
           name: string
+          opera_property_name?: string | null
         }
         Update: {
           active?: boolean
@@ -583,6 +862,7 @@ export type Database = {
             | null
           id?: string
           name?: string
+          opera_property_name?: string | null
         }
         Relationships: []
       }
@@ -1048,6 +1328,7 @@ export type Database = {
         Returns: boolean
       }
       is_ap_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_ar_manager: { Args: { _user_id: string }; Returns: boolean }
       is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
       is_hotel_allowed: {
         Args: { _hotel_id: string; _user_id: string }
@@ -1122,6 +1403,7 @@ export type Database = {
         | "carta_fernando_approved"
         | "carta_returned"
         | "ap_pendencies_to_gg"
+        | "open_folio_pendencies_to_gg"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -1291,6 +1573,7 @@ export const Constants = {
         "carta_fernando_approved",
         "carta_returned",
         "ap_pendencies_to_gg",
+        "open_folio_pendencies_to_gg",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
