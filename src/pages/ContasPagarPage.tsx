@@ -705,3 +705,132 @@ function EntryRow({
     </TableRow>
   );
 }
+
+function LinkDocDialog({
+  open, onClose, entry, documents, currentDoc, unlinkedDocs, onLink, onDelete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  entry: ApEntry | null;
+  documents: ApDocument[];
+  currentDoc: ApDocument | null;
+  unlinkedDocs: ApDocument[];
+  onLink: (docId: string | null, nfAmount: number | null) => Promise<void> | void;
+  onDelete: (d: ApDocument) => Promise<void> | void;
+}) {
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [nfAmountInput, setNfAmountInput] = useState<string>("");
+
+  // reset on entry change
+  const entryId = entry?.id ?? null;
+  useMemo(() => {
+    setSelectedId(currentDoc?.id ?? "");
+    setNfAmountInput(currentDoc?.nf_amount != null ? String(currentDoc.nf_amount) : "");
+  }, [entryId, currentDoc?.id]);
+
+  if (!entry) return null;
+
+  const choices = currentDoc ? [currentDoc, ...unlinkedDocs] : unlinkedDocs;
+
+  async function openDoc(d: ApDocument) {
+    const url = await getDocumentSignedUrl(d.file_path);
+    if (url) window.open(url, "_blank");
+    else toast.error("Não foi possível abrir o arquivo");
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Vincular documento ao lançamento</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md bg-muted/40 p-3 text-sm">
+            <p className="font-semibold">{entry.supplier}</p>
+            <p className="text-xs text-muted-foreground">
+              Doc {entry.document_number ?? "—"} · Venc. {fmtDate(entry.due_date)} · {fmtBRL(Number(entry.amount))}
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+              Documento ({choices.length} disponível{choices.length === 1 ? "" : "is"})
+            </label>
+            {choices.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-3 text-center border rounded-md">
+                Nenhum documento disponível. Use "Importar Documentos" no topo da página.
+              </p>
+            ) : (
+              <div className="border rounded-md max-h-[260px] overflow-y-auto divide-y">
+                {choices.map((d) => (
+                  <div
+                    key={d.id}
+                    className={`flex items-center gap-2 p-2 text-sm cursor-pointer hover:bg-muted/50 ${
+                      selectedId === d.id ? "bg-primary/5" : ""
+                    }`}
+                    onClick={() => setSelectedId(d.id)}
+                  >
+                    <input
+                      type="radio"
+                      checked={selectedId === d.id}
+                      onChange={() => setSelectedId(d.id)}
+                    />
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="flex-1 truncate">{d.file_name}</span>
+                    <Button
+                      size="sm" variant="ghost" className="h-6 w-6 p-0"
+                      onClick={(e) => { e.stopPropagation(); openDoc(d); }}
+                      title="Abrir"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive"
+                      onClick={(e) => { e.stopPropagation(); onDelete(d); }}
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+              Valor da NF (opcional — para detectar divergência)
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              placeholder={String(entry.amount)}
+              value={nfAmountInput}
+              onChange={(e) => setNfAmountInput(e.target.value)}
+            />
+            {nfAmountInput && Math.abs(parseFloat(nfAmountInput) - Number(entry.amount)) > 0.01 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Diferença de {fmtBRL(parseFloat(nfAmountInput) - Number(entry.amount))} em relação ao lançamento.
+              </p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          {currentDoc && (
+            <Button variant="ghost" onClick={() => onLink(null, null)} className="mr-auto">
+              Remover vínculo
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={!selectedId}
+            onClick={() => onLink(selectedId, nfAmountInput ? parseFloat(nfAmountInput) : null)}
+          >
+            Vincular
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
