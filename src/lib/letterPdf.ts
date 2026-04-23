@@ -177,8 +177,8 @@ function drawBarChart(
   const barW = groupW * 0.32;
   const gap = groupW * 0.06;
 
-  // Para 12 meses, fontes menores para os valores em cima das barras
-  ctx.font = `${2.4 * px}px Helvetica, Arial`;
+  // Fontes maiores para legibilidade
+  ctx.font = `${3.4 * px}px Helvetica, Arial`;
   ctx.textAlign = "center";
 
   for (let i = 0; i < n; i++) {
@@ -194,21 +194,21 @@ function drawBarChart(
       ctx.fillRect(cx - barW - gap / 2, y0 + h - bh, barW, bh);
       // label valor
       ctx.fillStyle = NAVY;
-      ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(cVal), cx - barW / 2 - gap / 2, y0 + h - bh - 1.5 * px);
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(cVal), cx - barW / 2 - gap / 2, y0 + h - bh - 1.8 * px);
     }
     if (pVal != null) {
       const bh = (pVal / max) * h;
       ctx.fillStyle = "#9CA3AF";
       ctx.fillRect(cx + gap / 2, y0 + h - bh, barW, bh);
       ctx.fillStyle = "#6B7280";
-      ctx.font = `${2.2 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(pVal), cx + barW / 2 + gap / 2, y0 + h - bh - 1.5 * px);
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(pVal), cx + barW / 2 + gap / 2, y0 + h - bh - 1.8 * px);
     }
     // mês (3 letras para caber 12 colunas)
     ctx.fillStyle = TEXT;
-    ctx.font = `${2.6 * px}px Helvetica, Arial`;
-    ctx.fillText(MONTHS_PT[current[i].month - 1].slice(0, 3), cx, y0 + h + 4 * px);
+    ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
+    ctx.fillText(MONTHS_PT[current[i].month - 1].slice(0, 3), cx, y0 + h + 5 * px);
   }
 
   // legenda
@@ -291,32 +291,47 @@ function drawLineChart(
   ctx.stroke();
 
   // pontos + valores
-  ctx.font = `bold ${2.4 * px}px Helvetica, Arial`;
+  // Posicionamento dinâmico: o maior valor do mês fica acima da linha,
+  // o menor abaixo. Vale para ambas as séries.
   ctx.textAlign = "center";
+  // Desenha pontos atuais
   current.forEach((d, i) => {
     const v = d[field] as number | null;
     if (v == null) return;
     const x = x0 + i * stepX, y = yFor(v);
     ctx.fillStyle = NAVY;
-    ctx.beginPath(); ctx.arc(x, y, 1.2 * px, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = NAVY;
-    ctx.fillText(formatter(v), x, y - 2.5 * px);
+    ctx.beginPath(); ctx.arc(x, y, 1.6 * px, 0, Math.PI * 2); ctx.fill();
   });
-  ctx.font = `${2.2 * px}px Helvetica, Arial`;
-  previous.forEach((d, i) => {
-    const v = d[field] as number | null;
-    if (v == null) return;
-    const x = x0 + i * stepX, y = yFor(v);
-    ctx.fillStyle = "#6B7280";
-    ctx.fillText(formatter(v), x, y + 4 * px);
-  });
+  // Rótulos posicionados dinamicamente por mês
+  for (let i = 0; i < current.length; i++) {
+    const cv = current[i][field] as number | null;
+    const pv = previous[i]?.[field] as number | null | undefined;
+    const x = x0 + i * stepX;
+    if (cv != null) {
+      const y = yFor(cv);
+      const above = pv == null ? true : cv >= pv;
+      ctx.fillStyle = NAVY;
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.textBaseline = above ? "bottom" : "top";
+      ctx.fillText(formatter(cv), x, above ? y - 2.4 * px : y + 2.4 * px);
+    }
+    if (pv != null) {
+      const y = yFor(pv);
+      const above = cv == null ? true : pv > cv;
+      ctx.fillStyle = "#6B7280";
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.textBaseline = above ? "bottom" : "top";
+      ctx.fillText(formatter(pv), x, above ? y - 2.4 * px : y + 2.4 * px);
+    }
+  }
+  ctx.textBaseline = "alphabetic";
 
   // labels mês (3 letras p/ Jan-Dez)
   ctx.fillStyle = TEXT;
-  ctx.font = `${2.6 * px}px Helvetica, Arial`;
+  ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 4 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 5 * px);
   });
 
   // legenda
@@ -443,13 +458,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
-  // ícone $ em círculo (maior)
-  doc.setFillColor(NAVY);
-  doc.circle(12 + cw / 2, cy + 26, 7, "F");
-  doc.setTextColor("#FFFFFF");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("$", 12 + cw / 2, cy + 28.4, { align: "center" });
+  // ícone: pilha de moedas douradas + cédula verde
+  drawCoinsAndBillIcon(doc, 12 + cw / 2, cy + 26);
   // valor (maior)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
@@ -459,14 +469,18 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // RPS
   const rx = 12 + cw + 6;
   doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.4);
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("RPS", rx + cw / 2, cy + 12, { align: "center" });
-  // estrela navy maior (manter cor do gráfico, não dourada)
-  doc.setFillColor(NAVY);
-  drawStar(doc, rx + cw / 2, cy + 26, 6);
+  // estrela dourada/amarela
+  doc.setFillColor(GOLD);
+  doc.setDrawColor(GOLD);
+  drawStar(doc, rx + cw / 2, cy + 26, 7);
+  // restaura cor de borda padrão
+  doc.setDrawColor(BORDER);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(NAVY);
@@ -477,8 +491,6 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Comentários do mês", falconData, brandData);
   doc.setTextColor(TEXT);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
   const blocks: string[] = [];
   const push = (s?: string | null) => { if (s && s.trim()) blocks.push(s.trim()); };
   push(letter.ai_intro);
@@ -486,8 +498,16 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   push(letter.ai_financial);
   push(letter.ai_outlook);
   const body = blocks.join("\n\n") || "—";
-  const lines = doc.splitTextToSize(body, SIZE - 32);
-  doc.text(lines, 16, 38, { lineHeightFactor: 1.55, align: "justify", maxWidth: SIZE - 32 });
+  drawDynamicTextBlock(doc, body, {
+    x: 16,
+    y: 32,
+    width: SIZE - 32,
+    height: SIZE - 32 - 14, // até ~14mm da base
+    minSize: 9,
+    maxSize: 22,
+    lineHeightFactor: 1.5,
+    minFillRatio: 0.85,
+  });
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
@@ -695,6 +715,120 @@ function drawStar(doc: jsPDF, cx: number, cy: number, r: number) {
     const linesArr = points.slice(1).concat([points[0]]).map((p, i) => [p[0] - points[i][0], p[1] - points[i][1]]);
     anyDoc.lines(linesArr, points[0][0], points[0][1], [1, 1], "F", true);
   }
+}
+
+/**
+ * Ícone visual: pilha de moedas douradas com uma cédula verde ao lado.
+ * Centro em (cx, cy). Aproximadamente 18mm de largura por 12mm de altura.
+ */
+function drawCoinsAndBillIcon(doc: jsPDF, cx: number, cy: number) {
+  const GREEN = "#3F8A4F";
+  const GREEN_DARK = "#2E6B3C";
+  const COIN = "#D4A847";
+  const COIN_DARK = "#A77E2C";
+
+  // Cédula verde (atrás, à direita)
+  const billW = 11, billH = 6;
+  const bx = cx - 1, by = cy - billH / 2 + 0.5;
+  doc.setFillColor(GREEN);
+  doc.setDrawColor(GREEN_DARK);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(bx, by, billW, billH, 0.6, 0.6, "FD");
+  // círculo central da cédula
+  doc.setFillColor(GREEN_DARK);
+  doc.circle(bx + billW / 2, by + billH / 2, 1.1, "F");
+  doc.setTextColor("#FFFFFF");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(5);
+  doc.text("$", bx + billW / 2, by + billH / 2 + 0.9, { align: "center" });
+
+  // Pilha de moedas (3 moedas empilhadas, à esquerda, na frente)
+  const coinR = 3.2;
+  const stackX = cx - 5.2;
+  const baseY = cy + 4.2;
+  doc.setDrawColor(COIN_DARK);
+  doc.setLineWidth(0.25);
+  for (let i = 0; i < 3; i++) {
+    const yc = baseY - i * 2.2;
+    // elipse (moeda em perspectiva)
+    doc.setFillColor(COIN);
+    doc.ellipse(stackX, yc, coinR, 1.1, "F");
+    doc.setDrawColor(COIN_DARK);
+    doc.ellipse(stackX, yc, coinR, 1.1, "S");
+  }
+  // Topo da pilha com símbolo $
+  const topY = baseY - 2 * 2.2;
+  doc.setTextColor(COIN_DARK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(4);
+  doc.text("$", stackX, topY + 0.6, { align: "center" });
+}
+
+/**
+ * Desenha um bloco de texto ajustando dinamicamente o tamanho da fonte
+ * para que ocupe pelo menos `minFillRatio` da altura disponível, sem
+ * ultrapassar a área. Texto justificado.
+ */
+function drawDynamicTextBlock(
+  doc: jsPDF,
+  text: string,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    minSize: number;
+    maxSize: number;
+    lineHeightFactor: number;
+    minFillRatio: number;
+  },
+) {
+  const { x, y, width, height, minSize, maxSize, lineHeightFactor, minFillRatio } = opts;
+  doc.setFont("helvetica", "normal");
+
+  // Busca binária pelo maior tamanho de fonte que cabe na altura
+  let lo = minSize, hi = maxSize, best = minSize;
+  let bestLines: string[] = [];
+  while (lo <= hi) {
+    const mid = (lo + hi) / 2;
+    doc.setFontSize(mid);
+    const lines = doc.splitTextToSize(text, width) as string[];
+    const lineH = (mid * lineHeightFactor) / doc.internal.scaleFactor;
+    const totalH = lines.length * lineH;
+    if (totalH <= height) {
+      best = mid;
+      bestLines = lines;
+      lo = mid + 0.25;
+    } else {
+      hi = mid - 0.25;
+    }
+    if (hi - lo < 0.2) break;
+  }
+
+  // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
+  // até atingir a altura alvo (mantendo dentro da área).
+  const lineH = (best * lineHeightFactor) / doc.internal.scaleFactor;
+  const filled = bestLines.length * lineH;
+  if (filled < height * minFillRatio && bestLines.length > 0) {
+    // Aumenta lineHeightFactor (espaçamento) para preencher
+    const targetH = Math.min(height, Math.max(filled, height * minFillRatio));
+    const newLineH = targetH / bestLines.length;
+    const newLhf = (newLineH * doc.internal.scaleFactor) / best;
+    doc.setFontSize(best);
+    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+      lineHeightFactor: Math.min(newLhf, 2.2),
+      align: "justify",
+      maxWidth: width,
+    });
+    return;
+  }
+
+  doc.setFontSize(best);
+  doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+    lineHeightFactor,
+    align: "justify",
+    maxWidth: width,
+  });
 }
 
 /**
