@@ -3,18 +3,21 @@ import { Construction } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
 const TITLES: Record<string, string> = {
-  "/contas-pagar": "Contas a Pagar",
-  "/contas-receber": "Contas a Receber",
+  "/fechamento/envio": "Envio",
+  "/financeiro": "Financeiro — Visão Geral",
+  "/financeiro/contas-pagar": "Contas a Pagar",
+  "/financeiro/contas-receber": "Contas a Receber",
   "/indicadores": "Indicadores DRE",
   "/metas": "Metas GG",
   "/rh": "RH & People",
   "/controladoria": "Controladoria",
-  "/configuracoes": "Configurações",
+  "/configuracoes/usuarios": "Usuários",
+  "/configuracoes/assets": "Assets",
 };
 
-export default function EmBreve() {
+export default function EmBreve({ title: titleProp }: { title?: string } = {}) {
   const { pathname } = useLocation();
-  const title = TITLES[pathname] ?? "Módulo";
+  const title = titleProp ?? TITLES[pathname] ?? "Módulo";
   return (
     <div className="max-w-2xl mx-auto mt-16">
       <Card className="p-12 text-center shadow-soft">

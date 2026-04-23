@@ -3,7 +3,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import DashboardPage from "./pages/DashboardPage";
 import FechamentoPage from "./pages/FechamentoPage";
 import EmBreve from "./pages/EmBreve";
 import NotFound from "./pages/NotFound.tsx";
@@ -16,6 +15,7 @@ import FinanceiroPage from "./pages/FinanceiroPage";
 import HoteisPage from "./pages/HoteisPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
+import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
@@ -34,19 +34,35 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<Navigate to="/fechamento" replace />} />
+
+              {/* Fechamento */}
               <Route path="/fechamento" element={<FechamentoPage />} />
-              <Route path="/dre" element={<DrePage />} />
-              <Route path="/carta" element={<CartaPage />} />
-              <Route path="/financeiro" element={<FinanceiroPage />} />
-              <Route path="/hoteis" element={<HoteisPage />} />
-              <Route path="/contas-pagar" element={<EmBreve />} />
-              <Route path="/contas-receber" element={<EmBreve />} />
+              <Route path="/fechamento/dre" element={<DrePage />} />
+              <Route path="/fechamento/carta" element={<CartaPage />} />
+              <Route path="/fechamento/financeiro" element={<FinanceiroPage />} />
+              <Route path="/fechamento/envio" element={<EmBreve />} />
+
+              {/* Compat: rotas antigas */}
+              <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
+              <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
+
+              {/* Análise */}
               <Route path="/indicadores" element={<EmBreve />} />
               <Route path="/metas" element={<EmBreve />} />
+
+              {/* Gestão — Financeiro */}
+              <Route path="/financeiro" element={<EmBreve />} />
+              <Route path="/financeiro/contas-pagar" element={<EmBreve />} />
+              <Route path="/financeiro/contas-receber" element={<EmBreve />} />
               <Route path="/rh" element={<EmBreve />} />
               <Route path="/controladoria" element={<EmBreve />} />
-              <Route path="/configuracoes" element={<EmBreve />} />
+
+              {/* Configurações */}
+              <Route path="/configuracoes/usuarios" element={<EmBreve />} />
+              <Route path="/configuracoes/hoteis" element={<HoteisPage />} />
+              <Route path="/configuracoes/assets" element={<EmBreve />} />
+              <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
