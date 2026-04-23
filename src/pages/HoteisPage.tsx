@@ -378,6 +378,33 @@ function HotelAssetSheet({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Nome no Opera Cloud (Contas a Receber) */}
+              <div className="space-y-2 border-t pt-4">
+                <h4 className="text-sm font-semibold">Nome no Opera Cloud</h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Usado para mapear este hotel nos relatórios de Contas a Receber (A Faturar e Open Folio).
+                </p>
+                <Input
+                  defaultValue={hotel.opera_property_name ?? ""}
+                  disabled={!canEdit}
+                  placeholder="Ex: Ibis Macaé"
+                  onBlur={async (e) => {
+                    const v = e.target.value.trim();
+                    if (v === (hotel.opera_property_name ?? "")) return;
+                    try {
+                      await update.mutateAsync({
+                        id: hotel.id,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        patch: { opera_property_name: v || null } as any,
+                      });
+                      toast.success("Nome no Opera Cloud atualizado");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                    }
+                  }}
+                />
+              </div>
             </div>
           </>
         )}

@@ -18,6 +18,7 @@ import HoteisPage from "./pages/HoteisPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
 import ContasPagarPage from "./pages/ContasPagarPage";
+import ContasReceberPage from "./pages/ContasReceberPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -60,7 +61,7 @@ const App = () => (
               {/* Gestão — Financeiro */}
               <Route path="/financeiro" element={<EmBreve />} />
               <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
-              <Route path="/financeiro/contas-receber" element={<EmBreve />} />
+              <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
               <Route path="/rh" element={<EmBreve />} />
               <Route path="/controladoria" element={<EmBreve />} />
 

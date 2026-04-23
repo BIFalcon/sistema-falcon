@@ -10,6 +10,7 @@ export interface HotelRow {
   brand_logo_url: string | null;
   created_at: string;
   financial_system: "totvs" | "omie" | null;
+  opera_property_name?: string | null;
 }
 
 export const FALCON_LOGO_KEY = "falcon_logo_url";
