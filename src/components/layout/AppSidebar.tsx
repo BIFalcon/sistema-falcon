@@ -171,8 +171,8 @@ export function AppSidebar() {
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild isActive={isActiveUrl(item.url, item.end)}>
                           <NavLink to={item.url} end={item.end}>
-                            <item.icon className="h-4 w-4" />
-                            <span className="flex-1">{item.title}</span>
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="flex-1 truncate">{item.title}</span>
                             {!collapsed && item.soon && <SoonBadge />}
                           </NavLink>
                         </SidebarMenuButton>
@@ -189,11 +189,11 @@ export function AppSidebar() {
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton isActive={parentActive}>
-                            <item.icon className="h-4 w-4" />
-                            <span className="flex-1">{item.title}</span>
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="flex-1 truncate">{item.title}</span>
                             {!collapsed && item.soon && <SoonBadge />}
                             {!collapsed && (
-                              <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                              <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                             )}
                           </SidebarMenuButton>
                         </CollapsibleTrigger>
@@ -207,10 +207,11 @@ export function AppSidebar() {
                                   <SidebarMenuSubButton
                                     asChild
                                     isActive={isActiveUrl(child.url, child.end)}
+                                    className="text-[13px]"
                                   >
                                     <NavLink to={child.url} end={child.end}>
-                                      <child.icon className="h-3.5 w-3.5" />
-                                      <span className="flex-1">{child.title}</span>
+                                      <child.icon className="h-3.5 w-3.5 shrink-0" />
+                                      <span className="flex-1 truncate">{child.title}</span>
                                       {child.soon && <SoonBadge />}
                                     </NavLink>
                                   </SidebarMenuSubButton>
