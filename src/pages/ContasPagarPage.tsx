@@ -396,12 +396,13 @@ export default function ContasPagarPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Urgência de pagamento</h3>
-              <div className="grid grid-cols-5 gap-2">
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" />
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <UrgencyCell label="Vencidos" count={entries.filter((e) => isWithinPeriod(e.due_date, "overdue")).length} tone="danger" active={period === "overdue"} onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")} />
+                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => setPeriod(period === "today" ? "all" : "today")} />
+                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => setPeriod(period === "tomorrow" ? "all" : "tomorrow")} />
+                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => setPeriod(period === "this_week" ? "all" : "this_week")} />
+                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
+                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
               </div>
             </Card>
             <Card className="p-5 shadow-soft">
