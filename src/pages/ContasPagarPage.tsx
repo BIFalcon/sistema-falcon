@@ -79,8 +79,11 @@ export default function ContasPagarPage() {
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: entries = [], isLoading: entriesLoading } = useApEntries(hotelId);
   const { data: balance } = useTodayBankBalance(hotelId);
+  const { data: documents = [] } = useApDocuments(hotelId);
   const upsertBalance = useUpsertBankBalance();
   const setApproval = useSetEntryApproval();
+  const linkDoc = useLinkDocumentToEntry();
+  const deleteDoc = useDeleteDocument();
 
   const [balanceInput, setBalanceInput] = useState<string>("");
   const [period, setPeriod] = useState<Period>("today");
@@ -88,6 +91,20 @@ export default function ContasPagarPage() {
   const [category, setCategory] = useState<string>("all");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const docsRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifySelected, setNotifySelected] = useState<Set<string>>(new Set());
+  const [notifying, setNotifying] = useState(false);
+
+  const docsByEntry = useMemo(() => {
+    const map = new Map<string, ApDocument>();
+    documents.forEach((d) => { if (d.entry_id) map.set(d.entry_id, d); });
+    return map;
+  }, [documents]);
+
+  const unlinkedDocs = useMemo(() => documents.filter((d) => !d.entry_id), [documents]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
