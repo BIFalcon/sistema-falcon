@@ -23,6 +23,7 @@ type ParsedEntry = {
   observation: string | null;
   interest_fees: number | null;
   omie_situation: string | null;
+  is_distribution: boolean;
   raw: Record<string, any>;
 };
 
@@ -86,6 +87,11 @@ function makeKey(supplier: string, doc: string | null, due: string | null, amoun
   return base.replace(/\s+/g, " ").slice(0, 240);
 }
 
+function isDistributionEntry(category: string | null, description: string | null): boolean {
+  const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
+  return blob.includes("distribuicao de lucros");
+}
+
 function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -118,6 +124,7 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
       observation: null,
       interest_fees: interest || null,
       omie_situation: null,
+      is_distribution: isDistributionEntry(null, description),
       raw: { row },
     });
   }
@@ -175,6 +182,7 @@ function parseOmieXlsx(buf: ArrayBuffer): ParsedEntry[] {
       observation: normalize(row[colObs] ?? "") || null,
       interest_fees: null,
       omie_situation: normalize(row[colSit] ?? "") || null,
+      is_distribution: isDistributionEntry(normalize(row[colCategory] ?? ""), null),
       raw: { row, header },
     });
   }
@@ -292,37 +300,18 @@ Deno.serve(async (req) => {
       });
     if (upErr) throw upErr;
 
-    // ── Substituição preservando aprovações por entry_key ──
-    // 1. lê aprovações existentes
+    // ── Upload preservando vínculos por entry_key ──
+    // 1. lê entries existentes (todos os campos que serão preservados)
     const { data: existing } = await admin
       .from("ap_entries")
-      .select("entry_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id")
+      .select("id, entry_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
       .eq("hotel_id", hotelId);
-    const approvalsByKey = new Map<string, any>();
+    const existingByKey = new Map<string, any>();
     for (const e of existing ?? []) {
-      if (e.gg_approval && e.gg_approval !== "pending") {
-        approvalsByKey.set(e.entry_key, e);
-      }
+      existingByKey.set(e.entry_key, e);
     }
 
-    // 2. apaga uploads de relatório anteriores (cascade apaga entries; documents.entry_id vira null por SET NULL)
-    const { data: oldReports } = await admin
-      .from("ap_uploads")
-      .select("id, file_path")
-      .eq("hotel_id", hotelId)
-      .eq("kind", "report");
-    if (oldReports?.length) {
-      const oldPaths = oldReports.map((r: any) => r.file_path);
-      if (oldPaths.length) {
-        await admin.storage.from("accounts-payable").remove(oldPaths);
-      }
-      await admin
-        .from("ap_uploads")
-        .delete()
-        .in("id", oldReports.map((r: any) => r.id));
-    }
-
-    // 3. insere novo upload
+    // 2. insere novo upload
     const { data: uploadRow, error: uErr } = await admin
       .from("ap_uploads")
       .insert({
@@ -339,50 +328,86 @@ Deno.serve(async (req) => {
       .single();
     if (uErr) throw uErr;
 
-    // 4. insere entries com aprovações preservadas
-    if (parsed.length) {
-      const rows = parsed.map((p) => {
-        const prev = approvalsByKey.get(p.entry_key);
-        // OMIE: situação 'Agendado' = aprovado; 'Atrasado'/'Em Aprovação' = pending
-        let approval: "pending" | "approved" | "rejected" = "pending";
-        let approvalBy: string | null = null;
-        let approvalAt: string | null = null;
-        if (prev) {
-          approval = prev.gg_approval;
-          approvalBy = prev.gg_approval_by;
-          approvalAt = prev.gg_approval_at;
-        } else if (sourceSystem === "omie" && p.omie_situation) {
-          if (toAscii(p.omie_situation).startsWith("agendado")) approval = "approved";
-        }
-        return {
-          hotel_id: hotelId,
-          upload_id: uploadRow.id,
-          source_system: sourceSystem,
-          entry_key: p.entry_key,
-          supplier: p.supplier,
-          cnpj: p.cnpj,
-          document_number: p.document_number,
-          description: p.description,
-          due_date: p.due_date,
-          amount: p.amount,
-          payment_method: p.payment_method,
-          category: p.category,
+    // 3. separa em (a) atualizar existentes — preservando vínculos — e (b) inserir novos
+    const seenKeys = new Set<string>();
+    const updates: any[] = [];
+    const inserts: any[] = [];
+    for (const p of parsed) {
+      seenKeys.add(p.entry_key);
+      const prev = existingByKey.get(p.entry_key);
+      // OMIE: situação 'Agendado' implica aprovado quando ainda não havia aprovação
+      let approvalDefault: "pending" | "approved" | "rejected" = "pending";
+      if (sourceSystem === "omie" && p.omie_situation && toAscii(p.omie_situation).startsWith("agendado")) {
+        approvalDefault = "approved";
+      }
+      const baseFields = {
+        hotel_id: hotelId,
+        upload_id: uploadRow.id,
+        source_system: sourceSystem,
+        entry_key: p.entry_key,
+        supplier: p.supplier,
+        cnpj: p.cnpj,
+        document_number: p.document_number,
+        description: p.description,
+        due_date: p.due_date,
+        amount: p.amount,
+        payment_method: p.payment_method,
+        category: p.category,
+        interest_fees: p.interest_fees,
+        omie_situation: p.omie_situation,
+        is_distribution: p.is_distribution,
+        raw: p.raw,
+        archived_at: null,
+      };
+      if (prev) {
+        // Preserva: gg_approval*, primary_document_id, observation
+        updates.push({
+          id: prev.id,
+          ...baseFields,
+          // não sobrescreve aprovação/observação/documento
+          observation: prev.observation ?? p.observation,
+        });
+      } else {
+        inserts.push({
+          ...baseFields,
           observation: p.observation,
-          interest_fees: p.interest_fees,
-          omie_situation: p.omie_situation,
-          gg_approval: approval,
-          gg_approval_by: approvalBy,
-          gg_approval_at: approvalAt,
-          gg_approval_notes: prev?.gg_approval_notes ?? null,
-          raw: p.raw,
-        };
-      });
-      // chunk pra não estourar payload
+          gg_approval: approvalDefault,
+          gg_approval_by: null,
+          gg_approval_at: null,
+          gg_approval_notes: null,
+          primary_document_id: null,
+        });
+      }
+    }
+
+    // 4. inserts em chunks
+    if (inserts.length) {
       const chunkSize = 500;
-      for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize);
+      for (let i = 0; i < inserts.length; i += chunkSize) {
+        const chunk = inserts.slice(i, i + chunkSize);
         const { error: insErr } = await admin.from("ap_entries").insert(chunk);
         if (insErr) throw insErr;
+      }
+    }
+
+    // 5. updates linha a linha (Supabase não tem bulk update por id)
+    for (const u of updates) {
+      const { id, ...rest } = u;
+      const { error: updErr } = await admin.from("ap_entries").update(rest).eq("id", id);
+      if (updErr) throw updErr;
+    }
+
+    // 6. arquiva os que sumiram do novo relatório
+    const toArchive: string[] = [];
+    for (const e of existing ?? []) {
+      if (!seenKeys.has(e.entry_key) && !e.archived_at) toArchive.push(e.id);
+    }
+    if (toArchive.length) {
+      const nowIso = new Date().toISOString();
+      const archiveChunk = 500;
+      for (let i = 0; i < toArchive.length; i += archiveChunk) {
+        const chunk = toArchive.slice(i, i + archiveChunk);
+        await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
       }
     }
 

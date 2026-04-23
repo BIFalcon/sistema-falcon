@@ -119,6 +119,7 @@ export type Database = {
       ap_entries: {
         Row: {
           amount: number
+          archived_at: string | null
           category: string | null
           cnpj: string | null
           created_at: string
@@ -133,6 +134,7 @@ export type Database = {
           hotel_id: string
           id: string
           interest_fees: number | null
+          is_distribution: boolean
           observation: string | null
           omie_situation: string | null
           payment_method: string | null
@@ -145,6 +147,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          archived_at?: string | null
           category?: string | null
           cnpj?: string | null
           created_at?: string
@@ -159,6 +162,7 @@ export type Database = {
           hotel_id: string
           id?: string
           interest_fees?: number | null
+          is_distribution?: boolean
           observation?: string | null
           omie_situation?: string | null
           payment_method?: string | null
@@ -171,6 +175,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          archived_at?: string | null
           category?: string | null
           cnpj?: string | null
           created_at?: string
@@ -185,6 +190,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           interest_fees?: number | null
+          is_distribution?: boolean
           observation?: string | null
           omie_situation?: string | null
           payment_method?: string | null
@@ -349,12 +355,15 @@ export type Database = {
       }
       ar_open_folio_entries: {
         Row: {
+          archived_at: string | null
           arrival_date: string | null
           balance: number | null
           confirmation_number: string | null
           created_at: string
           days_open: number | null
           departure_date: string | null
+          entry_key: string | null
+          expected_payment_date: string | null
           extraction_date: string | null
           first_name: string | null
           hotel_id: string | null
@@ -366,12 +375,15 @@ export type Database = {
           upload_id: string
         }
         Insert: {
+          archived_at?: string | null
           arrival_date?: string | null
           balance?: number | null
           confirmation_number?: string | null
           created_at?: string
           days_open?: number | null
           departure_date?: string | null
+          entry_key?: string | null
+          expected_payment_date?: string | null
           extraction_date?: string | null
           first_name?: string | null
           hotel_id?: string | null
@@ -383,12 +395,15 @@ export type Database = {
           upload_id: string
         }
         Update: {
+          archived_at?: string | null
           arrival_date?: string | null
           balance?: number | null
           confirmation_number?: string | null
           created_at?: string
           days_open?: number | null
           departure_date?: string | null
+          entry_key?: string | null
+          expected_payment_date?: string | null
           extraction_date?: string | null
           first_name?: string | null
           hotel_id?: string | null
@@ -421,6 +436,7 @@ export type Database = {
           author_id: string
           confirmation_number: string
           created_at: string
+          expected_payment_date: string | null
           hotel_id: string
           id: string
           note: string
@@ -430,6 +446,7 @@ export type Database = {
           author_id: string
           confirmation_number: string
           created_at?: string
+          expected_payment_date?: string | null
           hotel_id: string
           id?: string
           note: string
@@ -439,6 +456,7 @@ export type Database = {
           author_id?: string
           confirmation_number?: string
           created_at?: string
+          expected_payment_date?: string | null
           hotel_id?: string
           id?: string
           note?: string

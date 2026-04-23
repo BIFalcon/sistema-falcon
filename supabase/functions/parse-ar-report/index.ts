@@ -51,6 +51,10 @@ type OpenFolioPayload = {
   days_open: number | null;
 };
 
+function makeOpenFolioKey(p: { confirmation_number: string | null; property_name_raw: string; arrival_date: string | null; departure_date: string | null }): string {
+  return `${p.confirmation_number ?? ""}|${p.property_name_raw ?? ""}|${p.arrival_date ?? ""}|${p.departure_date ?? ""}`;
+}
+
 async function loadHotelMap(admin: any): Promise<HotelMap> {
   const map: HotelMap = new Map();
   const { data } = await admin
@@ -133,6 +137,13 @@ function mapOpenFolioEntries(entries: OpenFolioPayload[], hotelMap: HotelMap, up
         departure_date: entry.departure_date,
         extraction_date: entry.extraction_date,
         days_open: entry.days_open,
+        entry_key: makeOpenFolioKey({
+          confirmation_number: entry.confirmation_number,
+          property_name_raw: propRaw,
+          arrival_date: entry.arrival_date,
+          departure_date: entry.departure_date,
+        }),
+        archived_at: null,
       };
     }),
     unmapped: Array.from(unmapped),
@@ -231,15 +242,47 @@ Deno.serve(async (req) => {
       }
     } else {
       result = mapOpenFolioEntries(parsedEntries as OpenFolioPayload[], hotelMap, uploadRow.id);
-      // SUBSTITUIÇÃO completa
-      await admin.from("ar_open_folio_entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      if (result.entries.length) {
+      // Upsert preservando justificativas/datas (entry_key composto).
+      const withKey = result.entries.filter((e: any) => e.confirmation_number);
+      const noKey = result.entries.filter((e: any) => !e.confirmation_number);
+      const seenKeys = new Set<string>(withKey.map((e: any) => e.entry_key));
+      if (withKey.length) {
         const chunkSize = 500;
-        for (let i = 0; i < result.entries.length; i += chunkSize) {
-          const chunk = result.entries.slice(i, i + chunkSize);
+        for (let i = 0; i < withKey.length; i += chunkSize) {
+          const chunk = withKey.slice(i, i + chunkSize);
+          const { error: insErr } = await admin
+            .from("ar_open_folio_entries")
+            .upsert(chunk, { onConflict: "entry_key" });
+          if (insErr) throw insErr;
+          inserted += chunk.length;
+        }
+      }
+      if (noKey.length) {
+        // Linhas sem confirmation_number não têm como ser correlacionadas — limpa antigas e insere novas.
+        await admin.from("ar_open_folio_entries").delete().is("confirmation_number", null);
+        const chunkSize = 500;
+        for (let i = 0; i < noKey.length; i += chunkSize) {
+          const chunk = noKey.slice(i, i + chunkSize);
           const { error: insErr } = await admin.from("ar_open_folio_entries").insert(chunk);
           if (insErr) throw insErr;
           inserted += chunk.length;
+        }
+      }
+      // Arquiva (não deleta) os registros que sumiram do novo upload — preserva histórico e justificativas.
+      const { data: existingFolios } = await admin
+        .from("ar_open_folio_entries")
+        .select("id, entry_key, archived_at, confirmation_number");
+      const nowIso = new Date().toISOString();
+      const toArchive: string[] = [];
+      for (const f of existingFolios ?? []) {
+        if (!f.confirmation_number || !f.entry_key) continue;
+        if (!seenKeys.has(f.entry_key) && !f.archived_at) toArchive.push(f.id);
+      }
+      if (toArchive.length) {
+        const archiveChunk = 500;
+        for (let i = 0; i < toArchive.length; i += archiveChunk) {
+          const chunk = toArchive.slice(i, i + archiveChunk);
+          await admin.from("ar_open_folio_entries").update({ archived_at: nowIso }).in("id", chunk);
         }
       }
     }

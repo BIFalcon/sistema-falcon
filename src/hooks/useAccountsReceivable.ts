@@ -102,6 +102,8 @@ export interface OpenFolioEntry {
   departure_date: string | null;
   extraction_date: string | null;
   days_open: number | null;
+  expected_payment_date: string | null;
+  archived_at: string | null;
 }
 
 export type { ParsedOpenFolioEntry, ParsedToInvoiceEntry };
@@ -112,7 +114,7 @@ export function useOpenFolioEntries() {
     queryFn: async (): Promise<OpenFolioEntry[]> => {
       const { data, error } = await supabase
         .from("ar_open_folio_entries")
-        .select("id,hotel_id,property_name_raw,confirmation_number,reservation_status,first_name,last_name,balance,arrival_date,departure_date,extraction_date,days_open")
+        .select("id,hotel_id,property_name_raw,confirmation_number,reservation_status,first_name,last_name,balance,arrival_date,departure_date,extraction_date,days_open,expected_payment_date,archived_at")
         .order("balance", { ascending: false })
         .limit(5000);
       if (error) throw error;
@@ -126,6 +128,7 @@ export interface OpenFolioNote {
   hotel_id: string;
   confirmation_number: string;
   note: string;
+  expected_payment_date: string | null;
   author_id: string;
   created_at: string;
   updated_at: string;
@@ -151,12 +154,27 @@ export function useOpenFolioNotes(hotelId: string | null) {
 export function useUpsertOpenFolioNote() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { hotel_id: string; confirmation_number: string; note: string; author_id: string }) => {
-      const { error } = await supabase.from("ar_open_folio_notes").insert(input);
+    mutationFn: async (input: { hotel_id: string; confirmation_number: string; note: string; author_id: string; expected_payment_date?: string | null }) => {
+      const { error } = await supabase.from("ar_open_folio_notes").insert({
+        hotel_id: input.hotel_id,
+        confirmation_number: input.confirmation_number,
+        note: input.note,
+        author_id: input.author_id,
+        expected_payment_date: input.expected_payment_date ?? null,
+      });
       if (error) throw error;
+      // Espelha a data prevista no folio para facilitar leitura na listagem
+      if (input.expected_payment_date !== undefined) {
+        await supabase
+          .from("ar_open_folio_entries")
+          .update({ expected_payment_date: input.expected_payment_date })
+          .eq("hotel_id", input.hotel_id)
+          .eq("confirmation_number", input.confirmation_number);
+      }
     },
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["ar-of-notes", v.hotel_id] });
+      qc.invalidateQueries({ queryKey: ["ar-open-folio"] });
     },
   });
 }

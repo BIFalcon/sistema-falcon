@@ -78,9 +78,17 @@ export default function ContasPagarPage() {
   const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
 
   const { data: lastUpload } = useLatestApUpload(hotelId);
-  const { data: entries = [], isLoading: entriesLoading } = useApEntries(hotelId);
+  const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
   const { data: balance } = useTodayBankBalance(hotelId);
   const { data: documents = [] } = useApDocuments(hotelId);
+  // Separa entries em ATIVOS (do relatório atual) + ARQUIVADOS (sumiram do último upload).
+  // Distribuição de Lucros entra numa lista própria (mas continua "ativa").
+  const allEntries = allEntriesRaw;
+  const activeEntries = useMemo(() => allEntries.filter((e) => !e.archived_at), [allEntries]);
+  const archivedEntries = useMemo(() => allEntries.filter((e) => !!e.archived_at), [allEntries]);
+  const distributionEntries = useMemo(() => activeEntries.filter((e) => e.is_distribution), [activeEntries]);
+  const entries = useMemo(() => activeEntries.filter((e) => !e.is_distribution), [activeEntries]);
+
   const upsertBalance = useUpsertBankBalance();
   const setApproval = useSetEntryApproval();
   const linkDoc = useLinkDocumentToEntry();
@@ -203,6 +211,12 @@ export default function ContasPagarPage() {
     });
     return c;
   }, [entries]);
+
+  // Total a pagar de Distribuição de Lucros (independente de período)
+  const distributionTotal = useMemo(
+    () => distributionEntries.reduce((s, e) => s + Number(e.amount || 0), 0),
+    [distributionEntries],
+  );
 
   const issueCounts = useMemo(() => {
     let notApproved = 0, noDoc = 0, overdue = 0, divergent = 0;
@@ -441,6 +455,15 @@ export default function ContasPagarPage() {
                 <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
                 <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
               </div>
+              {distributionEntries.length > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-accent font-semibold">Distribuição de Lucros</p>
+                    <p className="text-xs text-muted-foreground">{distributionEntries.length} lançamento(s) — listagem separada abaixo</p>
+                  </div>
+                  <p className="text-base font-bold">{fmtBRL(distributionTotal)}</p>
+                </div>
+              )}
             </Card>
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Problemas identificados</h3>
@@ -643,6 +666,57 @@ export default function ContasPagarPage() {
         </>
       )}
 
+      {/* Tabela separada — Distribuição de Lucros */}
+      {hotelId && distributionEntries.length > 0 && (
+        <Card className="p-5 shadow-soft space-y-3 border-accent/40">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-accent">
+              Distribuição de Lucros — Sócios
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {distributionEntries.length} lançamento(s) · total {fmtBRL(distributionTotal)}
+            </p>
+          </div>
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fornecedor / Sócio</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Aprovação GG</TableHead>
+                  <TableHead>Doc</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {distributionEntries.map((e) => (
+                  <EntryRow
+                    key={e.id}
+                    entry={e}
+                    doc={docsByEntry.get(e.id) ?? null}
+                    sourceSystem={sourceSystem}
+                    canApprove={canApprove}
+                    canManage={canManage}
+                    compact
+                    onLink={() => setLinkEntry(e)}
+                    onApprove={async (approval) => {
+                      if (!user) return;
+                      try {
+                        await setApproval.mutateAsync({ entryId: e.id, hotelId, approval, userId: user.id });
+                        toast.success(approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                      }
+                    }}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
       {/* Modal de vínculo */}
       <LinkDocDialog
         open={!!linkEntry}
@@ -803,7 +877,7 @@ function UrgencyCell({
 }
 
 function EntryRow({
-  entry, doc, sourceSystem, canApprove, canManage, onLink, onApprove,
+  entry, doc, sourceSystem, canApprove, canManage, onLink, onApprove, compact,
 }: {
   entry: ApEntry;
   doc: ApDocument | null;
@@ -812,14 +886,21 @@ function EntryRow({
   canManage: boolean;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
+  compact?: boolean;
 }) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
+  const archived = !!entry.archived_at;
   return (
-    <TableRow className={overdue ? "bg-destructive/5" : ""}>
-      <TableCell className="font-medium">{entry.supplier}</TableCell>
-      {sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>}
-      <TableCell className="text-xs">{entry.document_number ?? "—"}</TableCell>
+    <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          <span>{entry.supplier}</span>
+          {archived && <Badge variant="outline" className="text-[10px]">Arquivado</Badge>}
+        </div>
+      </TableCell>
+      {!compact && sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>}
+      {!compact && <TableCell className="text-xs">{entry.document_number ?? "—"}</TableCell>}
       <TableCell className="text-xs">{fmtDate(entry.due_date)}</TableCell>
       <TableCell className="text-right font-mono text-sm">
         <div>{fmtBRL(Number(entry.amount))}</div>
@@ -829,7 +910,7 @@ function EntryRow({
           </div>
         )}
       </TableCell>
-      <TableCell className="text-xs text-muted-foreground">{entry.payment_method ?? entry.category ?? "—"}</TableCell>
+      {!compact && <TableCell className="text-xs text-muted-foreground">{entry.payment_method ?? entry.category ?? "—"}</TableCell>}
       <TableCell>
         {entry.gg_approval === "approved" ? (
           <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
