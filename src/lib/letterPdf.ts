@@ -29,6 +29,30 @@ const TEXT = "#1F1F1F";
 const MUTED = "#6B7280";
 const BORDER = "#D1D5DB";
 
+/**
+ * Extrai o nome da cidade a partir do nome do hotel, removendo a marca conhecida
+ * do prefixo. Ex.: "Ibis budget Itaperuna" → "Itaperuna",
+ * "Mercure Macaé" → "Macaé", "Manhattan Porto Alegre" → "Porto Alegre".
+ */
+function extractCityFromHotel(hotel: Hotel | null): string {
+  if (!hotel?.name) return "";
+  const name = hotel.name.trim();
+  const brandPrefixes = [
+    "ibis budget", "ibis styles", "ibis",
+    "mercure", "manhattan", "pousada",
+    "novotel", "pullman", "sofitel", "swissôtel", "swissotel",
+  ];
+  const lower = name.toLowerCase();
+  for (const p of brandPrefixes) {
+    if (lower.startsWith(p + " ")) {
+      return name.slice(p.length).trim();
+    }
+  }
+  // Fallback: assume primeira palavra é marca
+  const parts = name.split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(" ") : name;
+}
+
 export interface LetterPdfInput {
   letter: InvestorLetter;
   closing: ClosingRow;
