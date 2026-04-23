@@ -390,7 +390,7 @@ Deno.serve(async (req) => {
     let docsCreated = 0;
     if (extractedDocs.length) {
       for (const doc of extractedDocs) {
-        const path = `${hotelId}/documents/${ts}-${doc.name}`;
+        const path = `${hotelId}/documents/${ts}-${sanitizeFileName(doc.name)}`;
         const { error: dErr } = await admin.storage
           .from("accounts-payable")
           .upload(path, doc.data, { contentType: doc.mime, upsert: true });
