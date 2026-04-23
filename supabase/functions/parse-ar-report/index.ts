@@ -18,39 +18,6 @@ function sanitizeFileName(name: string): string {
   const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return base.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
 }
-function parseNumber(v: any): number {
-  if (v === null || v === undefined || v === "") return 0;
-  if (typeof v === "number") return v;
-  let s = String(v).trim().replace(/[R$\s]/g, "");
-  if (s.includes(",") && (!s.includes(".") || s.lastIndexOf(",") > s.lastIndexOf("."))) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  }
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-}
-function parseDate(v: any): string | null {
-  if (v === null || v === undefined || v === "") return null;
-  if (typeof v === "number") {
-    const ms = Math.round((v - 25569) * 86400 * 1000);
-    const d = new Date(ms);
-    if (!isNaN(d.getTime())) {
-      const yyyy = d.getUTCFullYear();
-      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const dd = String(d.getUTCDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
-  }
-  const s = String(v).trim();
-  const br = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (br) {
-    let [, d, m, y] = br;
-    if (y.length === 2) y = "20" + y;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  return null;
-}
 type HotelMap = Map<string, string>; // lower(opera_property_name) → hotel_id
 
 type ToInvoicePayload = {
