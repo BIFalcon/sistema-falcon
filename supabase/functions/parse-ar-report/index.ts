@@ -51,6 +51,10 @@ type OpenFolioPayload = {
   days_open: number | null;
 };
 
+function makeOpenFolioKey(p: { confirmation_number: string | null; property_name_raw: string; arrival_date: string | null; departure_date: string | null }): string {
+  return `${p.confirmation_number ?? ""}|${p.property_name_raw ?? ""}|${p.arrival_date ?? ""}|${p.departure_date ?? ""}`;
+}
+
 async function loadHotelMap(admin: any): Promise<HotelMap> {
   const map: HotelMap = new Map();
   const { data } = await admin
