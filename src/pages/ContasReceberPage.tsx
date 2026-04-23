@@ -439,16 +439,40 @@ function ConsolidatedRanking({
 
 /* ════════════════════ OPEN FOLIO ════════════════════ */
 
-function OpenFolioSection({ isManager }: { isManager: boolean }) {
+function OpenFolioSection({
+  isManager,
+  seesAllHotels,
+  restrictedHotelIds,
+  isGgOnly,
+}: {
+  isManager: boolean;
+  seesAllHotels: boolean;
+  restrictedHotelIds: string[] | null;
+  isGgOnly: boolean;
+}) {
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
   const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
+  const allowedSet = useMemo(
+    () => (seesAllHotels ? null : new Set(restrictedHotelIds ?? [])),
+    [seesAllHotels, restrictedHotelIds],
+  );
+  const visibleEntries = useMemo(
+    () => (allowedSet ? entries.filter((e) => e.hotel_id && allowedSet.has(e.hotel_id)) : entries),
+    [entries, allowedSet],
+  );
+  // GG: auto-seleciona o único hotel da cartela e esconde a lista
+  useEffect(() => {
+    if (isGgOnly && !selectedHotel && restrictedHotelIds && restrictedHotelIds.length === 1) {
+      setSelectedHotel(restrictedHotelIds[0]);
+    }
+  }, [isGgOnly, selectedHotel, restrictedHotelIds]);
 
   const summaries = useMemo(() => {
     const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
-    for (const e of entries) {
+    for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
       const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0 };
       cur.count++;
@@ -469,11 +493,11 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [entries, hotels]);
+  }, [visibleEntries, hotels]);
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
-    return entries
+    return visibleEntries
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
@@ -483,7 +507,7 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
         return d > 90;
       })
       .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0));
-  }, [entries, selectedHotel, agingFilter]);
+  }, [visibleEntries, selectedHotel, agingFilter]);
 
   return (
     <div className="space-y-5">
@@ -499,6 +523,7 @@ function OpenFolioSection({ isManager }: { isManager: boolean }) {
           agingFilter={agingFilter}
           setAgingFilter={setAgingFilter}
           onBack={() => setSelectedHotel(null)}
+          hideBack={isGgOnly}
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
