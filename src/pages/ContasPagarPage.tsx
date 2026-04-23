@@ -555,30 +555,50 @@ export default function ContasPagarPage() {
                 <TableBody>
                   {entriesLoading ? (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
-                  ) : filtered.length === 0 ? (
+                  ) : displayRows.length === 0 ? (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
-                  ) : filtered.map((e) => (
-                    <EntryRow
-                      key={e.id}
-                      entry={e}
-                      doc={docsByEntry.get(e.id) ?? null}
-                      sourceSystem={sourceSystem}
-                      canApprove={canApprove}
-                      canManage={canManage}
-                      onLink={() => setLinkEntry(e)}
-                      onApprove={async (approval) => {
-                        if (!user) return;
-                        try {
-                          await setApproval.mutateAsync({
-                            entryId: e.id, hotelId, approval, userId: user.id,
-                          });
-                          toast.success(approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente");
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
-                        }
-                      }}
-                    />
-                  ))}
+                  ) : displayRows.map((row, idx) => {
+                    if (row.kind === "group") {
+                      const colSpan = sourceSystem === "omie" ? 9 : 8;
+                      return (
+                        <TableRow key={`g-${idx}`} className="bg-muted/30">
+                          <TableCell className="font-medium">
+                            {row.supplier} <span className="text-muted-foreground font-normal">({row.entries.length})</span>
+                          </TableCell>
+                          {sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">—</TableCell>}
+                          <TableCell className="text-xs text-muted-foreground italic">N/D agrupado</TableCell>
+                          <TableCell className="text-xs">{fmtDate(row.due)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtBRL(row.amount)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground" colSpan={colSpan - (sourceSystem === "omie" ? 5 : 4)}>
+                            {row.entries.length} lançamento(s) sem nº de documento
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    const e = row.entry;
+                    return (
+                      <EntryRow
+                        key={e.id}
+                        entry={e}
+                        doc={docsByEntry.get(e.id) ?? null}
+                        sourceSystem={sourceSystem}
+                        canApprove={canApprove}
+                        canManage={canManage}
+                        onLink={() => setLinkEntry(e)}
+                        onApprove={async (approval) => {
+                          if (!user) return;
+                          try {
+                            await setApproval.mutateAsync({
+                              entryId: e.id, hotelId, approval, userId: user.id,
+                            });
+                            toast.success(approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente");
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
