@@ -672,7 +672,13 @@ function drawDreTable(
       y += rowH;
       continue;
     }
-    const v = findValue(r.rx);
+    let v = findValue(r.rx);
+    // Fallback: se "DESPESAS TOTAIS" não vier explícito da DRE, soma Fixas + Variáveis
+    if (v == null && r.kind === "total" && /despesas\s+totais/i.test(r.label)) {
+      const fixas = findValue([/^despesas?\s+fixas?\s+totais?/i, /^total\s+de?\s*despesas?\s+fixas?/i]);
+      const variaveis = findValue([/^despesas?\s+vari[áa]veis?\s+(totais?|total)/i, /^total\s+de?\s*despesas?\s+vari[áa]veis?/i]);
+      if (fixas != null || variaveis != null) v = (fixas ?? 0) + (variaveis ?? 0);
+    }
     const rowH = r.kind === "highlight" ? 6.4 : 5.4;
     if (r.kind === "highlight") {
       doc.setFillColor("#FEF3C7"); // amarelo destaque
