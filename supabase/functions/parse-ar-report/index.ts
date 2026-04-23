@@ -153,7 +153,6 @@ function parseToInvoice(buf: ArrayBuffer, hotelMap: HotelMap, uploadId: string) 
       reservation_status: normalize(row[cResStatus] ?? "") || null,
       departure_date: parseDate(row[cDep]),
       entry_key,
-      raw: { row, header },
     });
   }
   return { entries, unmapped: Array.from(unmapped) };
@@ -203,7 +202,6 @@ function parseOpenFolio(buf: ArrayBuffer, hotelMap: HotelMap, uploadId: string) 
       departure_date: parseDate(row[cDep]),
       extraction_date: parseDate(row[cExtraction]),
       days_open: parseInt(String(row[cDays] ?? "").replace(/\D/g, "")) || null,
-      raw: { row, header },
     });
   }
   return { entries, unmapped: Array.from(unmapped) };
