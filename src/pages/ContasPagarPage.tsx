@@ -655,7 +655,15 @@ function Stat({ label, value, tone = "neutral" }: { label: string; value: string
   );
 }
 
-function UrgencyCell({ label, count, tone }: { label: string; count: number; tone: "danger" | "warning" | "amber" | "info" | "muted" }) {
+function UrgencyCell({
+  label, count, tone, active, onClick,
+}: {
+  label: string;
+  count: number;
+  tone: "danger" | "warning" | "amber" | "info" | "muted";
+  active?: boolean;
+  onClick?: () => void;
+}) {
   const colors: Record<string, string> = {
     danger: "bg-destructive/10 text-destructive border-destructive/30",
     warning: "bg-orange-500/10 text-orange-600 border-orange-500/30 dark:text-orange-400",
@@ -663,11 +671,16 @@ function UrgencyCell({ label, count, tone }: { label: string; count: number; ton
     info: "bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-400",
     muted: "bg-muted text-muted-foreground border-border",
   };
+  const Comp: any = onClick ? "button" : "div";
   return (
-    <div className={`rounded-md border p-3 text-center ${colors[tone]}`}>
-      <p className="text-2xl font-bold leading-none">{count}</p>
-      <p className="text-[10px] uppercase tracking-wider mt-1">{label}</p>
-    </div>
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`rounded-md border px-2 py-2.5 text-center min-h-[72px] flex flex-col items-center justify-center gap-1 transition-all ${colors[tone]} ${onClick ? "hover:shadow-soft hover:scale-[1.02] cursor-pointer" : ""} ${active ? "ring-2 ring-offset-1 ring-current" : ""}`}
+    >
+      <p className="text-xl font-bold leading-none">{count}</p>
+      <p className="text-[9px] uppercase tracking-wide leading-tight break-words w-full">{label}</p>
+    </Comp>
   );
 }
 
