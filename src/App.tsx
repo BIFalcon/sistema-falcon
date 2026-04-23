@@ -12,6 +12,7 @@ import SemPermissaoPage from "./pages/SemPermissaoPage";
 import DrePage from "./pages/DrePage";
 import CartaPage from "./pages/CartaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
+import EnvioPage from "./pages/EnvioPage";
 import HoteisPage from "./pages/HoteisPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
@@ -41,7 +42,7 @@ const App = () => (
               <Route path="/fechamento/dre" element={<DrePage />} />
               <Route path="/fechamento/carta" element={<CartaPage />} />
               <Route path="/fechamento/financeiro" element={<FinanceiroPage />} />
-              <Route path="/fechamento/envio" element={<EmBreve />} />
+              <Route path="/fechamento/envio" element={<EnvioPage />} />
 
               {/* Compat: rotas antigas */}
               <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
