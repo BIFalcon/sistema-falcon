@@ -398,6 +398,26 @@ export default function ContasPagarPage() {
                   onChange={handleFile}
                   disabled={!canManage || !sourceSystem || uploading}
                 />
+                <input
+                  ref={docsRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.ofx,.xml,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={handleDocs}
+                  disabled={!canManage || uploadingDocs}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={!canManage || uploadingDocs}
+                  onClick={() => docsRef.current?.click()}
+                  title="Enviar PDFs/OFX/XML para vincular manualmente"
+                >
+                  {uploadingDocs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                  Importar Documentos
+                </Button>
                 <Button
                   variant="default"
                   size="sm"
