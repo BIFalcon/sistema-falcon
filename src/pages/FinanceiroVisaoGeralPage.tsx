@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import { useAllApEntries, useAllTodayBankBalances } from "@/hooks/useAccountsPayable";
 import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
@@ -71,23 +70,17 @@ export default function FinanceiroVisaoGeralPage() {
   const { hasRole, isMaster, userHotels } = useAuth();
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
-  const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds: string[] | null = seesAllHotels
     ? null
     : userHotels.map((h) => h.id);
 
   const { data: allHotels = [] } = useAllHotels();
-  const visibleHotels = useMemo(
-    () => (seesAllHotels ? allHotels : allHotels.filter((h) => restrictedHotelIds?.includes(h.id))),
-    [allHotels, seesAllHotels, restrictedHotelIds],
-  );
   const hotelById = useMemo(() => new Map(allHotels.map((h) => [h.id, h])), [allHotels]);
 
-  // Filtros
-  const initialHotel = isGgOnly && visibleHotels.length === 1 ? visibleHotels[0].id : "all";
-  const [hotelFilter, setHotelFilter] = useState<string>(initialHotel);
-  const now = new Date();
-  const [period, setPeriod] = useState<string>(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  // Filtros globais (header)
+  const { hotelId, month, year } = useFilters();
+  const hotelFilter = hotelId ?? "all";
+  const period = `${year}-${String(month).padStart(2, "0")}`;
 
   // Dados
   const { data: apEntries = [], isLoading: apLoading } = useAllApEntries();
@@ -257,19 +250,6 @@ export default function FinanceiroVisaoGeralPage() {
   const maxOfBar = Math.max(1, ...ofRanking.map((r) => r.total));
   const maxMonthBar = Math.max(1, ...monthsBars.map((m) => m.total));
 
-  // periodOptions: últimos 12 meses + próximos 2
-  const periodOptions = useMemo(() => {
-    const arr: string[] = [];
-    const base = new Date();
-    base.setDate(1);
-    for (let i = 11; i >= -2; i--) {
-      const d = new Date(base);
-      d.setMonth(d.getMonth() - i);
-      arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-    return arr;
-  }, []);
-
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div>
@@ -279,35 +259,6 @@ export default function FinanceiroVisaoGeralPage() {
           Dashboard executivo consolidando Contas a Pagar, Contas a Receber e indicadores financeiros.
         </p>
       </div>
-
-      {/* Filtros */}
-      <Card className="p-4 shadow-soft flex flex-wrap items-end gap-3">
-        {!isGgOnly && (
-          <div className="min-w-[220px]">
-            <Label className="text-xs">Hotel</Label>
-            <Select value={hotelFilter} onValueChange={setHotelFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os hotéis</SelectItem>
-                {visibleHotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="min-w-[180px]">
-          <Label className="text-xs">Período</Label>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {periodOptions.map((ym) => (
-                <SelectItem key={ym} value={ym}>{monthLabel(ym)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
 
       {/* Cards superiores */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

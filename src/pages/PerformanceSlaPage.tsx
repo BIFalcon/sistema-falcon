@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { MONTHS_PT, STATUS_LABELS, type Hotel } from "@/lib/constants";
 import {
   usePerfClosings,
@@ -85,12 +86,11 @@ function fullCycleHours(c: PerfClosing): number | null {
 
 export default function PerformanceSlaPage() {
   const { allowedHotels, isMaster, hasRole } = useAuth();
-  const now = new Date();
   const canAccess = isMaster || hasRole("processos");
 
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
-  const [hotelFilter, setHotelFilter] = useState<string>("__all");
+  // Filtros globais (header)
+  const { hotelId, month, year } = useFilters();
+  const hotelFilter = hotelId ?? "__all";
   const [userFilter, setUserFilter] = useState<string>("__all");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [search, setSearch] = useState("");
@@ -253,8 +253,6 @@ export default function PerformanceSlaPage() {
     return Array.from(activity.profilesMap.entries()).map(([id, name]) => ({ id, name }));
   }, [activity]);
 
-  const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
-
   if (!canAccess) {
     return (
       <div className="container max-w-2xl py-16 text-center">
@@ -278,41 +276,7 @@ export default function PerformanceSlaPage() {
       {/* Filtros */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-            <div>
-              <Label className="text-xs">Mês</Label>
-              <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MONTHS_PT.map((m, i) => (
-                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Ano</Label>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Hotel</Label>
-              <Select value={hotelFilter} onValueChange={setHotelFilter}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all">Todos os hotéis</SelectItem>
-                  {allowedHotels.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <Label className="text-xs">Usuário</Label>
               <Select value={userFilter} onValueChange={setUserFilter}>

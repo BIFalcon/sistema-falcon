@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
   useToInvoiceEntries,
@@ -118,22 +119,18 @@ function ToInvoiceSection({
   isGgOnly: boolean;
 }) {
   const { data: allHotels = [] } = useAllHotels();
-  const hotels = useMemo(
-    () => (seesAllHotels ? allHotels : allHotels.filter((h) => restrictedHotelIds?.includes(h.id))),
-    [allHotels, seesAllHotels, restrictedHotelIds],
-  );
-  // GG vê apenas o próprio hotel — auto seleciona e esconde o seletor
-  const initialHotelId = isGgOnly && hotels.length === 1 ? hotels[0].id : "";
-  const [hotelId, setHotelId] = useState<string>(initialHotelId);
-  // Mantém hotelId sincronizado quando a lista de hotéis carrega tardiamente
-  useEffect(() => {
-    if (isGgOnly && !hotelId && hotels.length === 1) {
-      setHotelId(hotels[0].id);
-    }
-  }, [isGgOnly, hotelId, hotels]);
+  // Filtro global do header (Hotel) é a única fonte de verdade.
+  const { hotelId: globalHotelId } = useFilters();
+  const hotelId = globalHotelId ?? "";
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
+
+  // Reset drill quando hotel muda
+  useEffect(() => {
+    setDrillMonth(null);
+    setDrillDay(null);
+  }, [hotelId]);
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
@@ -156,38 +153,19 @@ function ToInvoiceSection({
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
 
       <Card className="p-5 shadow-soft space-y-4">
-        {!isGgOnly && (
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="flex-1 min-w-[220px]">
-              <Label className="text-xs">Hotel</Label>
-              <Select value={hotelId || "all"} onValueChange={(v) => { setHotelId(v === "all" ? "" : v); setDrillMonth(null); setDrillDay(null); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {seesAllHotels && <SelectItem value="all">Todos (consolidado)</SelectItem>}
-                  {hotels.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {hotelId && (
-              <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" /> Contratos do hotel
-              </Button>
-            )}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-xs text-muted-foreground">Hotel</p>
+            <p className="text-sm font-semibold">
+              {hotelId ? hotelName(hotelId) : "Todos os hotéis (consolidado)"}
+            </p>
           </div>
-        )}
-        {isGgOnly && hotelId && (
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="text-xs text-muted-foreground">Hotel</p>
-              <p className="text-sm font-semibold">{hotelName(hotelId)}</p>
-            </div>
+          {hotelId && (
             <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Contratos do hotel
             </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
@@ -453,7 +431,9 @@ function OpenFolioSection({
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
-  const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
+  // Filtro global do header (Hotel) é a única fonte de verdade.
+  const { hotelId: globalHotelId, setHotelId } = useFilters();
+  const selectedHotel = globalHotelId;
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const allowedSet = useMemo(
     () => (seesAllHotels ? null : new Set(restrictedHotelIds ?? [])),
@@ -463,12 +443,6 @@ function OpenFolioSection({
     () => (allowedSet ? entries.filter((e) => e.hotel_id && allowedSet.has(e.hotel_id)) : entries),
     [entries, allowedSet],
   );
-  // GG: auto-seleciona o único hotel da cartela e esconde a lista
-  useEffect(() => {
-    if (isGgOnly && !selectedHotel && restrictedHotelIds && restrictedHotelIds.length === 1) {
-      setSelectedHotel(restrictedHotelIds[0]);
-    }
-  }, [isGgOnly, selectedHotel, restrictedHotelIds]);
 
   const summaries = useMemo(() => {
     const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
@@ -522,7 +496,7 @@ function OpenFolioSection({
           entries={filteredEntries}
           agingFilter={agingFilter}
           setAgingFilter={setAgingFilter}
-          onBack={() => setSelectedHotel(null)}
+          onBack={() => setHotelId(null)}
           hideBack={isGgOnly}
         />
       ) : (
@@ -540,7 +514,7 @@ function OpenFolioSection({
                 return (
                   <button
                     key={s.id}
-                    onClick={() => setSelectedHotel(s.id)}
+                    onClick={() => setHotelId(s.id)}
                     className="w-full text-left p-4 rounded-lg border hover:border-accent hover:shadow-soft transition-all flex items-center gap-4"
                   >
                     <div className="flex-1 min-w-0">
