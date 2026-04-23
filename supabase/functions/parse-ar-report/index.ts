@@ -137,6 +137,13 @@ function mapOpenFolioEntries(entries: OpenFolioPayload[], hotelMap: HotelMap, up
         departure_date: entry.departure_date,
         extraction_date: entry.extraction_date,
         days_open: entry.days_open,
+        entry_key: makeOpenFolioKey({
+          confirmation_number: entry.confirmation_number,
+          property_name_raw: propRaw,
+          arrival_date: entry.arrival_date,
+          departure_date: entry.departure_date,
+        }),
+        archived_at: null,
       };
     }),
     unmapped: Array.from(unmapped),
