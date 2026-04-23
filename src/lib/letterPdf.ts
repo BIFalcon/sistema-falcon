@@ -29,6 +29,30 @@ const TEXT = "#1F1F1F";
 const MUTED = "#6B7280";
 const BORDER = "#D1D5DB";
 
+/**
+ * Extrai o nome da cidade a partir do nome do hotel, removendo a marca conhecida
+ * do prefixo. Ex.: "Ibis budget Itaperuna" → "Itaperuna",
+ * "Mercure Macaé" → "Macaé", "Manhattan Porto Alegre" → "Porto Alegre".
+ */
+function extractCityFromHotel(hotel: Hotel | null): string {
+  if (!hotel?.name) return "";
+  const name = hotel.name.trim();
+  const brandPrefixes = [
+    "ibis budget", "ibis styles", "ibis",
+    "mercure", "manhattan", "pousada",
+    "novotel", "pullman", "sofitel", "swissôtel", "swissotel",
+  ];
+  const lower = name.toLowerCase();
+  for (const p of brandPrefixes) {
+    if (lower.startsWith(p + " ")) {
+      return name.slice(p.length).trim();
+    }
+  }
+  // Fallback: assume primeira palavra é marca
+  const parts = name.split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(" ") : name;
+}
+
 export interface LetterPdfInput {
   letter: InvestorLetter;
   closing: ClosingRow;
@@ -422,6 +446,14 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // logos rodapé direita — PNG (transparente)
   if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
   if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  // Cidade do hotel — abaixo da logo da bandeira
+  const city = extractCityFromHotel(hotel);
+  if (city) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(NAVY);
+    doc.text(city, SIZE - 78 + 14, 204, { align: "center" });
+  }
 
   /* ───── 2. INDICADORES — Ocupação + ADR ───── */
   addPage(doc);
@@ -629,10 +661,8 @@ function drawDreTable(
 
     { kind: "section", label: "RESULTADO" },
     { kind: "total", label: "Resultado Operacional Bruto (GOP)", rx: [/resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
-    { kind: "item", label: "Total dos Gastos de Propriedade", rx: [/gastos?\s+de\s+propriedade/i, /total\s+gastos?\s+(de\s+)?propriedade/i] },
-    { kind: "total", label: "Resultado Operacional Líquido", rx: [/resultado\s+operacional\s+l[íi]quido/i] },
-    { kind: "total", label: "Lucro Líquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
-    { kind: "highlight", label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
+    { kind: "total", label: "Lucro / Prejuízo a Distribuir no Período", rx: [/lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i, /^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
+    { kind: "highlight", label: "Distribuição por UH", rx: [/^por\s+uh$/i, /distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
   ];
 
   const findValue = (rxs: RegExp[]): number | null => {
@@ -674,7 +704,13 @@ function drawDreTable(
       y += rowH;
       continue;
     }
-    const v = findValue(r.rx);
+    let v = findValue(r.rx);
+    // Fallback: se "DESPESAS TOTAIS" não vier explícito da DRE, soma Fixas + Variáveis
+    if (v == null && r.kind === "total" && /despesas\s+totais/i.test(r.label)) {
+      const fixas = findValue([/^despesas?\s+fixas?\s+totais?/i, /^total\s+de?\s*despesas?\s+fixas?/i]);
+      const variaveis = findValue([/^despesas?\s+vari[áa]veis?\s+(totais?|total)/i, /^total\s+de?\s*despesas?\s+vari[áa]veis?/i]);
+      if (fixas != null || variaveis != null) v = (fixas ?? 0) + (variaveis ?? 0);
+    }
     const rowH = r.kind === "highlight" ? 6.4 : 5.4;
     if (r.kind === "highlight") {
       doc.setFillColor("#FEF3C7"); // amarelo destaque
