@@ -553,6 +553,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          status: Database["public"]["Enums"]["user_status"]
           updated_at: string
           user_id: string
         }
@@ -561,6 +562,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id: string
         }
@@ -569,6 +571,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id?: string
         }
@@ -624,6 +627,30 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          permission_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_by: string | null
@@ -667,6 +694,7 @@ export type Database = {
         Returns: boolean
       }
       is_master: { Args: { _user_id: string }; Returns: boolean }
+      is_protected_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:
@@ -691,6 +719,7 @@ export type Database = {
         | "aguardando_gg"
         | "nao_aplicavel"
         | "sem_distribuicao"
+      user_status: "active" | "pending" | "banned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -842,6 +871,7 @@ export const Constants = {
         "nao_aplicavel",
         "sem_distribuicao",
       ],
+      user_status: ["active", "pending", "banned"],
     },
   },
 } as const
