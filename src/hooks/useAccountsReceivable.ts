@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { parseArReportFile, type ParsedOpenFolioEntry, type ParsedToInvoiceEntry } from "@/lib/arReportParser";
 
 /* ──────────────── A FATURAR ──────────────── */
 
@@ -60,13 +61,23 @@ export function useUploadArReport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { file: File; kind: "to_invoice" | "open_folio" }) => {
+      const parsedEntries = await parseArReportFile(input.file, input.kind);
       const form = new FormData();
       form.append("file", input.file);
       form.append("kind", input.kind);
+      form.append("entries", JSON.stringify(parsedEntries));
       const { data, error } = await supabase.functions.invoke("parse-ar-report", { body: form });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data;
+      return {
+        ...data,
+        entries: data?.entries ?? parsedEntries.length,
+      } as {
+        ok: boolean;
+        upload_id: string;
+        entries: number;
+        unmapped_properties: string[];
+      };
     },
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
@@ -92,6 +103,8 @@ export interface OpenFolioEntry {
   extraction_date: string | null;
   days_open: number | null;
 }
+
+export type { ParsedOpenFolioEntry, ParsedToInvoiceEntry };
 
 export function useOpenFolioEntries() {
   return useQuery({

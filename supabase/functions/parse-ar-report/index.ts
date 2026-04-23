@@ -1,6 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
-import * as XLSX from "npm:xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,49 +18,38 @@ function sanitizeFileName(name: string): string {
   const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return base.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
 }
-function parseNumber(v: any): number {
-  if (v === null || v === undefined || v === "") return 0;
-  if (typeof v === "number") return v;
-  let s = String(v).trim().replace(/[R$\s]/g, "");
-  if (s.includes(",") && (!s.includes(".") || s.lastIndexOf(",") > s.lastIndexOf("."))) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  }
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-}
-function parseDate(v: any): string | null {
-  if (v === null || v === undefined || v === "") return null;
-  if (typeof v === "number") {
-    const ms = Math.round((v - 25569) * 86400 * 1000);
-    const d = new Date(ms);
-    if (!isNaN(d.getTime())) {
-      const yyyy = d.getUTCFullYear();
-      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const dd = String(d.getUTCDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
-  }
-  const s = String(v).trim();
-  const br = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (br) {
-    let [, d, m, y] = br;
-    if (y.length === 2) y = "20" + y;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  return null;
-}
-function findCol(header: string[], ...candidates: string[]): number {
-  const norm = header.map((h) => toAscii(normalize(h)));
-  for (const c of candidates) {
-    const i = norm.findIndex((h) => h === toAscii(c) || h.includes(toAscii(c)));
-    if (i >= 0) return i;
-  }
-  return -1;
-}
-
 type HotelMap = Map<string, string>; // lower(opera_property_name) → hotel_id
+
+type ToInvoicePayload = {
+  property_name_raw: string;
+  account_number: string | null;
+  account_name: string | null;
+  account_type: string | null;
+  invoice_number: string | null;
+  invoice_status: string | null;
+  transaction_date: string | null;
+  original_amount: number | null;
+  amount: number | null;
+  paid: number | null;
+  ar_open: number | null;
+  confirmation_number: string | null;
+  reservation_status: string | null;
+  departure_date: string | null;
+  entry_key: string;
+};
+
+type OpenFolioPayload = {
+  property_name_raw: string;
+  confirmation_number: string | null;
+  reservation_status: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  balance: number | null;
+  arrival_date: string | null;
+  departure_date: string | null;
+  extraction_date: string | null;
+  days_open: number | null;
+};
 
 async function loadHotelMap(admin: any): Promise<HotelMap> {
   const map: HotelMap = new Map();
@@ -92,119 +80,63 @@ function resolveHotel(map: HotelMap, propertyName: string): string | null {
   return null;
 }
 
-function parseToInvoice(buf: ArrayBuffer, hotelMap: HotelMap, uploadId: string) {
-  const wb = XLSX.read(buf, { type: "array", cellDates: false });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  if (rows.length < 2) return { entries: [], unmapped: [] };
-  const header = rows[0].map((h: any) => normalize(h));
-
-  const cProp = findCol(header, "property name", "property");
-  const cAcctNum = findCol(header, "account number");
-  const cAcctName = findCol(header, "account name");
-  const cAcctType = findCol(header, "account type");
-  const cInvNum = findCol(header, "invoice number");
-  const cInvStatus = findCol(header, "invoice status");
-  const cTxDate = findCol(header, "transaction date");
-  const cOrig = findCol(header, "original amount");
-  const cAmount = findCol(header, "amount");
-  const cPaid = findCol(header, "paid");
-  const cArOpen = findCol(header, "ar open");
-  const cConf = findCol(header, "confirmation number");
-  const cResStatus = findCol(header, "reservation status");
-  const cDep = findCol(header, "departure date");
-
-  const entries: any[] = [];
+function mapToInvoiceEntries(entries: ToInvoicePayload[], hotelMap: HotelMap, uploadId: string) {
   const unmapped = new Set<string>();
+  return {
+    entries: entries.map((entry) => {
+      const propRaw = normalize(entry.property_name_raw);
+      const hotelId = resolveHotel(hotelMap, propRaw);
+      if (!hotelId) unmapped.add(propRaw);
 
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length === 0) continue;
-    const propRaw = normalize(row[cProp] ?? "");
-    if (!propRaw) continue;
-    if (toAscii(propRaw).startsWith("total")) continue;
-    const hotelId = resolveHotel(hotelMap, propRaw);
-    if (!hotelId) unmapped.add(propRaw);
-
-    const txDate = parseDate(row[cTxDate]);
-    const amount = parseNumber(row[cAmount]);
-    const invNum = normalize(row[cInvNum] ?? "");
-    const acctNum = normalize(row[cAcctNum] ?? "");
-    const conf = normalize(row[cConf] ?? "");
-
-    const keyBase = `${toAscii(propRaw)}|${invNum}|${conf}|${acctNum}|${txDate ?? ""}|${amount.toFixed(2)}`;
-    const entry_key = keyBase.replace(/\s+/g, " ").slice(0, 240);
-
-    entries.push({
-      upload_id: uploadId,
-      hotel_id: hotelId,
-      property_name_raw: propRaw,
-      account_number: acctNum || null,
-      account_name: normalize(row[cAcctName] ?? "") || null,
-      account_type: normalize(row[cAcctType] ?? "") || null,
-      invoice_number: invNum || null,
-      invoice_status: normalize(row[cInvStatus] ?? "") || null,
-      transaction_date: txDate,
-      original_amount: parseNumber(row[cOrig]) || null,
-      amount: amount || null,
-      paid: parseNumber(row[cPaid]) || null,
-      ar_open: parseNumber(row[cArOpen]) || null,
-      confirmation_number: conf || null,
-      reservation_status: normalize(row[cResStatus] ?? "") || null,
-      departure_date: parseDate(row[cDep]),
-      entry_key,
-    });
-  }
-  return { entries, unmapped: Array.from(unmapped) };
+      return {
+        upload_id: uploadId,
+        hotel_id: hotelId,
+        property_name_raw: propRaw,
+        account_number: entry.account_number,
+        account_name: entry.account_name,
+        account_type: entry.account_type,
+        invoice_number: entry.invoice_number,
+        invoice_status: entry.invoice_status,
+        transaction_date: entry.transaction_date,
+        original_amount: entry.original_amount,
+        amount: entry.amount,
+        paid: entry.paid,
+        ar_open: entry.ar_open,
+        confirmation_number: entry.confirmation_number,
+        reservation_status: entry.reservation_status,
+        departure_date: entry.departure_date,
+        entry_key: normalize(entry.entry_key),
+      };
+    }),
+    unmapped: Array.from(unmapped),
+  };
 }
 
-function parseOpenFolio(buf: ArrayBuffer, hotelMap: HotelMap, uploadId: string) {
-  const wb = XLSX.read(buf, { type: "array", cellDates: false });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  // linha 0 título, linha 1 vazia, linha 2 cabeçalho, 3+ dados
-  if (rows.length < 4) return { entries: [], unmapped: [] };
-  const header = (rows[2] ?? []).map((h: any) => normalize(h));
-
-  const cProp = findCol(header, "property name", "property");
-  const cConf = findCol(header, "confirmation number");
-  const cResStatus = findCol(header, "reservation status");
-  const cFirst = findCol(header, "first name");
-  const cLast = findCol(header, "last name");
-  const cBalance = findCol(header, "balance");
-  const cArr = findCol(header, "arrival date");
-  const cDep = findCol(header, "departure date");
-  const cExtraction = findCol(header, "data de extracao", "extraction date");
-  const cDays = findCol(header, "tempo em aberto", "days open");
-
-  const entries: any[] = [];
+function mapOpenFolioEntries(entries: OpenFolioPayload[], hotelMap: HotelMap, uploadId: string) {
   const unmapped = new Set<string>();
+  return {
+    entries: entries.map((entry) => {
+      const propRaw = normalize(entry.property_name_raw);
+      const hotelId = resolveHotel(hotelMap, propRaw);
+      if (!hotelId) unmapped.add(propRaw);
 
-  for (let i = 3; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length === 0) continue;
-    const propRaw = normalize(row[cProp] ?? "");
-    if (!propRaw) continue;
-    if (toAscii(propRaw).startsWith("total")) continue;
-    const hotelId = resolveHotel(hotelMap, propRaw);
-    if (!hotelId) unmapped.add(propRaw);
-
-    entries.push({
-      upload_id: uploadId,
-      hotel_id: hotelId,
-      property_name_raw: propRaw,
-      confirmation_number: normalize(row[cConf] ?? "") || null,
-      reservation_status: normalize(row[cResStatus] ?? "") || null,
-      first_name: normalize(row[cFirst] ?? "") || null,
-      last_name: normalize(row[cLast] ?? "") || null,
-      balance: parseNumber(row[cBalance]) || null,
-      arrival_date: parseDate(row[cArr]),
-      departure_date: parseDate(row[cDep]),
-      extraction_date: parseDate(row[cExtraction]),
-      days_open: parseInt(String(row[cDays] ?? "").replace(/\D/g, "")) || null,
-    });
-  }
-  return { entries, unmapped: Array.from(unmapped) };
+      return {
+        upload_id: uploadId,
+        hotel_id: hotelId,
+        property_name_raw: propRaw,
+        confirmation_number: entry.confirmation_number,
+        reservation_status: entry.reservation_status,
+        first_name: entry.first_name,
+        last_name: entry.last_name,
+        balance: entry.balance,
+        arrival_date: entry.arrival_date,
+        departure_date: entry.departure_date,
+        extraction_date: entry.extraction_date,
+        days_open: entry.days_open,
+      };
+    }),
+    unmapped: Array.from(unmapped),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -229,8 +161,19 @@ Deno.serve(async (req) => {
     const form = await req.formData();
     const file = form.get("file") as File | null;
     const kind = String(form.get("kind") ?? "") as "to_invoice" | "open_folio";
+    const rawEntries = String(form.get("entries") ?? "[]");
     if (!file || !["to_invoice", "open_folio"].includes(kind)) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsedEntries: ToInvoicePayload[] | OpenFolioPayload[] = [];
+    try {
+      parsedEntries = JSON.parse(rawEntries);
+      if (!Array.isArray(parsedEntries)) throw new Error("invalid_entries");
+    } catch {
+      return new Response(JSON.stringify({ error: "invalid_entries" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -273,7 +216,7 @@ Deno.serve(async (req) => {
     let inserted = 0;
 
     if (kind === "to_invoice") {
-      result = parseToInvoice(arrayBuf, hotelMap, uploadRow.id);
+      result = mapToInvoiceEntries(parsedEntries as ToInvoicePayload[], hotelMap, uploadRow.id);
       // upsert acumulativo por entry_key
       if (result.entries.length) {
         const chunkSize = 500;
@@ -287,7 +230,7 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      result = parseOpenFolio(arrayBuf, hotelMap, uploadRow.id);
+      result = mapOpenFolioEntries(parsedEntries as OpenFolioPayload[], hotelMap, uploadRow.id);
       // SUBSTITUIÇÃO completa
       await admin.from("ar_open_folio_entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       if (result.entries.length) {
