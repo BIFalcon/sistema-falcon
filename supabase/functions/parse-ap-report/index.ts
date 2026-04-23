@@ -30,6 +30,12 @@ function normalize(s: any): string {
   return String(s ?? "").trim();
 }
 
+function sanitizeFileName(name: string): string {
+  // Remove acentos e troca caracteres não permitidos pelo Supabase Storage
+  const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return base.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
+}
+
 function toAscii(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
