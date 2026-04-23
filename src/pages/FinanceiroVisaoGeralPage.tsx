@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import { useAllApEntries, useAllTodayBankBalances } from "@/hooks/useAccountsPayable";
 import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
@@ -71,23 +70,17 @@ export default function FinanceiroVisaoGeralPage() {
   const { hasRole, isMaster, userHotels } = useAuth();
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
-  const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds: string[] | null = seesAllHotels
     ? null
     : userHotels.map((h) => h.id);
 
   const { data: allHotels = [] } = useAllHotels();
-  const visibleHotels = useMemo(
-    () => (seesAllHotels ? allHotels : allHotels.filter((h) => restrictedHotelIds?.includes(h.id))),
-    [allHotels, seesAllHotels, restrictedHotelIds],
-  );
   const hotelById = useMemo(() => new Map(allHotels.map((h) => [h.id, h])), [allHotels]);
 
-  // Filtros
-  const initialHotel = isGgOnly && visibleHotels.length === 1 ? visibleHotels[0].id : "all";
-  const [hotelFilter, setHotelFilter] = useState<string>(initialHotel);
-  const now = new Date();
-  const [period, setPeriod] = useState<string>(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  // Filtros globais (header)
+  const { hotelId, month, year } = useFilters();
+  const hotelFilter = hotelId ?? "all";
+  const period = `${year}-${String(month).padStart(2, "0")}`;
 
   // Dados
   const { data: apEntries = [], isLoading: apLoading } = useAllApEntries();
