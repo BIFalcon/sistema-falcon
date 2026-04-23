@@ -422,6 +422,14 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // logos rodapé direita — PNG (transparente)
   if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
   if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  // Cidade do hotel — abaixo da logo da bandeira
+  const city = extractCityFromHotel(hotel);
+  if (city) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(NAVY);
+    doc.text(city, SIZE - 78 + 14, 204, { align: "center" });
+  }
 
   /* ───── 2. INDICADORES — Ocupação + ADR ───── */
   addPage(doc);
