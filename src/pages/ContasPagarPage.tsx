@@ -7,15 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
   useApEntries, useLatestApUpload, useTodayBankBalance, useUpsertBankBalance,
   useSetEntryApproval, uploadApReport, type ApEntry, type FinancialSystem,
+  useApDocuments, uploadApDocuments, useLinkDocumentToEntry, useDeleteDocument,
+  getDocumentSignedUrl, notifyGgPendencies, type ApDocument,
 } from "@/hooks/useAccountsPayable";
 import {
   Upload, Loader2, AlertTriangle, CheckCircle2, XCircle, Clock,
-  Wallet, FileSpreadsheet, Building2,
+  Wallet, FileSpreadsheet, Building2, Paperclip, Link2, Mail, Trash2, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
