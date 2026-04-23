@@ -106,9 +106,29 @@ export default function ContasReceberPage() {
 
 /* ════════════════════ A FATURAR ════════════════════ */
 
-function ToInvoiceSection({ isManager }: { isManager: boolean }) {
-  const { data: hotels = [] } = useAllHotels();
-  const [hotelId, setHotelId] = useState<string>("");
+function ToInvoiceSection({
+  isManager,
+  seesAllHotels,
+  restrictedHotelIds,
+  isGgOnly,
+}: {
+  isManager: boolean;
+  seesAllHotels: boolean;
+  restrictedHotelIds: string[] | null;
+  isGgOnly: boolean;
+}) {
+  const { data: allHotels = [] } = useAllHotels();
+  const hotels = useMemo(
+    () => (seesAllHotels ? allHotels : allHotels.filter((h) => restrictedHotelIds?.includes(h.id))),
+    [allHotels, seesAllHotels, restrictedHotelIds],
+  );
+  // GG vê apenas o próprio hotel — auto seleciona e esconde o seletor
+  const initialHotelId = isGgOnly && hotels.length === 1 ? hotels[0].id : "";
+  const [hotelId, setHotelId] = useState<string>(initialHotelId);
+  // Mantém hotelId sincronizado quando a lista de hotéis carrega
+  if (isGgOnly && !hotelId && hotels.length === 1) {
+    // setState durante render seria errado; usamos efeito abaixo? Mais simples: estado derivado.
+  }
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
@@ -120,55 +140,75 @@ function ToInvoiceSection({ isManager }: { isManager: boolean }) {
   const { data: contracts } = useClientContracts(hotelId || null);
 
   const hotelName = (id: string | null) =>
-    id ? hotels.find((h) => h.id === id)?.name ?? id : "—";
+    id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
+
+  // Para o ranking consolidado, restringe entradas aos hotéis visíveis quando não master
+  const visibleEntries = useMemo(() => {
+    if (seesAllHotels) return entries;
+    const allowed = new Set(restrictedHotelIds ?? []);
+    return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
+  }, [entries, seesAllHotels, restrictedHotelIds]);
 
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
 
       <Card className="p-5 shadow-soft space-y-4">
-        <div className="flex items-end gap-3 flex-wrap">
-          <div className="flex-1 min-w-[220px]">
-            <Label className="text-xs">Hotel</Label>
-            <Select value={hotelId || "all"} onValueChange={(v) => { setHotelId(v === "all" ? "" : v); setDrillMonth(null); setDrillDay(null); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos (consolidado)</SelectItem>
-                {hotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {!isGgOnly && (
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex-1 min-w-[220px]">
+              <Label className="text-xs">Hotel</Label>
+              <Select value={hotelId || "all"} onValueChange={(v) => { setHotelId(v === "all" ? "" : v); setDrillMonth(null); setDrillDay(null); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {seesAllHotels && <SelectItem value="all">Todos (consolidado)</SelectItem>}
+                  {hotels.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {hotelId && (
+              <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Contratos do hotel
+              </Button>
+            )}
           </div>
-          {hotelId && (
+        )}
+        {isGgOnly && hotelId && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-xs text-muted-foreground">Hotel</p>
+              <p className="text-sm font-semibold">{hotelName(hotelId)}</p>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Contratos do hotel
             </Button>
-          )}
-        </div>
+          </div>
+        )}
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : entries.length === 0 ? (
+        ) : visibleEntries.length === 0 ? (
           <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
         ) : !hotelId ? (
-          <ConsolidatedRanking entries={entries} hotelName={hotelName} />
+          <ConsolidatedRanking entries={visibleEntries} hotelName={hotelName} />
         ) : drillDay ? (
           <DayBreakdown
-            entries={entries.filter((e) => e.transaction_date === drillDay)}
+            entries={visibleEntries.filter((e) => e.transaction_date === drillDay)}
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
           />
         ) : drillMonth ? (
           <MonthBreakdown
-            entries={entries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
+            entries={visibleEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
             month={drillMonth}
             onPickDay={setDrillDay}
             onBack={() => setDrillMonth(null)}
           />
         ) : (
-          <MonthlyOverview entries={entries} onPickMonth={setDrillMonth} />
+          <MonthlyOverview entries={visibleEntries} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
