@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
     }
 
     const ts = Date.now();
-    const reportPath = `${hotelId}/reports/${ts}-${reportName}`;
+    const reportPath = `${hotelId}/reports/${ts}-${sanitizeFileName(reportName)}`;
     const { error: upErr } = await admin.storage
       .from("accounts-payable")
       .upload(reportPath, new Uint8Array(reportBuf), {
