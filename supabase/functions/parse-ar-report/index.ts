@@ -15,6 +15,10 @@ function normalize(s: any): string {
 function toAscii(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
+function sanitizeFileName(name: string): string {
+  const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return base.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
+}
 function parseNumber(v: any): number {
   if (v === null || v === undefined || v === "") return 0;
   if (typeof v === "number") return v;
@@ -243,7 +247,7 @@ Deno.serve(async (req) => {
 
     const arrayBuf = await file.arrayBuffer();
     const ts = Date.now();
-    const reportPath = `${kind}/${ts}-${file.name}`;
+    const reportPath = `${kind}/${ts}-${sanitizeFileName(file.name)}`;
     const { error: upErr } = await admin.storage
       .from("accounts-receivable")
       .upload(reportPath, new Uint8Array(arrayBuf), {
