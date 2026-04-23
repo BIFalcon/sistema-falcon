@@ -10,6 +10,7 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
   useApEntries, useLatestApUpload, useTodayBankBalance, useUpsertBankBalance,
@@ -73,7 +74,8 @@ export default function ContasPagarPage() {
   const canApprove = canManage || hasRole("gg");
 
   const { data: hotels = [] } = useAllHotels();
-  const [hotelId, setHotelId] = useState<string | null>(null);
+  // Filtro global do header (Hotel) é a única fonte de verdade.
+  const { hotelId } = useFilters();
   const hotel = useMemo(() => hotels.find((h) => h.id === hotelId) ?? null, [hotels, hotelId]);
   const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
 
