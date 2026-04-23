@@ -188,6 +188,44 @@ export default function ContasPagarPage() {
     }
   }
 
+  async function handleDocs(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || !hotelId || !user) return;
+    setUploadingDocs(true);
+    try {
+      const n = await uploadApDocuments({ hotelId, files, userId: user.id });
+      toast.success(`${n} documento(s) enviado(s). Vincule-os aos lançamentos.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar documentos");
+    } finally {
+      setUploadingDocs(false);
+      if (docsRef.current) docsRef.current.value = "";
+    }
+  }
+
+  function openNotify() {
+    setNotifySelected(new Set(issueEntries.map((e) => e.id)));
+    setNotifyOpen(true);
+  }
+
+  async function sendNotify() {
+    if (!hotelId || notifySelected.size === 0) return;
+    setNotifying(true);
+    try {
+      const r = await notifyGgPendencies({ hotelId, entryIds: Array.from(notifySelected) });
+      if (r.recipients === 0) {
+        toast.warning("Nenhum GG cadastrado para este hotel.");
+      } else {
+        toast.success(`Notificação enfileirada para ${r.recipients} GG(s).`);
+      }
+      setNotifyOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao notificar");
+    } finally {
+      setNotifying(false);
+    }
+  }
+
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
   return (
