@@ -67,7 +67,6 @@ const App = () => (
               <Route path="/configuracoes/usuarios" element={<UsuariosPage />} />
               <Route path="/configuracoes/hoteis" element={<HoteisPage />} />
               <Route path="/configuracoes/notificacoes" element={<NotificacoesPage />} />
-              <Route path="/configuracoes/assets" element={<EmBreve />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
             </Route>
 
