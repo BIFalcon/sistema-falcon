@@ -51,6 +51,144 @@ export interface ApBankBalance {
   updated_at: string;
 }
 
+export interface ApDocument {
+  id: string;
+  hotel_id: string;
+  upload_id: string | null;
+  entry_id: string | null;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  nf_amount: number | null;
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
+export function useApDocuments(hotelId: string | null) {
+  return useQuery({
+    enabled: !!hotelId,
+    queryKey: ["ap-documents", hotelId],
+    queryFn: async (): Promise<ApDocument[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_documents")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ApDocument[];
+    },
+  });
+}
+
+export async function uploadApDocuments(input: {
+  hotelId: string;
+  files: File[];
+  userId: string;
+}): Promise<number> {
+  const ts = Date.now();
+  let count = 0;
+  for (const file of input.files) {
+    const safe = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${input.hotelId}/documents/${ts}-${count}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from("accounts-payable")
+      .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: true });
+    if (upErr) throw upErr;
+    const { error: insErr } = await supabase.from("ap_documents").insert({
+      hotel_id: input.hotelId,
+      file_name: file.name,
+      file_path: path,
+      file_size: file.size,
+      mime_type: file.type || null,
+      uploaded_by: input.userId,
+    });
+    if (insErr) throw insErr;
+    count++;
+  }
+  return count;
+}
+
+export function useLinkDocumentToEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      entryId: string;
+      documentId: string | null;
+      nfAmount?: number | null;
+    }) => {
+      // limpar vínculo anterior do entry
+      const { data: entry } = await supabase
+        .from("ap_entries")
+        .select("primary_document_id")
+        .eq("id", input.entryId)
+        .single();
+      if (entry?.primary_document_id && entry.primary_document_id !== input.documentId) {
+        await supabase
+          .from("ap_documents")
+          .update({ entry_id: null })
+          .eq("id", entry.primary_document_id);
+      }
+      // novo vínculo
+      if (input.documentId) {
+        const { error } = await supabase
+          .from("ap_documents")
+          .update({
+            entry_id: input.entryId,
+            ...(input.nfAmount !== undefined ? { nf_amount: input.nfAmount } : {}),
+          })
+          .eq("id", input.documentId);
+        if (error) throw error;
+      }
+      const { error: e2 } = await supabase
+        .from("ap_entries")
+        .update({ primary_document_id: input.documentId })
+        .eq("id", input.entryId);
+      if (e2) throw e2;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-documents", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+    },
+  });
+}
+
+export function useDeleteDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; documentId: string; filePath: string }) => {
+      await supabase.storage.from("accounts-payable").remove([input.filePath]);
+      const { error } = await supabase.from("ap_documents").delete().eq("id", input.documentId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-documents", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+    },
+  });
+}
+
+export async function getDocumentSignedUrl(filePath: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from("accounts-payable")
+    .createSignedUrl(filePath, 3600);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export async function notifyGgPendencies(input: {
+  hotelId: string;
+  entryIds: string[];
+}): Promise<{ ok: boolean; sent?: number; recipients?: number; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("notify-gg-ap", {
+    body: { hotel_id: input.hotelId, entry_ids: input.entryIds },
+  });
+  if (error) throw error;
+  return data as any;
+}
+
 export function useLatestApUpload(hotelId: string | null) {
   return useQuery({
     enabled: !!hotelId,

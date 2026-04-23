@@ -61,6 +61,7 @@ export type Database = {
           hotel_id: string
           id: string
           mime_type: string | null
+          nf_amount: number | null
           upload_id: string | null
           uploaded_at: string
           uploaded_by: string
@@ -73,6 +74,7 @@ export type Database = {
           hotel_id: string
           id?: string
           mime_type?: string | null
+          nf_amount?: number | null
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by: string
@@ -85,6 +87,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           mime_type?: string | null
+          nf_amount?: number | null
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by?: string
@@ -1118,6 +1121,7 @@ export type Database = {
         | "carta_gop_approved"
         | "carta_fernando_approved"
         | "carta_returned"
+        | "ap_pendencies_to_gg"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -1286,6 +1290,7 @@ export const Constants = {
         "carta_gop_approved",
         "carta_fernando_approved",
         "carta_returned",
+        "ap_pendencies_to_gg",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
