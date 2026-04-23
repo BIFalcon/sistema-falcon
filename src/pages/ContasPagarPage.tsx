@@ -515,6 +515,82 @@ export default function ContasPagarPage() {
           </Card>
         </>
       )}
+
+      {/* Modal de vínculo */}
+      <LinkDocDialog
+        open={!!linkEntry}
+        onClose={() => setLinkEntry(null)}
+        entry={linkEntry}
+        documents={documents}
+        currentDoc={linkEntry ? (docsByEntry.get(linkEntry.id) ?? null) : null}
+        unlinkedDocs={unlinkedDocs}
+        onLink={async (docId, nfAmount) => {
+          if (!linkEntry || !hotelId) return;
+          try {
+            await linkDoc.mutateAsync({
+              hotelId, entryId: linkEntry.id, documentId: docId, nfAmount,
+            });
+            toast.success(docId ? "Documento vinculado" : "Vínculo removido");
+            setLinkEntry(null);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Erro ao vincular");
+          }
+        }}
+        onDelete={async (d) => {
+          if (!hotelId) return;
+          if (!confirm(`Excluir documento "${d.file_name}"?`)) return;
+          try {
+            await deleteDoc.mutateAsync({ hotelId, documentId: d.id, filePath: d.file_path });
+            toast.success("Documento excluído");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+          }
+        }}
+      />
+
+      {/* Modal Notificar GG */}
+      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Notificar GG sobre pendências</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Selecione os lançamentos a incluir no e-mail. {issueEntries.length} pendência(s) detectada(s).
+          </p>
+          <div className="max-h-[400px] overflow-y-auto border rounded-md divide-y">
+            {issueEntries.map((e) => (
+              <label key={e.id} className="flex items-start gap-3 p-2 hover:bg-muted/50 cursor-pointer text-sm">
+                <Checkbox
+                  checked={notifySelected.has(e.id)}
+                  onCheckedChange={(c) => {
+                    setNotifySelected((prev) => {
+                      const next = new Set(prev);
+                      if (c) next.add(e.id); else next.delete(e.id);
+                      return next;
+                    });
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{e.supplier}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Venc. {fmtDate(e.due_date)} · {fmtBRL(Number(e.amount))} · Doc {e.document_number ?? "—"}
+                  </p>
+                </div>
+              </label>
+            ))}
+            {issueEntries.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-6">Sem pendências.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNotifyOpen(false)}>Cancelar</Button>
+            <Button onClick={sendNotify} disabled={notifying || notifySelected.size === 0} className="gap-2">
+              {notifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Enviar ({notifySelected.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
