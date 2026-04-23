@@ -487,12 +487,13 @@ export default function ContasPagarPage() {
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  <SelectItem value="overdue">Vencidos</SelectItem>
                   <SelectItem value="today">Hoje</SelectItem>
                   <SelectItem value="tomorrow">Amanhã</SelectItem>
                   <SelectItem value="this_week">Essa semana</SelectItem>
                   <SelectItem value="next_week">Semana que vem</SelectItem>
                   <SelectItem value="next_month">Próximo mês</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
