@@ -28,11 +28,13 @@ function parseNumber(v: any): number {
 function parseDate(v: any): string | null {
   if (v === null || v === undefined || v === "") return null;
   if (typeof v === "number") {
-    const d = XLSX.SSF.parse_date_code(v);
-    if (d) {
-      const mm = String(d.m).padStart(2, "0");
-      const dd = String(d.d).padStart(2, "0");
-      return `${d.y}-${mm}-${dd}`;
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
     }
   }
   const s = String(v).trim();
