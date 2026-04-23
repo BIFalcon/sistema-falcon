@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,7 +127,7 @@ function ToInvoiceSection({
   const [contractsOpen, setContractsOpen] = useState(false);
 
   // Reset drill quando hotel muda
-  useMemo(() => {
+  useEffect(() => {
     setDrillMonth(null);
     setDrillDay(null);
   }, [hotelId]);
