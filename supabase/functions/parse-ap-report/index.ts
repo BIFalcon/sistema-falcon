@@ -23,6 +23,7 @@ type ParsedEntry = {
   observation: string | null;
   interest_fees: number | null;
   omie_situation: string | null;
+  is_distribution: boolean;
   raw: Record<string, any>;
 };
 
@@ -86,6 +87,11 @@ function makeKey(supplier: string, doc: string | null, due: string | null, amoun
   return base.replace(/\s+/g, " ").slice(0, 240);
 }
 
+function isDistributionEntry(category: string | null, description: string | null): boolean {
+  const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
+  return blob.includes("distribuicao de lucros");
+}
+
 function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -118,6 +124,7 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
       observation: null,
       interest_fees: interest || null,
       omie_situation: null,
+      is_distribution: isDistributionEntry(null, description),
       raw: { row },
     });
   }
@@ -175,6 +182,7 @@ function parseOmieXlsx(buf: ArrayBuffer): ParsedEntry[] {
       observation: normalize(row[colObs] ?? "") || null,
       interest_fees: null,
       omie_situation: normalize(row[colSit] ?? "") || null,
+      is_distribution: isDistributionEntry(normalize(row[colCategory] ?? ""), null),
       raw: { row, header },
     });
   }
