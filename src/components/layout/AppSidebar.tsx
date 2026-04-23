@@ -107,7 +107,6 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
       { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail },
-      { title: "Assets", url: "/configuracoes/assets", icon: ImageIcon, soon: true },
     ],
   },
 ];
