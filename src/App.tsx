@@ -19,6 +19,7 @@ import UsuariosPage from "./pages/UsuariosPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
 import ContasPagarPage from "./pages/ContasPagarPage";
 import ContasReceberPage from "./pages/ContasReceberPage";
+import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -59,7 +60,7 @@ const App = () => (
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
-              <Route path="/financeiro" element={<EmBreve />} />
+              <Route path="/financeiro" element={<FinanceiroVisaoGeralPage />} />
               <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
               <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
               <Route path="/rh" element={<EmBreve />} />
