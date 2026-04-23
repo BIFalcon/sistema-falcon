@@ -46,7 +46,14 @@ const App = () => (
               <Route path="/fechamento/carta" element={<CartaPage />} />
               <Route path="/fechamento/financeiro" element={<FinanceiroPage />} />
               <Route path="/fechamento/envio" element={<EnvioPage />} />
-              <Route path="/fechamento/performance" element={<PerformanceSlaPage />} />
+              <Route
+                path="/fechamento/performance"
+                element={
+                  <ProtectedLayout requireRoles={["processos"]}>
+                    <PerformanceSlaPage />
+                  </ProtectedLayout>
+                }
+              />
 
               {/* Compat: rotas antigas */}
               <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
