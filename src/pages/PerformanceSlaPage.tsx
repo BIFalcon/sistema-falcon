@@ -84,8 +84,20 @@ function fullCycleHours(c: PerfClosing): number | null {
 }
 
 export default function PerformanceSlaPage() {
-  const { allowedHotels } = useAuth();
+  const { allowedHotels, isMaster, hasRole } = useAuth();
   const now = new Date();
+
+  // Acesso restrito: apenas Processos e Fernando (masters)
+  if (!isMaster && !hasRole("processos")) {
+    return (
+      <div className="container max-w-2xl py-16 text-center">
+        <h1 className="text-2xl font-semibold">Acesso restrito</h1>
+        <p className="text-muted-foreground mt-2">
+          Este módulo está disponível apenas para Processos e Fernando.
+        </p>
+      </div>
+    );
+  }
 
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());

@@ -50,6 +50,7 @@ type LeafItem = {
   icon: React.ComponentType<{ className?: string }>;
   soon?: boolean;
   end?: boolean;
+  requireMaster?: boolean;
 };
 
 type GroupItem = LeafItem & {
@@ -70,7 +71,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail },
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet },
           { title: "Envio", url: "/fechamento/envio", icon: Send, soon: true },
-          { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge },
+          { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge, requireMaster: true },
         ],
       },
     ],
