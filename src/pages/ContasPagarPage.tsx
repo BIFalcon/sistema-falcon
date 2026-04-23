@@ -545,21 +545,32 @@ function UrgencyCell({ label, count, tone }: { label: string; count: number; ton
 }
 
 function EntryRow({
-  entry, sourceSystem, canApprove, onApprove,
+  entry, doc, sourceSystem, canApprove, canManage, onLink, onApprove,
 }: {
   entry: ApEntry;
+  doc: ApDocument | null;
   sourceSystem: FinancialSystem | null;
   canApprove: boolean;
+  canManage: boolean;
+  onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
 }) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
+  const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
   return (
     <TableRow className={overdue ? "bg-destructive/5" : ""}>
       <TableCell className="font-medium">{entry.supplier}</TableCell>
       {sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>}
       <TableCell className="text-xs">{entry.document_number ?? "—"}</TableCell>
       <TableCell className="text-xs">{fmtDate(entry.due_date)}</TableCell>
-      <TableCell className="text-right font-mono text-sm">{fmtBRL(Number(entry.amount))}</TableCell>
+      <TableCell className="text-right font-mono text-sm">
+        <div>{fmtBRL(Number(entry.amount))}</div>
+        {divergent && (
+          <div className="text-[10px] text-amber-600 dark:text-amber-400">
+            NF: {fmtBRL(Number(doc!.nf_amount))}
+          </div>
+        )}
+      </TableCell>
       <TableCell className="text-xs text-muted-foreground">{entry.payment_method ?? entry.category ?? "—"}</TableCell>
       <TableCell>
         {entry.gg_approval === "approved" ? (
@@ -577,7 +588,27 @@ function EntryRow({
         )}
       </TableCell>
       <TableCell>
-        {entry.primary_document_id ? (
+        {canManage ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs gap-1"
+            onClick={onLink}
+            title={doc ? doc.file_name : "Vincular documento"}
+          >
+            {doc ? (
+              <>
+                <CheckCircle2 className={`h-3.5 w-3.5 ${divergent ? "text-amber-600" : "text-emerald-600"}`} />
+                <span className="truncate max-w-[100px]">{doc.file_name}</span>
+              </>
+            ) : (
+              <>
+                <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+                Vincular
+              </>
+            )}
+          </Button>
+        ) : doc ? (
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
