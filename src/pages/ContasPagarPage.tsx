@@ -35,7 +35,7 @@ const fmtDate = (s: string | null) => {
 const fmtDateTime = (s: string) =>
   new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
-type Period = "today" | "tomorrow" | "this_week" | "next_week" | "next_month" | "all";
+type Period = "today" | "tomorrow" | "this_week" | "next_week" | "next_month" | "overdue" | "all";
 type StatusFilter = "all" | "pending" | "approved" | "issues";
 
 function isWithinPeriod(due: string | null, period: Period): boolean {
@@ -46,6 +46,7 @@ function isWithinPeriod(due: string | null, period: Period): boolean {
   const d = new Date(due + "T00:00:00");
   const diffDays = Math.floor((d.getTime() - today.getTime()) / 86400000);
   switch (period) {
+    case "overdue": return diffDays < 0;
     case "today": return diffDays === 0;
     case "tomorrow": return diffDays === 1;
     case "this_week": {
@@ -86,9 +87,11 @@ export default function ContasPagarPage() {
   const deleteDoc = useDeleteDocument();
 
   const [balanceInput, setBalanceInput] = useState<string>("");
-  const [period, setPeriod] = useState<Period>("today");
+  const [period, setPeriod] = useState<Period>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [category, setCategory] = useState<string>("all");
+  const [hideTrivial, setHideTrivial] = useState<boolean>(true);
+  const [groupNd, setGroupNd] = useState<boolean>(true);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docsRef = useRef<HTMLInputElement | null>(null);
@@ -124,9 +127,56 @@ export default function ContasPagarPage() {
         if (!overdue && !noApproval && !noDoc) return false;
       }
       if (category !== "all" && e.category !== category) return false;
+      if (hideTrivial && Number(e.amount || 0) < 1) return false;
       return true;
     });
-  }, [entries, period, status, category]);
+  }, [entries, period, status, category, hideTrivial]);
+
+  // Agrupa lançamentos N/D (sem nº doc) do mesmo fornecedor + mesma data em uma única linha
+  type DisplayRow =
+    | { kind: "single"; entry: ApEntry }
+    | { kind: "group"; supplier: string; due: string | null; entries: ApEntry[]; amount: number };
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    if (!groupNd) return filtered.map((e) => ({ kind: "single" as const, entry: e }));
+    const groups = new Map<string, ApEntry[]>();
+    const singles: ApEntry[] = [];
+    for (const e of filtered) {
+      const isNd = !e.document_number || e.document_number.trim() === "" || e.document_number.toUpperCase() === "N/D";
+      if (isNd) {
+        const key = `${e.supplier}|${e.due_date ?? ""}`;
+        const arr = groups.get(key) ?? [];
+        arr.push(e);
+        groups.set(key, arr);
+      } else {
+        singles.push(e);
+      }
+    }
+    const rows: DisplayRow[] = singles.map((e) => ({ kind: "single", entry: e }));
+    for (const [key, arr] of groups) {
+      if (arr.length === 1) {
+        rows.push({ kind: "single", entry: arr[0] });
+      } else {
+        const [supplier, due] = key.split("|");
+        rows.push({
+          kind: "group",
+          supplier,
+          due: due || null,
+          entries: arr,
+          amount: arr.reduce((s, x) => s + Number(x.amount || 0), 0),
+        });
+      }
+    }
+    // ordena por vencimento asc
+    rows.sort((a, b) => {
+      const da = a.kind === "single" ? a.entry.due_date : a.due;
+      const db = b.kind === "single" ? b.entry.due_date : b.due;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da.localeCompare(db);
+    });
+    return rows;
+  }, [filtered, groupNd]);
 
   const totalToPayToday = useMemo(
     () => entries.filter((e) => isWithinPeriod(e.due_date, "today")).reduce((s, e) => s + Number(e.amount || 0), 0),
@@ -346,12 +396,13 @@ export default function ContasPagarPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Urgência de pagamento</h3>
-              <div className="grid grid-cols-5 gap-2">
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" />
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <UrgencyCell label="Vencidos" count={entries.filter((e) => isWithinPeriod(e.due_date, "overdue")).length} tone="danger" active={period === "overdue"} onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")} />
+                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => setPeriod(period === "today" ? "all" : "today")} />
+                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => setPeriod(period === "tomorrow" ? "all" : "tomorrow")} />
+                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => setPeriod(period === "this_week" ? "all" : "this_week")} />
+                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
+                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
               </div>
             </Card>
             <Card className="p-5 shadow-soft">
@@ -436,12 +487,13 @@ export default function ContasPagarPage() {
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  <SelectItem value="overdue">Vencidos</SelectItem>
                   <SelectItem value="today">Hoje</SelectItem>
                   <SelectItem value="tomorrow">Amanhã</SelectItem>
                   <SelectItem value="this_week">Essa semana</SelectItem>
                   <SelectItem value="next_week">Semana que vem</SelectItem>
                   <SelectItem value="next_month">Próximo mês</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
@@ -466,6 +518,24 @@ export default function ContasPagarPage() {
               ) : <div />}
             </div>
 
+            {/* Toggles auxiliares */}
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={hideTrivial}
+                  onCheckedChange={(c) => setHideTrivial(!!c)}
+                />
+                Ocultar lançamentos abaixo de R$ 1,00
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={groupNd}
+                  onCheckedChange={(c) => setGroupNd(!!c)}
+                />
+                Agrupar lançamentos N/D do mesmo fornecedor e data
+              </label>
+            </div>
+
             {/* Tabela */}
             <div className="border rounded-md overflow-hidden">
               <Table>
@@ -485,30 +555,50 @@ export default function ContasPagarPage() {
                 <TableBody>
                   {entriesLoading ? (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
-                  ) : filtered.length === 0 ? (
+                  ) : displayRows.length === 0 ? (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
-                  ) : filtered.map((e) => (
-                    <EntryRow
-                      key={e.id}
-                      entry={e}
-                      doc={docsByEntry.get(e.id) ?? null}
-                      sourceSystem={sourceSystem}
-                      canApprove={canApprove}
-                      canManage={canManage}
-                      onLink={() => setLinkEntry(e)}
-                      onApprove={async (approval) => {
-                        if (!user) return;
-                        try {
-                          await setApproval.mutateAsync({
-                            entryId: e.id, hotelId, approval, userId: user.id,
-                          });
-                          toast.success(approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente");
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
-                        }
-                      }}
-                    />
-                  ))}
+                  ) : displayRows.map((row, idx) => {
+                    if (row.kind === "group") {
+                      const colSpan = sourceSystem === "omie" ? 9 : 8;
+                      return (
+                        <TableRow key={`g-${idx}`} className="bg-muted/30">
+                          <TableCell className="font-medium">
+                            {row.supplier} <span className="text-muted-foreground font-normal">({row.entries.length})</span>
+                          </TableCell>
+                          {sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">—</TableCell>}
+                          <TableCell className="text-xs text-muted-foreground italic">N/D agrupado</TableCell>
+                          <TableCell className="text-xs">{fmtDate(row.due)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtBRL(row.amount)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground" colSpan={colSpan - (sourceSystem === "omie" ? 5 : 4)}>
+                            {row.entries.length} lançamento(s) sem nº de documento
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    const e = row.entry;
+                    return (
+                      <EntryRow
+                        key={e.id}
+                        entry={e}
+                        doc={docsByEntry.get(e.id) ?? null}
+                        sourceSystem={sourceSystem}
+                        canApprove={canApprove}
+                        canManage={canManage}
+                        onLink={() => setLinkEntry(e)}
+                        onApprove={async (approval) => {
+                          if (!user) return;
+                          try {
+                            await setApproval.mutateAsync({
+                              entryId: e.id, hotelId, approval, userId: user.id,
+                            });
+                            toast.success(approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente");
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -604,7 +694,15 @@ function Stat({ label, value, tone = "neutral" }: { label: string; value: string
   );
 }
 
-function UrgencyCell({ label, count, tone }: { label: string; count: number; tone: "danger" | "warning" | "amber" | "info" | "muted" }) {
+function UrgencyCell({
+  label, count, tone, active, onClick,
+}: {
+  label: string;
+  count: number;
+  tone: "danger" | "warning" | "amber" | "info" | "muted";
+  active?: boolean;
+  onClick?: () => void;
+}) {
   const colors: Record<string, string> = {
     danger: "bg-destructive/10 text-destructive border-destructive/30",
     warning: "bg-orange-500/10 text-orange-600 border-orange-500/30 dark:text-orange-400",
@@ -612,11 +710,16 @@ function UrgencyCell({ label, count, tone }: { label: string; count: number; ton
     info: "bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-400",
     muted: "bg-muted text-muted-foreground border-border",
   };
+  const Comp: any = onClick ? "button" : "div";
   return (
-    <div className={`rounded-md border p-3 text-center ${colors[tone]}`}>
-      <p className="text-2xl font-bold leading-none">{count}</p>
-      <p className="text-[10px] uppercase tracking-wider mt-1">{label}</p>
-    </div>
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`rounded-md border px-2 py-2.5 text-center min-h-[72px] flex flex-col items-center justify-center gap-1 transition-all ${colors[tone]} ${onClick ? "hover:shadow-soft hover:scale-[1.02] cursor-pointer" : ""} ${active ? "ring-2 ring-offset-1 ring-current" : ""}`}
+    >
+      <p className="text-xl font-bold leading-none">{count}</p>
+      <p className="text-[9px] uppercase tracking-wide leading-tight break-words w-full">{label}</p>
+    </Comp>
   );
 }
 
