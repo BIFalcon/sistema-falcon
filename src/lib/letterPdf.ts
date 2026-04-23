@@ -458,13 +458,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
-  // ícone $ em círculo (maior)
-  doc.setFillColor(NAVY);
-  doc.circle(12 + cw / 2, cy + 26, 7, "F");
-  doc.setTextColor("#FFFFFF");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("$", 12 + cw / 2, cy + 28.4, { align: "center" });
+  // ícone: pilha de moedas douradas + cédula verde
+  drawCoinsAndBillIcon(doc, 12 + cw / 2, cy + 26);
   // valor (maior)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
@@ -474,14 +469,18 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // RPS
   const rx = 12 + cw + 6;
   doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.4);
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("RPS", rx + cw / 2, cy + 12, { align: "center" });
-  // estrela navy maior (manter cor do gráfico, não dourada)
-  doc.setFillColor(NAVY);
-  drawStar(doc, rx + cw / 2, cy + 26, 6);
+  // estrela dourada/amarela
+  doc.setFillColor(GOLD);
+  doc.setDrawColor(GOLD);
+  drawStar(doc, rx + cw / 2, cy + 26, 7);
+  // restaura cor de borda padrão
+  doc.setDrawColor(BORDER);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(NAVY);
@@ -492,8 +491,6 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Comentários do mês", falconData, brandData);
   doc.setTextColor(TEXT);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
   const blocks: string[] = [];
   const push = (s?: string | null) => { if (s && s.trim()) blocks.push(s.trim()); };
   push(letter.ai_intro);
@@ -501,8 +498,16 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   push(letter.ai_financial);
   push(letter.ai_outlook);
   const body = blocks.join("\n\n") || "—";
-  const lines = doc.splitTextToSize(body, SIZE - 32);
-  doc.text(lines, 16, 38, { lineHeightFactor: 1.55, align: "justify", maxWidth: SIZE - 32 });
+  drawDynamicTextBlock(doc, body, {
+    x: 16,
+    y: 32,
+    width: SIZE - 32,
+    height: SIZE - 32 - 14, // até ~14mm da base
+    minSize: 9,
+    maxSize: 22,
+    lineHeightFactor: 1.5,
+    minFillRatio: 0.85,
+  });
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
