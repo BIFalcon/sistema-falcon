@@ -625,12 +625,13 @@ function HotelOpenFolioDetail({
               <TableHead>Check-in</TableHead>
               <TableHead>Check-out</TableHead>
               <TableHead className="text-right">Em aberto</TableHead>
+              <TableHead>Previsto pagto</TableHead>
               <TableHead>Justificativa</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
             ) : (
               entries.map((e) => {
                 const cn = e.confirmation_number ?? "";
@@ -638,6 +639,9 @@ function HotelOpenFolioDetail({
                 const last = cnNotes[0];
                 const aging = e.days_open ?? 0;
                 const tone = aging > 90 ? "text-destructive" : aging > 30 ? "text-amber-600" : "text-muted-foreground";
+                const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
+                const todayIso = new Date().toISOString().slice(0, 10);
+                const overdue = expected && expected < todayIso;
                 return (
                   <TableRow key={e.id}>
                     <TableCell className="text-sm">{fullName(e)}</TableCell>
@@ -646,6 +650,16 @@ function HotelOpenFolioDetail({
                     <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
                     <TableCell className="text-xs">{e.departure_date ? formatDay(e.departure_date) : "—"}</TableCell>
                     <TableCell className={`text-right text-xs font-semibold ${tone}`}>{aging}d</TableCell>
+                    <TableCell className="text-xs">
+                      {expected ? (
+                        <span className={overdue ? "text-destructive font-semibold" : ""}>
+                          {formatDay(expected)}
+                          {overdue && <Badge variant="destructive" className="ml-1.5 text-[9px] px-1 py-0">vencido</Badge>}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {last ? (
