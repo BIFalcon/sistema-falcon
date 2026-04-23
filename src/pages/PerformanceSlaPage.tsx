@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FilterContext";
 import { MONTHS_PT, STATUS_LABELS, type Hotel } from "@/lib/constants";
 import {
   usePerfClosings,
@@ -85,12 +86,11 @@ function fullCycleHours(c: PerfClosing): number | null {
 
 export default function PerformanceSlaPage() {
   const { allowedHotels, isMaster, hasRole } = useAuth();
-  const now = new Date();
   const canAccess = isMaster || hasRole("processos");
 
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
-  const [hotelFilter, setHotelFilter] = useState<string>("__all");
+  // Filtros globais (header)
+  const { hotelId, month, year } = useFilters();
+  const hotelFilter = hotelId ?? "__all";
   const [userFilter, setUserFilter] = useState<string>("__all");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [search, setSearch] = useState("");
