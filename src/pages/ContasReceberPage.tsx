@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,10 +125,12 @@ function ToInvoiceSection({
   // GG vê apenas o próprio hotel — auto seleciona e esconde o seletor
   const initialHotelId = isGgOnly && hotels.length === 1 ? hotels[0].id : "";
   const [hotelId, setHotelId] = useState<string>(initialHotelId);
-  // Mantém hotelId sincronizado quando a lista de hotéis carrega
-  if (isGgOnly && !hotelId && hotels.length === 1) {
-    // setState durante render seria errado; usamos efeito abaixo? Mais simples: estado derivado.
-  }
+  // Mantém hotelId sincronizado quando a lista de hotéis carrega tardiamente
+  useEffect(() => {
+    if (isGgOnly && !hotelId && hotels.length === 1) {
+      setHotelId(hotels[0].id);
+    }
+  }, [isGgOnly, hotelId, hotels]);
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
