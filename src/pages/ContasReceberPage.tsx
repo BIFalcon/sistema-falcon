@@ -431,7 +431,9 @@ function OpenFolioSection({
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
-  const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
+  // Filtro global do header (Hotel) é a única fonte de verdade.
+  const { hotelId: globalHotelId, setHotelId } = useFilters();
+  const selectedHotel = globalHotelId;
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const allowedSet = useMemo(
     () => (seesAllHotels ? null : new Set(restrictedHotelIds ?? [])),
@@ -441,12 +443,6 @@ function OpenFolioSection({
     () => (allowedSet ? entries.filter((e) => e.hotel_id && allowedSet.has(e.hotel_id)) : entries),
     [entries, allowedSet],
   );
-  // GG: auto-seleciona o único hotel da cartela e esconde a lista
-  useEffect(() => {
-    if (isGgOnly && !selectedHotel && restrictedHotelIds && restrictedHotelIds.length === 1) {
-      setSelectedHotel(restrictedHotelIds[0]);
-    }
-  }, [isGgOnly, selectedHotel, restrictedHotelIds]);
 
   const summaries = useMemo(() => {
     const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
@@ -500,7 +496,7 @@ function OpenFolioSection({
           entries={filteredEntries}
           agingFilter={agingFilter}
           setAgingFilter={setAgingFilter}
-          onBack={() => setSelectedHotel(null)}
+          onBack={() => setHotelId(null)}
           hideBack={isGgOnly}
         />
       ) : (
@@ -518,7 +514,7 @@ function OpenFolioSection({
                 return (
                   <button
                     key={s.id}
-                    onClick={() => setSelectedHotel(s.id)}
+                    onClick={() => setHotelId(s.id)}
                     className="w-full text-left p-4 rounded-lg border hover:border-accent hover:shadow-soft transition-all flex items-center gap-4"
                   >
                     <div className="flex-1 min-w-0">
