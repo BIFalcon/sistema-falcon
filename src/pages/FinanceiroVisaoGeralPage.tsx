@@ -250,19 +250,6 @@ export default function FinanceiroVisaoGeralPage() {
   const maxOfBar = Math.max(1, ...ofRanking.map((r) => r.total));
   const maxMonthBar = Math.max(1, ...monthsBars.map((m) => m.total));
 
-  // periodOptions: últimos 12 meses + próximos 2
-  const periodOptions = useMemo(() => {
-    const arr: string[] = [];
-    const base = new Date();
-    base.setDate(1);
-    for (let i = 11; i >= -2; i--) {
-      const d = new Date(base);
-      d.setMonth(d.getMonth() - i);
-      arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-    return arr;
-  }, []);
-
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div>
@@ -272,35 +259,6 @@ export default function FinanceiroVisaoGeralPage() {
           Dashboard executivo consolidando Contas a Pagar, Contas a Receber e indicadores financeiros.
         </p>
       </div>
-
-      {/* Filtros */}
-      <Card className="p-4 shadow-soft flex flex-wrap items-end gap-3">
-        {!isGgOnly && (
-          <div className="min-w-[220px]">
-            <Label className="text-xs">Hotel</Label>
-            <Select value={hotelFilter} onValueChange={setHotelFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os hotéis</SelectItem>
-                {visibleHotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="min-w-[180px]">
-          <Label className="text-xs">Período</Label>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {periodOptions.map((ym) => (
-                <SelectItem key={ym} value={ym}>{monthLabel(ym)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
 
       {/* Cards superiores */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
