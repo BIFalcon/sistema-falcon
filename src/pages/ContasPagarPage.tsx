@@ -518,6 +518,24 @@ export default function ContasPagarPage() {
               ) : <div />}
             </div>
 
+            {/* Toggles auxiliares */}
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={hideTrivial}
+                  onCheckedChange={(c) => setHideTrivial(!!c)}
+                />
+                Ocultar lançamentos abaixo de R$ 1,00
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={groupNd}
+                  onCheckedChange={(c) => setGroupNd(!!c)}
+                />
+                Agrupar lançamentos N/D do mesmo fornecedor e data
+              </label>
+            </div>
+
             {/* Tabela */}
             <div className="border rounded-md overflow-hidden">
               <Table>
