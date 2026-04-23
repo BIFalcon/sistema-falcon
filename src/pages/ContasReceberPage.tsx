@@ -684,11 +684,12 @@ function NoteDialog({
 }: {
   entry: OpenFolioEntry | null;
   hotelId: string;
-  existingNotes: { id: string; note: string; created_at: string }[];
+  existingNotes: { id: string; note: string; created_at: string; expected_payment_date?: string | null }[];
   onClose: () => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
+  const [expectedDate, setExpectedDate] = useState("");
   const upsert = useUpsertOpenFolioNote();
 
   async function save() {
@@ -699,9 +700,11 @@ function NoteDialog({
         confirmation_number: entry.confirmation_number,
         note: text.trim(),
         author_id: user.id,
+        expected_payment_date: expectedDate || null,
       });
       toast.success("Justificativa registrada");
       setText("");
+      setExpectedDate("");
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao salvar");
@@ -734,6 +737,15 @@ function NoteDialog({
             placeholder="Ex: cliente vai pagar semana que vem, em negociação, cobrança enviada…"
             rows={4}
           />
+          <div>
+            <Label className="text-xs">Data prevista de pagamento (opcional)</Label>
+            <input
+              type="date"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
