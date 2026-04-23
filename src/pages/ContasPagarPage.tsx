@@ -148,14 +148,28 @@ export default function ContasPagarPage() {
   }, [entries]);
 
   const issueCounts = useMemo(() => {
-    let notApproved = 0, noDoc = 0, overdue = 0;
+    let notApproved = 0, noDoc = 0, overdue = 0, divergent = 0;
     entries.forEach((e) => {
       if (e.gg_approval !== "approved") notApproved++;
       if (!e.primary_document_id) noDoc++;
       if (e.omie_situation?.toLowerCase().includes("atras")) overdue++;
+      const doc = docsByEntry.get(e.id);
+      if (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01) divergent++;
     });
-    return { notApproved, noDoc, overdue };
-  }, [entries]);
+    return { notApproved, noDoc, overdue, divergent };
+  }, [entries, docsByEntry]);
+
+  const issueEntries = useMemo(
+    () => entries.filter((e) => {
+      const overdue = e.omie_situation?.toLowerCase().includes("atras");
+      const noApproval = e.gg_approval !== "approved";
+      const noDoc = !e.primary_document_id;
+      const doc = docsByEntry.get(e.id);
+      const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01;
+      return overdue || noApproval || noDoc || divergent;
+    }),
+    [entries, docsByEntry],
+  );
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
