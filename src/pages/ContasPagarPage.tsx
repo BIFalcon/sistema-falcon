@@ -87,9 +87,11 @@ export default function ContasPagarPage() {
   const deleteDoc = useDeleteDocument();
 
   const [balanceInput, setBalanceInput] = useState<string>("");
-  const [period, setPeriod] = useState<Period>("today");
+  const [period, setPeriod] = useState<Period>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [category, setCategory] = useState<string>("all");
+  const [hideTrivial, setHideTrivial] = useState<boolean>(true);
+  const [groupNd, setGroupNd] = useState<boolean>(true);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docsRef = useRef<HTMLInputElement | null>(null);
