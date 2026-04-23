@@ -92,7 +92,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         soon: true,
         children: [
           { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, soon: true },
-          { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, soon: true },
+          { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle },
           { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, soon: true },
         ],
       },
