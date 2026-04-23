@@ -98,8 +98,15 @@ export default function ContasPagarPage() {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [notifySelected, setNotifySelected] = useState<Set<string>>(new Set());
   const [notifying, setNotifying] = useState(false);
+  const [notifyCats, setNotifyCats] = useState({
+    notApproved: true,
+    noDoc: true,
+    overdue: true,
+    divergent: true,
+  });
+  const [notifyHideTrivial, setNotifyHideTrivial] = useState(true);
+  const [notifyHideNd, setNotifyHideNd] = useState(false);
 
   const docsByEntry = useMemo(() => {
     const map = new Map<string, ApDocument>();
@@ -254,15 +261,45 @@ export default function ContasPagarPage() {
   }
 
   function openNotify() {
-    setNotifySelected(new Set(issueEntries.map((e) => e.id)));
+    setNotifyCats({ notApproved: true, noDoc: true, overdue: true, divergent: true });
+    setNotifyHideTrivial(true);
+    setNotifyHideNd(false);
     setNotifyOpen(true);
   }
 
+  // Categoria por entry (independentes — uma entry pode ter várias)
+  function entryFlags(e: ApEntry) {
+    const overdue = !!e.omie_situation?.toLowerCase().includes("atras");
+    const noApproval = e.gg_approval !== "approved";
+    const noDoc = !e.primary_document_id;
+    const doc = docsByEntry.get(e.id);
+    const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01;
+    return { overdue, noApproval, noDoc, divergent };
+  }
+
+  const notifyEntries = useMemo(() => {
+    return issueEntries.filter((e) => {
+      const f = entryFlags(e);
+      const matches =
+        (notifyCats.notApproved && f.noApproval) ||
+        (notifyCats.noDoc && f.noDoc) ||
+        (notifyCats.overdue && f.overdue) ||
+        (notifyCats.divergent && f.divergent);
+      if (!matches) return false;
+      if (notifyHideTrivial && Number(e.amount || 0) < 1) return false;
+      if (notifyHideNd) {
+        const isNd = !e.document_number || e.document_number.trim() === "" || e.document_number.toUpperCase() === "N/D";
+        if (isNd) return false;
+      }
+      return true;
+    });
+  }, [issueEntries, notifyCats, notifyHideTrivial, notifyHideNd, docsByEntry]);
+
   async function sendNotify() {
-    if (!hotelId || notifySelected.size === 0) return;
+    if (!hotelId || notifyEntries.length === 0) return;
     setNotifying(true);
     try {
-      const r = await notifyGgPendencies({ hotelId, entryIds: Array.from(notifySelected) });
+      const r = await notifyGgPendencies({ hotelId, entryIds: notifyEntries.map((e) => e.id) });
       if (r.recipients === 0) {
         toast.warning("Nenhum GG cadastrado para este hotel.");
       } else {
@@ -645,38 +682,80 @@ export default function ContasPagarPage() {
             <DialogTitle>Notificar GG sobre pendências</DialogTitle>
           </DialogHeader>
           <p className="text-xs text-muted-foreground">
-            Selecione os lançamentos a incluir no e-mail. {issueEntries.length} pendência(s) detectada(s).
+            Escolha quais categorias de pendência devem ser incluídas no e-mail ao GG.
           </p>
-          <div className="max-h-[400px] overflow-y-auto border rounded-md divide-y">
-            {issueEntries.map((e) => (
-              <label key={e.id} className="flex items-start gap-3 p-2 hover:bg-muted/50 cursor-pointer text-sm">
+
+          <div className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Categorias</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
                 <Checkbox
-                  checked={notifySelected.has(e.id)}
-                  onCheckedChange={(c) => {
-                    setNotifySelected((prev) => {
-                      const next = new Set(prev);
-                      if (c) next.add(e.id); else next.delete(e.id);
-                      return next;
-                    });
-                  }}
+                  checked={notifyCats.notApproved}
+                  onCheckedChange={(c) => setNotifyCats((s) => ({ ...s, notApproved: !!c }))}
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{e.supplier}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Venc. {fmtDate(e.due_date)} · {fmtBRL(Number(e.amount))} · Doc {e.document_number ?? "—"}
-                  </p>
-                </div>
+                <span className="flex-1 text-sm">Sem aprovação GG</span>
+                <Badge variant="outline">{issueCounts.notApproved}</Badge>
               </label>
-            ))}
-            {issueEntries.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-6">Sem pendências.</p>
-            )}
+              <label className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
+                <Checkbox
+                  checked={notifyCats.noDoc}
+                  onCheckedChange={(c) => setNotifyCats((s) => ({ ...s, noDoc: !!c }))}
+                />
+                <span className="flex-1 text-sm">Sem documento</span>
+                <Badge variant="outline">{issueCounts.noDoc}</Badge>
+              </label>
+              <label className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
+                <Checkbox
+                  checked={notifyCats.overdue}
+                  onCheckedChange={(c) => setNotifyCats((s) => ({ ...s, overdue: !!c }))}
+                />
+                <span className="flex-1 text-sm">Atrasados</span>
+                <Badge variant="outline">{issueCounts.overdue}</Badge>
+              </label>
+              <label className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
+                <Checkbox
+                  checked={notifyCats.divergent}
+                  onCheckedChange={(c) => setNotifyCats((s) => ({ ...s, divergent: !!c }))}
+                />
+                <span className="flex-1 text-sm">Divergência de valor</span>
+                <Badge variant="outline">{issueCounts.divergent}</Badge>
+              </label>
+            </div>
+
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-2">Filtros</p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <Checkbox
+                  checked={notifyHideTrivial}
+                  onCheckedChange={(c) => setNotifyHideTrivial(!!c)}
+                />
+                Ocultar lançamentos abaixo de R$ 1,00
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <Checkbox
+                  checked={notifyHideNd}
+                  onCheckedChange={(c) => setNotifyHideNd(!!c)}
+                />
+                Ocultar lançamentos N/D (sem nº de documento)
+              </label>
+            </div>
+
+            <div className="rounded-md bg-muted/50 p-3 text-sm">
+              Serão notificados <strong>{notifyEntries.length}</strong> lançamento(s)
+              {notifyEntries.length > 0 && (
+                <span className="text-muted-foreground">
+                  {" "}· total {fmtBRL(notifyEntries.reduce((s, e) => s + Number(e.amount || 0), 0))}
+                </span>
+              )}
+              .
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setNotifyOpen(false)}>Cancelar</Button>
-            <Button onClick={sendNotify} disabled={notifying || notifySelected.size === 0} className="gap-2">
+            <Button onClick={sendNotify} disabled={notifying || notifyEntries.length === 0} className="gap-2">
               {notifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Enviar ({notifySelected.size})
+              Enviar notificação ({notifyEntries.length})
             </Button>
           </DialogFooter>
         </DialogContent>
