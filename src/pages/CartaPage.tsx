@@ -351,7 +351,7 @@ export default function CartaPage() {
                       Configure em{" "}
                       <button
                         type="button"
-                        onClick={() => navigate("/hoteis")}
+                        onClick={() => navigate("/configuracoes/hoteis")}
                         className="underline font-semibold hover:no-underline"
                       >
                         Hotéis
