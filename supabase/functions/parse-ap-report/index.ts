@@ -30,6 +30,12 @@ function normalize(s: any): string {
   return String(s ?? "").trim();
 }
 
+function sanitizeFileName(name: string): string {
+  // Remove acentos e troca caracteres não permitidos pelo Supabase Storage
+  const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return base.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
+}
+
 function toAscii(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -277,7 +283,7 @@ Deno.serve(async (req) => {
     }
 
     const ts = Date.now();
-    const reportPath = `${hotelId}/reports/${ts}-${reportName}`;
+    const reportPath = `${hotelId}/reports/${ts}-${sanitizeFileName(reportName)}`;
     const { error: upErr } = await admin.storage
       .from("accounts-payable")
       .upload(reportPath, new Uint8Array(reportBuf), {
@@ -384,7 +390,7 @@ Deno.serve(async (req) => {
     let docsCreated = 0;
     if (extractedDocs.length) {
       for (const doc of extractedDocs) {
-        const path = `${hotelId}/documents/${ts}-${doc.name}`;
+        const path = `${hotelId}/documents/${ts}-${sanitizeFileName(doc.name)}`;
         const { error: dErr } = await admin.storage
           .from("accounts-payable")
           .upload(path, doc.data, { contentType: doc.mime, upsert: true });
