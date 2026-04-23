@@ -629,10 +629,8 @@ function drawDreTable(
 
     { kind: "section", label: "RESULTADO" },
     { kind: "total", label: "Resultado Operacional Bruto (GOP)", rx: [/resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
-    { kind: "item", label: "Total dos Gastos de Propriedade", rx: [/gastos?\s+de\s+propriedade/i, /total\s+gastos?\s+(de\s+)?propriedade/i] },
-    { kind: "total", label: "Resultado Operacional Líquido", rx: [/resultado\s+operacional\s+l[íi]quido/i] },
-    { kind: "total", label: "Lucro Líquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
-    { kind: "highlight", label: "Distribuição por UH", rx: [/distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
+    { kind: "total", label: "Lucro / Prejuízo a Distribuir no Período", rx: [/lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i, /^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido/i] },
+    { kind: "highlight", label: "Distribuição por UH", rx: [/^por\s+uh$/i, /distribui[çc][ãa]o\s+por\s+uh/i, /distribui[çc][ãa]o\s+\/\s*uh/i, /resultado\s+por\s+uh/i] },
   ];
 
   const findValue = (rxs: RegExp[]): number | null => {
