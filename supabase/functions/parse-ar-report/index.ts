@@ -51,15 +51,6 @@ function parseDate(v: any): string | null {
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   return null;
 }
-function findCol(header: string[], ...candidates: string[]): number {
-  const norm = header.map((h) => toAscii(normalize(h)));
-  for (const c of candidates) {
-    const i = norm.findIndex((h) => h === toAscii(c) || h.includes(toAscii(c)));
-    if (i >= 0) return i;
-  }
-  return -1;
-}
-
 type HotelMap = Map<string, string>; // lower(opera_property_name) → hotel_id
 
 type ToInvoicePayload = {
