@@ -718,6 +718,120 @@ function drawStar(doc: jsPDF, cx: number, cy: number, r: number) {
 }
 
 /**
+ * Ícone visual: pilha de moedas douradas com uma cédula verde ao lado.
+ * Centro em (cx, cy). Aproximadamente 18mm de largura por 12mm de altura.
+ */
+function drawCoinsAndBillIcon(doc: jsPDF, cx: number, cy: number) {
+  const GREEN = "#3F8A4F";
+  const GREEN_DARK = "#2E6B3C";
+  const COIN = "#D4A847";
+  const COIN_DARK = "#A77E2C";
+
+  // Cédula verde (atrás, à direita)
+  const billW = 11, billH = 6;
+  const bx = cx - 1, by = cy - billH / 2 + 0.5;
+  doc.setFillColor(GREEN);
+  doc.setDrawColor(GREEN_DARK);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(bx, by, billW, billH, 0.6, 0.6, "FD");
+  // círculo central da cédula
+  doc.setFillColor(GREEN_DARK);
+  doc.circle(bx + billW / 2, by + billH / 2, 1.1, "F");
+  doc.setTextColor("#FFFFFF");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(5);
+  doc.text("$", bx + billW / 2, by + billH / 2 + 0.9, { align: "center" });
+
+  // Pilha de moedas (3 moedas empilhadas, à esquerda, na frente)
+  const coinR = 3.2;
+  const stackX = cx - 5.2;
+  const baseY = cy + 4.2;
+  doc.setDrawColor(COIN_DARK);
+  doc.setLineWidth(0.25);
+  for (let i = 0; i < 3; i++) {
+    const yc = baseY - i * 2.2;
+    // elipse (moeda em perspectiva)
+    doc.setFillColor(COIN);
+    doc.ellipse(stackX, yc, coinR, 1.1, "F");
+    doc.setDrawColor(COIN_DARK);
+    doc.ellipse(stackX, yc, coinR, 1.1, "S");
+  }
+  // Topo da pilha com símbolo $
+  const topY = baseY - 2 * 2.2;
+  doc.setTextColor(COIN_DARK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(4);
+  doc.text("$", stackX, topY + 0.6, { align: "center" });
+}
+
+/**
+ * Desenha um bloco de texto ajustando dinamicamente o tamanho da fonte
+ * para que ocupe pelo menos `minFillRatio` da altura disponível, sem
+ * ultrapassar a área. Texto justificado.
+ */
+function drawDynamicTextBlock(
+  doc: jsPDF,
+  text: string,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    minSize: number;
+    maxSize: number;
+    lineHeightFactor: number;
+    minFillRatio: number;
+  },
+) {
+  const { x, y, width, height, minSize, maxSize, lineHeightFactor, minFillRatio } = opts;
+  doc.setFont("helvetica", "normal");
+
+  // Busca binária pelo maior tamanho de fonte que cabe na altura
+  let lo = minSize, hi = maxSize, best = minSize;
+  let bestLines: string[] = [];
+  while (lo <= hi) {
+    const mid = (lo + hi) / 2;
+    doc.setFontSize(mid);
+    const lines = doc.splitTextToSize(text, width) as string[];
+    const lineH = (mid * lineHeightFactor) / doc.internal.scaleFactor;
+    const totalH = lines.length * lineH;
+    if (totalH <= height) {
+      best = mid;
+      bestLines = lines;
+      lo = mid + 0.25;
+    } else {
+      hi = mid - 0.25;
+    }
+    if (hi - lo < 0.2) break;
+  }
+
+  // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
+  // até atingir a altura alvo (mantendo dentro da área).
+  const lineH = (best * lineHeightFactor) / doc.internal.scaleFactor;
+  const filled = bestLines.length * lineH;
+  if (filled < height * minFillRatio && bestLines.length > 0) {
+    // Aumenta lineHeightFactor (espaçamento) para preencher
+    const targetH = Math.min(height, Math.max(filled, height * minFillRatio));
+    const newLineH = targetH / bestLines.length;
+    const newLhf = (newLineH * doc.internal.scaleFactor) / best;
+    doc.setFontSize(best);
+    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+      lineHeightFactor: Math.min(newLhf, 2.2),
+      align: "justify",
+      maxWidth: width,
+    });
+    return;
+  }
+
+  doc.setFontSize(best);
+  doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+    lineHeightFactor,
+    align: "justify",
+    maxWidth: width,
+  });
+}
+
+/**
  * Faixa decorativa de tracinhos curtos alternando azul-marinho e cinza,
  * usada na capa entre a foto do hotel e o título "Carta ao investidor".
  */
