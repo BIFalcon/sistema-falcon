@@ -107,3 +107,28 @@
     letter-spacing: -0.01em;
   }
 }
+
+/* Scrollbar discreta apenas dentro do sidebar (tema escuro) */
+[data-sidebar="sidebar"] *::-webkit-scrollbar,
+[data-sidebar="sidebar"]::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+[data-sidebar="sidebar"] *::-webkit-scrollbar-track,
+[data-sidebar="sidebar"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-sidebar="sidebar"] *::-webkit-scrollbar-thumb,
+[data-sidebar="sidebar"]::-webkit-scrollbar-thumb {
+  background: hsla(0, 0%, 100%, 0.15);
+  border-radius: 4px;
+}
+[data-sidebar="sidebar"] *::-webkit-scrollbar-thumb:hover,
+[data-sidebar="sidebar"]::-webkit-scrollbar-thumb:hover {
+  background: hsla(0, 0%, 100%, 0.25);
+}
+[data-sidebar="sidebar"],
+[data-sidebar="sidebar"] * {
+  scrollbar-width: thin;
+  scrollbar-color: hsla(0, 0%, 100%, 0.15) transparent;
+}
