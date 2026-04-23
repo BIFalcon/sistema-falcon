@@ -58,8 +58,14 @@ function fullName(e: { first_name: string | null; last_name: string | null }) {
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster } = useAuth();
+  const { hasRole, isMaster, userHotels } = useAuth();
   const isManager = isMaster || hasRole("financeiro");
+  // Quem vê todos os hotéis: master, financeiro, controladoria, ri
+  const seesAllHotels =
+    isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
+  // GG/GOP: somente os hotéis da sua cartela
+  const isGgOnly = !seesAllHotels && hasRole("gg");
+  const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);
   const [tab, setTab] = useState<"to_invoice" | "open_folio">("to_invoice");
 
   return (
@@ -78,10 +84,20 @@ export default function ContasReceberPage() {
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
-          <ToInvoiceSection isManager={isManager} />
+          <ToInvoiceSection
+            isManager={isManager}
+            seesAllHotels={seesAllHotels}
+            restrictedHotelIds={restrictedHotelIds}
+            isGgOnly={isGgOnly}
+          />
         </TabsContent>
         <TabsContent value="open_folio" className="mt-5">
-          <OpenFolioSection isManager={isManager} />
+          <OpenFolioSection
+            isManager={isManager}
+            seesAllHotels={seesAllHotels}
+            restrictedHotelIds={restrictedHotelIds}
+            isGgOnly={isGgOnly}
+          />
         </TabsContent>
       </Tabs>
     </div>
