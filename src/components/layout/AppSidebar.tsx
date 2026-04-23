@@ -1,18 +1,22 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
+  ClipboardList,
   FileSpreadsheet,
   Mail,
   Wallet,
+  Send,
   TrendingUp,
-  Settings,
-  Hotel,
-  ClipboardList,
+  Target,
   ArrowDownCircle,
   ArrowUpCircle,
-  Target,
   Users,
   ShieldCheck,
+  Hotel,
+  Settings,
+  UserCog,
+  Image as ImageIcon,
+  ChevronRight,
+  LayoutGrid,
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,25 +27,50 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarFooter,
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import falconLogo from "@/assets/falcon-logo-white.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS } from "@/lib/constants";
 
-const navGroups = [
-  {
-    label: "Visão Geral",
-    items: [{ title: "Dashboard", url: "/", icon: LayoutDashboard, end: true }],
-  },
+type LeafItem = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  soon?: boolean;
+  end?: boolean;
+};
+
+type GroupItem = LeafItem & {
+  children?: LeafItem[];
+};
+
+const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Operação",
     items: [
-      { title: "Fechamento", url: "/fechamento", icon: ClipboardList },
-      { title: "Contas a Pagar", url: "/contas-pagar", icon: ArrowUpCircle, soon: true },
-      { title: "Contas a Receber", url: "/contas-receber", icon: ArrowDownCircle, soon: true },
+      {
+        title: "Fechamento",
+        url: "/fechamento",
+        icon: ClipboardList,
+        children: [
+          { title: "Visão Geral", url: "/fechamento", icon: LayoutGrid, end: true },
+          { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet },
+          { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail },
+          { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet },
+          { title: "Envio", url: "/fechamento/envio", icon: Send, soon: true },
+        ],
+      },
     ],
   },
   {
@@ -54,13 +83,38 @@ const navGroups = [
   {
     label: "Gestão",
     items: [
+      {
+        title: "Financeiro",
+        url: "/financeiro",
+        icon: Wallet,
+        soon: true,
+        children: [
+          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, soon: true },
+          { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, soon: true },
+          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, soon: true },
+        ],
+      },
       { title: "RH & People", url: "/rh", icon: Users, soon: true },
       { title: "Controladoria", url: "/controladoria", icon: ShieldCheck, soon: true },
-      { title: "Hotéis", url: "/hoteis", icon: Hotel },
-      { title: "Configurações", url: "/configuracoes", icon: Settings, soon: true },
+    ],
+  },
+  {
+    label: "Configurações",
+    items: [
+      { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, soon: true },
+      { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
+      { title: "Assets", url: "/configuracoes/assets", icon: ImageIcon, soon: true },
     ],
   },
 ];
+
+function SoonBadge() {
+  return (
+    <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sidebar-accent/20 text-sidebar-foreground/60">
+      Em breve
+    </span>
+  );
+}
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -74,6 +128,9 @@ export function AppSidebar() {
     : primaryRole
       ? ROLE_LABELS[primaryRole]
       : "—";
+
+  const isActiveUrl = (url: string, end?: boolean) =>
+    end ? location.pathname === url : location.pathname === url || location.pathname.startsWith(url + "/");
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -103,23 +160,62 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const active = item.end
-                    ? location.pathname === item.url
-                    : location.pathname.startsWith(item.url);
+                  const hasChildren = !!item.children?.length;
+                  const parentActive = isActiveUrl(item.url, false);
+
+                  if (!hasChildren) {
+                    return (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild isActive={isActiveUrl(item.url, item.end)}>
+                          <NavLink to={item.url} end={item.end}>
+                            <item.icon className="h-4 w-4" />
+                            <span className="flex-1">{item.title}</span>
+                            {!collapsed && item.soon && <SoonBadge />}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  }
+
                   return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild isActive={active}>
-                        <NavLink to={item.url} end={item.end}>
-                          <item.icon className="h-4 w-4" />
-                          <span className="flex-1">{item.title}</span>
-                          {!collapsed && (item as { soon?: boolean }).soon && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sidebar-accent/20 text-sidebar-foreground/60">
-                              Em breve
-                            </span>
-                          )}
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    <Collapsible
+                      key={item.url}
+                      defaultOpen={parentActive}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton isActive={parentActive}>
+                            <item.icon className="h-4 w-4" />
+                            <span className="flex-1">{item.title}</span>
+                            {!collapsed && item.soon && <SoonBadge />}
+                            {!collapsed && (
+                              <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            )}
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        {!collapsed && (
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.children!.map((child) => (
+                                <SidebarMenuSubItem key={child.url}>
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isActiveUrl(child.url, child.end)}
+                                  >
+                                    <NavLink to={child.url} end={child.end}>
+                                      <child.icon className="h-3.5 w-3.5" />
+                                      <span className="flex-1">{child.title}</span>
+                                      {child.soon && <SoonBadge />}
+                                    </NavLink>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        )}
+                      </SidebarMenuItem>
+                    </Collapsible>
                   );
                 })}
               </SidebarMenu>
