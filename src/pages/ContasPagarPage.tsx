@@ -356,11 +356,21 @@ export default function ContasPagarPage() {
             </Card>
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Problemas identificados</h3>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                 <UrgencyCell label="Sem aprovação GG" count={issueCounts.notApproved} tone="warning" />
                 <UrgencyCell label="Sem documento" count={issueCounts.noDoc} tone="info" />
                 <UrgencyCell label="Atrasados" count={issueCounts.overdue} tone="danger" />
+                <UrgencyCell label="Divergência valor" count={issueCounts.divergent} tone="amber" />
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={!canManage || issueEntries.length === 0}
+                onClick={openNotify}
+              >
+                <Mail className="h-4 w-4" /> Notificar GG ({issueEntries.length})
+              </Button>
             </Card>
           </div>
 
