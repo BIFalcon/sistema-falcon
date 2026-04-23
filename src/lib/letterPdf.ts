@@ -444,6 +444,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   drawPageHeader(doc, "Indicadores do mês", falconData, brandData);
 
   const recH = 88;
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.4);
   doc.roundedRect(12, 30, cardW, recH, 2, 2, "S");
   const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
   doc.addImage(recChart, "PNG", 15, 33, cardW - 6, recH - 6);
@@ -456,7 +458,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.roundedRect(12, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(14);
   doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
   // ícone: pilha de moedas douradas + cédula verde
   drawCoinsAndBillIcon(doc, 12 + cw / 2, cy + 26);
@@ -473,7 +475,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
   doc.setTextColor(NAVY);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(14);
   doc.text("RPS", rx + cw / 2, cy + 12, { align: "center" });
   // estrela dourada/amarela
   doc.setFillColor(GOLD);
