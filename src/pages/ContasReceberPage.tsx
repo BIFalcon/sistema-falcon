@@ -571,6 +571,7 @@ function HotelOpenFolioDetail({
   agingFilter,
   setAgingFilter,
   onBack,
+  hideBack,
 }: {
   hotelId: string;
   hotelName: string;
@@ -578,6 +579,7 @@ function HotelOpenFolioDetail({
   agingFilter: "all" | "fresh" | "mid" | "old";
   setAgingFilter: (v: "all" | "fresh" | "mid" | "old") => void;
   onBack: () => void;
+  hideBack?: boolean;
 }) {
   const { data: notes = [] } = useOpenFolioNotes(hotelId);
   const [noteFor, setNoteFor] = useState<OpenFolioEntry | null>(null);
@@ -596,9 +598,11 @@ function HotelOpenFolioDetail({
     <Card className="p-5 shadow-soft space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Button>
+          {!hideBack && (
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+          )}
           <h3 className="text-sm font-semibold">{hotelName}</h3>
         </div>
         <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
