@@ -20,6 +20,7 @@ import NotificacoesPage from "./pages/NotificacoesPage";
 import ContasPagarPage from "./pages/ContasPagarPage";
 import ContasReceberPage from "./pages/ContasReceberPage";
 import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
+import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -56,7 +57,7 @@ const App = () => (
               <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
 
               {/* Análise */}
-              <Route path="/indicadores" element={<EmBreve />} />
+              <Route path="/indicadores" element={<IndicadoresDrePage />} />
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
