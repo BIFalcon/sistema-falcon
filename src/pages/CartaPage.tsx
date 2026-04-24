@@ -168,6 +168,16 @@ export default function CartaPage() {
     }
   }
 
+  async function handleSaveManualNarrative(manualText: Parameters<typeof genAi.mutateAsync>[0]["manualText"]) {
+    if (!letter || !resolvedId || !manualText) return;
+    try {
+      const r = await genAi.mutateAsync({ closingId: resolvedId, letterId: letter.id, manualText });
+      toast.success(`Edição manual salva como v${r.version}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar edição manual");
+    }
+  }
+
   async function handleGeneratePdf() {
     if (!letter || !closing) return;
     if (!assetsReady) {
@@ -367,6 +377,7 @@ export default function CartaPage() {
               isGenerating={genAi.isPending}
               canEdit={!!canEdit && !!letter}
               onRegenerate={handleRegenerate}
+              onSaveManual={handleSaveManualNarrative}
             />
 
             <Card className="p-5 shadow-soft">

@@ -242,12 +242,25 @@ export function useLetterVersions(letterId: string | null | undefined) {
 export function useGenerateLetterAi() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { closingId: string; letterId: string; instruction?: string }) => {
+    mutationFn: async (input: {
+      closingId: string;
+      letterId: string;
+      instruction?: string;
+      manualText?: Pick<LetterVersion, "ai_intro" | "ai_market_context" | "ai_operational" | "ai_financial" | "ai_outlook" | "ai_closing">;
+    }) => {
       const { data, error } = await supabase.functions.invoke("generate-letter", {
         body: {
           closing_id: input.closingId,
           letter_id: input.letterId,
           instruction: input.instruction ?? null,
+          manual_text: input.manualText ? {
+            intro: input.manualText.ai_intro,
+            market_context: input.manualText.ai_market_context,
+            operational: input.manualText.ai_operational,
+            financial: input.manualText.ai_financial,
+            outlook: input.manualText.ai_outlook,
+            closing: input.manualText.ai_closing,
+          } : undefined,
         },
       });
       if (error) throw error;

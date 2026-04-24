@@ -12,6 +12,14 @@ interface Body {
   closing_id: string;
   letter_id: string;
   instruction?: string;
+  manual_text?: {
+    intro?: string | null;
+    market_context?: string | null;
+    operational?: string | null;
+    financial?: string | null;
+    outlook?: string | null;
+    closing?: string | null;
+  };
 }
 
 const MODEL = "google/gemini-2.5-flash";
@@ -34,7 +42,7 @@ Deno.serve(async (req) => {
     if (claimsErr || !claimsData?.claims?.sub) return json({ error: "Usuário inválido" }, 401);
     const userId = claimsData.claims.sub as string;
 
-    const { closing_id, letter_id, instruction } = (await req.json()) as Body;
+    const { closing_id, letter_id, instruction, manual_text } = (await req.json()) as Body;
     if (!closing_id || !letter_id) return json({ error: "Parâmetros ausentes" }, 400);
 
     const closing = await supabase.from("closings").select("*").eq("id", closing_id).maybeSingle();
@@ -42,6 +50,41 @@ Deno.serve(async (req) => {
     const hotel = await supabase.from("hotels").select("*").eq("id", closing.data.hotel_id).maybeSingle();
     const letter = await supabase.from("investor_letters").select("*").eq("id", letter_id).maybeSingle();
     if (letter.error || !letter.data) return json({ error: "Carta não encontrada" }, 404);
+
+    const nextVersion = (letter.data.ai_version_number ?? 0) + 1;
+    if (manual_text) {
+      const ver = await supabase.from("letter_versions").insert({
+        letter_id,
+        closing_id,
+        version_number: nextVersion,
+        ai_intro: manual_text.intro ?? null,
+        ai_market_context: manual_text.market_context ?? null,
+        ai_operational: manual_text.operational ?? null,
+        ai_financial: manual_text.financial ?? null,
+        ai_outlook: manual_text.outlook ?? null,
+        ai_closing: manual_text.closing ?? null,
+        ai_model: "manual",
+        instruction: "Editado manualmente",
+        created_by: userId,
+      });
+      if (ver.error) return json({ error: ver.error.message }, 500);
+
+      const upd = await supabase.from("investor_letters").update({
+        ai_intro: manual_text.intro ?? null,
+        ai_market_context: manual_text.market_context ?? null,
+        ai_operational: manual_text.operational ?? null,
+        ai_financial: manual_text.financial ?? null,
+        ai_outlook: manual_text.outlook ?? null,
+        ai_closing: manual_text.closing ?? null,
+        ai_model: "manual",
+        ai_generated_at: new Date().toISOString(),
+        ai_version_number: nextVersion,
+        last_ai_instruction: "Editado manualmente",
+        updated_by: userId,
+      }).eq("id", letter_id);
+      if (upd.error) return json({ error: upd.error.message }, 500);
+      return json({ ok: true, model: "manual", version: nextVersion });
+    }
 
     const highlights = await supabase
       .from("letter_highlights")
@@ -162,8 +205,6 @@ Gere o JSON.`;
     } catch {
       return json({ error: "IA retornou JSON inválido" }, 500);
     }
-
-    const nextVersion = (letter.data.ai_version_number ?? 0) + 1;
 
     // Salva snapshot no histórico
     const ver = await supabase.from("letter_versions").insert({
