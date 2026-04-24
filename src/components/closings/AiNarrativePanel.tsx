@@ -12,12 +12,17 @@ interface Props {
   isGenerating: boolean;
   canEdit: boolean;
   onRegenerate: (instruction?: string) => void;
+  onSaveManual: (text: Pick<LetterVersion, "ai_intro" | "ai_market_context" | "ai_operational" | "ai_financial" | "ai_outlook" | "ai_closing">) => void;
 }
 
-export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate }: Props) {
+export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate, onSaveManual }: Props) {
   const [showInstruction, setShowInstruction] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [selectedVersion, setSelectedVersion] = useState<string>("latest");
+  const [isEditingManual, setIsEditingManual] = useState(false);
+  const [manualText, setManualText] = useState({
+    ai_intro: "", ai_market_context: "", ai_operational: "", ai_financial: "", ai_outlook: "", ai_closing: "",
+  });
 
   const latest = versions[0];
   const viewing = selectedVersion === "latest"
@@ -56,6 +61,24 @@ export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate
     setShowInstruction(false);
   }
 
+  function startManualEdit() {
+    setManualText({
+      ai_intro: viewing?.ai_intro ?? "",
+      ai_market_context: viewing?.ai_market_context ?? "",
+      ai_operational: viewing?.ai_operational ?? "",
+      ai_financial: viewing?.ai_financial ?? "",
+      ai_outlook: viewing?.ai_outlook ?? "",
+      ai_closing: viewing?.ai_closing ?? "",
+    });
+    setShowInstruction(false);
+    setIsEditingManual(true);
+  }
+
+  function saveManualEdit() {
+    onSaveManual(manualText);
+    setIsEditingManual(false);
+  }
+
   return (
     <Card className="p-5 shadow-soft space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -63,7 +86,7 @@ export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate
           <h3 className="text-sm font-semibold uppercase tracking-wider">Narrativa gerada (IA)</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Versão {viewing?.version_number} de {versions.length}
-            {viewing?.ai_model && ` · ${viewing.ai_model}`}
+            {viewing?.ai_model && ` · ${viewing.ai_model === "manual" ? "Editado manualmente" : viewing.ai_model}`}
           </p>
         </div>
         {versions.length > 1 && (
@@ -77,7 +100,7 @@ export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate
                 <SelectItem value="latest">Mais recente (v{latest.version_number})</SelectItem>
                 {versions.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
-                    v{v.version_number} · {new Date(v.created_at).toLocaleDateString("pt-BR")}
+                    v{v.version_number} · {v.ai_model === "manual" ? "Editado manualmente" : new Date(v.created_at).toLocaleDateString("pt-BR")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -101,19 +124,44 @@ export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate
           ["Financeiro", viewing?.ai_financial],
           ["Perspectivas", viewing?.ai_outlook],
           ["Encerramento", viewing?.ai_closing],
-        ].map(([t, body]) =>
-          body ? (
+        ].map(([t, body]) => {
+          const field = ({
+            Introdução: "ai_intro",
+            "Contexto de mercado": "ai_market_context",
+            Operacional: "ai_operational",
+            Financeiro: "ai_financial",
+            Perspectivas: "ai_outlook",
+            Encerramento: "ai_closing",
+          } as const)[t as string];
+          return isEditingManual ? (
+            <div key={t as string}>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{t}</p>
+              <Textarea
+                rows={field === "ai_operational" ? 5 : 3}
+                value={manualText[field]}
+                onChange={(e) => setManualText((m) => ({ ...m, [field]: e.target.value }))}
+              />
+            </div>
+          ) : body ? (
             <div key={t as string}>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{t}</p>
               <p className="leading-relaxed whitespace-pre-line">{body}</p>
             </div>
-          ) : null,
-        )}
+          ) : null;
+        })}
       </div>
 
       {canEdit && (
         <div className="border-t pt-4 space-y-3">
-          {!showInstruction ? (
+          {isEditingManual ? (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveManualEdit} disabled={isGenerating} className="gap-2">
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Salvar edição
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsEditingManual(false)} disabled={isGenerating}>Cancelar</Button>
+            </div>
+          ) : !showInstruction ? (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={isGenerating} className="gap-2">
                 {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -121,6 +169,9 @@ export function AiNarrativePanel({ versions, isGenerating, canEdit, onRegenerate
               </Button>
               <Button size="sm" variant="outline" onClick={() => setShowInstruction(true)} disabled={isGenerating}>
                 Regenerar com comentário
+              </Button>
+              <Button size="sm" variant="outline" onClick={startManualEdit} disabled={isGenerating}>
+                Editar manualmente
               </Button>
             </div>
           ) : (
