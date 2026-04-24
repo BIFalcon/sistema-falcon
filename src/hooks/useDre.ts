@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
+import { mergeDreDatasets, parseDreAnalyticsWorkbook, type DreAnalyticsDataset } from "@/lib/dreAnalytics";
 import {
   estimateDistribution,
   buildHistoryEntry,
@@ -248,6 +249,46 @@ export function useDreIndicators(closingId: string | null | undefined) {
       return ((data ?? [])
         .filter((r) => r.version_number === top)
         .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
+    },
+  });
+}
+
+export function useDreAnalytics(input: { hotelIds: string[]; year: number }) {
+  return useQuery({
+    enabled: input.hotelIds.length > 0,
+    queryKey: ["dre-analytics", input.hotelIds, input.year],
+    queryFn: async (): Promise<DreAnalyticsDataset | null> => {
+      const datasets: DreAnalyticsDataset[] = [];
+      for (const hotelId of input.hotelIds) {
+        const { data: closing, error: closingError } = await supabase
+          .from("closings")
+          .select("id, hotel_id, year")
+          .eq("hotel_id", hotelId)
+          .eq("year", input.year)
+          .order("month", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (closingError) throw closingError;
+        if (!closing) continue;
+
+        const { data: version, error: versionError } = await supabase
+          .from("dre_versions")
+          .select("file_url, file_name, version_number")
+          .eq("closing_id", closing.id)
+          .order("version_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (versionError) throw versionError;
+        if (!version?.file_url) continue;
+
+        const { data: file, error: downloadError } = await supabase.storage
+          .from("closings")
+          .download(version.file_url);
+        if (downloadError) throw downloadError;
+        datasets.push(parseDreAnalyticsWorkbook(await file.arrayBuffer(), version.file_name));
+      }
+      if (!datasets.length) return null;
+      return datasets.length === 1 ? datasets[0] : mergeDreDatasets(datasets);
     },
   });
 }
