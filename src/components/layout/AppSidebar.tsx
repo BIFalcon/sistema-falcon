@@ -78,7 +78,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, soon: true },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp },
       { title: "Metas GG", url: "/metas", icon: Target, soon: true },
     ],
   },
