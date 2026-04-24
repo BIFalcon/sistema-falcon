@@ -19,7 +19,7 @@ export interface DreAnalyticsDataset {
 }
 
 const MONTHS = [
-  ["janeiro", "jan"], ["fevereiro", "fev"], ["março", "marco", "fev"], ["abril", "abr"],
+  ["janeiro", "jan"], ["fevereiro", "fev"], ["março", "marco", "mar"], ["abril", "abr"],
   ["maio", "mai"], ["junho", "jun"], ["julho", "jul"], ["agosto", "ago"],
   ["setembro", "set"], ["outubro", "out"], ["novembro", "nov"], ["dezembro", "dez"],
 ];
@@ -73,7 +73,7 @@ function extractLabel(row: unknown[]) {
   for (let c = 0; c < row.length; c++) {
     if (c === 1 || monthFromCell(row[c])) continue;
     if (typeof row[c] !== "string") continue;
-    const value = row[c].trim();
+    const value = String(row[c]).trim();
     const norm = normalize(value);
     if (!value || norm === "nivel" || norm === "nível" || norm === "realizado" || norm === "orcamento") continue;
     return value;
