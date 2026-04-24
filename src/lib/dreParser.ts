@@ -18,6 +18,7 @@ export type IndicatorKey =
   | "adr"
   | "revpar"
   | "roomnights"
+  | "distribuicao_por_uh"
   | "uhs_total"
   | "uhs_disponiveis"
   | "receita_hospedagem"
@@ -78,6 +79,7 @@ const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
   { key: "gop", rx: [/^resultado\s+operacional\s+bruto/i, /\bgop\b/i] },
   { key: "ebitda", rx: [/ebitda/i] },
   { key: "lucro_liquido", rx: [/^lucro\s+l[íi]quido/i, /^resultado\s+l[íi]quido\s+do\s+exerc/i, /^resultado\s+l[íi]quido/i] },
+  { key: "distribuicao_por_uh", rx: [/^por\s+uh$/i] },
 ];
 
 /**
@@ -242,6 +244,7 @@ export async function parseDreExcel(
 
   const indicators: Record<IndicatorKey, IndicatorHit | null> = {
     ocupacao: null, adr: null, revpar: null, roomnights: null,
+    distribuicao_por_uh: null,
     uhs_total: null, uhs_disponiveis: null,
     receita_hospedagem: null, receita_ab: null,
     receita_bruta_total: null, receita_liquida_total: null,
@@ -393,6 +396,7 @@ export const INDICATOR_LABELS: Record<IndicatorKey, string> = {
   adr: "Diária Média (ADR)",
   revpar: "RevPAR",
   roomnights: "Room Nights",
+  distribuicao_por_uh: "Distribuição por UH",
   uhs_total: "UHs Totais",
   uhs_disponiveis: "UHs Disponíveis",
   receita_hospedagem: "Receita de Hospedagem",
@@ -414,7 +418,7 @@ export function formatIndicator(key: IndicatorKey, value: number | null): string
   if (key === "roomnights" || key === "uhs_total" || key === "uhs_disponiveis") {
     return Math.round(value).toLocaleString("pt-BR");
   }
-  if (key === "adr" || key === "revpar") {
+  if (key === "adr" || key === "revpar" || key === "distribuicao_por_uh") {
     return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
   }
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
