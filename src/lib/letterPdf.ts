@@ -492,8 +492,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
-  // ícone: pilha de moedas douradas + cédula verde
-  drawCoinsAndBillIcon(doc, 12 + cw / 2, cy + 26);
+  drawGoldDollarIcon(doc, 12 + cw / 2, cy + 30);
   // valor (maior)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
@@ -756,50 +755,13 @@ function drawStar(doc: jsPDF, cx: number, cy: number, r: number) {
 }
 
 /**
- * Ícone visual: pilha de moedas douradas com uma cédula verde ao lado.
- * Centro em (cx, cy). Aproximadamente 18mm de largura por 12mm de altura.
+ * Ícone visual: cifrão dourado simples para Fundo de Reserva.
  */
-function drawCoinsAndBillIcon(doc: jsPDF, cx: number, cy: number) {
-  const GREEN = "#3F8A4F";
-  const GREEN_DARK = "#2E6B3C";
-  const COIN = "#D4A847";
-  const COIN_DARK = "#A77E2C";
-
-  // Cédula verde (atrás, à direita)
-  const billW = 11, billH = 6;
-  const bx = cx - 1, by = cy - billH / 2 + 0.5;
-  doc.setFillColor(GREEN);
-  doc.setDrawColor(GREEN_DARK);
-  doc.setLineWidth(0.25);
-  doc.roundedRect(bx, by, billW, billH, 0.6, 0.6, "FD");
-  // círculo central da cédula
-  doc.setFillColor(GREEN_DARK);
-  doc.circle(bx + billW / 2, by + billH / 2, 1.1, "F");
-  doc.setTextColor("#FFFFFF");
+function drawGoldDollarIcon(doc: jsPDF, cx: number, cy: number) {
+  doc.setTextColor(GOLD);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(5);
-  doc.text("$", bx + billW / 2, by + billH / 2 + 0.9, { align: "center" });
-
-  // Pilha de moedas (3 moedas empilhadas, à esquerda, na frente)
-  const coinR = 3.2;
-  const stackX = cx - 5.2;
-  const baseY = cy + 4.2;
-  doc.setDrawColor(COIN_DARK);
-  doc.setLineWidth(0.25);
-  for (let i = 0; i < 3; i++) {
-    const yc = baseY - i * 2.2;
-    // elipse (moeda em perspectiva)
-    doc.setFillColor(COIN);
-    doc.ellipse(stackX, yc, coinR, 1.1, "F");
-    doc.setDrawColor(COIN_DARK);
-    doc.ellipse(stackX, yc, coinR, 1.1, "S");
-  }
-  // Topo da pilha com símbolo $
-  const topY = baseY - 2 * 2.2;
-  doc.setTextColor(COIN_DARK);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(4);
-  doc.text("$", stackX, topY + 0.6, { align: "center" });
+  doc.setFontSize(26);
+  doc.text("$", cx, cy, { align: "center" });
 }
 
 /**
