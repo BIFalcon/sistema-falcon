@@ -1,6 +1,13 @@
 import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+type EmailQueueMessage = {
+  msg_id: number
+  read_ct?: number
+  enqueued_at?: string
+  message: Record<string, any>
+}
+
 const MAX_RETRIES = 5
 const DEFAULT_BATCH_SIZE = 10
 const DEFAULT_SEND_DELAY_MS = 200
@@ -54,9 +61,9 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
 
 // Move a message to the dead letter queue and log the reason.
 async function moveToDlq(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof createClient<any>>,
   queue: string,
-  msg: { msg_id: number; message: Record<string, unknown> },
+  msg: EmailQueueMessage,
   reason: string
 ): Promise<void> {
   const payload = msg.message
@@ -67,7 +74,7 @@ async function moveToDlq(
     status: 'dlq',
     error_message: reason,
   })
-  const { error } = await supabase.rpc('move_to_dlq', {
+  const { error } = await supabase.rpc('move_to_dlq' as any, {
     source_queue: queue,
     dlq_name: `${queue}_dlq`,
     message_id: msg.msg_id,
@@ -111,7 +118,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const supabase = createClient<any>(supabaseUrl, supabaseServiceKey)
 
   // 1. Check rate-limit cooldown and read queue config
   const { data: state } = await supabase
@@ -155,13 +162,13 @@ Deno.serve(async (req) => {
     // messages not attempted when a 429 stops processing early.
     const messageIds = Array.from(
       new Set(
-        messages
-          .map((msg) =>
+        (messages as EmailQueueMessage[])
+          .map((msg: EmailQueueMessage) =>
             msg?.message?.message_id && typeof msg.message.message_id === 'string'
               ? msg.message.message_id
               : null
           )
-          .filter((id): id is string => Boolean(id))
+          .filter((id: string | null): id is string => Boolean(id))
       )
     )
     const failedAttemptsByMessageId = new Map<string, number>()
@@ -189,8 +196,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i]
+    const typedMessages = messages as EmailQueueMessage[]
+    for (let i = 0; i < typedMessages.length; i++) {
+      const msg = typedMessages[i]
       const payload = msg.message
       const failedAttempts =
         payload?.message_id && typeof payload.message_id === 'string'
@@ -350,7 +358,7 @@ Deno.serve(async (req) => {
       }
 
       // Small delay between sends to smooth bursts
-      if (i < messages.length - 1) {
+      if (i < typedMessages.length - 1) {
         await new Promise((r) => setTimeout(r, sendDelayMs))
       }
     }
