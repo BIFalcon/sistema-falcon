@@ -551,7 +551,19 @@ function OpenFolioSection({
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider">Folios em aberto por hotel</h3>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Folios em aberto por hotel</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={visibleEntries.length === 0}
+              onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar para Excel
+            </Button>
+          </div>
           {summaries.length === 0 ? (
             <EmptyState text="Nenhum folio em aberto." />
           ) : (
