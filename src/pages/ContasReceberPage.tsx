@@ -35,10 +35,11 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 function brl(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
