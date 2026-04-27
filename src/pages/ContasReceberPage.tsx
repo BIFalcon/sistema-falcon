@@ -35,10 +35,11 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 function brl(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -56,6 +57,55 @@ function formatDay(iso: string) {
 }
 function fullName(e: { first_name: string | null; last_name: string | null }) {
   return [e.first_name, e.last_name].filter(Boolean).join(" ") || "—";
+}
+
+/* ──────────────── Export Open Folio para Excel ──────────────── */
+function exportOpenFolioToExcel(
+  entries: OpenFolioEntry[],
+  notesByConf: Map<string, { note: string; expected_payment_date?: string | null; updated_at?: string; created_at: string }[]>,
+  fileLabel: string,
+) {
+  if (!entries.length) {
+    toast.error("Nenhum folio para exportar");
+    return;
+  }
+  const fmt = (iso: string | null | undefined) =>
+    iso ? format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "";
+  const fmtDateTime = (iso: string | null | undefined) =>
+    iso ? format(new Date(iso), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "";
+
+  const rows = entries.map((e) => {
+    const cn = e.confirmation_number ?? "";
+    const cnNotes = notesByConf.get(cn) ?? [];
+    const last = cnNotes[0];
+    const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
+    const lastUpdate = last?.updated_at ?? last?.created_at ?? null;
+    return {
+      "Property Name": e.property_name_raw ?? "",
+      "Confirmation Number": cn,
+      "First Name": e.first_name ?? "",
+      "Last Name": e.last_name ?? "",
+      "Balance": Number(e.balance ?? 0),
+      "Arrival Date": fmt(e.arrival_date),
+      "Departure Date": fmt(e.departure_date),
+      "Tempo em aberto (dias)": e.days_open ?? 0,
+      "Justificativa GG": last?.note ?? "",
+      "Data prevista de pagamento": fmt(expected),
+      "Data da última atualização": fmtDateTime(lastUpdate),
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 12 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 50 }, { wch: 22 }, { wch: 20 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Open Folio");
+  const stamp = format(new Date(), "yyyyMMdd_HHmm");
+  const safeLabel = fileLabel.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 40);
+  XLSX.writeFile(wb, `open_folio_${safeLabel}_${stamp}.xlsx`);
+  toast.success(`${rows.length} folio(s) exportados`);
 }
 
 export default function ContasReceberPage() {
@@ -501,7 +551,19 @@ function OpenFolioSection({
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider">Folios em aberto por hotel</h3>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Folios em aberto por hotel</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={visibleEntries.length === 0}
+              onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar para Excel
+            </Button>
+          </div>
           {summaries.length === 0 ? (
             <EmptyState text="Nenhum folio em aberto." />
           ) : (
@@ -579,15 +641,27 @@ function HotelOpenFolioDetail({
           )}
           <h3 className="text-sm font-semibold">{hotelName}</h3>
         </div>
-        <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="fresh">Até 30 dias</SelectItem>
-            <SelectItem value="mid">31 a 90 dias</SelectItem>
-            <SelectItem value="old">Acima de 90 dias</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="fresh">Até 30 dias</SelectItem>
+              <SelectItem value="mid">31 a 90 dias</SelectItem>
+              <SelectItem value="old">Acima de 90 dias</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={entries.length === 0}
+            onClick={() => exportOpenFolioToExcel(entries, notesByConf, hotelName)}
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar Excel
+          </Button>
+        </div>
       </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput, isPasswordStrong } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -16,8 +16,12 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) {
-      toast({ title: "Senha curta", description: "Use pelo menos 8 caracteres.", variant: "destructive" });
+    if (!isPasswordStrong(password)) {
+      toast({
+        title: "Senha não atende aos requisitos",
+        description: "Verifique os requisitos abaixo do campo de senha.",
+        variant: "destructive",
+      });
       return;
     }
     if (password !== confirm) {
@@ -48,11 +52,24 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="pw">Nova senha</Label>
-              <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+              <PasswordInput
+                id="pw"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                showChecklist
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pw2">Confirmar senha</Label>
-              <Input id="pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
+              <PasswordInput
+                id="pw2"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={8}
+              />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Salvando…" : "Salvar nova senha"}
