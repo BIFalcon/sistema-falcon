@@ -66,6 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
+        // CRÍTICO: marcar loading=true ANTES de deferir, senão há
+        // janela onde user!=null, roles=[] e loading=false — o que
+        // dispara redirect para /sem-permissao indevidamente.
+        setLoading(true);
         // defer DB calls
         setTimeout(() => {
           loadUserData(newSession.user.id).finally(() => setLoading(false));

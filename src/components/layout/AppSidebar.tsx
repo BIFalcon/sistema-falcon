@@ -105,6 +105,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
       { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail },
+      { title: "DRE retroativa", url: "/configuracoes/dre-retroativo", icon: FileSpreadsheet, requireMaster: true },
     ],
   },
 ];
@@ -123,12 +124,13 @@ export function AppSidebar() {
   const location = useLocation();
   const { profile, roles, isMaster } = useAuth();
 
-  const primaryRole = roles[0];
-  const roleLabel = isMaster
-    ? "Master"
-    : primaryRole
-      ? ROLE_LABELS[primaryRole]
-      : "—";
+  // Mostra TODOS os roles do usuário, com prefixo "Master" quando aplicável.
+  const roleNames = roles.map((r) => ROLE_LABELS[r] ?? r);
+  const roleLabel = roles.length === 0
+    ? "—"
+    : isMaster
+      ? `Master · ${roleNames.join(", ")}`
+      : roleNames.join(", ");
 
   const isActiveUrl = (url: string, end?: boolean) =>
     end ? location.pathname === url : location.pathname === url || location.pathname.startsWith(url + "/");
