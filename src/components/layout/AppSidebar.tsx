@@ -105,6 +105,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
       { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail },
+      { title: "DRE retroativa", url: "/configuracoes/dre-retroativo", icon: FileSpreadsheet, requireMaster: true },
     ],
   },
 ];
