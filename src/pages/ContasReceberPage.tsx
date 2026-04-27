@@ -641,15 +641,27 @@ function HotelOpenFolioDetail({
           )}
           <h3 className="text-sm font-semibold">{hotelName}</h3>
         </div>
-        <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="fresh">Até 30 dias</SelectItem>
-            <SelectItem value="mid">31 a 90 dias</SelectItem>
-            <SelectItem value="old">Acima de 90 dias</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="fresh">Até 30 dias</SelectItem>
+              <SelectItem value="mid">31 a 90 dias</SelectItem>
+              <SelectItem value="old">Acima de 90 dias</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={entries.length === 0}
+            onClick={() => exportOpenFolioToExcel(entries, notesByConf, hotelName)}
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar Excel
+          </Button>
+        </div>
       </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>
