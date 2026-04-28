@@ -475,9 +475,29 @@ export default function ContasPagarPage() {
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Problemas identificados</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                <UrgencyCell label="Sem aprovação GG" count={issueCounts.notApproved} tone="warning" />
-                <UrgencyCell label="Sem documento" count={issueCounts.noDoc} tone="info" />
-                <UrgencyCell label="Atrasados" count={issueCounts.overdue} tone="danger" />
+                {showApproval && (
+                  <UrgencyCell
+                    label="Sem aprovação GG"
+                    count={issueCounts.notApproved}
+                    tone="warning"
+                    active={status === "issues"}
+                    onClick={() => setStatus(status === "issues" ? "all" : "issues")}
+                  />
+                )}
+                <UrgencyCell
+                  label="Sem documento"
+                  count={issueCounts.noDoc}
+                  tone="info"
+                  active={status === "no_doc"}
+                  onClick={() => setStatus(status === "no_doc" ? "all" : "no_doc")}
+                />
+                <UrgencyCell
+                  label="Atrasados"
+                  count={issueCounts.overdue}
+                  tone="danger"
+                  active={period === "overdue"}
+                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
+                />
                 <UrgencyCell label="Divergência valor" count={issueCounts.divergent} tone="amber" />
               </div>
               <Button
@@ -615,19 +635,19 @@ export default function ContasPagarPage() {
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Forma</TableHead>
-                    <TableHead>Aprovação GG</TableHead>
+                    {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Doc</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showApproval ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
                   ) : displayRows.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showApproval ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
                   ) : displayRows.map((row, idx) => {
                     if (row.kind === "group") {
-                      const colSpan = sourceSystem === "omie" ? 9 : 8;
+                      const colSpan = (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1);
                       return (
                         <TableRow key={`g-${idx}`} className="bg-muted/30">
                           <TableCell className="font-medium">
@@ -652,6 +672,7 @@ export default function ContasPagarPage() {
                         sourceSystem={sourceSystem}
                         canApprove={canApprove}
                         canManage={canManage}
+                        showApproval={showApproval}
                         onLink={() => setLinkEntry(e)}
                         onApprove={async (approval) => {
                           if (!user) return;
@@ -706,6 +727,7 @@ export default function ContasPagarPage() {
                     sourceSystem={sourceSystem}
                     canApprove={canApprove}
                     canManage={canManage}
+                    showApproval={showApproval}
                     compact
                     onLink={() => setLinkEntry(e)}
                     onApprove={async (approval) => {
@@ -740,6 +762,15 @@ export default function ContasPagarPage() {
               hotelId, entryId: linkEntry.id, documentId: docId, nfAmount,
             });
             toast.success(docId ? "Documento vinculado" : "Vínculo removido");
+            // Trigger validação IA em background (não bloqueia o fluxo)
+            if (docId) {
+              validateApDocument({ documentId: docId, entryId: linkEntry.id })
+                .then((r) => {
+                  if (r.validation_status === "divergence") toast.warning("Divergência detectada pela IA");
+                  else if (r.validation_status === "ok") toast.success("Documento validado pela IA");
+                })
+                .catch(() => { /* silencioso */ });
+            }
             setLinkEntry(null);
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Erro ao vincular");
@@ -806,6 +837,24 @@ export default function ContasPagarPage() {
 
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-2">Filtros</p>
             <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Vencimento de</label>
+                  <Input
+                    type="date"
+                    value={notifyDueFrom}
+                    onChange={(e) => setNotifyDueFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Vencimento até</label>
+                  <Input
+                    type="date"
+                    value={notifyDueTo}
+                    onChange={(e) => setNotifyDueTo(e.target.value)}
+                  />
+                </div>
+              </div>
               <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <Checkbox
                   checked={notifyHideTrivial}
@@ -885,19 +934,22 @@ function UrgencyCell({
 }
 
 function EntryRow({
-  entry, doc, sourceSystem, canApprove, canManage, onLink, onApprove, compact,
+  entry, doc, sourceSystem, canApprove, canManage, showApproval = true, onLink, onApprove, compact,
 }: {
   entry: ApEntry;
   doc: ApDocument | null;
   sourceSystem: FinancialSystem | null;
   canApprove: boolean;
   canManage: boolean;
+  showApproval?: boolean;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
   compact?: boolean;
 }) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
-  const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
+  const divergent =
+    doc?.validation_status === "divergence" ||
+    (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01);
   const archived = !!entry.archived_at;
   return (
     <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
@@ -905,6 +957,11 @@ function EntryRow({
         <div className="flex items-center gap-2">
           <span>{entry.supplier}</span>
           {archived && <Badge variant="outline" className="text-[10px]">Arquivado</Badge>}
+          {divergent && (
+            <Badge variant="outline" className="text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3" /> Divergência
+            </Badge>
+          )}
         </div>
       </TableCell>
       {!compact && sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>}
@@ -912,14 +969,14 @@ function EntryRow({
       <TableCell className="text-xs">{fmtDate(entry.due_date)}</TableCell>
       <TableCell className="text-right font-mono text-sm">
         <div>{fmtBRL(Number(entry.amount))}</div>
-        {divergent && (
+        {doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01 && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400">
             NF: {fmtBRL(Number(doc!.nf_amount))}
           </div>
         )}
       </TableCell>
       {!compact && <TableCell className="text-xs text-muted-foreground">{entry.payment_method ?? entry.category ?? "—"}</TableCell>}
-      <TableCell>
+      {showApproval && <TableCell>
         {entry.gg_approval === "approved" ? (
           <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="h-3 w-3" /> Aprovado
@@ -933,7 +990,7 @@ function EntryRow({
             <Clock className="h-3 w-3" /> Pendente
           </Badge>
         )}
-      </TableCell>
+      </TableCell>}
       <TableCell>
         {canManage ? (
           <Button
@@ -1022,6 +1079,32 @@ function LinkDocDialog({
               Doc {entry.document_number ?? "—"} · Venc. {fmtDate(entry.due_date)} · {fmtBRL(Number(entry.amount))}
             </p>
           </div>
+
+          {currentDoc?.validation_status && (
+            <div className={`rounded-md border p-3 text-xs space-y-1 ${
+              currentDoc.validation_status === "ok"
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : currentDoc.validation_status === "divergence"
+                ? "border-amber-500/40 bg-amber-500/5"
+                : "border-border bg-muted/30"
+            }`}>
+              <div className="flex items-center gap-2 font-semibold">
+                {currentDoc.validation_status === "ok" ? (
+                  <><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Validado pela IA</>
+                ) : currentDoc.validation_status === "divergence" ? (
+                  <><AlertTriangle className="h-4 w-4 text-amber-600" /> Divergência detectada</>
+                ) : (
+                  <><Clock className="h-4 w-4" /> Validação: {currentDoc.validation_status}</>
+                )}
+              </div>
+              {currentDoc.doc_type && <p>Tipo: <span className="font-mono">{currentDoc.doc_type}</span></p>}
+              {currentDoc.doc_cnpj && <p>CNPJ no documento: <span className="font-mono">{currentDoc.doc_cnpj}</span></p>}
+              {currentDoc.nf_amount != null && <p>Valor NF: <span className="font-mono">{fmtBRL(Number(currentDoc.nf_amount))}</span></p>}
+              {currentDoc.validation_details?.summary && (
+                <p className="text-muted-foreground italic">{String(currentDoc.validation_details.summary)}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
