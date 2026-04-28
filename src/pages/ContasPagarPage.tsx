@@ -523,13 +523,13 @@ export default function ContasPagarPage() {
                   accept=".pdf,.ofx,.xml,.png,.jpg,.jpeg"
                   className="hidden"
                   onChange={handleDocs}
-                  disabled={!canManage || uploadingDocs}
+                  disabled={!canUploadDocs || uploadingDocs}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  disabled={!canManage || uploadingDocs}
+                  disabled={!canUploadDocs || uploadingDocs}
                   onClick={() => docsRef.current?.click()}
                   title="Enviar PDFs/OFX/XML para vincular manualmente"
                 >
@@ -567,8 +567,9 @@ export default function ContasPagarPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="pending">Pendentes</SelectItem>
-                  <SelectItem value="approved">Aprovados</SelectItem>
+                  {showApproval && <SelectItem value="pending">Pendentes</SelectItem>}
+                  {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
+                  <SelectItem value="no_doc">Sem documento</SelectItem>
                   <SelectItem value="issues">Com problema</SelectItem>
                 </SelectContent>
               </Select>
