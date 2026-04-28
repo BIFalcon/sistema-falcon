@@ -1080,6 +1080,32 @@ function LinkDocDialog({
             </p>
           </div>
 
+          {currentDoc?.validation_status && (
+            <div className={`rounded-md border p-3 text-xs space-y-1 ${
+              currentDoc.validation_status === "ok"
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : currentDoc.validation_status === "divergence"
+                ? "border-amber-500/40 bg-amber-500/5"
+                : "border-border bg-muted/30"
+            }`}>
+              <div className="flex items-center gap-2 font-semibold">
+                {currentDoc.validation_status === "ok" ? (
+                  <><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Validado pela IA</>
+                ) : currentDoc.validation_status === "divergence" ? (
+                  <><AlertTriangle className="h-4 w-4 text-amber-600" /> Divergência detectada</>
+                ) : (
+                  <><Clock className="h-4 w-4" /> Validação: {currentDoc.validation_status}</>
+                )}
+              </div>
+              {currentDoc.doc_type && <p>Tipo: <span className="font-mono">{currentDoc.doc_type}</span></p>}
+              {currentDoc.doc_cnpj && <p>CNPJ no documento: <span className="font-mono">{currentDoc.doc_cnpj}</span></p>}
+              {currentDoc.nf_amount != null && <p>Valor NF: <span className="font-mono">{fmtBRL(Number(currentDoc.nf_amount))}</span></p>}
+              {currentDoc.validation_details?.summary && (
+                <p className="text-muted-foreground italic">{currentDoc.validation_details.summary}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
               Documento ({choices.length} disponível{choices.length === 1 ? "" : "is"})
