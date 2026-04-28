@@ -766,8 +766,8 @@ export default function ContasPagarPage() {
             if (docId) {
               validateApDocument({ documentId: docId, entryId: linkEntry.id })
                 .then((r) => {
-                  if (r.status === "divergence") toast.warning("Divergência detectada pela IA: " + (r.summary ?? ""));
-                  else if (r.status === "ok") toast.success("Documento validado pela IA");
+                  if (r.validation_status === "divergence") toast.warning("Divergência detectada pela IA");
+                  else if (r.validation_status === "ok") toast.success("Documento validado pela IA");
                 })
                 .catch(() => { /* silencioso */ });
             }
