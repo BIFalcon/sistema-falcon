@@ -635,19 +635,19 @@ export default function ContasPagarPage() {
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Forma</TableHead>
-                    <TableHead>Aprovação GG</TableHead>
+                    {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Doc</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showApproval ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">Carregando…</TableCell></TableRow>
                   ) : displayRows.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showApproval ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">Nenhum lançamento encontrado.</TableCell></TableRow>
                   ) : displayRows.map((row, idx) => {
                     if (row.kind === "group") {
-                      const colSpan = sourceSystem === "omie" ? 9 : 8;
+                      const colSpan = (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1);
                       return (
                         <TableRow key={`g-${idx}`} className="bg-muted/30">
                           <TableCell className="font-medium">
@@ -672,6 +672,7 @@ export default function ContasPagarPage() {
                         sourceSystem={sourceSystem}
                         canApprove={canApprove}
                         canManage={canManage}
+                        showApproval={showApproval}
                         onLink={() => setLinkEntry(e)}
                         onApprove={async (approval) => {
                           if (!user) return;
@@ -726,6 +727,7 @@ export default function ContasPagarPage() {
                     sourceSystem={sourceSystem}
                     canApprove={canApprove}
                     canManage={canManage}
+                    showApproval={showApproval}
                     compact
                     onLink={() => setLinkEntry(e)}
                     onApprove={async (approval) => {
