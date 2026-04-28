@@ -313,11 +313,13 @@ Deno.serve(async (req) => {
     // 1. lê entries existentes (todos os campos que serão preservados)
     const { data: existing } = await admin
       .from("ap_entries")
-      .select("id, entry_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
+      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
       .eq("hotel_id", hotelId);
     const existingByKey = new Map<string, any>();
+    const existingByLookup = new Map<string, any>();
     for (const e of existing ?? []) {
       existingByKey.set(e.entry_key, e);
+      if (e.lookup_key) existingByLookup.set(e.lookup_key, e);
     }
 
     // 2. insere novo upload
@@ -343,7 +345,11 @@ Deno.serve(async (req) => {
     const inserts: any[] = [];
     for (const p of parsed) {
       seenKeys.add(p.entry_key);
-      const prev = existingByKey.get(p.entry_key);
+      const lookup = makeLookupKey(p.supplier, p.document_number);
+      // Match em cascata: 1) entry_key exato, 2) lookup_key (supplier+doc).
+      // O segundo permite preservar vínculo de documento mesmo quando o
+      // financeiro re-importa a planilha com mudanças em valor/vencimento.
+      const prev = existingByKey.get(p.entry_key) ?? (p.document_number ? existingByLookup.get(lookup) : null);
       // OMIE: situação 'Agendado' implica aprovado quando ainda não havia aprovação
       let approvalDefault: "pending" | "approved" | "rejected" = "pending";
       if (sourceSystem === "omie" && p.omie_situation && toAscii(p.omie_situation).startsWith("agendado")) {
@@ -354,6 +360,7 @@ Deno.serve(async (req) => {
         upload_id: uploadRow.id,
         source_system: sourceSystem,
         entry_key: p.entry_key,
+        lookup_key: lookup,
         supplier: p.supplier,
         cnpj: p.cnpj,
         document_number: p.document_number,
