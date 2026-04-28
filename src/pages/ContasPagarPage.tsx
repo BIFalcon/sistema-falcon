@@ -475,9 +475,29 @@ export default function ContasPagarPage() {
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Problemas identificados</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                <UrgencyCell label="Sem aprovação GG" count={issueCounts.notApproved} tone="warning" />
-                <UrgencyCell label="Sem documento" count={issueCounts.noDoc} tone="info" />
-                <UrgencyCell label="Atrasados" count={issueCounts.overdue} tone="danger" />
+                {showApproval && (
+                  <UrgencyCell
+                    label="Sem aprovação GG"
+                    count={issueCounts.notApproved}
+                    tone="warning"
+                    active={status === "issues"}
+                    onClick={() => setStatus(status === "issues" ? "all" : "issues")}
+                  />
+                )}
+                <UrgencyCell
+                  label="Sem documento"
+                  count={issueCounts.noDoc}
+                  tone="info"
+                  active={status === "no_doc"}
+                  onClick={() => setStatus(status === "no_doc" ? "all" : "no_doc")}
+                />
+                <UrgencyCell
+                  label="Atrasados"
+                  count={issueCounts.overdue}
+                  tone="danger"
+                  active={period === "overdue"}
+                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
+                />
                 <UrgencyCell label="Divergência valor" count={issueCounts.divergent} tone="amber" />
               </div>
               <Button
