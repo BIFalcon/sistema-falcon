@@ -75,7 +75,13 @@ export async function fetchLetterHistory(
   return { current, previous };
 }
 
-/** Lê linhas DRE (todas) da última versão para a tabela do PDF. */
+/** Lê linhas DRE (todas) da última versão para a tabela do PDF.
+ *  Inclui também o indicador `[distribuicao_por_uh]` como fallback, pois em
+ *  uploads antigos a linha "Por UH" pode não ter sido persistida com
+ *  `line_type='line'` (ficava no fim da DRE, fora do limite antigo de 200
+ *  linhas). O parser sempre persiste o indicador, então usamos ele como
+ *  rede de segurança para a tabela DRE da Carta.
+ */
 export async function fetchDreLines(closingId: string): Promise<{ label: string; value: number | null }[]> {
   const { data } = await supabase
     .from("dre_parsed_lines")
@@ -84,7 +90,21 @@ export async function fetchDreLines(closingId: string): Promise<{ label: string;
     .order("version_number", { ascending: false });
   if (!data || data.length === 0) return [];
   const top = data[0].version_number;
-  return data
-    .filter((r) => r.version_number === top && r.line_type === "line")
+  const topRows = data.filter((r) => r.version_number === top);
+  const out: { label: string; value: number | null }[] = topRows
+    .filter((r) => r.line_type === "line")
     .map((r) => ({ label: r.line_label, value: r.line_value }));
+  // Fallback: garante que "Por UH" apareça mesmo quando só foi salvo como
+  // indicador (`[distribuicao_por_uh] Por UH`).
+  const hasPorUh = out.some((l) => /^por\s+uh$/i.test(l.label));
+  if (!hasPorUh) {
+    const distInd = topRows.find(
+      (r) => r.line_type === "indicator" && /^\[distribuicao_por_uh\]/i.test(r.line_label),
+    );
+    if (distInd) {
+      const cleanLabel = distInd.line_label.replace(/^\[\w+\]\s*/, "").trim() || "Por UH";
+      out.push({ label: cleanLabel, value: distInd.line_value });
+    }
+  }
+  return out;
 }
