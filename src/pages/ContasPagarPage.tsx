@@ -907,19 +907,22 @@ function UrgencyCell({
 }
 
 function EntryRow({
-  entry, doc, sourceSystem, canApprove, canManage, onLink, onApprove, compact,
+  entry, doc, sourceSystem, canApprove, canManage, showApproval = true, onLink, onApprove, compact,
 }: {
   entry: ApEntry;
   doc: ApDocument | null;
   sourceSystem: FinancialSystem | null;
   canApprove: boolean;
   canManage: boolean;
+  showApproval?: boolean;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
   compact?: boolean;
 }) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
-  const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
+  const divergent =
+    doc?.validation_status === "divergence" ||
+    (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01);
   const archived = !!entry.archived_at;
   return (
     <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
@@ -927,6 +930,11 @@ function EntryRow({
         <div className="flex items-center gap-2">
           <span>{entry.supplier}</span>
           {archived && <Badge variant="outline" className="text-[10px]">Arquivado</Badge>}
+          {divergent && (
+            <Badge variant="outline" className="text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3" /> Divergência
+            </Badge>
+          )}
         </div>
       </TableCell>
       {!compact && sourceSystem === "omie" && <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>}
@@ -934,14 +942,14 @@ function EntryRow({
       <TableCell className="text-xs">{fmtDate(entry.due_date)}</TableCell>
       <TableCell className="text-right font-mono text-sm">
         <div>{fmtBRL(Number(entry.amount))}</div>
-        {divergent && (
+        {doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01 && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400">
             NF: {fmtBRL(Number(doc!.nf_amount))}
           </div>
         )}
       </TableCell>
       {!compact && <TableCell className="text-xs text-muted-foreground">{entry.payment_method ?? entry.category ?? "—"}</TableCell>}
-      <TableCell>
+      {showApproval && <TableCell>
         {entry.gg_approval === "approved" ? (
           <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="h-3 w-3" /> Aprovado
@@ -955,7 +963,7 @@ function EntryRow({
             <Clock className="h-3 w-3" /> Pendente
           </Badge>
         )}
-      </TableCell>
+      </TableCell>}
       <TableCell>
         {canManage ? (
           <Button
