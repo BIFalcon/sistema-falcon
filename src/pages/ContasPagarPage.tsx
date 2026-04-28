@@ -828,6 +828,24 @@ export default function ContasPagarPage() {
 
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-2">Filtros</p>
             <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Vencimento de</label>
+                  <Input
+                    type="date"
+                    value={notifyDueFrom}
+                    onChange={(e) => setNotifyDueFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Vencimento até</label>
+                  <Input
+                    type="date"
+                    value={notifyDueTo}
+                    onChange={(e) => setNotifyDueTo(e.target.value)}
+                  />
+                </div>
+              </div>
               <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <Checkbox
                   checked={notifyHideTrivial}
