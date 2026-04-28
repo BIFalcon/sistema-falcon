@@ -54,6 +54,8 @@ export type Database = {
       }
       ap_documents: {
         Row: {
+          doc_cnpj: string | null
+          doc_type: string | null
           entry_id: string | null
           file_name: string
           file_path: string
@@ -65,8 +67,13 @@ export type Database = {
           upload_id: string | null
           uploaded_at: string
           uploaded_by: string
+          validated_at: string | null
+          validation_details: Json | null
+          validation_status: string | null
         }
         Insert: {
+          doc_cnpj?: string | null
+          doc_type?: string | null
           entry_id?: string | null
           file_name: string
           file_path: string
@@ -78,8 +85,13 @@ export type Database = {
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by: string
+          validated_at?: string | null
+          validation_details?: Json | null
+          validation_status?: string | null
         }
         Update: {
+          doc_cnpj?: string | null
+          doc_type?: string | null
           entry_id?: string | null
           file_name?: string
           file_path?: string
@@ -91,6 +103,9 @@ export type Database = {
           upload_id?: string | null
           uploaded_at?: string
           uploaded_by?: string
+          validated_at?: string | null
+          validation_details?: Json | null
+          validation_status?: string | null
         }
         Relationships: [
           {
@@ -135,6 +150,7 @@ export type Database = {
           id: string
           interest_fees: number | null
           is_distribution: boolean
+          lookup_key: string | null
           observation: string | null
           omie_situation: string | null
           payment_method: string | null
@@ -163,6 +179,7 @@ export type Database = {
           id?: string
           interest_fees?: number | null
           is_distribution?: boolean
+          lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
           payment_method?: string | null
@@ -191,6 +208,7 @@ export type Database = {
           id?: string
           interest_fees?: number | null
           is_distribution?: boolean
+          lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
           payment_method?: string | null
