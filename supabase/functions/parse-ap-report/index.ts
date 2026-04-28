@@ -341,6 +341,7 @@ Deno.serve(async (req) => {
 
     // 3. separa em (a) atualizar existentes — preservando vínculos — e (b) inserir novos
     const seenKeys = new Set<string>();
+    const updatedIds = new Set<string>();
     const updates: any[] = [];
     const inserts: any[] = [];
     for (const p of parsed) {
@@ -349,7 +350,12 @@ Deno.serve(async (req) => {
       // Match em cascata: 1) entry_key exato, 2) lookup_key (supplier+doc).
       // O segundo permite preservar vínculo de documento mesmo quando o
       // financeiro re-importa a planilha com mudanças em valor/vencimento.
-      const prev = existingByKey.get(p.entry_key) ?? (p.document_number ? existingByLookup.get(lookup) : null);
+      let prev = existingByKey.get(p.entry_key);
+      if (!prev && p.document_number) {
+        const candidate = existingByLookup.get(lookup);
+        // Evita reusar o mesmo registro pra duas linhas novas
+        if (candidate && !updatedIds.has(candidate.id)) prev = candidate;
+      }
       // OMIE: situação 'Agendado' implica aprovado quando ainda não havia aprovação
       let approvalDefault: "pending" | "approved" | "rejected" = "pending";
       if (sourceSystem === "omie" && p.omie_situation && toAscii(p.omie_situation).startsWith("agendado")) {
@@ -376,6 +382,7 @@ Deno.serve(async (req) => {
         archived_at: null,
       };
       if (prev) {
+        updatedIds.add(prev.id);
         // Preserva: gg_approval*, primary_document_id, observation
         updates.push({
           id: prev.id,
@@ -416,6 +423,8 @@ Deno.serve(async (req) => {
     // 6. arquiva os que sumiram do novo relatório
     const toArchive: string[] = [];
     for (const e of existing ?? []) {
+      // Não arquiva se já foi atualizada via lookup_key (mesmo sem entry_key match)
+      if (updatedIds.has(e.id)) continue;
       if (!seenKeys.has(e.entry_key) && !e.archived_at) toArchive.push(e.id);
     }
     if (toArchive.length) {
