@@ -294,6 +294,8 @@ export default function ContasPagarPage() {
     setNotifyCats({ notApproved: true, noDoc: true, overdue: true, divergent: true });
     setNotifyHideTrivial(true);
     setNotifyHideNd(false);
+    setNotifyDueFrom("");
+    setNotifyDueTo("");
     setNotifyOpen(true);
   }
 
