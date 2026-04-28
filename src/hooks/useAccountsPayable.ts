@@ -65,6 +65,11 @@ export interface ApDocument {
   nf_amount: number | null;
   uploaded_by: string;
   uploaded_at: string;
+  doc_cnpj?: string | null;
+  doc_type?: string | null;
+  validation_status?: "ok" | "divergence" | "unreadable" | "pending" | null;
+  validation_details?: Record<string, unknown> | null;
+  validated_at?: string | null;
 }
 
 export function useApDocuments(hotelId: string | null) {
@@ -183,9 +188,28 @@ export async function getDocumentSignedUrl(filePath: string): Promise<string | n
 export async function notifyGgPendencies(input: {
   hotelId: string;
   entryIds: string[];
+  dueFrom?: string | null;
+  dueTo?: string | null;
 }): Promise<{ ok: boolean; sent?: number; recipients?: number; error?: string }> {
   const { data, error } = await supabase.functions.invoke("notify-gg-ap", {
-    body: { hotel_id: input.hotelId, entry_ids: input.entryIds },
+    body: {
+      hotel_id: input.hotelId,
+      entry_ids: input.entryIds,
+      due_from: input.dueFrom ?? null,
+      due_to: input.dueTo ?? null,
+    },
+  });
+  if (error) throw error;
+  return data as any;
+}
+
+/** Dispara validação automática (IA) de um documento contra o lançamento. */
+export async function validateApDocument(input: {
+  documentId: string;
+  entryId: string;
+}): Promise<{ ok: boolean; validation_status?: string; checks?: any }> {
+  const { data, error } = await supabase.functions.invoke("validate-ap-document", {
+    body: { document_id: input.documentId, entry_id: input.entryId },
   });
   if (error) throw error;
   return data as any;

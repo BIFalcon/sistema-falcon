@@ -16,7 +16,7 @@ import {
   useApEntries, useLatestApUpload, useTodayBankBalance, useUpsertBankBalance,
   useSetEntryApproval, uploadApReport, type ApEntry, type FinancialSystem,
   useApDocuments, uploadApDocuments, useLinkDocumentToEntry, useDeleteDocument,
-  getDocumentSignedUrl, notifyGgPendencies, type ApDocument,
+  getDocumentSignedUrl, notifyGgPendencies, validateApDocument, type ApDocument,
 } from "@/hooks/useAccountsPayable";
 import {
   Upload, Loader2, AlertTriangle, CheckCircle2, XCircle, Clock,
@@ -37,7 +37,7 @@ const fmtDateTime = (s: string) =>
   new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
 type Period = "today" | "tomorrow" | "this_week" | "next_week" | "next_month" | "overdue" | "all";
-type StatusFilter = "all" | "pending" | "approved" | "issues";
+type StatusFilter = "all" | "pending" | "approved" | "issues" | "no_doc";
 
 function isWithinPeriod(due: string | null, period: Period): boolean {
   if (period === "all") return true;
@@ -71,13 +71,19 @@ function isWithinPeriod(due: string | null, period: Period): boolean {
 export default function ContasPagarPage() {
   const { user, hasRole, isMaster } = useAuth();
   const canManage = isMaster || hasRole("financeiro");
-  const canApprove = canManage || hasRole("gg");
+  const isGg = hasRole("gg");
+  const canApproveBase = canManage || isGg;
+  const canUploadDocs = canManage || isGg; // GG agora pode enviar/vincular documentos
 
   const { data: hotels = [] } = useAllHotels();
   // Filtro global do header (Hotel) é a única fonte de verdade.
   const { hotelId } = useFilters();
   const hotel = useMemo(() => hotels.find((h) => h.id === hotelId) ?? null, [hotels, hotelId]);
   const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
+  const isOmie = sourceSystem === "omie";
+  // Hotéis OMIE não têm aprovação GG no Falcon — correção é feita direto no OMIE
+  const showApproval = !isOmie;
+  const canApprove = canApproveBase && showApproval;
 
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
@@ -117,6 +123,8 @@ export default function ContasPagarPage() {
   });
   const [notifyHideTrivial, setNotifyHideTrivial] = useState(true);
   const [notifyHideNd, setNotifyHideNd] = useState(false);
+  const [notifyDueFrom, setNotifyDueFrom] = useState<string>("");
+  const [notifyDueTo, setNotifyDueTo] = useState<string>("");
 
   const docsByEntry = useMemo(() => {
     const map = new Map<string, ApDocument>();
@@ -137,9 +145,10 @@ export default function ContasPagarPage() {
       if (!isWithinPeriod(e.due_date, period)) return false;
       if (status === "pending" && e.gg_approval !== "pending") return false;
       if (status === "approved" && e.gg_approval !== "approved") return false;
+      if (status === "no_doc" && !!e.primary_document_id) return false;
       if (status === "issues") {
         const overdue = e.omie_situation?.toLowerCase().includes("atras");
-        const noApproval = e.gg_approval !== "approved";
+        const noApproval = showApproval && e.gg_approval !== "approved";
         const noDoc = !e.primary_document_id;
         if (!overdue && !noApproval && !noDoc) return false;
       }
@@ -147,7 +156,7 @@ export default function ContasPagarPage() {
       if (hideTrivial && Number(e.amount || 0) < 1) return false;
       return true;
     });
-  }, [entries, period, status, category, hideTrivial]);
+  }, [entries, period, status, category, hideTrivial, showApproval]);
 
   // Agrupa lançamentos N/D (sem nº doc) do mesmo fornecedor + mesma data em uma única linha
   type DisplayRow =
@@ -223,25 +232,30 @@ export default function ContasPagarPage() {
   const issueCounts = useMemo(() => {
     let notApproved = 0, noDoc = 0, overdue = 0, divergent = 0;
     entries.forEach((e) => {
-      if (e.gg_approval !== "approved") notApproved++;
+      if (showApproval && e.gg_approval !== "approved") notApproved++;
       if (!e.primary_document_id) noDoc++;
       if (e.omie_situation?.toLowerCase().includes("atras")) overdue++;
       const doc = docsByEntry.get(e.id);
-      if (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01) divergent++;
+      const isDivergent =
+        doc?.validation_status === "divergence" ||
+        (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01);
+      if (isDivergent) divergent++;
     });
     return { notApproved, noDoc, overdue, divergent };
-  }, [entries, docsByEntry]);
+  }, [entries, docsByEntry, showApproval]);
 
   const issueEntries = useMemo(
     () => entries.filter((e) => {
       const overdue = e.omie_situation?.toLowerCase().includes("atras");
-      const noApproval = e.gg_approval !== "approved";
+      const noApproval = showApproval && e.gg_approval !== "approved";
       const noDoc = !e.primary_document_id;
       const doc = docsByEntry.get(e.id);
-      const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01;
+      const divergent =
+        doc?.validation_status === "divergence" ||
+        (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01);
       return overdue || noApproval || noDoc || divergent;
     }),
-    [entries, docsByEntry],
+    [entries, docsByEntry, showApproval],
   );
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -280,16 +294,20 @@ export default function ContasPagarPage() {
     setNotifyCats({ notApproved: true, noDoc: true, overdue: true, divergent: true });
     setNotifyHideTrivial(true);
     setNotifyHideNd(false);
+    setNotifyDueFrom("");
+    setNotifyDueTo("");
     setNotifyOpen(true);
   }
 
   // Categoria por entry (independentes — uma entry pode ter várias)
   function entryFlags(e: ApEntry) {
     const overdue = !!e.omie_situation?.toLowerCase().includes("atras");
-    const noApproval = e.gg_approval !== "approved";
+    const noApproval = showApproval && e.gg_approval !== "approved";
     const noDoc = !e.primary_document_id;
     const doc = docsByEntry.get(e.id);
-    const divergent = doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01;
+    const divergent =
+      doc?.validation_status === "divergence" ||
+      (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01);
     return { overdue, noApproval, noDoc, divergent };
   }
 
@@ -315,7 +333,12 @@ export default function ContasPagarPage() {
     if (!hotelId || notifyEntries.length === 0) return;
     setNotifying(true);
     try {
-      const r = await notifyGgPendencies({ hotelId, entryIds: notifyEntries.map((e) => e.id) });
+      const r = await notifyGgPendencies({
+        hotelId,
+        entryIds: notifyEntries.map((e) => e.id),
+        dueFrom: notifyDueFrom || null,
+        dueTo: notifyDueTo || null,
+      });
       if (r.recipients === 0) {
         toast.warning("Nenhum GG cadastrado para este hotel.");
       } else {
@@ -500,13 +523,13 @@ export default function ContasPagarPage() {
                   accept=".pdf,.ofx,.xml,.png,.jpg,.jpeg"
                   className="hidden"
                   onChange={handleDocs}
-                  disabled={!canManage || uploadingDocs}
+                  disabled={!canUploadDocs || uploadingDocs}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  disabled={!canManage || uploadingDocs}
+                  disabled={!canUploadDocs || uploadingDocs}
                   onClick={() => docsRef.current?.click()}
                   title="Enviar PDFs/OFX/XML para vincular manualmente"
                 >
@@ -544,8 +567,9 @@ export default function ContasPagarPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="pending">Pendentes</SelectItem>
-                  <SelectItem value="approved">Aprovados</SelectItem>
+                  {showApproval && <SelectItem value="pending">Pendentes</SelectItem>}
+                  {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
+                  <SelectItem value="no_doc">Sem documento</SelectItem>
                   <SelectItem value="issues">Com problema</SelectItem>
                 </SelectContent>
               </Select>

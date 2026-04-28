@@ -87,6 +87,15 @@ function makeKey(supplier: string, doc: string | null, due: string | null, amoun
   return base.replace(/\s+/g, " ").slice(0, 240);
 }
 
+// Stable identity used to preserve user-attached documents across re-uploads,
+// even when due_date or amount change. Uses ONLY supplier (normalized) +
+// document number — matches the SQL backfill of `lookup_key`.
+function makeLookupKey(supplier: string, doc: string | null): string {
+  const sup = toAscii(supplier).replace(/\s+/g, " ").trim();
+  const docNorm = (doc ?? "").toString().trim();
+  return `${sup}|${docNorm}`.slice(0, 240);
+}
+
 function isDistributionEntry(category: string | null, description: string | null): boolean {
   const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
   return blob.includes("distribuicao de lucros");
@@ -304,11 +313,13 @@ Deno.serve(async (req) => {
     // 1. lê entries existentes (todos os campos que serão preservados)
     const { data: existing } = await admin
       .from("ap_entries")
-      .select("id, entry_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
+      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
       .eq("hotel_id", hotelId);
     const existingByKey = new Map<string, any>();
+    const existingByLookup = new Map<string, any>();
     for (const e of existing ?? []) {
       existingByKey.set(e.entry_key, e);
+      if (e.lookup_key) existingByLookup.set(e.lookup_key, e);
     }
 
     // 2. insere novo upload
@@ -330,11 +341,21 @@ Deno.serve(async (req) => {
 
     // 3. separa em (a) atualizar existentes — preservando vínculos — e (b) inserir novos
     const seenKeys = new Set<string>();
+    const updatedIds = new Set<string>();
     const updates: any[] = [];
     const inserts: any[] = [];
     for (const p of parsed) {
       seenKeys.add(p.entry_key);
-      const prev = existingByKey.get(p.entry_key);
+      const lookup = makeLookupKey(p.supplier, p.document_number);
+      // Match em cascata: 1) entry_key exato, 2) lookup_key (supplier+doc).
+      // O segundo permite preservar vínculo de documento mesmo quando o
+      // financeiro re-importa a planilha com mudanças em valor/vencimento.
+      let prev = existingByKey.get(p.entry_key);
+      if (!prev && p.document_number) {
+        const candidate = existingByLookup.get(lookup);
+        // Evita reusar o mesmo registro pra duas linhas novas
+        if (candidate && !updatedIds.has(candidate.id)) prev = candidate;
+      }
       // OMIE: situação 'Agendado' implica aprovado quando ainda não havia aprovação
       let approvalDefault: "pending" | "approved" | "rejected" = "pending";
       if (sourceSystem === "omie" && p.omie_situation && toAscii(p.omie_situation).startsWith("agendado")) {
@@ -345,6 +366,7 @@ Deno.serve(async (req) => {
         upload_id: uploadRow.id,
         source_system: sourceSystem,
         entry_key: p.entry_key,
+        lookup_key: lookup,
         supplier: p.supplier,
         cnpj: p.cnpj,
         document_number: p.document_number,
@@ -360,6 +382,7 @@ Deno.serve(async (req) => {
         archived_at: null,
       };
       if (prev) {
+        updatedIds.add(prev.id);
         // Preserva: gg_approval*, primary_document_id, observation
         updates.push({
           id: prev.id,
@@ -400,6 +423,8 @@ Deno.serve(async (req) => {
     // 6. arquiva os que sumiram do novo relatório
     const toArchive: string[] = [];
     for (const e of existing ?? []) {
+      // Não arquiva se já foi atualizada via lookup_key (mesmo sem entry_key match)
+      if (updatedIds.has(e.id)) continue;
       if (!seenKeys.has(e.entry_key) && !e.archived_at) toArchive.push(e.id);
     }
     if (toArchive.length) {

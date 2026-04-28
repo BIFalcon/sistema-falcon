@@ -39,6 +39,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const hotelId = String(body.hotel_id ?? "");
     const entryIds: string[] = Array.isArray(body.entry_ids) ? body.entry_ids : [];
+    const dueFrom: string | null = body.due_from ? String(body.due_from) : null; // YYYY-MM-DD
+    const dueTo: string | null = body.due_to ? String(body.due_to) : null;       // YYYY-MM-DD
     if (!hotelId || entryIds.length === 0) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -56,11 +58,20 @@ Deno.serve(async (req) => {
     }
 
     // Buscar dados
-    const [{ data: hotel }, { data: entries }, { data: ggs }] = await Promise.all([
-      admin.from("hotels").select("id,name").eq("id", hotelId).single(),
+    const [{ data: hotel }, { data: entriesRaw }, { data: ggs }] = await Promise.all([
+      admin.from("hotels").select("id,name,financial_system").eq("id", hotelId).single(),
       admin.from("ap_entries").select("*").eq("hotel_id", hotelId).in("id", entryIds),
       admin.rpc("users_with_role_for_hotel", { _role: "gg", _hotel_id: hotelId }),
     ]);
+
+    // Filtra por intervalo de vencimento (se informado).
+    const entries = (entriesRaw ?? []).filter((e: any) => {
+      if (!dueFrom && !dueTo) return true;
+      if (!e.due_date) return false;
+      if (dueFrom && e.due_date < dueFrom) return false;
+      if (dueTo && e.due_date > dueTo) return false;
+      return true;
+    });
 
     if (!entries || entries.length === 0) {
       return new Response(JSON.stringify({ error: "no_entries" }), {
@@ -76,12 +87,14 @@ Deno.serve(async (req) => {
     }
 
     // Montar corpo do e-mail
+    const isOmie = (hotel as any)?.financial_system === "omie";
     const total = entries.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
     const lines = entries
       .sort((a: any, b: any) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))
       .map((e: any) => {
         const issues: string[] = [];
-        if (e.gg_approval !== "approved") issues.push("sem aprovação");
+        // Hotéis OMIE não usam aprovação no Falcon — a correção é feita no OMIE
+        if (!isOmie && e.gg_approval !== "approved") issues.push("sem aprovação");
         if (!e.primary_document_id) issues.push("sem documento");
         if (e.omie_situation?.toLowerCase().includes("atras")) issues.push("atrasado");
         return `- **${e.supplier}** — Doc ${e.document_number ?? "—"} — Venc. ${fmtDate(e.due_date)} — ${fmtBRL(Number(e.amount))}` +
@@ -89,11 +102,14 @@ Deno.serve(async (req) => {
       });
 
     const subject = `[${hotel?.name ?? "Hotel"}] Contas a Pagar — ${entries.length} pendência(s) aguardando você`;
+    const cta = isOmie
+      ? `Acesse o **OMIE** para corrigir as inconsistências apontadas. Para hotéis OMIE não há aprovação pelo Falcon.`
+      : `Acesse o Falcon para aprovar ou recusar.`;
     const bodyMd =
       `Olá,\n\nVocê tem **${entries.length} lançamento(s)** com pendências em **${hotel?.name ?? "seu hotel"}** ` +
       `totalizando **${fmtBRL(total)}**:\n\n` +
       lines.join("\n") +
-      `\n\nAcesse o Falcon para aprovar ou recusar.\n\n[Abrir Contas a Pagar](/financeiro/contas-pagar)`;
+      `\n\n${cta}\n\n[Abrir Contas a Pagar](/financeiro/contas-pagar)`;
 
     const linkUrl = `/financeiro/contas-pagar`;
 
