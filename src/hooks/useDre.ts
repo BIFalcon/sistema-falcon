@@ -91,7 +91,21 @@ export function useUploadDre() {
             line_type: "indicator",
             line_value: i.value,
           }));
-        const otherRows = parsed.lines.slice(0, 200).map((l) => ({
+        // Limite alto para garantir que linhas no fim da DRE (ex.: "Por UH",
+        // que aparece após "Lucro / Prejuízo a Distribuir no Período") sejam
+        // persistidas e exibidas na tabela DRE da Carta ao Investidor.
+        const KEY_LINE_RX = [
+          /^por\s+uh$/i,
+          /distribui[çc][ãa]o\s+por\s+uh/i,
+          /distribui[çc][ãa]o\s+\/\s*uh/i,
+          /resultado\s+por\s+uh/i,
+        ];
+        const baseRows = parsed.lines.slice(0, 1000);
+        const baseSet = new Set(baseRows.map((l) => l.row));
+        const extraKeyRows = parsed.lines.filter(
+          (l) => !baseSet.has(l.row) && KEY_LINE_RX.some((rx) => rx.test(l.label)),
+        );
+        const otherRows = [...baseRows, ...extraKeyRows].map((l) => ({
           closing_id: closingId,
           version_number: nextVersion,
           line_label: l.label,
