@@ -762,6 +762,15 @@ export default function ContasPagarPage() {
               hotelId, entryId: linkEntry.id, documentId: docId, nfAmount,
             });
             toast.success(docId ? "Documento vinculado" : "Vínculo removido");
+            // Trigger validação IA em background (não bloqueia o fluxo)
+            if (docId) {
+              validateApDocument({ documentId: docId, entryId: linkEntry.id })
+                .then((r) => {
+                  if (r.status === "divergence") toast.warning("Divergência detectada pela IA: " + (r.summary ?? ""));
+                  else if (r.status === "ok") toast.success("Documento validado pela IA");
+                })
+                .catch(() => { /* silencioso */ });
+            }
             setLinkEntry(null);
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Erro ao vincular");
