@@ -87,6 +87,15 @@ function makeKey(supplier: string, doc: string | null, due: string | null, amoun
   return base.replace(/\s+/g, " ").slice(0, 240);
 }
 
+// Stable identity used to preserve user-attached documents across re-uploads,
+// even when due_date or amount change. Uses ONLY supplier (normalized) +
+// document number — matches the SQL backfill of `lookup_key`.
+function makeLookupKey(supplier: string, doc: string | null): string {
+  const sup = toAscii(supplier).replace(/\s+/g, " ").trim();
+  const docNorm = (doc ?? "").toString().trim();
+  return `${sup}|${docNorm}`.slice(0, 240);
+}
+
 function isDistributionEntry(category: string | null, description: string | null): boolean {
   const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
   return blob.includes("distribuicao de lucros");
