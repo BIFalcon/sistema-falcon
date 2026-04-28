@@ -1101,7 +1101,7 @@ function LinkDocDialog({
               {currentDoc.doc_cnpj && <p>CNPJ no documento: <span className="font-mono">{currentDoc.doc_cnpj}</span></p>}
               {currentDoc.nf_amount != null && <p>Valor NF: <span className="font-mono">{fmtBRL(Number(currentDoc.nf_amount))}</span></p>}
               {currentDoc.validation_details?.summary && (
-                <p className="text-muted-foreground italic">{currentDoc.validation_details.summary}</p>
+                <p className="text-muted-foreground italic">{String(currentDoc.validation_details.summary)}</p>
               )}
             </div>
           )}
