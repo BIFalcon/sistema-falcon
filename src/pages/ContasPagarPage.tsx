@@ -265,11 +265,15 @@ export default function ContasPagarPage() {
   function toggleSelectAllVisible(checked: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      const visibleIds = displayRows.flatMap((r) => (r.kind === "entry" ? [r.entry.id] : []));
+      const visibleIds = displayRows.flatMap((r) => (r.kind === "single" ? [r.entry.id] : []));
       if (checked) visibleIds.forEach((id) => next.add(id));
       else visibleIds.forEach((id) => next.delete(id));
       return next;
     });
+  }
+
+  function labelForStatus(s: ApPaymentStatus) {
+    return s === "pago" ? "Pago" : s === "inserido" ? "Inserido" : s === "agendado" ? "Agendado" : "Pendente";
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
