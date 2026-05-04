@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PasswordInput, isPasswordStrong } from "@/components/ui/password-input";
@@ -12,10 +12,82 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        // 1) Hash tokens (#access_token=...&refresh_token=...&type=recovery)
+        const hash = window.location.hash.startsWith("#")
+          ? window.location.hash.substring(1)
+          : window.location.hash;
+        const hashParams = new URLSearchParams(hash);
+        const access_token = hashParams.get("access_token");
+        const refresh_token = hashParams.get("refresh_token");
+
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (error) throw error;
+          // limpa o hash da URL
+          window.history.replaceState(null, "", window.location.pathname);
+          setSessionReady(true);
+          return;
+        }
+
+        // 2) Query params (PKCE / verifyOtp): ?token_hash=...&type=recovery
+        const search = new URLSearchParams(window.location.search);
+        const token_hash = search.get("token_hash");
+        const type = search.get("type");
+        if (token_hash && type) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash,
+            type: type as "recovery" | "invite" | "signup" | "email_change",
+          });
+          if (error) throw error;
+          window.history.replaceState(null, "", window.location.pathname);
+          setSessionReady(true);
+          return;
+        }
+
+        // 3) Já existe sessão ativa? (ex.: usuário já clicou e o listener pegou)
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSessionReady(true);
+          return;
+        }
+
+        setInitError(
+          "Link inválido ou expirado. Solicite um novo convite ou um novo link de recuperação de senha.",
+        );
+      } catch (e) {
+        setInitError(
+          e instanceof Error
+            ? `Não foi possível validar o link: ${e.message}`
+            : "Não foi possível validar o link. Solicite um novo convite.",
+        );
+      } finally {
+        setInitializing(false);
+      }
+    };
+    init();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!sessionReady) {
+      toast({
+        title: "Sessão não inicializada",
+        description: "Abra novamente o link recebido por e-mail.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!isPasswordStrong(password)) {
       toast({
         title: "Senha não atende aos requisitos",
@@ -49,6 +121,23 @@ export default function ResetPasswordPage() {
         <Card className="p-8 shadow-card">
           <h1 className="text-xl font-semibold mb-1">Definir nova senha</h1>
           <p className="text-sm text-muted-foreground mb-6">Crie uma senha forte para sua conta.</p>
+          {initializing && (
+            <p className="text-sm text-muted-foreground">Validando link…</p>
+          )}
+          {!initializing && initError && (
+            <div className="space-y-4">
+              <p className="text-sm text-destructive">{initError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate("/login", { replace: true })}
+              >
+                Voltar ao login
+              </Button>
+            </div>
+          )}
+          {!initializing && !initError && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="pw">Nova senha</Label>
@@ -75,6 +164,7 @@ export default function ResetPasswordPage() {
               {submitting ? "Salvando…" : "Salvar nova senha"}
             </Button>
           </form>
+          )}
         </Card>
       </div>
     </main>
