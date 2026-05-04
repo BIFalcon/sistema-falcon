@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, LineChart as LineChartIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -83,7 +84,7 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
 }
 
 export default function IndicadoresDrePage() {
-  const { allowedHotels } = useAuth();
+  const { allowedHotels, isMaster } = useAuth();
   const { hotelId, month, year } = useFilters();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
@@ -120,10 +121,20 @@ export default function IndicadoresDrePage() {
 
   return (
     <div className="space-y-6 max-w-[1500px]">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Análise</p>
-        <h1 className="text-2xl font-semibold text-foreground">Indicadores DRE</h1>
-        <p className="text-sm text-muted-foreground">{hotelId ? "Hotel selecionado" : `${hotelIds.length} hotéis`} · {month === 0 ? "Acumulado do ano" : MONTHS_PT[month - 1]} de {year}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Análise</p>
+          <h1 className="text-2xl font-semibold text-foreground">Indicadores DRE</h1>
+          <p className="text-sm text-muted-foreground">{hotelId ? "Hotel selecionado" : `${hotelIds.length} hotéis`} · {month === 0 ? "Acumulado do ano" : MONTHS_PT[month - 1]} de {year}</p>
+        </div>
+        {isMaster && (
+          <Button asChild variant="outline" size="sm">
+            <Link to="/configuracoes/dre-retroativo">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload retroativo
+            </Link>
+          </Button>
+        )}
       </div>
 
       {!dataset && !isLoading ? (
