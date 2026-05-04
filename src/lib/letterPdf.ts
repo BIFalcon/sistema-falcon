@@ -253,16 +253,11 @@ function drawBirdWatermark(
   const x = area.x + (area.w - w) / 2;
   const y = area.y + (area.h - h) / 2;
 
-  const gs = new (jsPDF as unknown as { GState: new (p: { opacity: number }) => unknown }).GState({
-    opacity: 0.08,
-  });
-  doc.setGState(gs);
+  const docAny = doc as unknown as { GState: (p: { opacity: number }) => unknown };
+  doc.setGState(docAny.GState({ opacity: 0.08 }));
   doc.addImage(bird.data, "PNG", x, y, w, h, undefined, "FAST");
   // Restaura opacidade total para o conteúdo subsequente.
-  const gsFull = new (jsPDF as unknown as { GState: new (p: { opacity: number }) => unknown }).GState({
-    opacity: 1,
-  });
-  doc.setGState(gsFull);
+  doc.setGState(docAny.GState({ opacity: 1 }));
 }
 
 /**
