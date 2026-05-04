@@ -21,6 +21,10 @@ export interface ToInvoiceEntry {
   confirmation_number: string | null;
   reservation_status: string | null;
   departure_date: string | null;
+  gg_status: "pendente" | "faturado" | "nao_faturado";
+  gg_note: string | null;
+  gg_confirmed_by: string | null;
+  gg_confirmed_at: string | null;
 }
 
 export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
@@ -29,7 +33,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
@@ -83,6 +87,44 @@ export function useUploadArReport() {
       qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
       qc.invalidateQueries({ queryKey: ["ar-open-folio"] });
       qc.invalidateQueries({ queryKey: ["ar-latest-upload", v.kind] });
+    },
+  });
+}
+
+/* Confirmação por GG dos registros A Faturar */
+export function useSetToInvoiceGgStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      gg_status: "pendente" | "faturado" | "nao_faturado";
+      gg_note?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("ar_to_invoice_entries")
+        .update({
+          gg_status: input.gg_status,
+          gg_note: input.gg_note ?? null,
+        })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+    },
+  });
+}
+
+/* Notifica GGs com registros novos / pendentes em A Faturar */
+export function useNotifyGgToInvoice() {
+  return useMutation({
+    mutationFn: async (input: { hotel_id?: string }) => {
+      const { data, error } = await supabase.functions.invoke(
+        "notify-gg-to-invoice",
+        { body: { hotel_id: input.hotel_id } },
+      );
+      if (error) throw error;
+      return data as { ok: boolean; hotels_notified: number };
     },
   });
 }
