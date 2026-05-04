@@ -191,6 +191,7 @@ function ToInvoiceSection({
   });
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: contracts } = useClientContracts(hotelId || null);
+  const notifyTi = useNotifyGgToInvoice();
 
   const hotelName = (id: string | null) =>
     id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
@@ -214,11 +215,36 @@ function ToInvoiceSection({
               {hotelId ? hotelName(hotelId) : "Todos os hotéis (consolidado)"}
             </p>
           </div>
-          {hotelId && (
-            <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Contratos do hotel
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={notifyTi.isPending}
+                onClick={async () => {
+                  try {
+                    const res = await notifyTi.mutateAsync({ hotel_id: hotelId || undefined });
+                    if (res?.hotels_notified) {
+                      toast.success(`GG notificado em ${res.hotels_notified} hotel(éis)`);
+                    } else {
+                      toast.warning("Nenhum GG ativo encontrado para notificar");
+                    }
+                  } catch (err: any) {
+                    toast.error(err?.message ?? "Erro ao notificar GG");
+                  }
+                }}
+                className="gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                {notifyTi.isPending ? "Enviando…" : "Notificar GG"}
+              </Button>
+            )}
+            {hotelId && (
+              <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Contratos do hotel
+              </Button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
