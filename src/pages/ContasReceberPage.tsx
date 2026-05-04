@@ -403,8 +403,12 @@ function DayBreakdown({
   contracts: ClientContract[] | undefined;
   onBack: () => void;
 }) {
-  const { isGg, isMaster, isFinanceiro, isControladoria } = useAuth();
-  const canConfirm = isGg || isMaster || isFinanceiro || isControladoria;
+  const { isMaster, hasRole } = useAuth();
+  const canConfirm =
+    isMaster ||
+    hasRole("gg") ||
+    hasRole("financeiro") ||
+    hasRole("controladoria");
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
