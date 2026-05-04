@@ -306,6 +306,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Dispara notificação A Faturar — confirmação por registro pelo GG
+    if (kind === "to_invoice" && inserted > 0) {
+      try {
+        await admin.functions.invoke("notify-gg-to-invoice", {
+          body: { upload_id: uploadRow.id },
+        });
+      } catch (err) {
+        console.error("notify-gg-to-invoice invoke failed", err);
+      }
+    }
+
     return new Response(JSON.stringify({
       ok: true,
       upload_id: uploadRow.id,
