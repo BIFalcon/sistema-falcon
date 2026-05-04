@@ -522,7 +522,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Indicadores do mês", falconData, brandData);
 
-  const card1Y = 30, cardH = 78, cardW = SIZE - 24;
+  // Cabeçalho ampliado para 28mm — conteúdo começa em y=34mm.
+  // Cards reduzidos de 78 → 75mm para manter o conjunto dentro da página.
+  const card1Y = HEADER_CONTENT_Y, cardH = 75, cardW = SIZE - 24;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   doc.roundedRect(12, card1Y, cardW, cardH, 2, 2, "S");
@@ -538,15 +540,16 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Indicadores do mês", falconData, brandData);
 
-  const recH = 88;
+  // Página 3 — Receita + Cards (Fundo de Reserva / RPS)
+  const recH = 84;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
-  doc.roundedRect(12, 30, cardW, recH, 2, 2, "S");
+  doc.roundedRect(12, HEADER_CONTENT_Y, cardW, recH, 2, 2, "S");
   const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
-  doc.addImage(recChart, "PNG", 15, 33, cardW - 6, recH - 6);
+  doc.addImage(recChart, "PNG", 15, HEADER_CONTENT_Y + 3, cardW - 6, recH - 6);
 
   // dois cards lado a lado — borda na MESMA cor do gráfico (BORDER cinza claro)
-  const cw = (SIZE - 30) / 2, ch = 64, cy = 30 + recH + 8;
+  const cw = (SIZE - 30) / 2, ch = 64, cy = HEADER_CONTENT_Y + recH + 6;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   // Fundo de Reserva
