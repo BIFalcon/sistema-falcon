@@ -91,6 +91,44 @@ export function useUploadArReport() {
   });
 }
 
+/* Confirmação por GG dos registros A Faturar */
+export function useSetToInvoiceGgStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      gg_status: "pendente" | "faturado" | "nao_faturado";
+      gg_note?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("ar_to_invoice_entries")
+        .update({
+          gg_status: input.gg_status,
+          gg_note: input.gg_note ?? null,
+        })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+    },
+  });
+}
+
+/* Notifica GGs com registros novos / pendentes em A Faturar */
+export function useNotifyGgToInvoice() {
+  return useMutation({
+    mutationFn: async (input: { hotel_id?: string }) => {
+      const { data, error } = await supabase.functions.invoke(
+        "notify-gg-to-invoice",
+        { body: { hotel_id: input.hotel_id } },
+      );
+      if (error) throw error;
+      return data as { ok: boolean; hotels_notified: number };
+    },
+  });
+}
+
 /* ──────────────── OPEN FOLIO ──────────────── */
 
 export interface OpenFolioEntry {
