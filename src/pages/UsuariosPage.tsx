@@ -709,6 +709,12 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                       : "—"
                 }
               />
+              {!isMasterFlag && primaryRole === "financeiro" && (
+                <ReviewRow
+                  label="Sub-papel"
+                  value={financeiroSubrole === "equipe" ? "Equipe Financeiro" : "Coordenadoria Financeiro"}
+                />
+              )}
               <ReviewRow
                 label="Hotéis"
                 value={
