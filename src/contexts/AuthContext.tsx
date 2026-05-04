@@ -9,6 +9,7 @@ interface Profile {
   user_id: string;
   email: string | null;
   display_name: string | null;
+  financeiro_subrole?: "equipe" | "coordenadora" | null;
 }
 
 interface AuthContextValue {
@@ -22,6 +23,10 @@ interface AuthContextValue {
   isMaster: boolean;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: () => boolean;
+  /** Sub-papel do financeiro: equipe (ops) ou coordenadora (chefe). */
+  financeiroSubrole: "equipe" | "coordenadora" | null;
+  isFinanceiroEquipe: boolean;
+  isFinanceiroCoordenadora: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -99,6 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isMaster = roles.some((r) => (MASTER_ROLES as readonly string[]).includes(r));
   const allowedHotels = isMaster ? allHotels : userHotels;
 
+  const hasFinanceiroRole = roles.includes("financeiro" as AppRole);
+  // Default histórico: financeiro sem sub-flag = coordenadora.
+  const financeiroSubrole: "equipe" | "coordenadora" | null = hasFinanceiroRole
+    ? (profile?.financeiro_subrole ?? "coordenadora")
+    : null;
+  const isFinanceiroEquipe = hasFinanceiroRole && financeiroSubrole === "equipe";
+  const isFinanceiroCoordenadora = hasFinanceiroRole && financeiroSubrole === "coordenadora";
+
   const value: AuthContextValue = {
     user,
     session,
@@ -110,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isMaster,
     hasRole: (r) => roles.includes(r),
     hasAnyRole: () => roles.length > 0,
+    financeiroSubrole,
+    isFinanceiroEquipe,
+    isFinanceiroCoordenadora,
     signIn: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error };
