@@ -153,7 +153,11 @@ export type Database = {
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
+          payment_marked_at: string | null
+          payment_marked_by: string | null
           payment_method: string | null
+          payment_paid_at: string | null
+          payment_status: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id: string | null
           raw: Json
           source_system: Database["public"]["Enums"]["financial_system"]
@@ -182,7 +186,11 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          payment_marked_at?: string | null
+          payment_marked_by?: string | null
           payment_method?: string | null
+          payment_paid_at?: string | null
+          payment_status?: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id?: string | null
           raw?: Json
           source_system: Database["public"]["Enums"]["financial_system"]
@@ -211,7 +219,11 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          payment_marked_at?: string | null
+          payment_marked_by?: string | null
           payment_method?: string | null
+          payment_paid_at?: string | null
+          payment_status?: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id?: string | null
           raw?: Json
           source_system?: Database["public"]["Enums"]["financial_system"]
@@ -1301,6 +1313,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           email: string | null
+          financeiro_subrole: string | null
           id: string
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
@@ -1310,6 +1323,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          financeiro_subrole?: string | null
           id?: string
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -1319,6 +1333,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          financeiro_subrole?: string | null
           id?: string
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -1474,6 +1489,7 @@ export type Database = {
         }
         Returns: number
       }
+      get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -1485,6 +1501,11 @@ export type Database = {
       is_ap_manager: { Args: { _user_id: string }; Returns: boolean }
       is_ar_manager: { Args: { _user_id: string }; Returns: boolean }
       is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
+      is_financeiro_coordenadora: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_financeiro_equipe: { Args: { _user_id: string }; Returns: boolean }
       is_hotel_allowed: {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
@@ -1538,6 +1559,7 @@ export type Database = {
     }
     Enums: {
       ap_entry_approval: "pending" | "approved" | "rejected"
+      ap_payment_status: "pendente" | "inserido" | "agendado" | "pago"
       app_role:
         | "processos"
         | "fernando"
@@ -1706,6 +1728,7 @@ export const Constants = {
   public: {
     Enums: {
       ap_entry_approval: ["pending", "approved", "rejected"],
+      ap_payment_status: ["pendente", "inserido", "agendado", "pago"],
       app_role: [
         "processos",
         "fernando",
