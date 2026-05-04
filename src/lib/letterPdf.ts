@@ -663,8 +663,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.text("(31) 3500-5431", 16, 176);
   doc.text("R. Bernardo Guimarães, 245, B.", 16, 182);
   doc.text("Funcionários, Belo Horizonte - MG", 16, 188);
-  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  drawContainedLogo(doc, brandData, SIZE - 78, 178, 28, 22, "center");
+  drawContainedLogo(doc, falconData, SIZE - 44, 178, 30, 22, "center");
   doc.setFontSize(7);
   doc.setTextColor(MUTED);
   doc.text(`v${(letter.pdf_version ?? 0) + 1}`, SIZE - 10, SIZE - 4, { align: "right" });
