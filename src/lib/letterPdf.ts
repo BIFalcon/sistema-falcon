@@ -609,6 +609,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // e capturando dimensões intrínsecas para evitar distorção (contain).
   const brandData = logoFromImage(brandLogoImg);
   const falconData = logoFromImage(falconLogoImg);
+  // Marca d'água: extrai apenas o pássaro da logo Falcon (sem o wordmark).
+  const birdWatermark = extractBirdWatermark(falconLogoImg);
   const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
 
   // Histórico de 6 meses para os gráficos
