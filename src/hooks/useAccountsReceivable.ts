@@ -152,6 +152,20 @@ export function useOpenFolioNotes(hotelId: string | null) {
   });
 }
 
+export function useAllOpenFolioNotes() {
+  return useQuery({
+    queryKey: ["ar-of-notes-all"],
+    queryFn: async (): Promise<OpenFolioNote[]> => {
+      const { data, error } = await supabase
+        .from("ar_open_folio_notes")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as OpenFolioNote[];
+    },
+  });
+}
+
 export function useUpsertOpenFolioNote() {
   const qc = useQueryClient();
   return useMutation({
