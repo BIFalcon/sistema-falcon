@@ -21,6 +21,10 @@ export interface ToInvoiceEntry {
   confirmation_number: string | null;
   reservation_status: string | null;
   departure_date: string | null;
+  gg_status: "pendente" | "faturado" | "nao_faturado";
+  gg_note: string | null;
+  gg_confirmed_by: string | null;
+  gg_confirmed_at: string | null;
 }
 
 export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
@@ -29,7 +33,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
