@@ -215,6 +215,100 @@ export function useLinkDocumentToEntry() {
   });
 }
 
+/**
+ * Anexa um documento adicional ao lançamento (sem alterar o principal).
+ * Use isto quando vincular ex.: NF + boleto a um mesmo lançamento.
+ */
+export function useAttachDocumentToEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      entryId: string;
+      documentId: string;
+      nfAmount?: number | null;
+      makePrimary?: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("ap_documents")
+        .update({
+          entry_id: input.entryId,
+          ...(input.nfAmount !== undefined ? { nf_amount: input.nfAmount } : {}),
+        })
+        .eq("id", input.documentId);
+      if (error) throw error;
+      // Define como principal se for o primeiro ou se solicitado.
+      const { data: existing } = await supabase
+        .from("ap_entries")
+        .select("primary_document_id")
+        .eq("id", input.entryId)
+        .single();
+      if (input.makePrimary || !existing?.primary_document_id) {
+        await supabase
+          .from("ap_entries")
+          .update({ primary_document_id: input.documentId })
+          .eq("id", input.entryId);
+      }
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-documents", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+    },
+  });
+}
+
+/** Remove o vínculo de UM documento (sem deletar o arquivo). */
+export function useDetachDocumentFromEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryId: string; documentId: string }) => {
+      const { error } = await supabase
+        .from("ap_documents")
+        .update({ entry_id: null })
+        .eq("id", input.documentId);
+      if (error) throw error;
+      // Se era o principal, escolhe outro doc remanescente como principal.
+      const { data: entry } = await supabase
+        .from("ap_entries")
+        .select("primary_document_id")
+        .eq("id", input.entryId)
+        .single();
+      if (entry?.primary_document_id === input.documentId) {
+        const { data: others } = await supabase
+          .from("ap_documents")
+          .select("id")
+          .eq("entry_id", input.entryId)
+          .limit(1);
+        await supabase
+          .from("ap_entries")
+          .update({ primary_document_id: others?.[0]?.id ?? null })
+          .eq("id", input.entryId);
+      }
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-documents", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+    },
+  });
+}
+
+/** Marca um documento como principal entre os já vinculados ao lançamento. */
+export function useSetPrimaryDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryId: string; documentId: string }) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ primary_document_id: input.documentId })
+        .eq("id", input.entryId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+    },
+  });
+}
+
 export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
