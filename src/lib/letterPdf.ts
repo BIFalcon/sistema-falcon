@@ -101,6 +101,60 @@ function imageToDataUrl(
     : canvas.toDataURL("image/jpeg", 0.85);
 }
 
+/**
+ * Logo com dimensões intrínsecas (px) — usado para preservar a proporção
+ * ao desenhar dentro de uma "caixa" no PDF (object-fit: contain).
+ */
+interface LogoAsset {
+  data: string;
+  /** Largura intrínseca em pixels (após reescala em `imageToDataUrl`). */
+  w: number;
+  /** Altura intrínseca em pixels. */
+  h: number;
+}
+
+function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
+  if (!img) return null;
+  const data = imageToDataUrl(img, 800, "png");
+  return { data, w: img.naturalWidth, h: img.naturalHeight };
+}
+
+/**
+ * Desenha uma imagem PNG dentro de uma caixa (boxX, boxY, boxW, boxH)
+ * preservando a proporção original (object-fit: contain) e centralizando.
+ * `align` controla o alinhamento horizontal quando há sobra de espaço.
+ */
+function drawContainedLogo(
+  doc: jsPDF,
+  logo: LogoAsset | null,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+  align: "left" | "right" | "center" = "center",
+) {
+  if (!logo) return;
+  const ratio = logo.w / logo.h;
+  const boxRatio = boxW / boxH;
+  let drawW: number;
+  let drawH: number;
+  if (ratio >= boxRatio) {
+    // mais larga que a caixa — limita pela largura
+    drawW = boxW;
+    drawH = boxW / ratio;
+  } else {
+    // mais alta — limita pela altura
+    drawH = boxH;
+    drawW = boxH * ratio;
+  }
+  const offY = boxY + (boxH - drawH) / 2;
+  let offX: number;
+  if (align === "left") offX = boxX;
+  else if (align === "right") offX = boxX + boxW - drawW;
+  else offX = boxX + (boxW - drawW) / 2;
+  doc.addImage(logo.data, "PNG", offX, offY, drawW, drawH, undefined, "FAST");
+}
+
 function fmtBRL0(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return "R$ " + Math.round(v).toLocaleString("pt-BR");
@@ -128,24 +182,32 @@ function addPage(doc: jsPDF) {
 function drawPageHeader(
   doc: jsPDF,
   title: string,
-  falconLogo: string | null,
-  brandLogo: string | null,
+  falconLogo: LogoAsset | null,
+  brandLogo: LogoAsset | null,
 ) {
-  // logos esquerda/direita — PNG preserva transparência
-  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 26, 13, undefined, "FAST");
-  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 26, 10, 26, 13, undefined, "FAST");
-  // título central (sem charSpace para alinhar perfeitamente com a régua dourada)
+  // Cabeçalho ampliado (28mm) para acomodar logos sem distorção.
+  // Caixas das logos: 34mm × 20mm — preservam aspect-ratio (contain).
+  const boxW = 34;
+  const boxH = 20;
+  const boxY = 6;
+  drawContainedLogo(doc, falconLogo, 12, boxY, boxW, boxH, "left");
+  drawContainedLogo(doc, brandLogo, SIZE - 12 - boxW, boxY, boxW, boxH, "right");
+
+  // título central — abaixado para 22mm (dentro da nova faixa de 28mm)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(NAVY);
   const titleUpper = title.toUpperCase();
-  doc.text(titleUpper, SIZE / 2, 18, { align: "center" });
+  doc.text(titleUpper, SIZE / 2, 22, { align: "center" });
   // sublinhado dourado centralizado, exatamente da largura do título
   doc.setDrawColor(GOLD);
   doc.setLineWidth(1.2);
   const tw = doc.getTextWidth(titleUpper);
-  doc.line(SIZE / 2 - tw / 2, 21.4, SIZE / 2 + tw / 2, 21.4);
+  doc.line(SIZE / 2 - tw / 2, 25.4, SIZE / 2 + tw / 2, 25.4);
 }
+
+/** Y inicial do conteúdo das páginas com cabeçalho (logos + título). */
+const HEADER_CONTENT_Y = 34;
 
 /* ───────────────── Gráficos via Canvas 2D ───────────────── */
 
@@ -398,8 +460,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   const coverData = coverImg ? imageToDataUrl(coverImg, 1800, "jpeg") : null;
   // Logos como PNG (preserva transparência — sem fundo preto/branco)
-  const brandData = brandLogoImg ? imageToDataUrl(brandLogoImg, 800, "png") : null;
-  const falconData = falconLogoImg ? imageToDataUrl(falconLogoImg, 800, "png") : null;
+  // e capturando dimensões intrínsecas para evitar distorção (contain).
+  const brandData = logoFromImage(brandLogoImg);
+  const falconData = logoFromImage(falconLogoImg);
   const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
 
   // Histórico de 6 meses para os gráficos
@@ -443,9 +506,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setFontSize(11);
   doc.setTextColor(MUTED);
   doc.text(monthYear, 16, 168);
-  // logos rodapé direita — PNG (transparente)
-  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  // logos rodapé direita — PNG (transparente), preservando proporção
+  drawContainedLogo(doc, brandData, SIZE - 78, 178, 28, 22, "center");
+  drawContainedLogo(doc, falconData, SIZE - 44, 178, 30, 22, "center");
   // Cidade do hotel — abaixo da logo da bandeira
   const city = extractCityFromHotel(hotel);
   if (city) {
@@ -459,7 +522,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Indicadores do mês", falconData, brandData);
 
-  const card1Y = 30, cardH = 78, cardW = SIZE - 24;
+  // Cabeçalho ampliado para 28mm — conteúdo começa em y=34mm.
+  // Cards reduzidos de 78 → 75mm para manter o conjunto dentro da página.
+  const card1Y = HEADER_CONTENT_Y, cardH = 75, cardW = SIZE - 24;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   doc.roundedRect(12, card1Y, cardW, cardH, 2, 2, "S");
@@ -475,15 +540,16 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Indicadores do mês", falconData, brandData);
 
-  const recH = 88;
+  // Página 3 — Receita + Cards (Fundo de Reserva / RPS)
+  const recH = 84;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
-  doc.roundedRect(12, 30, cardW, recH, 2, 2, "S");
+  doc.roundedRect(12, HEADER_CONTENT_Y, cardW, recH, 2, 2, "S");
   const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
-  doc.addImage(recChart, "PNG", 15, 33, cardW - 6, recH - 6);
+  doc.addImage(recChart, "PNG", 15, HEADER_CONTENT_Y + 3, cardW - 6, recH - 6);
 
   // dois cards lado a lado — borda na MESMA cor do gráfico (BORDER cinza claro)
-  const cw = (SIZE - 30) / 2, ch = 64, cy = 30 + recH + 8;
+  const cw = (SIZE - 30) / 2, ch = 64, cy = HEADER_CONTENT_Y + recH + 6;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   // Fundo de Reserva
@@ -533,9 +599,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const body = blocks.join("\n\n") || "—";
   drawDynamicTextBlock(doc, body, {
     x: 16,
-    y: 32,
+    y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
-    height: SIZE - 32 - 14, // até ~14mm da base
+    height: SIZE - (HEADER_CONTENT_Y + 2) - 14, // até ~14mm da base
     minSize: 9,
     maxSize: 22,
     lineHeightFactor: 1.5,
@@ -546,8 +612,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Destaques do mês", falconData, brandData);
   const colW = (SIZE - 30) / 2;
-  const rowH = 78;
-  const startY = 32;
+  const rowH = 75;
+  const startY = HEADER_CONTENT_Y + 2;
   highlights.slice(0, 6).forEach((h, i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
@@ -600,8 +666,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.text("(31) 3500-5431", 16, 176);
   doc.text("R. Bernardo Guimarães, 245, B.", 16, 182);
   doc.text("Funcionários, Belo Horizonte - MG", 16, 188);
-  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  drawContainedLogo(doc, brandData, SIZE - 78, 178, 28, 22, "center");
+  drawContainedLogo(doc, falconData, SIZE - 44, 178, 30, 22, "center");
   doc.setFontSize(7);
   doc.setTextColor(MUTED);
   doc.text(`v${(letter.pdf_version ?? 0) + 1}`, SIZE - 10, SIZE - 4, { align: "right" });
@@ -680,7 +746,7 @@ function drawDreTable(
         : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
   const x0 = 12, x1 = SIZE - 12;
-  let y = 30;
+  let y = HEADER_CONTENT_Y;
   // header navy
   doc.setFillColor(NAVY);
   doc.rect(x0, y, x1 - x0, 7, "F");
