@@ -506,9 +506,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setFontSize(11);
   doc.setTextColor(MUTED);
   doc.text(monthYear, 16, 168);
-  // logos rodapé direita — PNG (transparente)
-  if (brandData) doc.addImage(brandData, "PNG", SIZE - 78, 178, 28, 22, undefined, "FAST");
-  if (falconData) doc.addImage(falconData, "PNG", SIZE - 44, 178, 30, 22, undefined, "FAST");
+  // logos rodapé direita — PNG (transparente), preservando proporção
+  drawContainedLogo(doc, brandData, SIZE - 78, 178, 28, 22, "center");
+  drawContainedLogo(doc, falconData, SIZE - 44, 178, 30, 22, "center");
   // Cidade do hotel — abaixo da logo da bandeira
   const city = extractCityFromHotel(hotel);
   if (city) {
