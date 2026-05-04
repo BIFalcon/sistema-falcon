@@ -62,6 +62,7 @@ import {
   useUpdateUser,
   useSetUserStatus,
   useResendInvite,
+  useSetFinanceiroSubrole,
   type ManagedUser,
 } from "@/hooks/useUsers";
 import { useAllHotels } from "@/hooks/useHotelAssets";
@@ -392,10 +393,13 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const [isMasterFlag, setIsMasterFlag] = useState(false);
   const [primaryRole, setPrimaryRole] = useState<AppRole | "">("");
   const [hotelIds, setHotelIds] = useState<string[]>([]);
+  const [financeiroSubrole, setFinanceiroSubrole] =
+    useState<"equipe" | "coordenadora">("coordenadora");
   const [linkDialog, setLinkDialog] = useState<string | null>(null);
 
   const invite = useInviteUser();
   const update = useUpdateUser();
+  const setSubrole = useSetFinanceiroSubrole();
 
   // Reset / preencher quando abre
   useMemo(() => {
@@ -408,12 +412,14 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
       const role = editing.roles.find((r) => r !== "processos" && r !== "fernando");
       setPrimaryRole(role ?? "");
       setHotelIds(editing.hotel_ids);
+      setFinanceiroSubrole(editing.financeiro_subrole ?? "coordenadora");
     } else {
       setDisplayName("");
       setEmail("");
       setIsMasterFlag(false);
       setPrimaryRole("");
       setHotelIds([]);
+      setFinanceiroSubrole("coordenadora");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing?.user_id]);
