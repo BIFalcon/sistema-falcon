@@ -252,19 +252,43 @@ Deno.serve(async (req) => {
         if (!payload.user_id) return json({ error: "user_id_required" }, 400);
         const { data: prof } = await admin
           .from("profiles")
-          .select("email")
+          .select("email, display_name")
           .eq("user_id", payload.user_id)
           .maybeSingle();
         if (!prof?.email) return json({ error: "user_not_found" }, 404);
 
         const redirectTo =
           (req.headers.get("origin") ?? "") + "/reset-password";
-        const { data: linkData, error } = await admin.auth.admin.generateLink({
-          type: "recovery",
-          email: prof.email,
-          options: { redirectTo },
+
+        // Tenta reenviar via inviteUserByEmail (envia email automaticamente).
+        // Se o usuário já está confirmado, cai para generateLink('recovery').
+        const inviteRes = await admin.auth.admin.inviteUserByEmail(prof.email, {
+          redirectTo,
+          data: { display_name: prof.display_name ?? null },
         });
-        if (error) return json({ error: error.message }, 400);
+
+        if (!inviteRes.error) {
+          // Email de convite enviado pelo Supabase Auth.
+          const { data: linkData } = await admin.auth.admin.generateLink({
+            type: "recovery",
+            email: prof.email,
+            options: { redirectTo },
+          });
+          return json({
+            ok: true,
+            invite_link: linkData?.properties?.action_link ?? null,
+          });
+        }
+
+        // Fallback: usuário já existe/confirmado — gera link de recovery
+        // (também dispara email de recovery via Auth).
+        const { data: linkData, error: linkErr } =
+          await admin.auth.admin.generateLink({
+            type: "recovery",
+            email: prof.email,
+            options: { redirectTo },
+          });
+        if (linkErr) return json({ error: linkErr.message }, 400);
         return json({
           ok: true,
           invite_link: linkData?.properties?.action_link ?? null,
