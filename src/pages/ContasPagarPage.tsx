@@ -586,9 +586,77 @@ export default function ContasPagarPage() {
 
             {/* Tabela */}
             <div className="border rounded-md overflow-hidden">
+              {/* Barra de ações em lote */}
+              {(canMarkInsertedAgendado || canMarkPaid) && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30 flex-wrap">
+                  <div className="text-xs text-muted-foreground">
+                    {selectedIds.size > 0
+                      ? `${selectedIds.size} selecionado(s)`
+                      : "Selecione lançamentos para marcar status em lote"}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canMarkInsertedAgendado && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 h-8"
+                          disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                          onClick={() => handleBulkPaymentStatus("inserido")}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Inserido no banco
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 h-8"
+                          disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                          onClick={() => handleBulkPaymentStatus("agendado")}
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" /> Agendado
+                        </Button>
+                      </>
+                    )}
+                    {canMarkPaid && (
+                      <Button
+                        size="sm"
+                        className="gap-1 h-8"
+                        disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                        onClick={() => handleBulkPaymentStatus("pago")}
+                      >
+                        <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                      </Button>
+                    )}
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8"
+                        onClick={() => setSelectedIds(new Set())}
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {(canMarkInsertedAgendado || canMarkPaid) && (
+                      <TableHead className="w-8">
+                        <Checkbox
+                          checked={
+                            displayRows.length > 0 &&
+                            displayRows
+                              .filter((r) => r.kind === "single")
+                              .every((r) => selectedIds.has((r as { entry: ApEntry }).entry.id))
+                          }
+                          onCheckedChange={(c) => toggleSelectAllVisible(!!c)}
+                          aria-label="Selecionar todos visíveis"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Fornecedor</TableHead>
                     {sourceSystem === "omie" && <TableHead>CNPJ</TableHead>}
                     <TableHead>Nº Doc</TableHead>
@@ -596,6 +664,7 @@ export default function ContasPagarPage() {
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Forma</TableHead>
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
+                    <TableHead>Status</TableHead>
                     <TableHead>Doc</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -604,7 +673,7 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={showApproval ? 9 : 8}
+                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Carregando…
@@ -613,7 +682,7 @@ export default function ContasPagarPage() {
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={showApproval ? 9 : 8}
+                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -623,9 +692,13 @@ export default function ContasPagarPage() {
                     displayRows.map((row, idx) => {
                       if (row.kind === "group") {
                         const colSpan =
-                          (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1);
+                          (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1) + 1 +
+                          ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
+                            {(canMarkInsertedAgendado || canMarkPaid) && (
+                              <TableCell />
+                            )}
                             <TableCell className="font-medium">
                               {row.supplier}{" "}
                               <span className="text-muted-foreground font-normal">
@@ -669,6 +742,9 @@ export default function ContasPagarPage() {
                           canApprove={canApprove}
                           canManage={canManage}
                           showApproval={showApproval}
+                          selectable={canMarkInsertedAgendado || canMarkPaid}
+                          selected={selectedIds.has(e.id)}
+                          onToggleSelected={(v) => toggleSelected(e.id, v)}
                           onLink={() => setLinkEntry(e)}
                           onApprove={(approval) => handleApprove(e.id, approval)}
                         />
