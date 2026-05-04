@@ -2,11 +2,12 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  * Extraída de ContasPagarPage para isolar a renderização por linha.
  */
-import { AlertTriangle, CheckCircle2, Clock, Link2, XCircle } from "lucide-react";
+import { AlertTriangle, BanknoteArrowUp, CalendarClock, CheckCircle2, CircleDashed, Clock, Link2, Wallet, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
-import type { ApDocument, ApEntry, FinancialSystem } from "@/hooks/useAccountsPayable";
+import type { ApDocument, ApEntry, ApPaymentStatus, FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 
 interface EntryRowProps {
@@ -17,6 +18,10 @@ interface EntryRowProps {
   canManage: boolean;
   showApproval?: boolean;
   compact?: boolean;
+  /** Seleção em lote — se omitido, a coluna não é renderizada. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (v: boolean) => void;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
 }
@@ -29,6 +34,9 @@ export function ApEntryRow({
   canManage,
   showApproval = true,
   compact = false,
+  selectable = false,
+  selected = false,
+  onToggleSelected,
   onLink,
   onApprove,
 }: EntryRowProps) {
@@ -41,6 +49,15 @@ export function ApEntryRow({
 
   return (
     <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
+      {selectable && (
+        <TableCell className="w-8">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(c) => onToggleSelected?.(!!c)}
+            aria-label="Selecionar lançamento"
+          />
+        </TableCell>
+      )}
       {/* Fornecedor */}
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
@@ -95,6 +112,13 @@ export function ApEntryRow({
       {showApproval && (
         <TableCell>
           <ApprovalBadge status={entry.gg_approval} />
+        </TableCell>
+      )}
+
+      {/* Status de pagamento */}
+      {!compact && (
+        <TableCell>
+          <PaymentStatusBadge status={entry.payment_status} />
         </TableCell>
       )}
 
