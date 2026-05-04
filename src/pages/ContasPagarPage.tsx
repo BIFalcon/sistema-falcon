@@ -36,11 +36,14 @@ import {
   uploadApReport,
   useApDocuments,
   useApEntries,
+  useAttachDocumentToEntry,
   useDeleteDocument,
+  useDetachDocumentFromEntry,
   useLinkDocumentToEntry,
   useLatestApUpload,
   useSetEntryApproval,
   useSetEntryPaymentStatus,
+  useSetPrimaryDocument,
   useTodayBankBalance,
   useUpsertBankBalance,
   validateApDocument,
@@ -97,6 +100,9 @@ export default function ContasPagarPage() {
   const setApproval = useSetEntryApproval();
   const setPaymentStatus = useSetEntryPaymentStatus();
   const linkDocMutation = useLinkDocumentToEntry();
+  const attachDocMutation = useAttachDocumentToEntry();
+  const detachDocMutation = useDetachDocumentFromEntry();
+  const setPrimaryDocMutation = useSetPrimaryDocument();
   const deleteDocMutation = useDeleteDocument();
 
   // ── Estado local ───────────────────────────────────────────────────────
@@ -136,6 +142,7 @@ export default function ContasPagarPage() {
     displayRows,
     categories,
     docsByEntry,
+    allDocsByEntry,
     unlinkedDocs,
     urgencyCounts,
     issueCounts,
@@ -194,30 +201,44 @@ export default function ContasPagarPage() {
     }
   }
 
-  async function handleLink(docId: string | null, nfAmount: number | null) {
+  async function handleAttach(docId: string, nfAmount: number | null) {
     if (!linkEntry || !hotelId) return;
     try {
-      await linkDocMutation.mutateAsync({
+      await attachDocMutation.mutateAsync({
         hotelId,
         entryId: linkEntry.id,
         documentId: docId,
         nfAmount,
       });
-      toast.success(docId ? "Documento vinculado" : "Vínculo removido");
-      // Validação IA em background — não bloqueia o fluxo
-      if (docId) {
-        validateApDocument({ documentId: docId, entryId: linkEntry.id })
-          .then((r) => {
-            if (r.validation_status === "divergence")
-              toast.warning("Divergência detectada pela IA");
-            else if (r.validation_status === "ok")
-              toast.success("Documento validado pela IA");
-          })
-          .catch(() => {});
-      }
-      setLinkEntry(null);
+      toast.success("Documento vinculado");
+      validateApDocument({ documentId: docId, entryId: linkEntry.id })
+        .then((r) => {
+          if (r.validation_status === "divergence") toast.warning("Divergência detectada pela IA");
+          else if (r.validation_status === "ok") toast.success("Documento validado pela IA");
+        })
+        .catch(() => {});
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao vincular");
+    }
+  }
+
+  async function handleDetach(d: { id: string }) {
+    if (!linkEntry || !hotelId) return;
+    try {
+      await detachDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
+      toast.success("Vínculo removido");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao desvincular");
+    }
+  }
+
+  async function handleSetPrimary(d: { id: string }) {
+    if (!linkEntry || !hotelId) return;
+    try {
+      await setPrimaryDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
+      toast.success("Documento principal atualizado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro");
     }
   }
 

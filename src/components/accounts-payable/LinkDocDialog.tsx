@@ -1,15 +1,19 @@
 /**
  * Modal para vincular / desvincular documentos a um lançamento.
- * Extraído de ContasPagarPage — sem mudança de comportamento.
+ * Suporta múltiplos documentos por lançamento (ex.: NF + boleto)
+ * e busca por nome de arquivo na lista de documentos disponíveis.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock,
   ExternalLink,
   Paperclip,
+  Search,
+  Star,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +34,15 @@ interface LinkDocDialogProps {
   open: boolean;
   onClose: () => void;
   entry: ApEntry | null;
-  documents: ApDocument[];
-  currentDoc: ApDocument | null;
+  /** Documentos atualmente vinculados a este lançamento. */
+  linkedDocs: ApDocument[];
+  /** Documento marcado como principal (primary_document_id). */
+  primaryDoc: ApDocument | null;
+  /** Documentos sem vínculo, disponíveis para anexar. */
   unlinkedDocs: ApDocument[];
-  onLink: (docId: string | null, nfAmount: number | null) => Promise<void> | void;
+  onAttach: (docId: string, nfAmount: number | null) => Promise<void> | void;
+  onDetach: (d: ApDocument) => Promise<void> | void;
+  onSetPrimary: (d: ApDocument) => Promise<void> | void;
   onDelete: (d: ApDocument) => Promise<void> | void;
 }
 
@@ -41,25 +50,33 @@ export function LinkDocDialog({
   open,
   onClose,
   entry,
-  documents: _documents,
-  currentDoc,
+  linkedDocs,
+  primaryDoc,
   unlinkedDocs,
-  onLink,
+  onAttach,
+  onDetach,
+  onSetPrimary,
   onDelete,
 }: LinkDocDialogProps) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [nfAmountInput, setNfAmountInput] = useState<string>("");
+  const [search, setSearch] = useState("");
 
-  // Reseta os campos sempre que o lançamento alvo muda
+  // Reseta sempre que o lançamento alvo muda
   const entryId = entry?.id ?? null;
-  useMemo(() => {
-    setSelectedId(currentDoc?.id ?? "");
-    setNfAmountInput(currentDoc?.nf_amount != null ? String(currentDoc.nf_amount) : "");
-  }, [entryId, currentDoc?.id]);
+  useEffect(() => {
+    setSelectedId("");
+    setNfAmountInput("");
+    setSearch("");
+  }, [entryId]);
 
   if (!entry) return null;
 
-  const choices = currentDoc ? [currentDoc, ...unlinkedDocs] : unlinkedDocs;
+  const filteredUnlinked = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return unlinkedDocs;
+    return unlinkedDocs.filter((d) => d.file_name.toLowerCase().includes(q));
+  }, [unlinkedDocs, search]);
 
   const nfFloat = nfAmountInput ? parseFloat(nfAmountInput) : null;
   const hasDivergence =
@@ -73,9 +90,9 @@ export function LinkDocDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Vincular documento ao lançamento</DialogTitle>
+          <DialogTitle>Documentos do lançamento</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -88,23 +105,105 @@ export function LinkDocDialog({
             </p>
           </div>
 
-          {/* Resultado da validação IA */}
-          {currentDoc?.validation_status && (
-            <ValidationResult doc={currentDoc} />
-          )}
+          {/* Validação IA do documento principal */}
+          {primaryDoc?.validation_status && <ValidationResult doc={primaryDoc} />}
 
-          {/* Lista de documentos disponíveis */}
+          {/* Documentos já vinculados */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-              Documento ({choices.length} disponível{choices.length === 1 ? "" : "is"})
+              Vinculados ({linkedDocs.length})
             </label>
-            {choices.length === 0 ? (
+            {linkedDocs.length === 0 ? (
               <p className="text-xs text-muted-foreground py-3 text-center border rounded-md">
-                Nenhum documento disponível. Use "Importar Documentos" no topo da página.
+                Nenhum documento vinculado ainda.
               </p>
             ) : (
-              <div className="border rounded-md max-h-[260px] overflow-y-auto divide-y">
-                {choices.map((d) => (
+              <div className="border rounded-md divide-y">
+                {linkedDocs.map((d) => {
+                  const isPrimary = primaryDoc?.id === d.id;
+                  return (
+                    <div key={d.id} className="flex items-center gap-2 p-2 text-sm">
+                      {isPrimary ? (
+                        <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                      ) : (
+                        <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <span className="flex-1 truncate">
+                        {d.file_name}
+                        {isPrimary && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            Principal
+                          </Badge>
+                        )}
+                      </span>
+                      {!isPrimary && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => onSetPrimary(d)}
+                          title="Marcar como principal"
+                        >
+                          Principal
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => openDoc(d)}
+                        title="Abrir"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-amber-700"
+                        onClick={() => onDetach(d)}
+                        title="Desvincular (mantém o arquivo)"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-destructive"
+                        onClick={() => onDelete(d)}
+                        title="Excluir arquivo"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Adicionar novo documento */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+              Adicionar documento ({unlinkedDocs.length} não vinculado{unlinkedDocs.length === 1 ? "" : "s"})
+            </label>
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar pelo nome do arquivo…"
+                className="pl-8 h-9"
+              />
+            </div>
+            {filteredUnlinked.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-3 text-center border rounded-md">
+                {unlinkedDocs.length === 0
+                  ? 'Nenhum documento disponível. Use "Importar Documentos" no topo da página.'
+                  : "Nenhum arquivo corresponde à busca."}
+              </p>
+            ) : (
+              <div className="border rounded-md max-h-[220px] overflow-y-auto divide-y">
+                {filteredUnlinked.map((d) => (
                   <div
                     key={d.id}
                     className={`flex items-center gap-2 p-2 text-sm cursor-pointer hover:bg-muted/50 ${
@@ -166,23 +265,19 @@ export function LinkDocDialog({
         </div>
 
         <DialogFooter>
-          {currentDoc && (
-            <Button
-              variant="ghost"
-              onClick={() => onLink(null, null)}
-              className="mr-auto"
-            >
-              Remover vínculo
-            </Button>
-          )}
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            Fechar
           </Button>
           <Button
             disabled={!selectedId}
-            onClick={() => onLink(selectedId, nfFloat)}
+            onClick={async () => {
+              await onAttach(selectedId, nfFloat);
+              setSelectedId("");
+              setNfAmountInput("");
+              setSearch("");
+            }}
           >
-            Vincular
+            Vincular selecionado
           </Button>
         </DialogFooter>
       </DialogContent>

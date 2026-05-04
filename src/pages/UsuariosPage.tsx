@@ -62,6 +62,7 @@ import {
   useUpdateUser,
   useSetUserStatus,
   useResendInvite,
+  useSetFinanceiroSubrole,
   type ManagedUser,
 } from "@/hooks/useUsers";
 import { useAllHotels } from "@/hooks/useHotelAssets";
@@ -392,10 +393,13 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const [isMasterFlag, setIsMasterFlag] = useState(false);
   const [primaryRole, setPrimaryRole] = useState<AppRole | "">("");
   const [hotelIds, setHotelIds] = useState<string[]>([]);
+  const [financeiroSubrole, setFinanceiroSubrole] =
+    useState<"equipe" | "coordenadora">("coordenadora");
   const [linkDialog, setLinkDialog] = useState<string | null>(null);
 
   const invite = useInviteUser();
   const update = useUpdateUser();
+  const setSubrole = useSetFinanceiroSubrole();
 
   // Reset / preencher quando abre
   useMemo(() => {
@@ -408,12 +412,14 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
       const role = editing.roles.find((r) => r !== "processos" && r !== "fernando");
       setPrimaryRole(role ?? "");
       setHotelIds(editing.hotel_ids);
+      setFinanceiroSubrole(editing.financeiro_subrole ?? "coordenadora");
     } else {
       setDisplayName("");
       setEmail("");
       setIsMasterFlag(false);
       setPrimaryRole("");
       setHotelIds([]);
+      setFinanceiroSubrole("coordenadora");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing?.user_id]);
@@ -443,6 +449,16 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           primary_role: isMasterFlag ? undefined : (primaryRole as AppRole),
           hotel_ids: needsHotelSelection ? hotelIds : [],
         });
+        // Persistir sub-papel do financeiro (independente do edge function)
+        if (!isMasterFlag && primaryRole === "financeiro") {
+          await setSubrole.mutateAsync({
+            user_id: editing.user_id,
+            subrole: financeiroSubrole,
+          });
+        } else if (editing.financeiro_subrole) {
+          // Trocou de role: limpa o sub-papel
+          await setSubrole.mutateAsync({ user_id: editing.user_id, subrole: null });
+        }
         toast.success("Usuário atualizado");
         onOpenChange(false);
       } else {
@@ -453,6 +469,12 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           primary_role: isMasterFlag ? undefined : (primaryRole as AppRole),
           hotel_ids: needsHotelSelection ? hotelIds : [],
         });
+        if (!isMasterFlag && primaryRole === "financeiro" && res?.user_id) {
+          await setSubrole.mutateAsync({
+            user_id: res.user_id,
+            subrole: financeiroSubrole,
+          });
+        }
         toast.success("Convite criado");
         onOpenChange(false);
         if (res.invite_link) setLinkDialog(res.invite_link);
@@ -575,6 +597,40 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                   </Select>
                 </div>
               )}
+
+              {/* Sub-papel do Financeiro */}
+              {!isMasterFlag && primaryRole === "financeiro" && (
+                <div className="space-y-2 p-3 rounded-lg border bg-muted/20">
+                  <Label>Sub-papel do Financeiro</Label>
+                  <Select
+                    value={financeiroSubrole}
+                    onValueChange={(v) => setFinanceiroSubrole(v as "equipe" | "coordenadora")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="equipe">
+                        <div className="flex flex-col py-0.5">
+                          <span className="font-medium">Equipe Financeiro</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            Sobe planilhas, vincula documentos, marca como Inserido/Agendado
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="coordenadora">
+                        <div className="flex flex-col py-0.5">
+                          <span className="font-medium">Coordenadoria Financeiro</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            Acesso total — pode marcar lançamentos como Pago
+                          </span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="text-xs text-muted-foreground p-3 rounded border bg-muted/20">
                 <strong>Próximas fases:</strong> seleção fina de módulos e permissões granulares (upload
                 de DRE, aprovação por estágio etc.) será adicionada na próxima entrega. Por enquanto, o
@@ -653,6 +709,12 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                       : "—"
                 }
               />
+              {!isMasterFlag && primaryRole === "financeiro" && (
+                <ReviewRow
+                  label="Sub-papel"
+                  value={financeiroSubrole === "equipe" ? "Equipe Financeiro" : "Coordenadoria Financeiro"}
+                />
+              )}
               <ReviewRow
                 label="Hotéis"
                 value={
