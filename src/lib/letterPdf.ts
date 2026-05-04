@@ -599,9 +599,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const body = blocks.join("\n\n") || "—";
   drawDynamicTextBlock(doc, body, {
     x: 16,
-    y: 32,
+    y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
-    height: SIZE - 32 - 14, // até ~14mm da base
+    height: SIZE - (HEADER_CONTENT_Y + 2) - 14, // até ~14mm da base
     minSize: 9,
     maxSize: 22,
     lineHeightFactor: 1.5,
@@ -612,8 +612,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawPageHeader(doc, "Destaques do mês", falconData, brandData);
   const colW = (SIZE - 30) / 2;
-  const rowH = 78;
-  const startY = 32;
+  const rowH = 75;
+  const startY = HEADER_CONTENT_Y + 2;
   highlights.slice(0, 6).forEach((h, i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
