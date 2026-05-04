@@ -449,6 +449,16 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           primary_role: isMasterFlag ? undefined : (primaryRole as AppRole),
           hotel_ids: needsHotelSelection ? hotelIds : [],
         });
+        // Persistir sub-papel do financeiro (independente do edge function)
+        if (!isMasterFlag && primaryRole === "financeiro") {
+          await setSubrole.mutateAsync({
+            user_id: editing.user_id,
+            subrole: financeiroSubrole,
+          });
+        } else if (editing.financeiro_subrole) {
+          // Trocou de role: limpa o sub-papel
+          await setSubrole.mutateAsync({ user_id: editing.user_id, subrole: null });
+        }
         toast.success("Usuário atualizado");
         onOpenChange(false);
       } else {
@@ -459,6 +469,12 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           primary_role: isMasterFlag ? undefined : (primaryRole as AppRole),
           hotel_ids: needsHotelSelection ? hotelIds : [],
         });
+        if (!isMasterFlag && primaryRole === "financeiro" && res?.user_id) {
+          await setSubrole.mutateAsync({
+            user_id: res.user_id,
+            subrole: financeiroSubrole,
+          });
+        }
         toast.success("Convite criado");
         onOpenChange(false);
         if (res.invite_link) setLinkDialog(res.invite_link);
