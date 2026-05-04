@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Building2, FileSpreadsheet, Loader2, Mail, Paperclip, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileSpreadsheet, Loader2, Mail, Paperclip, Upload, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,10 +40,12 @@ import {
   useLinkDocumentToEntry,
   useLatestApUpload,
   useSetEntryApproval,
+  useSetEntryPaymentStatus,
   useTodayBankBalance,
   useUpsertBankBalance,
   validateApDocument,
   type ApEntry,
+  type ApPaymentStatus,
   type FinancialSystem,
 } from "@/hooks/useAccountsPayable";
 import { useApPageDerived } from "@/hooks/useApPageDerived";
@@ -59,8 +61,18 @@ import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
 import { useMemo } from "react";
 
 export default function ContasPagarPage() {
-  const { user, hasRole, isMaster } = useAuth();
+  const {
+    user,
+    hasRole,
+    isMaster,
+    isFinanceiroEquipe,
+    isFinanceiroCoordenadora,
+  } = useAuth();
   const canManage = isMaster || hasRole("financeiro");
+  // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
+  const canMarkInsertedAgendado =
+    isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
+  const canMarkPaid = isMaster || isFinanceiroCoordenadora;
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
   const canUploadDocs = canManage || isGg;
@@ -83,6 +95,7 @@ export default function ContasPagarPage() {
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
   const setApproval = useSetEntryApproval();
+  const setPaymentStatus = useSetEntryPaymentStatus();
   const linkDocMutation = useLinkDocumentToEntry();
   const deleteDocMutation = useDeleteDocument();
 
@@ -97,6 +110,7 @@ export default function ContasPagarPage() {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const fileRef = useRef<HTMLInputElement>(null);
   const docsRef = useRef<HTMLInputElement>(null);
