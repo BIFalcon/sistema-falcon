@@ -343,6 +343,7 @@ Deno.serve(async (req) => {
     const lowerName = file.name.toLowerCase();
 
     let parsed: ParsedEntry[] = [];
+    let skipped: { other_bank: number; no_amount: number; no_supplier: number } | null = null;
     let reportBuf: ArrayBuffer = arrayBuf;
     let reportName = file.name;
     let extractedDocs: { name: string; data: Uint8Array; mime: string }[] = [];
@@ -357,9 +358,11 @@ Deno.serve(async (req) => {
       reportBuf = ext.reportBuf;
       reportName = ext.reportName ?? file.name;
       extractedDocs = ext.documents;
-      parsed = parseOmieXlsx(reportBuf);
+      const r = parseOmieXlsx(reportBuf, hotelId);
+      parsed = r.entries; skipped = r.skipped;
     } else if (sourceSystem === "omie") {
-      parsed = parseOmieXlsx(arrayBuf);
+      const r = parseOmieXlsx(arrayBuf, hotelId);
+      parsed = r.entries; skipped = r.skipped;
     } else {
       parsed = parseTotvsXls(arrayBuf);
     }
@@ -421,10 +424,10 @@ Deno.serve(async (req) => {
         // Evita reusar o mesmo registro pra duas linhas novas
         if (candidate && !updatedIds.has(candidate.id)) prev = candidate;
       }
-      // OMIE: situação 'Agendado' implica aprovado quando ainda não havia aprovação
+      // OMIE: 'Em Aprovação' = GG já aprovou. 'Agendado' = já foi pro banco.
       let approvalDefault: "pending" | "approved" | "rejected" = "pending";
-      if (sourceSystem === "omie" && p.omie_situation && toAscii(p.omie_situation).startsWith("agendado")) {
-        approvalDefault = "approved";
+      if (sourceSystem === "omie") {
+        approvalDefault = omieApprovalFromSituation(p.omie_situation);
       }
       const baseFields = {
         hotel_id: hotelId,
@@ -528,6 +531,7 @@ Deno.serve(async (req) => {
       upload_id: uploadRow.id,
       entries: parsed.length,
       documents_extracted: docsCreated,
+      skipped,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("parse-ap-report error", err);
