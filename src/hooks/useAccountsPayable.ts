@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import JSZip from "jszip";
 
 export type FinancialSystem = "totvs" | "omie";
 export type ApApproval = "pending" | "approved" | "rejected";
@@ -101,24 +102,71 @@ export async function uploadApDocuments(input: {
 }): Promise<number> {
   const ts = Date.now();
   let count = 0;
+
+  // 1) Extrair ZIPs no client e expandir lista de arquivos.
+  const expanded: { name: string; blob: Blob; mime: string; size: number }[] = [];
   for (const file of input.files) {
-    const safe = file.name.replace(/[^\w.\-]+/g, "_");
-    const path = `${input.hotelId}/documents/${ts}-${count}-${safe}`;
-    const { error: upErr } = await supabase.storage
-      .from("accounts-payable")
-      .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: true });
-    if (upErr) throw upErr;
-    const { error: insErr } = await supabase.from("ap_documents").insert({
-      hotel_id: input.hotelId,
-      file_name: file.name,
-      file_path: path,
-      file_size: file.size,
-      mime_type: file.type || null,
-      uploaded_by: input.userId,
-    });
-    if (insErr) throw insErr;
-    count++;
+    const isZip =
+      file.name.toLowerCase().endsWith(".zip") ||
+      file.type === "application/zip" ||
+      file.type === "application/x-zip-compressed";
+    if (isZip) {
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const inner = Object.values(zip.files).filter((z) => !z.dir);
+        for (const z of inner) {
+          const lower = z.name.toLowerCase();
+          // Aceita PDFs e outros docs comuns dentro do ZIP
+          if (!/\.(pdf|ofx|xml|png|jpe?g)$/i.test(lower)) continue;
+          const blob = await z.async("blob");
+          const baseName = z.name.split("/").pop() || z.name;
+          const mime = lower.endsWith(".pdf")
+            ? "application/pdf"
+            : lower.endsWith(".png")
+            ? "image/png"
+            : /\.jpe?g$/.test(lower)
+            ? "image/jpeg"
+            : lower.endsWith(".xml")
+            ? "application/xml"
+            : lower.endsWith(".ofx")
+            ? "application/octet-stream"
+            : "application/octet-stream";
+          expanded.push({ name: baseName, blob, mime, size: blob.size });
+        }
+      } catch (err) {
+        throw new Error(`Falha ao extrair ZIP "${file.name}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      expanded.push({ name: file.name, blob: file, mime: file.type || "application/octet-stream", size: file.size });
+    }
   }
+
+  // 2) Upload concorrente em lotes para acelerar muitos arquivos.
+  const CONCURRENCY = 5;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < expanded.length) {
+      const i = cursor++;
+      const f = expanded[i];
+      const safe = f.name.replace(/[^\w.\-]+/g, "_");
+      const path = `${input.hotelId}/documents/${ts}-${i}-${safe}`;
+      const { error: upErr } = await supabase.storage
+        .from("accounts-payable")
+        .upload(path, f.blob, { contentType: f.mime, upsert: true });
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase.from("ap_documents").insert({
+        hotel_id: input.hotelId,
+        file_name: f.name,
+        file_path: path,
+        file_size: f.size,
+        mime_type: f.mime,
+        uploaded_by: input.userId,
+      });
+      if (insErr) throw insErr;
+      count++;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, expanded.length) }, worker));
   return count;
 }
 
