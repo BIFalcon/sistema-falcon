@@ -828,10 +828,31 @@ export default function ContasPagarPage() {
         open={!!linkEntry}
         onClose={() => setLinkEntry(null)}
         entry={linkEntry}
-        documents={[...docsByEntry.values(), ...unlinkedDocs]}
-        currentDoc={linkEntry ? (docsByEntry.get(linkEntry.id) ?? null) : null}
+        linkedDocs={linkEntry ? (allDocsByEntry.get(linkEntry.id) ?? []) : []}
+        primaryDoc={linkEntry ? (docsByEntry.get(linkEntry.id) ?? null) : null}
         unlinkedDocs={unlinkedDocs}
-        onLink={handleLink}
+        onAttach={(documentId, nfAmount) =>
+          attachDocMutation.mutateAsync({
+            hotelId: hotelId!,
+            entryId: linkEntry!.id,
+            documentId,
+            nfAmount,
+          })
+        }
+        onDetach={(d) =>
+          detachDocMutation.mutateAsync({
+            hotelId: hotelId!,
+            entryId: linkEntry!.id,
+            documentId: d.id,
+          })
+        }
+        onSetPrimary={(d) =>
+          setPrimaryDocMutation.mutateAsync({
+            hotelId: hotelId!,
+            entryId: linkEntry!.id,
+            documentId: d.id,
+          })
+        }
         onDelete={(d) =>
           handleDeleteDoc({ hotelId: hotelId!, documentId: d.id, filePath: d.file_path })
         }
