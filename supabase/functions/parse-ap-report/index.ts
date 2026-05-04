@@ -192,9 +192,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
       break;
     }
   }
-  const header = (rows[1] ?? []).map((h: any) => normalize(h));
   const headerArr = (rows[headerIdx] ?? []).map((h: any) => normalize(h));
-  const colSit = findCol(header, "situacao");
   // Colunas reais do OMIE (115 cols). Pulamos as variantes "Minha Empresa (...)".
   const colSit = findCol(headerArr, "situacao");
   const colSitVenc = findCol(headerArr, "situacao do vencimento");
