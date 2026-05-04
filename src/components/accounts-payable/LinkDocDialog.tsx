@@ -70,13 +70,13 @@ export function LinkDocDialog({
     setSearch("");
   }, [entryId]);
 
-  if (!entry) return null;
-
   const filteredUnlinked = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return unlinkedDocs;
     return unlinkedDocs.filter((d) => d.file_name.toLowerCase().includes(q));
   }, [unlinkedDocs, search]);
+
+  if (!entry) return null;
 
   const nfFloat = nfAmountInput ? parseFloat(nfAmountInput) : null;
   const hasDivergence =
