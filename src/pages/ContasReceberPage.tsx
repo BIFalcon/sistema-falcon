@@ -403,6 +403,11 @@ function DayBreakdown({
   contracts: ClientContract[] | undefined;
   onBack: () => void;
 }) {
+  const { isGg, isMaster, isFinanceiro, isControladoria } = useAuth();
+  const canConfirm = isGg || isMaster || isFinanceiro || isControladoria;
+  const setStatus = useSetToInvoiceGgStatus();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -420,12 +425,14 @@ function DayBreakdown({
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
+              <TableHead>Confirmação GG</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
               const due = term != null && e.transaction_date ? addDays(e.transaction_date, term) : null;
+              const isEditing = editingId === e.id;
               return (
                 <TableRow key={e.id}>
                   <TableCell>
@@ -438,6 +445,69 @@ function DayBreakdown({
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
                   </TableCell>
                   <TableCell className="text-xs">{due ? formatDay(due) : "—"}</TableCell>
+                  <TableCell className="text-xs space-y-1 min-w-[220px]">
+                    <GgStatusBadge status={e.gg_status} />
+                    {e.gg_note && (
+                      <div className="text-[11px] text-muted-foreground italic">"{e.gg_note}"</div>
+                    )}
+                    {canConfirm && !isEditing && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        <Button
+                          size="sm"
+                          variant={e.gg_status === "faturado" ? "default" : "outline"}
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => setStatus.mutate({ id: e.id, gg_status: "faturado", gg_note: e.gg_note })}
+                        >
+                          Faturado
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={e.gg_status === "nao_faturado" ? "default" : "outline"}
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => {
+                            setEditingId(e.id);
+                            setNoteDraft(e.gg_note ?? "");
+                          }}
+                        >
+                          Não faturado
+                        </Button>
+                      </div>
+                    )}
+                    {canConfirm && isEditing && (
+                      <div className="flex flex-col gap-1 pt-1">
+                        <Textarea
+                          value={noteDraft}
+                          onChange={(ev) => setNoteDraft(ev.target.value)}
+                          placeholder="Observação (opcional)"
+                          className="h-14 text-[11px]"
+                        />
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={async () => {
+                              await setStatus.mutateAsync({
+                                id: e.id,
+                                gg_status: "nao_faturado",
+                                gg_note: noteDraft.trim() || null,
+                              });
+                              setEditingId(null);
+                            }}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -446,6 +516,14 @@ function DayBreakdown({
       </div>
     </div>
   );
+}
+
+function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
+  if (status === "faturado")
+    return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Faturado</Badge>;
+  if (status === "nao_faturado")
+    return <Badge variant="destructive">Não faturado</Badge>;
+  return <Badge variant="outline">Pendente</Badge>;
 }
 
 function ConsolidatedRanking({
