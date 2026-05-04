@@ -14,12 +14,47 @@ import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } 
 import { MONTHS_PT } from "@/lib/constants";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const CARD_LINES = [
-  { title: "Taxa de Ocupação", labels: ["Taxa de Ocupação"] },
-  { title: "ADR", labels: ["Diária Média", "ADR"] },
-  { title: "RevPAR", labels: ["RevPAR"] },
-  { title: "GOP", labels: ["GOP", "Resultado Operacional Bruto"] },
+
+/**
+ * agg = "sum" para receitas/GOP (acumular no período)
+ * agg = "avg" para taxas/médias (Ocupação, ADR, RevPAR)
+ * agg = "ratio" para indicadores percentuais (%GOP, Margem Líquida) — calculado como
+ *        soma(numerador) / soma(denominador) no período.
+ */
+type CardDef =
+  | { title: string; format: "pct" | "brl"; agg: "sum" | "avg"; labels: string[] }
+  | { title: string; format: "pct"; agg: "ratio"; numLabels: string[]; denLabels: string[] };
+
+const CARD_LINES: CardDef[] = [
+  { title: "Taxa de Ocupação", format: "pct", agg: "avg", labels: ["Taxa de Ocupação"] },
+  { title: "ADR", format: "brl", agg: "avg", labels: ["Diária Média", "ADR"] },
+  { title: "RevPAR", format: "brl", agg: "avg", labels: ["RevPAR"] },
+  { title: "GOP", format: "brl", agg: "sum", labels: ["GOP", "Resultado Operacional Bruto"] },
+  {
+    title: "%GOP",
+    format: "pct",
+    agg: "ratio",
+    numLabels: ["GOP", "Resultado Operacional Bruto"],
+    denLabels: ["RECEITA LÍQUIDA TOTAL", "Receita Líquida Total", "RECEITA BRUTA TOTAL"],
+  },
+  {
+    title: "Margem Líquida",
+    format: "pct",
+    agg: "ratio",
+    numLabels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
+    denLabels: ["RECEITA LÍQUIDA TOTAL", "Receita Líquida Total", "RECEITA BRUTA TOTAL"],
+  },
 ];
+
+type PeriodKey = "1" | "2" | "3" | "6" | "12";
+const PERIOD_OPTIONS: { value: PeriodKey; label: string; months: number }[] = [
+  { value: "1", label: "Mensal", months: 1 },
+  { value: "2", label: "Bimestral", months: 2 },
+  { value: "3", label: "Trimestral", months: 3 },
+  { value: "6", label: "Semestral", months: 6 },
+  { value: "12", label: "Anual", months: 12 },
+];
+
 const chartConfig = {
   current: { label: "Realizado", color: "hsl(var(--primary))" },
   budget: { label: "Orçado", color: "hsl(var(--ring))" },
@@ -42,6 +77,85 @@ function valueAt(series: DreMonthValue[], month: number) {
   if (month === 0) return series.reduce<number | null>((sum, v) => (v == null ? sum : Number(sum ?? 0) + v), null);
   return series[month - 1] ?? null;
 }
+
+/**
+ * Retorna a janela de meses (1-based) para um período terminando em `endMonth`.
+ * Se endMonth = 0 (acumulado) ou periodMonths = 12, retorna todos de 1..12.
+ */
+function periodMonths(endMonth: number, periodMonths: number): number[] {
+  if (endMonth === 0 || periodMonths >= 12) {
+    return Array.from({ length: 12 }, (_, i) => i + 1);
+  }
+  const start = Math.max(1, endMonth - periodMonths + 1);
+  return Array.from({ length: endMonth - start + 1 }, (_, i) => start + i);
+}
+
+function aggregateSeries(
+  series: DreMonthValue[],
+  months: number[],
+  agg: "sum" | "avg",
+): number | null {
+  const vals = months
+    .map((m) => series[m - 1])
+    .filter((v): v is number => v != null && Number.isFinite(v));
+  if (vals.length === 0) return null;
+  const total = vals.reduce((a, b) => a + b, 0);
+  return agg === "sum" ? total : total / vals.length;
+}
+
+function aggregateRatio(
+  num: DreMonthValue[],
+  den: DreMonthValue[],
+  months: number[],
+): number | null {
+  let sumN = 0;
+  let sumD = 0;
+  let any = false;
+  for (const m of months) {
+    const n = num[m - 1];
+    const d = den[m - 1];
+    if (n != null && d != null && Number.isFinite(n) && Number.isFinite(d)) {
+      sumN += n;
+      sumD += d;
+      any = true;
+    }
+  }
+  if (!any || sumD === 0) return null;
+  return (sumN / sumD) * 100;
+}
+
+function pickLine(
+  dataset: ReturnType<typeof useDreAnalytics>["data"],
+  labels: string[],
+): DreLineNode | undefined {
+  for (const lbl of labels) {
+    const ln = findDreLine(dataset ?? undefined, lbl);
+    if (ln) return ln;
+  }
+  return undefined;
+}
+
+function computeCardValue(
+  card: CardDef,
+  dataset: ReturnType<typeof useDreAnalytics>["data"],
+  months: number[],
+  series: DreSeriesKey,
+): number | null {
+  if (card.agg === "ratio") {
+    const num = pickLine(dataset, card.numLabels);
+    const den = pickLine(dataset, card.denLabels);
+    if (!num || !den) return null;
+    return aggregateRatio(num.series[series], den.series[series], months);
+  }
+  const line = pickLine(dataset, card.labels);
+  if (!line) return null;
+  const v = aggregateSeries(line.series[series], months, card.agg);
+  if (v == null) return null;
+  // Taxa de Ocupação vem em fração ou %; normaliza para %
+  if (card.title === "Taxa de Ocupação") return v <= 1 ? v * 100 : v;
+  return v;
+}
+
 function sumSeries(lines: DreLineNode[], key: DreSeriesKey) {
   return Array.from({ length: 12 }, (_, i) => {
     let hasValue = false;
@@ -90,6 +204,7 @@ export default function IndicadoresDrePage() {
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   const [metric, setMetric] = useState("value");
   const [divider, setDivider] = useState("none");
+  const [period, setPeriod] = useState<PeriodKey>("1");
   const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
   const { data: dataset, isLoading } = useDreAnalytics({ hotelIds, year });
 
@@ -119,6 +234,19 @@ export default function IndicadoresDrePage() {
     return next;
   });
 
+  const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
+  const monthsWindow = useMemo(
+    () => periodMonths(month, periodCfg.months),
+    [month, periodCfg.months],
+  );
+  const periodLabel = useMemo(() => {
+    if (monthsWindow.length === 12) return `Acumulado de ${year}`;
+    if (monthsWindow.length === 1) return `${MONTHS_PT[monthsWindow[0] - 1]} de ${year}`;
+    const first = MONTHS_PT[monthsWindow[0] - 1];
+    const last = MONTHS_PT[monthsWindow[monthsWindow.length - 1] - 1];
+    return `${first}–${last} de ${year}`;
+  }, [monthsWindow, year]);
+
   return (
     <div className="space-y-6 max-w-[1500px]">
       <div className="flex items-start justify-between gap-4">
@@ -145,22 +273,59 @@ export default function IndicadoresDrePage() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Período
+              </span>
+              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERIOD_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">{periodLabel}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {CARD_LINES.map((card) => {
-              const line = card.labels.map((label) => findDreLine(dataset ?? undefined, label)).find(Boolean);
-              const cur = line ? valueAt(line.series.current, month) : null;
-              const bud = line ? valueAt(line.series.budget, month) : null;
-              const prev = line ? valueAt(line.series.previous, month) : null;
+              const cur = computeCardValue(card, dataset, monthsWindow, "current");
+              const bud = computeCardValue(card, dataset, monthsWindow, "budget");
+              const prev = computeCardValue(card, dataset, monthsWindow, "previous");
+              const fmt = (v: number | null) =>
+                card.format === "pct" ? pct(v) : brl(v);
               return (
                 <Card key={card.title} className="p-4 shadow-soft">
                   <h3 className="text-sm font-semibold mb-3">{card.title}</h3>
                   <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div><p className="text-muted-foreground">Realizado</p><p className="font-semibold text-foreground">{card.title === "Taxa de Ocupação" ? pct(cur && cur <= 1 ? cur * 100 : cur) : brl(cur)}</p></div>
-                    <div><p className="text-muted-foreground">Orçado</p><p className="font-semibold text-foreground">{card.title === "Taxa de Ocupação" ? pct(bud && bud <= 1 ? bud * 100 : bud) : brl(bud)}</p></div>
-                    <div><p className="text-muted-foreground">Ano ant.</p><p className="font-semibold text-foreground">{card.title === "Taxa de Ocupação" ? pct(prev && prev <= 1 ? prev * 100 : prev) : brl(prev)}</p></div>
+                    <div>
+                      <p className="text-muted-foreground">Realizado</p>
+                      <p className="font-semibold text-foreground">{fmt(cur)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Orçado</p>
+                      <p className="font-semibold text-foreground">{fmt(bud)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Ano ant.</p>
+                      <p className="font-semibold text-foreground">{fmt(prev)}</p>
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs"><span>vs Ano ant.</span><VariationPill value={variation(cur, prev)} /></div>
-                  <div className="mt-1 flex items-center justify-between text-xs"><span>vs Orçado</span><VariationPill value={variation(cur, bud)} /></div>
+                  <div className="mt-3 flex items-center justify-between text-xs">
+                    <span>vs Ano ant.</span>
+                    <VariationPill value={variation(cur, prev)} />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span>vs Orçado</span>
+                    <VariationPill value={variation(cur, bud)} />
+                  </div>
                 </Card>
               );
             })}
