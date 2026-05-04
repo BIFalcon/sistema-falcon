@@ -460,8 +460,9 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   const coverData = coverImg ? imageToDataUrl(coverImg, 1800, "jpeg") : null;
   // Logos como PNG (preserva transparência — sem fundo preto/branco)
-  const brandData = brandLogoImg ? imageToDataUrl(brandLogoImg, 800, "png") : null;
-  const falconData = falconLogoImg ? imageToDataUrl(falconLogoImg, 800, "png") : null;
+  // e capturando dimensões intrínsecas para evitar distorção (contain).
+  const brandData = logoFromImage(brandLogoImg);
+  const falconData = logoFromImage(falconLogoImg);
   const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
 
   // Histórico de 6 meses para os gráficos
