@@ -597,6 +597,40 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                   </Select>
                 </div>
               )}
+
+              {/* Sub-papel do Financeiro */}
+              {!isMasterFlag && primaryRole === "financeiro" && (
+                <div className="space-y-2 p-3 rounded-lg border bg-muted/20">
+                  <Label>Sub-papel do Financeiro</Label>
+                  <Select
+                    value={financeiroSubrole}
+                    onValueChange={(v) => setFinanceiroSubrole(v as "equipe" | "coordenadora")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="equipe">
+                        <div className="flex flex-col py-0.5">
+                          <span className="font-medium">Equipe Financeiro</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            Sobe planilhas, vincula documentos, marca como Inserido/Agendado
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="coordenadora">
+                        <div className="flex flex-col py-0.5">
+                          <span className="font-medium">Coordenadoria Financeiro</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            Acesso total — pode marcar lançamentos como Pago
+                          </span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="text-xs text-muted-foreground p-3 rounded border bg-muted/20">
                 <strong>Próximas fases:</strong> seleção fina de módulos e permissões granulares (upload
                 de DRE, aprovação por estágio etc.) será adicionada na próxima entrega. Por enquanto, o
