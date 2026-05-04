@@ -676,6 +676,12 @@ function HotelOpenFolioDetail({
   entries,
   agingFilter,
   setAgingFilter,
+  unjustifiedOnly,
+  setUnjustifiedOnly,
+  unjustifiedCount,
+  totalCount,
+  onNotifyGg,
+  notifying,
   onBack,
   hideBack,
 }: {
@@ -684,6 +690,12 @@ function HotelOpenFolioDetail({
   entries: OpenFolioEntry[];
   agingFilter: "all" | "fresh" | "mid" | "old";
   setAgingFilter: (v: "all" | "fresh" | "mid" | "old") => void;
+  unjustifiedOnly: boolean;
+  setUnjustifiedOnly: (v: boolean) => void;
+  unjustifiedCount: number;
+  totalCount: number;
+  onNotifyGg?: () => void;
+  notifying?: boolean;
   onBack: () => void;
   hideBack?: boolean;
 }) {
@@ -710,8 +722,28 @@ function HotelOpenFolioDetail({
             </Button>
           )}
           <h3 className="text-sm font-semibold">{hotelName}</h3>
+          {totalCount > 0 && (
+            <Badge variant="outline" className="text-[10px]">
+              {totalCount} folio(s)
+              {unjustifiedCount > 0 && (
+                <span className="ml-1 text-amber-600">· {unjustifiedCount} sem justificativa</span>
+              )}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={unjustifiedOnly ? "default" : "outline"}
+            size="sm"
+            className="gap-2"
+            onClick={() => setUnjustifiedOnly(!unjustifiedOnly)}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Sem justificativa
+            {unjustifiedCount > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">{unjustifiedCount}</Badge>
+            )}
+          </Button>
           <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -721,6 +753,18 @@ function HotelOpenFolioDetail({
               <SelectItem value="old">Acima de 90 dias</SelectItem>
             </SelectContent>
           </Select>
+          {onNotifyGg && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={!!notifying || totalCount === 0}
+              onClick={onNotifyGg}
+            >
+              {notifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Notificar GG
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
