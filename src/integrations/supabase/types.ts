@@ -513,6 +513,10 @@ export type Database = {
           created_at: string
           departure_date: string | null
           entry_key: string
+          gg_confirmed_at: string | null
+          gg_confirmed_by: string | null
+          gg_note: string | null
+          gg_status: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id: string | null
           id: string
           invoice_number: string | null
@@ -535,6 +539,10 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           entry_key: string
+          gg_confirmed_at?: string | null
+          gg_confirmed_by?: string | null
+          gg_note?: string | null
+          gg_status?: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id?: string | null
           id?: string
           invoice_number?: string | null
@@ -557,6 +565,10 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           entry_key?: string
+          gg_confirmed_at?: string | null
+          gg_confirmed_by?: string | null
+          gg_note?: string | null
+          gg_status?: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id?: string | null
           id?: string
           invoice_number?: string | null
@@ -1568,6 +1580,7 @@ export type Database = {
         | "ri"
         | "financeiro"
         | "gg"
+      ar_gg_status: "pendente" | "faturado" | "nao_faturado"
       closing_stage: "dre" | "carta" | "financeiro" | "envio"
       closing_status:
         | "nao_iniciado"
@@ -1738,6 +1751,7 @@ export const Constants = {
         "financeiro",
         "gg",
       ],
+      ar_gg_status: ["pendente", "faturado", "nao_faturado"],
       closing_stage: ["dre", "carta", "financeiro", "envio"],
       closing_status: [
         "nao_iniciado",
