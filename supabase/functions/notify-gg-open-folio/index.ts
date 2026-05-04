@@ -21,11 +21,14 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const uploadId: string | undefined = body?.upload_id;
+    const targetHotelId: string | undefined = body?.hotel_id;
 
     // Agrega folios em aberto por hotel
-    const { data: entries, error } = await admin
+    let q = admin
       .from("ar_open_folio_entries")
       .select("hotel_id, balance");
+    if (targetHotelId) q = q.eq("hotel_id", targetHotelId);
+    const { data: entries, error } = await q;
     if (error) throw error;
 
     const grouped = new Map<string, { count: number; total: number }>();
