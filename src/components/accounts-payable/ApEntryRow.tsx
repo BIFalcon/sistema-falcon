@@ -21,7 +21,7 @@ interface EntryRowProps {
   onApprove: (a: "approved" | "rejected" | "pending") => void;
 }
 
-export function EntryRow({
+export function ApEntryRow({
   entry,
   doc,
   sourceSystem,
