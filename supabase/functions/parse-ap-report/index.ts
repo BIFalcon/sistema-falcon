@@ -143,41 +143,106 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
 function findCol(header: string[], ...candidates: string[]): number {
   const norm = header.map((h) => toAscii(normalize(h)));
   for (const c of candidates) {
-    const i = norm.findIndex((h) => h.includes(toAscii(c)));
+    const target = toAscii(c);
+    // Tenta match exato primeiro (header OMIE tem variantes do tipo
+    // "Razão Social" e "Minha Empresa (Razão Social)" — exato evita confusão).
+    let i = norm.findIndex((h) => h === target);
+    if (i < 0) i = norm.findIndex((h) => h.includes(target));
     if (i >= 0) return i;
   }
   return -1;
 }
 
-function parseOmieXlsx(buf: ArrayBuffer): ParsedEntry[] {
+// Hotéis que aceitam Santander além de Itaú Unibanco
+const SANTANDER_ALLOWED_HOTELS = new Set([
+  "ibis-budget-petropolis",
+  "ibis-juiz-de-fora",
+]);
+
+function isAllowedBank(account: string, hotelId: string): boolean {
+  const a = toAscii(account);
+  if (a.includes("itau")) return true;
+  if (a.includes("santander") && SANTANDER_ALLOWED_HOTELS.has(hotelId)) return true;
+  return false;
+}
+
+// 'Em Aprovação' no OMIE = GG já aprovou. 'Agendado' também já passou (foi pro
+// banco). Os demais ('A Vencer', 'Atrasado', 'Vence Hoje') ainda dependem do GG.
+function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
+  const s = toAscii(sit ?? "");
+  if (s.includes("em aprovacao") || s.startsWith("agendado")) return "approved";
+  return "pending";
+}
+
+function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
+  entries: ParsedEntry[];
+  skipped: { other_bank: number; no_amount: number; no_supplier: number };
+} {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  // linha 0 título, linha 1 cabeçalho, linha 2 total geral, 3+ dados
-  if (rows.length < 4) return [];
+  // OMIE real: linha 0 = título, linha 1 = cabeçalho (115 colunas), linha 2 = vazia/totais, dados a partir do índice 2.
+  // Mantemos compat: detectamos a linha do cabeçalho buscando 'Vencimento'.
+  if (rows.length < 3) return { entries: [], skipped: { other_bank: 0, no_amount: 0, no_supplier: 0 } };
+  let headerIdx = 1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const row = (rows[i] ?? []).map((c: any) => toAscii(normalize(c)));
+    if (row.includes("vencimento") && row.some((c) => c.includes("razao social"))) {
+      headerIdx = i;
+      break;
+    }
+  }
   const header = (rows[1] ?? []).map((h: any) => normalize(h));
+  const headerArr = (rows[headerIdx] ?? []).map((h: any) => normalize(h));
   const colSit = findCol(header, "situacao");
-  const colCnpj = findCol(header, "cnpj");
-  const colSupplier = findCol(header, "razao social", "razao", "fornecedor");
-  const colDue = findCol(header, "vencimento");
-  const colCategory = findCol(header, "categoria");
-  const colDoc = findCol(header, "nota fiscal", "documento");
-  const colAmount = findCol(header, "a pagar", "valor", "receber");
-  const colObs = findCol(header, "observacao", "observa");
+  // Colunas reais do OMIE (115 cols). Pulamos as variantes "Minha Empresa (...)".
+  const colSit = findCol(headerArr, "situacao");
+  const colSitVenc = findCol(headerArr, "situacao do vencimento");
+  // CNPJ do fornecedor — preferimos 'CNPJ/CPF' e evitamos 'Minha Empresa (CNPJ)'.
+  let colCnpj = findCol(headerArr, "cnpj/cpf");
+  if (colCnpj < 0) {
+    // fallback: primeiro 'cnpj' que NÃO seja 'minha empresa'
+    const norm = headerArr.map((h: string) => toAscii(h));
+    colCnpj = norm.findIndex((h) => h.includes("cnpj") && !h.includes("minha empresa"));
+  }
+  // Razão Social do fornecedor — evitar 'Minha Empresa (Razão Social)'.
+  let colSupplier = -1;
+  {
+    const norm = headerArr.map((h: string) => toAscii(h));
+    colSupplier = norm.findIndex((h) => h === "razao social");
+    if (colSupplier < 0) colSupplier = norm.findIndex((h) => h.includes("razao social") && !h.includes("minha empresa"));
+    if (colSupplier < 0) colSupplier = findCol(headerArr, "fornecedor");
+  }
+  const colDue = findCol(headerArr, "vencimento");
+  const colCategory = findCol(headerArr, "categoria");
+  const colDoc = findCol(headerArr, "nota fiscal", "documento");
+  const colAmount = findCol(headerArr, "a pagar", "valor", "receber");
+  const colObs = findCol(headerArr, "observacao da conta", "observacao", "observa");
+  const colBank = findCol(headerArr, "conta corrente");
+  const colPayMethod = findCol(headerArr, "forma de pagamento");
 
   const out: ParsedEntry[] = [];
-  for (let i = 3; i < rows.length; i++) {
+  const skipped = { other_bank: 0, no_amount: 0, no_supplier: 0 };
+  for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
     const supplier = normalize(row[colSupplier] ?? "");
-    if (!supplier) continue;
+    if (!supplier) { skipped.no_supplier++; continue; }
     const lower = toAscii(supplier);
-    if (lower.includes("total")) continue;
+    if (lower.includes("total") || lower === "razao social") continue;
+    // Filtro de banco
+    const bank = colBank >= 0 ? normalize(row[colBank] ?? "") : "";
+    if (bank && !isAllowedBank(bank, hotelId)) {
+      skipped.other_bank++;
+      continue;
+    }
     const amountRaw = row[colAmount];
     const amount = Math.abs(parseNumber(amountRaw));
-    if (amount <= 0) continue;
+    if (amount <= 0) { skipped.no_amount++; continue; }
     const docNumber = normalize(row[colDoc] ?? "");
     const due = parseDate(row[colDue]);
+    const sitVenc = colSitVenc >= 0 ? normalize(row[colSitVenc] ?? "") : "";
+    const sit = colSit >= 0 ? normalize(row[colSit] ?? "") : "";
     out.push({
       entry_key: makeKey(supplier, docNumber, due, amount),
       supplier,
@@ -186,16 +251,16 @@ function parseOmieXlsx(buf: ArrayBuffer): ParsedEntry[] {
       description: null,
       due_date: due,
       amount,
-      payment_method: null,
+      payment_method: colPayMethod >= 0 ? normalize(row[colPayMethod] ?? "") || null : null,
       category: normalize(row[colCategory] ?? "") || null,
       observation: normalize(row[colObs] ?? "") || null,
       interest_fees: null,
-      omie_situation: normalize(row[colSit] ?? "") || null,
+      omie_situation: sit || null,
       is_distribution: isDistributionEntry(normalize(row[colCategory] ?? ""), null),
-      raw: { row, header },
+      raw: { row, header: headerArr, situacao_vencimento: sitVenc, conta_corrente: bank },
     });
   }
-  return out;
+  return { entries: out, skipped };
 }
 
 async function extractFromZip(buf: ArrayBuffer): Promise<{
