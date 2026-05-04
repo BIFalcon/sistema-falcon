@@ -746,7 +746,7 @@ function drawDreTable(
         : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
   const x0 = 12, x1 = SIZE - 12;
-  let y = 30;
+  let y = HEADER_CONTENT_Y;
   // header navy
   doc.setFillColor(NAVY);
   doc.rect(x0, y, x1 - x0, 7, "F");
