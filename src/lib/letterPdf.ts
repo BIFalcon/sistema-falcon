@@ -120,6 +120,152 @@ function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
 }
 
 /**
+ * Extrai apenas o ÍCONE DO PÁSSARO da logo Falcon institucional.
+ *
+ * A logo padrão tem o pássaro na parte superior e o wordmark "FALCON HOTÉIS"
+ * na metade inferior, sempre com fundo transparente ou branco. Para isolar o
+ * pássaro, varremos os pixels não-transparentes APENAS no topo da imagem
+ * (até ~45% da altura) e calculamos a bounding box. Em seguida recortamos.
+ *
+ * Retorna um PNG com o pássaro normalizado para tom cinza muito claro
+ * (cinza neutro), pronto para ser usado como marca d'água.
+ */
+function extractBirdWatermark(img: HTMLImageElement | null): LogoAsset | null {
+  if (!img) return null;
+  const W = img.naturalWidth;
+  const H = img.naturalHeight;
+  if (!W || !H) return null;
+
+  // Renderiza em canvas para poder ler pixels.
+  const src = document.createElement("canvas");
+  src.width = W;
+  src.height = H;
+  const sctx = src.getContext("2d");
+  if (!sctx) return null;
+  sctx.drawImage(img, 0, 0);
+
+  let data: ImageData;
+  try {
+    data = sctx.getImageData(0, 0, W, H);
+  } catch {
+    // Cross-origin sem CORS — devolve a logo inteira como fallback (melhor que nada).
+    return logoFromImage(img);
+  }
+
+  // Considera "tinta" (parte do desenho) qualquer pixel com alfa > 32 que
+  // não seja praticamente branco. Funciona para PNG transparente ou JPEG/PNG
+  // com fundo branco.
+  const isInk = (r: number, g: number, b: number, a: number): boolean => {
+    if (a < 32) return false;
+    const lum = (r + g + b) / 3;
+    return lum < 230;
+  };
+
+  // 1) Encontra a bbox do pássaro varrendo apenas o topo (até 50% da altura).
+  const scanH = Math.floor(H * 0.5);
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < scanH; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (isInk(data.data[i], data.data[i + 1], data.data[i + 2], data.data[i + 3])) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  // Se não achou nada (logo só com texto?), devolve a logo inteira.
+  if (maxX < 0 || maxY < 0) return logoFromImage(img);
+
+  // pequena margem (2% de cada lado) para não cortar
+  const pad = Math.round(Math.max(W, H) * 0.02);
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(W - 1, maxX + pad);
+  maxY = Math.min(H - 1, maxY + pad);
+  const cw = maxX - minX + 1;
+  const ch = maxY - minY + 1;
+
+  // 2) Renderiza o recorte e neutraliza a cor para um cinza médio
+  //    (a opacidade final é controlada pelo GState ao desenhar no PDF).
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  const octx = out.getContext("2d");
+  if (!octx) return null;
+  octx.drawImage(img, minX, minY, cw, ch, 0, 0, cw, ch);
+
+  const cropped = octx.getImageData(0, 0, cw, ch);
+  for (let i = 0; i < cropped.data.length; i += 4) {
+    const a = cropped.data[i + 3];
+    if (a < 32) {
+      // pixel praticamente vazio — força transparente
+      cropped.data[i + 3] = 0;
+      continue;
+    }
+    const r = cropped.data[i];
+    const g = cropped.data[i + 1];
+    const b = cropped.data[i + 2];
+    const lum = (r + g + b) / 3;
+    if (lum > 230) {
+      // fundo branco/quase-branco — torna transparente
+      cropped.data[i + 3] = 0;
+    } else {
+      // tinta do pássaro — pinta de cinza neutro escuro,
+      // a opacidade visual final virá do GState no PDF.
+      cropped.data[i] = 80;
+      cropped.data[i + 1] = 80;
+      cropped.data[i + 2] = 80;
+      cropped.data[i + 3] = 255;
+    }
+  }
+  octx.putImageData(cropped, 0, 0);
+
+  return { data: out.toDataURL("image/png"), w: cw, h: ch };
+}
+
+/**
+ * Desenha a marca d'água do pássaro Falcon centralizada em uma área
+ * da página, atrás do conteúdo, em opacidade muito baixa (8%).
+ *
+ * IMPORTANTE: chamar ANTES de desenhar qualquer conteúdo da página
+ * (logo após `addPage` + `drawPageHeader`) para que fique no fundo.
+ */
+function drawBirdWatermark(
+  doc: jsPDF,
+  bird: LogoAsset | null,
+  area: { x: number; y: number; w: number; h: number },
+  heightFraction = 0.55,
+) {
+  if (!bird) return;
+  // Altura alvo = fração da altura da área disponível
+  const targetH = area.h * heightFraction;
+  const ratio = bird.w / bird.h;
+  const targetW = targetH * ratio;
+  // Se ficar mais largo que a área, limita pela largura (mantém aspecto)
+  const w = Math.min(targetW, area.w * 0.85);
+  const h = w / ratio;
+  const x = area.x + (area.w - w) / 2;
+  const y = area.y + (area.h - h) / 2;
+
+  const gs = new (jsPDF as unknown as { GState: new (p: { opacity: number }) => unknown }).GState({
+    opacity: 0.08,
+  });
+  doc.setGState(gs);
+  doc.addImage(bird.data, "PNG", x, y, w, h, undefined, "FAST");
+  // Restaura opacidade total para o conteúdo subsequente.
+  const gsFull = new (jsPDF as unknown as { GState: new (p: { opacity: number }) => unknown }).GState({
+    opacity: 1,
+  });
+  doc.setGState(gsFull);
+}
+
+/**
  * Desenha uma imagem PNG dentro de uma caixa (boxX, boxY, boxW, boxH)
  * preservando a proporção original (object-fit: contain) e centralizando.
  * `align` controla o alinhamento horizontal quando há sobra de espaço.
@@ -463,6 +609,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // e capturando dimensões intrínsecas para evitar distorção (contain).
   const brandData = logoFromImage(brandLogoImg);
   const falconData = logoFromImage(falconLogoImg);
+  // Marca d'água: extrai apenas o pássaro da logo Falcon (sem o wordmark).
+  const birdWatermark = extractBirdWatermark(falconLogoImg);
   const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
 
   // Histórico de 6 meses para os gráficos
@@ -588,6 +736,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 4. COMENTÁRIOS DO MÊS ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Comentários do mês", falconData, brandData);
   doc.setTextColor(TEXT);
   const blocks: string[] = [];
@@ -610,6 +759,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Destaques do mês", falconData, brandData);
   const colW = (SIZE - 30) / 2;
   const rowH = 75;
@@ -642,6 +792,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 6. DEMONSTRATIVO DE RESULTADOS ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Demonstrativo de Resultados", falconData, brandData);
   drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`);
 
@@ -653,6 +804,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     doc.setFillColor(NAVY); doc.rect(0, 0, SIZE, 138, "F");
   }
   doc.setFillColor("#FFFFFF"); doc.rect(0, 138, SIZE, SIZE - 138, "F");
+  // Marca d'água apenas na metade branca da página (abaixo da foto).
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 138, w: SIZE, h: SIZE - 138 }, 0.7);
   // Faixa decorativa entre foto e bloco de texto (igual à capa)
   drawDecorativeStripe(doc, 16, 144, SIZE - 32);
   doc.setTextColor(NAVY);
