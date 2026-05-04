@@ -232,6 +232,46 @@ export default function ContasPagarPage() {
     }
   }
 
+  async function handleBulkPaymentStatus(newStatus: ApPaymentStatus) {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (newStatus === "pago" && !canMarkPaid) {
+      toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
+      return;
+    }
+    if ((newStatus === "inserido" || newStatus === "agendado") && !canMarkInsertedAgendado) {
+      toast.error("Sem permissão para alterar status");
+      return;
+    }
+    try {
+      await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
+      toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`);
+      setSelectedIds(new Set());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar status");
+    }
+  }
+
+  function toggleSelected(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const visibleIds = displayRows.flatMap((r) => (r.kind === "entry" ? [r.entry.id] : []));
+      if (checked) visibleIds.forEach((id) => next.add(id));
+      else visibleIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-[1400px]">
