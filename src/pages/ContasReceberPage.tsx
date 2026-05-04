@@ -483,10 +483,50 @@ function OpenFolioSection({
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
+  const { data: allNotes = [] } = useAllOpenFolioNotes();
   // Filtro global do header (Hotel) é a única fonte de verdade.
   const { hotelId: globalHotelId, setHotelId } = useFilters();
   const selectedHotel = globalHotelId;
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
+  const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
+  const [notifying, setNotifying] = useState<string | null>(null);
+
+  // confirmation_numbers que possuem ao menos uma justificativa, indexados por hotel
+  const justifiedByHotel = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const n of allNotes) {
+      if (!n.note?.trim()) continue;
+      const set = m.get(n.hotel_id) ?? new Set<string>();
+      set.add(n.confirmation_number);
+      m.set(n.hotel_id, set);
+    }
+    return m;
+  }, [allNotes]);
+
+  const isJustified = (e: OpenFolioEntry) => {
+    if (!e.hotel_id || !e.confirmation_number) return false;
+    return justifiedByHotel.get(e.hotel_id)?.has(e.confirmation_number) ?? false;
+  };
+
+  async function notifyGgForHotel(hotelId: string, hotelName: string) {
+    setNotifying(hotelId);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-gg-open-folio", {
+        body: { hotel_id: hotelId },
+      });
+      if (error) throw error;
+      if ((data as any)?.hotels_notified > 0) {
+        toast.success(`GG de ${hotelName} notificado por e-mail`);
+      } else {
+        toast.warning(`Nenhum GG ativo encontrado para ${hotelName}`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao notificar GG");
+    } finally {
+      setNotifying(null);
+    }
+  }
+
   const allowedSet = useMemo(
     () => (seesAllHotels ? null : new Set(restrictedHotelIds ?? [])),
     [seesAllHotels, restrictedHotelIds],
@@ -497,16 +537,17 @@ function OpenFolioSection({
   );
 
   const summaries = useMemo(() => {
-    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
+    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number }>();
     for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
-      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0 };
+      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0, unjustified: 0 };
       cur.count++;
       cur.total += Number(e.balance ?? 0);
       if (e.days_open != null) {
         cur.daysSum += e.days_open;
         cur.daysCount++;
       }
+      if (!isJustified(e)) cur.unjustified++;
       map.set(e.hotel_id, cur);
     }
     const hotelById = new Map(hotels.map((h) => [h.id, h]));
@@ -517,9 +558,10 @@ function OpenFolioSection({
         count: v.count,
         total: v.total,
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
+        unjustified: v.unjustified,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [visibleEntries, hotels]);
+  }, [visibleEntries, hotels, justifiedByHotel]);
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
@@ -532,8 +574,9 @@ function OpenFolioSection({
         if (agingFilter === "mid") return d > 30 && d <= 90;
         return d > 90;
       })
+      .filter((e) => (unjustifiedOnly ? !isJustified(e) : true))
       .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0));
-  }, [visibleEntries, selectedHotel, agingFilter]);
+  }, [visibleEntries, selectedHotel, agingFilter, unjustifiedOnly, justifiedByHotel]);
 
   return (
     <div className="space-y-5">
@@ -548,6 +591,12 @@ function OpenFolioSection({
           entries={filteredEntries}
           agingFilter={agingFilter}
           setAgingFilter={setAgingFilter}
+          unjustifiedOnly={unjustifiedOnly}
+          setUnjustifiedOnly={setUnjustifiedOnly}
+          unjustifiedCount={summaries.find((s) => s.id === selectedHotel)?.unjustified ?? 0}
+          totalCount={summaries.find((s) => s.id === selectedHotel)?.count ?? 0}
+          onNotifyGg={isManager ? () => notifyGgForHotel(selectedHotel, hotels.find((h) => h.id === selectedHotel)?.name ?? selectedHotel) : undefined}
+          notifying={notifying === selectedHotel}
           onBack={() => setHotelId(null)}
           hideBack={isGgOnly}
         />
@@ -576,22 +625,41 @@ function OpenFolioSection({
                   : s.avgDays > 30 ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
                   : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400";
                 return (
-                  <button
+                  <div
                     key={s.id}
-                    onClick={() => setHotelId(s.id)}
                     className="w-full text-left p-4 rounded-lg border hover:border-accent hover:shadow-soft transition-all flex items-center gap-4"
                   >
-                    <div className="flex-1 min-w-0">
+                    <button
+                      onClick={() => setHotelId(s.id)}
+                      className="flex-1 min-w-0 text-left"
+                    >
                       <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.count} folio(s) em aberto</p>
-                    </div>
+                      <p className="text-xs text-muted-foreground">
+                        {s.count} folio(s) em aberto
+                        {s.unjustified > 0 && (
+                          <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
+                        )}
+                      </p>
+                    </button>
                     <div className="text-right">
                       <p className="text-lg font-semibold">{brl(s.total)}</p>
                       <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${tone}`}>
                         média {s.avgDays}d
                       </span>
                     </div>
-                  </button>
+                    {isManager && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 shrink-0"
+                        disabled={notifying === s.id}
+                        onClick={() => notifyGgForHotel(s.id, s.name)}
+                      >
+                        {notifying === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                        Notificar GG
+                      </Button>
+                    )}
+                  </div>
                 );
               })}
             </div>
