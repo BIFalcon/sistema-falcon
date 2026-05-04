@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type FinancialSystem = "totvs" | "omie";
 export type ApApproval = "pending" | "approved" | "rejected";
+export type ApPaymentStatus = "pendente" | "inserido" | "agendado" | "pago";
 
 export interface ApUpload {
   id: string;
@@ -42,6 +43,10 @@ export interface ApEntry {
   primary_document_id: string | null;
   is_distribution: boolean;
   archived_at: string | null;
+  payment_status: ApPaymentStatus;
+  payment_marked_by: string | null;
+  payment_marked_at: string | null;
+  payment_paid_at: string | null;
 }
 
 export interface ApBankBalance {
@@ -372,4 +377,28 @@ export async function uploadApReport(input: {
   if (error) throw error;
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as { entries: number; documents_extracted: number };
+}
+
+/** Atualiza em lote o status de pagamento dos lançamentos. */
+export function useSetEntryPaymentStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      entryIds: string[];
+      status: ApPaymentStatus;
+    }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ payment_status: input.status })
+        .in("id", input.entryIds);
+      if (error) throw error;
+      return input.entryIds.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
 }
