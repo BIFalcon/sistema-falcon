@@ -87,12 +87,28 @@ function findCol(header: string[], ...candidates: string[]): number {
 
 function parseToInvoice(rows: unknown[][]): ParsedToInvoiceEntry[] {
   if (rows.length < 2) return [];
-  const header = rows[0].map((cell) => normalize(cell));
+  // O arquivo real tem:
+  //   linha 0: título "Faturados" (a ignorar)
+  //   linha 1: vazia
+  //   linha 2: cabeçalho (17 colunas)
+  //   linhas 3+: dados
+  // Detectamos o cabeçalho dinamicamente procurando pela linha que contém
+  // "Property Name" — assim mantemos compat com arquivos antigos.
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(rows.length, 8); i += 1) {
+    const candidate = (rows[i] ?? []).map((cell) => toAscii(normalize(cell)));
+    if (candidate.some((c) => c.includes("property name") || c === "property")) {
+      headerIdx = i;
+      break;
+    }
+  }
+  const header = (rows[headerIdx] ?? []).map((cell) => normalize(cell));
 
   const cProp = findCol(header, "property name", "property");
   const cAcctNum = findCol(header, "account number");
   const cAcctName = findCol(header, "account name");
   const cAcctType = findCol(header, "account type");
+  const cStatus = findCol(header, "status");
   const cInvNum = findCol(header, "invoice number");
   const cInvStatus = findCol(header, "invoice status");
   const cTxDate = findCol(header, "transaction date");
@@ -105,10 +121,12 @@ function parseToInvoice(rows: unknown[][]): ParsedToInvoiceEntry[] {
   const cDep = findCol(header, "departure date");
 
   const entries: ParsedToInvoiceEntry[] = [];
-  for (let i = 1; i < rows.length; i += 1) {
+  for (let i = headerIdx + 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
     const propertyName = normalize(row[cProp] ?? "");
     if (!propertyName || toAscii(propertyName).startsWith("total")) continue;
+    // Pula a linha de cabeçalho repetida ou linhas vazias
+    if (toAscii(propertyName) === "property name") continue;
 
     const transactionDate = parseDate(row[cTxDate]);
     const amount = parseNumber(row[cAmount]);
@@ -123,7 +141,9 @@ function parseToInvoice(rows: unknown[][]): ParsedToInvoiceEntry[] {
       account_name: normalize(row[cAcctName] ?? "") || null,
       account_type: normalize(row[cAcctType] ?? "") || null,
       invoice_number: invoiceNumber || null,
-      invoice_status: normalize(row[cInvStatus] ?? "") || null,
+      // Usa Invoice Status; se não existir, cai para Status genérico.
+      invoice_status:
+        normalize(row[cInvStatus] ?? row[cStatus] ?? "") || null,
       transaction_date: transactionDate,
       original_amount: parseNumber(row[cOrig]) || null,
       amount: amount || null,
