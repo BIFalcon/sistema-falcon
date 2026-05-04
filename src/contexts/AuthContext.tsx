@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("hotels").select("*").order("name"),
       ]);
 
-    setProfile(prof ?? null);
+    setProfile((prof ?? null) as Profile | null);
     setRoles((roleRows ?? []).map((r: { role: AppRole }) => r.role));
     setUserHotels(
       (hotelRows ?? [])
