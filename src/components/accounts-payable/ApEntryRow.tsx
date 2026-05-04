@@ -2,7 +2,7 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  * Extraída de ContasPagarPage para isolar a renderização por linha.
  */
-import { AlertTriangle, BanknoteArrowUp, CalendarClock, CheckCircle2, CircleDashed, Clock, Link2, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, Link2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -198,6 +198,34 @@ function ApprovalBadge({ status }: { status: string }) {
   return (
     <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400">
       <Clock className="h-3 w-3" /> Pendente
+    </Badge>
+  );
+}
+
+// ── Badge de status de pagamento ────────────────────────────────────────────
+
+export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
+  if (status === "pago")
+    return (
+      <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+        <Banknote className="h-3 w-3" /> Pago
+      </Badge>
+    );
+  if (status === "inserido")
+    return (
+      <Badge variant="outline" className="gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400">
+        <CheckCircle2 className="h-3 w-3" /> Inserido
+      </Badge>
+    );
+  if (status === "agendado")
+    return (
+      <Badge variant="outline" className="gap-1 border-violet-500/40 text-violet-700 dark:text-violet-400">
+        <CalendarClock className="h-3 w-3" /> Agendado
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="gap-1 border-muted-foreground/30 text-muted-foreground">
+      <CircleDashed className="h-3 w-3" /> Pendente
     </Badge>
   );
 }
