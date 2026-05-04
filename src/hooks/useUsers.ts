@@ -14,6 +14,8 @@ export interface ManagedUser {
   hotel_ids: string[];
   is_master: boolean;
   is_protected: boolean; // processos ou fernando — não pode ser desativado
+  /** Sub-papel do financeiro: equipe (ops) ou coordenadora. Apenas relevante se roles inclui 'financeiro'. */
+  financeiro_subrole: "equipe" | "coordenadora" | null;
 }
 
 export function useManagedUsers() {
@@ -24,7 +26,7 @@ export function useManagedUsers() {
         await Promise.all([
           supabase
             .from("profiles")
-            .select("user_id, email, display_name, status, created_at")
+            .select("user_id, email, display_name, status, created_at, financeiro_subrole")
             .order("created_at", { ascending: false }),
           supabase.from("user_roles").select("user_id, role"),
           supabase.from("user_hotels").select("user_id, hotel_id"),
@@ -60,9 +62,29 @@ export function useManagedUsers() {
           hotel_ids: hotelsByUser.get(p.user_id) ?? [],
           is_master: isMaster,
           is_protected: isProtected,
+          financeiro_subrole:
+            ((p as { financeiro_subrole?: string | null }).financeiro_subrole as
+              | "equipe"
+              | "coordenadora"
+              | null) ?? null,
         };
       });
     },
+  });
+}
+
+/** Atualiza apenas o sub-papel do financeiro (equipe / coordenadora) no profile. */
+export function useSetFinanceiroSubrole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { user_id: string; subrole: "equipe" | "coordenadora" | null }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ financeiro_subrole: input.subrole })
+        .eq("user_id", input.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["managed-users"] }),
   });
 }
 
