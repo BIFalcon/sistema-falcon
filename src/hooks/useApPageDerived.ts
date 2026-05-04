@@ -28,7 +28,10 @@ export interface ApPageDerived {
   filtered: ApEntry[];
   displayRows: DisplayRow[];
   categories: string[];
+  /** Documento "principal" (primary_document_id) por lançamento. */
   docsByEntry: Map<string, ApDocument>;
+  /** TODOS os documentos vinculados a cada lançamento. */
+  allDocsByEntry: Map<string, ApDocument[]>;
   unlinkedDocs: ApDocument[];
   urgencyCounts: {
     today: number;
@@ -95,11 +98,35 @@ export function useApPageDerived(opts: {
   );
 
   // ── Documentos ─────────────────────────────────────────────────────────
-  const docsByEntry = useMemo(() => {
-    const map = new Map<string, ApDocument>();
-    documents.forEach((d) => { if (d.entry_id) map.set(d.entry_id, d); });
+  const allDocsByEntry = useMemo(() => {
+    const map = new Map<string, ApDocument[]>();
+    documents.forEach((d) => {
+      if (!d.entry_id) return;
+      const arr = map.get(d.entry_id) ?? [];
+      arr.push(d);
+      map.set(d.entry_id, arr);
+    });
     return map;
   }, [documents]);
+
+  const primaryDocIdByEntry = useMemo(() => {
+    const map = new Map<string, string>();
+    allEntriesRaw.forEach((e) => {
+      if (e.primary_document_id) map.set(e.id, e.primary_document_id);
+    });
+    return map;
+  }, [allEntriesRaw]);
+
+  const docsByEntry = useMemo(() => {
+    // primary doc por entry (compat com código existente)
+    const map = new Map<string, ApDocument>();
+    for (const [entryId, list] of allDocsByEntry) {
+      const primaryId = primaryDocIdByEntry.get(entryId);
+      const primary = primaryId ? list.find((d) => d.id === primaryId) : null;
+      map.set(entryId, primary ?? list[0]);
+    }
+    return map;
+  }, [allDocsByEntry, primaryDocIdByEntry]);
 
   const unlinkedDocs = useMemo(
     () => documents.filter((d) => !d.entry_id),
@@ -252,6 +279,7 @@ export function useApPageDerived(opts: {
     displayRows,
     categories,
     docsByEntry,
+    allDocsByEntry,
     unlinkedDocs,
     urgencyCounts,
     issueCounts,
