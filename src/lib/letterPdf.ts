@@ -101,6 +101,60 @@ function imageToDataUrl(
     : canvas.toDataURL("image/jpeg", 0.85);
 }
 
+/**
+ * Logo com dimensões intrínsecas (px) — usado para preservar a proporção
+ * ao desenhar dentro de uma "caixa" no PDF (object-fit: contain).
+ */
+interface LogoAsset {
+  data: string;
+  /** Largura intrínseca em pixels (após reescala em `imageToDataUrl`). */
+  w: number;
+  /** Altura intrínseca em pixels. */
+  h: number;
+}
+
+function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
+  if (!img) return null;
+  const data = imageToDataUrl(img, 800, "png");
+  return { data, w: img.naturalWidth, h: img.naturalHeight };
+}
+
+/**
+ * Desenha uma imagem PNG dentro de uma caixa (boxX, boxY, boxW, boxH)
+ * preservando a proporção original (object-fit: contain) e centralizando.
+ * `align` controla o alinhamento horizontal quando há sobra de espaço.
+ */
+function drawContainedLogo(
+  doc: jsPDF,
+  logo: LogoAsset | null,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+  align: "left" | "right" | "center" = "center",
+) {
+  if (!logo) return;
+  const ratio = logo.w / logo.h;
+  const boxRatio = boxW / boxH;
+  let drawW: number;
+  let drawH: number;
+  if (ratio >= boxRatio) {
+    // mais larga que a caixa — limita pela largura
+    drawW = boxW;
+    drawH = boxW / ratio;
+  } else {
+    // mais alta — limita pela altura
+    drawH = boxH;
+    drawW = boxH * ratio;
+  }
+  const offY = boxY + (boxH - drawH) / 2;
+  let offX: number;
+  if (align === "left") offX = boxX;
+  else if (align === "right") offX = boxX + boxW - drawW;
+  else offX = boxX + (boxW - drawW) / 2;
+  doc.addImage(logo.data, "PNG", offX, offY, drawW, drawH, undefined, "FAST");
+}
+
 function fmtBRL0(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return "R$ " + Math.round(v).toLocaleString("pt-BR");
@@ -128,24 +182,32 @@ function addPage(doc: jsPDF) {
 function drawPageHeader(
   doc: jsPDF,
   title: string,
-  falconLogo: string | null,
-  brandLogo: string | null,
+  falconLogo: LogoAsset | null,
+  brandLogo: LogoAsset | null,
 ) {
-  // logos esquerda/direita — PNG preserva transparência
-  if (falconLogo) doc.addImage(falconLogo, "PNG", 14, 10, 26, 13, undefined, "FAST");
-  if (brandLogo) doc.addImage(brandLogo, "PNG", SIZE - 14 - 26, 10, 26, 13, undefined, "FAST");
-  // título central (sem charSpace para alinhar perfeitamente com a régua dourada)
+  // Cabeçalho ampliado (28mm) para acomodar logos sem distorção.
+  // Caixas das logos: 34mm × 20mm — preservam aspect-ratio (contain).
+  const boxW = 34;
+  const boxH = 20;
+  const boxY = 6;
+  drawContainedLogo(doc, falconLogo, 12, boxY, boxW, boxH, "left");
+  drawContainedLogo(doc, brandLogo, SIZE - 12 - boxW, boxY, boxW, boxH, "right");
+
+  // título central — abaixado para 22mm (dentro da nova faixa de 28mm)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(NAVY);
   const titleUpper = title.toUpperCase();
-  doc.text(titleUpper, SIZE / 2, 18, { align: "center" });
+  doc.text(titleUpper, SIZE / 2, 22, { align: "center" });
   // sublinhado dourado centralizado, exatamente da largura do título
   doc.setDrawColor(GOLD);
   doc.setLineWidth(1.2);
   const tw = doc.getTextWidth(titleUpper);
-  doc.line(SIZE / 2 - tw / 2, 21.4, SIZE / 2 + tw / 2, 21.4);
+  doc.line(SIZE / 2 - tw / 2, 25.4, SIZE / 2 + tw / 2, 25.4);
 }
+
+/** Y inicial do conteúdo das páginas com cabeçalho (logos + título). */
+const HEADER_CONTENT_Y = 34;
 
 /* ───────────────── Gráficos via Canvas 2D ───────────────── */
 
