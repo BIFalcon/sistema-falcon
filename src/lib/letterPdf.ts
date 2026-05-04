@@ -736,6 +736,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 4. COMENTÁRIOS DO MÊS ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Comentários do mês", falconData, brandData);
   doc.setTextColor(TEXT);
   const blocks: string[] = [];
@@ -758,6 +759,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Destaques do mês", falconData, brandData);
   const colW = (SIZE - 30) / 2;
   const rowH = 75;
@@ -790,6 +792,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   /* ───── 6. DEMONSTRATIVO DE RESULTADOS ───── */
   addPage(doc);
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Demonstrativo de Resultados", falconData, brandData);
   drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`);
 
@@ -801,6 +804,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     doc.setFillColor(NAVY); doc.rect(0, 0, SIZE, 138, "F");
   }
   doc.setFillColor("#FFFFFF"); doc.rect(0, 138, SIZE, SIZE - 138, "F");
+  // Marca d'água apenas na metade branca da página (abaixo da foto).
+  drawBirdWatermark(doc, birdWatermark, { x: 0, y: 138, w: SIZE, h: SIZE - 138 }, 0.7);
   // Faixa decorativa entre foto e bloco de texto (igual à capa)
   drawDecorativeStripe(doc, 16, 144, SIZE - 32);
   doc.setTextColor(NAVY);
