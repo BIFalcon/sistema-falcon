@@ -17,6 +17,7 @@ import {
   ChevronRight,
   LayoutGrid,
   Gauge,
+  Home,
 } from "lucide-react";
 import {
   Sidebar,
@@ -61,6 +62,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Operação",
     items: [
+      { title: "Início", url: "/", icon: Home, end: true },
       {
         title: "Fechamento",
         url: "/fechamento",
@@ -132,7 +134,7 @@ function SoonBadge() {
 }
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpen } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { profile, roles, isMaster } = useAuth();
@@ -149,7 +151,12 @@ export function AppSidebar() {
     end ? location.pathname === url : location.pathname === url || location.pathname.startsWith(url + "/");
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <SidebarHeader className="border-b border-sidebar-border">
         <div className={`flex items-center ${collapsed ? "justify-center py-3" : "justify-center py-5"}`}>
           <img
