@@ -812,6 +812,7 @@ export default function ContasPagarPage() {
                     compact
                     onLink={() => setLinkEntry(e)}
                     onApprove={(approval) => handleApprove(e.id, approval)}
+                    issues={entryIssues(e)}
                   />
                 ))}
               </TableBody>
