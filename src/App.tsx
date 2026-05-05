@@ -23,6 +23,7 @@ import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import UploadRetroativoDrePage from "./pages/UploadRetroativoDrePage";
 import PerfilPage from "./pages/PerfilPage";
+import HomePage from "./pages/HomePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -76,7 +77,8 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<HomeRedirect />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/home" element={<HomePage />} />
 
               {/* Fechamento */}
               <Route path="/fechamento" element={<FechamentoPage />} />
