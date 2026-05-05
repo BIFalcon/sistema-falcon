@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
-import { mergeDreDatasets, parseDreAnalyticsWorkbook, type DreAnalyticsDataset } from "@/lib/dreAnalytics";
+import type { ParsedDre, IndicatorKey } from "@/lib/dreParser";
+import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
   estimateDistribution,
   buildHistoryEntry,
