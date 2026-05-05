@@ -270,30 +270,33 @@ export function useDreAnalytics(input: { hotelIds: string[]; year: number; month
   return useDreAnalyticsImpl(input);
 }
 
-function convertParsedDreToDataset(parsed: ParsedDre, sourceName: string): DreAnalyticsDataset {
+function convertParsedDreToDataset(
+  parsed: ParsedDre,
+  sourceName: string,
+): DreAnalyticsDataset {
   const nodes: DreLineNode[] = [];
-  const allKeys = Object.keys(parsed.indicators) as IndicatorKey[];
-  for (const key of allKeys) {
-    const ind = parsed.indicators[key];
+  // Monta um nó para cada indicador-chave com séries completas
+  for (const [key, ind] of Object.entries(parsed.indicators)) {
     if (!ind) continue;
-    const current = Array(12).fill(null) as (number | null)[];
-    const budget = Array(12).fill(null) as (number | null)[];
-    const previous = Array(12).fill(null) as (number | null)[];
-    const curSeries = parsed.currentSeries[key];
-    if (curSeries) curSeries.forEach((v, i) => { current[i] = v ?? null; });
-    else if (ind.value != null) {
-      const col = parsed.monthColumnIndex;
-      if (col != null) current[col] = ind.value;
+    const k = key as IndicatorKey;
+    // Série realizada Jan-Dez
+    const current: (number | null)[] = Array(12).fill(null);
+    const curSeries = parsed.currentSeries[k];
+    if (curSeries) {
+      curSeries.forEach((v, i) => { current[i] = v ?? null; });
+    } else if (ind.value != null && parsed.monthColumnIndex != null) {
+      current[parsed.monthColumnIndex] = ind.value;
     }
-    const prevSeries = parsed.previousSeries[key];
+    // Série ano anterior Jan-Dez
+    const previous: (number | null)[] = Array(12).fill(null);
+    const prevSeries = parsed.previousSeries[k];
     if (prevSeries) {
       prevSeries.forEach((v, i) => { previous[i] = v ?? null; });
-    } else {
-      const prevVal = parsed.previousIndicators?.[key];
-      if (prevVal != null && parsed.monthColumnIndex != null) {
-        previous[parsed.monthColumnIndex] = prevVal;
-      }
+    } else if (parsed.previousIndicators?.[k] != null && parsed.monthColumnIndex != null) {
+      previous[parsed.monthColumnIndex] = parsed.previousIndicators[k] ?? null;
     }
+    // Orçado: por enquanto vazio (virá de futura integração)
+    const budget: (number | null)[] = Array(12).fill(null);
     nodes.push({
       id: `1:${key}`,
       label: ind.label,
@@ -302,7 +305,34 @@ function convertParsedDreToDataset(parsed: ParsedDre, sourceName: string): DreAn
       children: [],
     });
   }
-  return { tree: nodes, flat: nodes, hotelCount: 1, sourceNames: [sourceName] };
+  // Adiciona todas as linhas da DRE como nós de nível 3
+  // para alimentar o seletor "Linhas da DRE" no gráfico
+  for (const line of parsed.lines) {
+    if (!line.label || line.value == null) continue;
+    const id = `3:${line.label.toLowerCase().trim()}`;
+    if (nodes.find((n) => n.id === id)) continue;
+    const current: (number | null)[] = Array(12).fill(null);
+    if (parsed.monthColumnIndex != null) {
+      current[parsed.monthColumnIndex] = line.value;
+    }
+    nodes.push({
+      id,
+      label: line.label,
+      level: 3,
+      series: {
+        current,
+        budget: Array(12).fill(null),
+        previous: Array(12).fill(null),
+      },
+      children: [],
+    });
+  }
+  return {
+    tree: nodes.filter((n) => n.level === 1),
+    flat: nodes,
+    hotelCount: 1,
+    sourceNames: [sourceName],
+  };
 }
 
 function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number; month: number }) {
