@@ -196,13 +196,11 @@ export function useUploadDre() {
           const estimate = estimateDistribution(parsed, history);
           await supabase
             .from("closings")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .update({
               estimated_distribution: estimate.estimated_distribution,
               estimated_lines: estimate.lines as unknown as object,
               estimated_at: new Date().toISOString(),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any)
+            } as Record<string, unknown>)
             .eq("id", closingId);
         }
       } catch (parseErr) {
@@ -218,8 +216,7 @@ export function useUploadDre() {
       if (c && c.status_dre === "nao_iniciado") {
         await supabase
           .from("closings")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .update({ status_dre: "aguardando_comentarios" } as any)
+          .update({ status_dre: "aguardando_comentarios" } as Record<string, unknown>)
           .eq("id", closingId);
       }
 
