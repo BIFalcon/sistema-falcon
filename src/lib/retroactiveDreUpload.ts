@@ -11,6 +11,7 @@
  * (status já entra como "aprovado").
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel, type ParsedDre } from "@/lib/dreParser";
 
@@ -197,8 +198,7 @@ export async function uploadRetroactiveDre(input: {
       if (existing && existing.status_dre !== "aprovado") {
         await supabase
           .from("closings")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .update({ status_dre: "aprovado" } as any)
+          .update({ status_dre: "aprovado" } as TablesUpdate<"closings">)
           .eq("id", closingId);
       }
 

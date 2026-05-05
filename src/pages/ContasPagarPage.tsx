@@ -27,10 +27,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
-import { useAllHotels } from "@/hooks/useHotelAssets";
+import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   notifyGgPendencies,
   uploadApDocuments,
@@ -84,8 +94,11 @@ export default function ContasPagarPage() {
 
   const { data: hotels = [] } = useAllHotels();
   const { hotelId } = useFilters();
-  const hotel = useMemo(() => hotels.find((h) => h.id === hotelId) ?? null, [hotels, hotelId]);
-  const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
+  const hotel = useMemo(
+    () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
+    [hotels, hotelId],
+  );
+  const sourceSystem = (hotel?.financial_system ?? null) as FinancialSystem | null;
   const isOmie = sourceSystem === "omie";
   // Hotéis OMIE não têm aprovação GG no Falcon — correção é feita direto no OMIE.
   const showApproval = !isOmie;
@@ -120,6 +133,9 @@ export default function ContasPagarPage() {
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDocConfirm, setDeleteDocConfirm] = useState<
+    Parameters<typeof deleteDocMutation.mutateAsync>[0] | null
+  >(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const docsRef = useRef<HTMLInputElement>(null);
@@ -248,14 +264,20 @@ export default function ContasPagarPage() {
     }
   }
 
-  async function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
+  function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
     if (!hotelId) return;
-    if (!confirm(`Excluir documento "${d.filePath}"?`)) return;
+    setDeleteDocConfirm(d);
+  }
+
+  async function executeDeleteDoc() {
+    if (!deleteDocConfirm) return;
     try {
-      await deleteDocMutation.mutateAsync(d);
+      await deleteDocMutation.mutateAsync(deleteDocConfirm);
       toast.success("Documento excluído");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+    } finally {
+      setDeleteDocConfirm(null);
     }
   }
 
@@ -907,6 +929,30 @@ export default function ContasPagarPage() {
           handleDeleteDoc({ hotelId: hotelId!, documentId: d.id, filePath: d.file_path })
         }
       />
+
+      <AlertDialog
+        open={!!deleteDocConfirm}
+        onOpenChange={(open) => { if (!open) setDeleteDocConfirm(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDocConfirm?.filePath?.split("/").pop() ?? "Este documento"} será
+              removido permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDeleteDoc}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de notificação ao GG */}
       {hotelId && (

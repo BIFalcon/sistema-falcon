@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
 export interface InvestorLetter {
   id: string;
@@ -111,8 +112,7 @@ export function useUpdateLetter() {
     mutationFn: async (input: { id: string; closingId: string; patch: Partial<InvestorLetter> }) => {
       const { error } = await supabase
         .from("investor_letters")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(input.patch as any)
+        .update(input.patch as TablesUpdate<"investor_letters">)
         .eq("id", input.id);
       if (error) throw error;
     },
@@ -177,8 +177,7 @@ export function useUpdateHighlight() {
     mutationFn: async (input: { id: string; letterId: string; patch: Partial<LetterHighlight> }) => {
       const { error } = await supabase
         .from("letter_highlights")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(input.patch as any)
+        .update(input.patch as TablesUpdate<"letter_highlights">)
         .eq("id", input.id);
       if (error) throw error;
     },

@@ -53,8 +53,7 @@ export function useUpdateHotelAsset() {
     mutationFn: async (input: { id: string; patch: Partial<HotelRow> }) => {
       const { error } = await supabase
         .from("hotels")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(input.patch as any)
+        .update(input.patch as Partial<HotelRow>)
         .eq("id", input.id);
       if (error) throw error;
     },

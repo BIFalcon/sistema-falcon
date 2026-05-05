@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ClosingStatus } from "@/lib/constants";
 
 export interface EnvioRow {
@@ -77,8 +78,7 @@ export function useMarkEnvioSent() {
     mutationFn: async (input: { closingId: string }) => {
       const { error } = await supabase
         .from("closings")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ status_envio: "aprovado" } as any)
+        .update({ status_envio: "aprovado" } as TablesUpdate<"closings">)
         .eq("id", input.closingId);
       if (error) throw error;
     },
@@ -99,8 +99,7 @@ export function useReopenEnvio() {
     mutationFn: async (input: { closingId: string }) => {
       const { error } = await supabase
         .from("closings")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ status_envio: "em_andamento" } as any)
+        .update({ status_envio: "em_andamento" } as TablesUpdate<"closings">)
         .eq("id", input.closingId);
       if (error) throw error;
     },

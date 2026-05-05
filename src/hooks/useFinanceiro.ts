@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ClosingStatus } from "@/lib/constants";
 
 export type DistributionDecision = "enviado" | "sem_distribuicao" | "pendente";
@@ -74,7 +75,6 @@ export function useRecordDistribution() {
             : "pendente";
       const { error } = await supabase
         .from("closings")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
           distribution_decision: decision,
           final_distribution: decision === "enviado" ? finalValue : null,
@@ -82,8 +82,7 @@ export function useRecordDistribution() {
           distribution_decided_by: userId,
           distribution_decided_at: new Date().toISOString(),
           status_financeiro,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
+        } as TablesUpdate<"closings">)
         .eq("id", closingId);
       if (error) throw error;
     },

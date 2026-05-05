@@ -15,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
@@ -44,10 +54,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
+import { fmtBRL } from "@/lib/formatters";
 
-function brl(n: number | null | undefined) {
-  return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
 }
@@ -319,7 +327,7 @@ function MonthlyOverview({
             <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">
               {formatYM(ym)}
             </p>
-            <p className="text-xl font-semibold mt-1">{brl(total)}</p>
+            <p className="text-xl font-semibold mt-1">{fmtBRL(total)}</p>
             <div className="mt-2 h-1.5 rounded bg-muted overflow-hidden">
               <div
                 className="h-full bg-accent"
@@ -378,7 +386,7 @@ function MonthBreakdown({
                 <TableRow key={day} className="cursor-pointer" onClick={() => onPickDay(day)}>
                   <TableCell className="font-medium">{formatDay(day)}</TableCell>
                   <TableCell className="text-right">{count}</TableCell>
-                  <TableCell className="text-right font-semibold">{brl(total)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmtBRL(total)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm">Ver clientes</Button>
                   </TableCell>
@@ -444,7 +452,7 @@ function DayBreakdown({
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
-                  <TableCell className="text-right font-semibold">{brl(e.amount)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
                   </TableCell>
@@ -556,7 +564,7 @@ function ConsolidatedRanking({
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
         <h3 className="text-sm font-semibold">Ranking por hotel</h3>
-        <span className="text-xs text-muted-foreground">Total: <strong>{brl(grand)}</strong></span>
+        <span className="text-xs text-muted-foreground">Total: <strong>{fmtBRL(grand)}</strong></span>
       </div>
       <div className="space-y-2">
         {ranking.map((r) => (
@@ -567,7 +575,7 @@ function ConsolidatedRanking({
                 className="h-full bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground"
                 style={{ width: `${Math.max(2, (r.total / max) * 100)}%` }}
               >
-                {brl(r.total)}
+                {fmtBRL(r.total)}
               </div>
             </div>
           </div>
@@ -625,7 +633,8 @@ function OpenFolioSection({
         body: { hotel_id: hotelId },
       });
       if (error) throw error;
-      if ((data as any)?.hotels_notified > 0) {
+      const result = data as { hotels_notified?: number } | null;
+      if ((result?.hotels_notified ?? 0) > 0) {
         toast.success(`GG de ${hotelName} notificado por e-mail`);
       } else {
         toast.warning(`Nenhum GG ativo encontrado para ${hotelName}`);
@@ -752,7 +761,7 @@ function OpenFolioSection({
                       </p>
                     </button>
                     <div className="text-right">
-                      <p className="text-lg font-semibold">{brl(s.total)}</p>
+                      <p className="text-lg font-semibold">{fmtBRL(s.total)}</p>
                       <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${tone}`}>
                         média {s.avgDays}d
                       </span>
@@ -918,7 +927,7 @@ function HotelOpenFolioDetail({
                   <TableRow key={e.id}>
                     <TableCell className="text-sm">{fullName(e)}</TableCell>
                     <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
-                    <TableCell className="text-right font-semibold">{brl(e.balance)}</TableCell>
+                    <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
                     <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
                     <TableCell className="text-xs">{e.departure_date ? formatDay(e.departure_date) : "—"}</TableCell>
                     <TableCell className={`text-right text-xs font-semibold ${tone}`}>{aging}d</TableCell>
@@ -1003,7 +1012,7 @@ function NoteDialog({
         <DialogHeader>
           <DialogTitle>Justificativa do folio</DialogTitle>
           <DialogDescription>
-            {entry && <>{fullName(entry)} · {entry.confirmation_number} · {brl(entry.balance)}</>}
+            {entry && <>{fullName(entry)} · {entry.confirmation_number} · {fmtBRL(entry.balance)}</>}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -1064,6 +1073,9 @@ function ContractsDialog({
   const upsert = useUpsertContract();
   const del = useDeleteContract();
   const [form, setForm] = useState({ account_number: "", account_name: "", payment_term_days: "", notes: "" });
+  const [contractToDelete, setContractToDelete] = useState<
+    { id: string; hotel_id: string } | null
+  >(null);
 
   async function add() {
     if (!user) return;
@@ -1093,6 +1105,7 @@ function ContractsDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -1149,15 +1162,11 @@ function ContractsDialog({
                     <TableCell className="text-xs text-muted-foreground">{c.notes ?? ""}</TableCell>
                     <TableCell className="text-right">
                       {canEdit && (
-                        <Button variant="ghost" size="sm" onClick={async () => {
-                          if (!confirm("Remover contrato?")) return;
-                          try {
-                            await del.mutateAsync({ id: c.id, hotel_id: hotelId });
-                            toast.success("Contrato removido");
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Erro");
-                          }
-                        }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setContractToDelete({ id: c.id, hotel_id: hotelId })}
+                        >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       )}
@@ -1170,6 +1179,41 @@ function ContractsDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog
+      open={!!contractToDelete}
+      onOpenChange={(open) => { if (!open) setContractToDelete(null); }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remover contrato?</AlertDialogTitle>
+          <AlertDialogDescription>
+            O prazo de pagamento desta conta será removido. Isso pode afetar
+            o cálculo de vencimentos no Open Folio.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={async () => {
+              if (!contractToDelete) return;
+              try {
+                await del.mutateAsync(contractToDelete);
+                toast.success("Contrato removido");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro");
+              } finally {
+                setContractToDelete(null);
+              }
+            }}
+          >
+            Remover
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 

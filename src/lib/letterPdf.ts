@@ -960,11 +960,10 @@ function drawStar(doc: jsPDF, cx: number, cy: number, r: number) {
     points.push([cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad]);
   }
   // jsPDF não tem polygon convexo simples — usa lines
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyDoc = doc as any;
-  if (anyDoc.lines) {
+  const jspdfInternal = doc as unknown as { lines?: (...args: unknown[]) => void };
+  if (jspdfInternal.lines) {
     const linesArr = points.slice(1).concat([points[0]]).map((p, i) => [p[0] - points[i][0], p[1] - points[i][1]]);
-    anyDoc.lines(linesArr, points[0][0], points[0][1], [1, 1], "F", true);
+    jspdfInternal.lines(linesArr, points[0][0], points[0][1], [1, 1], "F", true);
   }
 }
 

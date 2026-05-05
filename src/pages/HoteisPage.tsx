@@ -360,8 +360,7 @@ function HotelAssetSheet({
                     try {
                       await update.mutateAsync({
                         id: hotel.id,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        patch: { financial_system: v as any },
+                        patch: { financial_system: v as HotelRow["financial_system"] },
                       });
                       toast.success("Sistema financeiro atualizado");
                     } catch (err) {
@@ -395,8 +394,7 @@ function HotelAssetSheet({
                     try {
                       await update.mutateAsync({
                         id: hotel.id,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        patch: { opera_property_name: v || null } as any,
+                        patch: { opera_property_name: v || null },
                       });
                       toast.success("Nome no Opera Cloud atualizado");
                     } catch (err) {

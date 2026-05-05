@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ClosingStatus } from "@/lib/constants";
 
 export interface ClosingRow {
@@ -112,8 +113,7 @@ export function useUpdateClosingStatus() {
       const payload: Record<string, unknown> = { [field]: value };
       const { error } = await supabase
         .from("closings")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(payload as any)
+        .update(payload as TablesUpdate<"closings">)
         .eq("id", closingId);
       if (error) throw error;
     },

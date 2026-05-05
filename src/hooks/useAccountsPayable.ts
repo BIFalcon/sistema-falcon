@@ -347,7 +347,7 @@ export async function notifyGgPendencies(input: {
     },
   });
   if (error) throw error;
-  return data as any;
+  return data as { ok: boolean; sent?: number; recipients?: number; error?: string };
 }
 
 /** Dispara validação automática (IA) de um documento contra o lançamento. */
@@ -359,7 +359,7 @@ export async function validateApDocument(input: {
     body: { document_id: input.documentId, entry_id: input.entryId },
   });
   if (error) throw error;
-  return data as any;
+  return data as { ok: boolean; validation_status?: string; checks?: unknown };
 }
 
 export function useLatestApUpload(hotelId: string | null) {
@@ -517,8 +517,9 @@ export async function uploadApReport(input: {
     body: form,
   });
   if (error) throw error;
-  if ((data as any)?.error) throw new Error((data as any).error);
-  return data as { entries: number; documents_extracted: number };
+  const result = data as { entries: number; documents_extracted: number; error?: string };
+  if (result?.error) throw new Error(result.error);
+  return result;
 }
 
 /** Atualiza em lote o status de pagamento dos lançamentos. */
