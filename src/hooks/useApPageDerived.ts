@@ -45,6 +45,7 @@ export interface ApPageDerived {
   issueEntries: ApEntry[];
   entryIssues: (e: ApEntry) => Set<IssueCategory>;
   totalToPayToday: number;
+  totalToPayPeriod: number;
   distributionTotal: number;
   balanceDiff: number | null;
 }
@@ -64,6 +65,8 @@ export function useApPageDerived(opts: {
   showApproval: boolean;
   hotelCnpj?: string | null;
   searchText?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }): ApPageDerived {
   const {
     allEntriesRaw,
@@ -78,6 +81,8 @@ export function useApPageDerived(opts: {
     sourceSystem,
     hotelCnpj,
     searchText,
+    dateFrom,
+    dateTo,
   } = opts;
 
   // ── Separação base ─────────────────────────────────────────────────────
@@ -183,15 +188,8 @@ export function useApPageDerived(opts: {
     () =>
       entries.filter((e) => {
         if (!isWithinPeriod(e.due_date, period)) return false;
-        if (status === "pending" && e.gg_approval !== "pending") return false;
-        if (status === "approved" && e.gg_approval !== "approved") return false;
-        if (status === "no_doc" && !!e.primary_document_id) return false;
         if (status === "issues") {
-          if (entryIssues(e).size === 0) return false;
-        }
-        if (status.startsWith("issue_")) {
-          const cat = status.replace("issue_", "") as IssueCategory;
-          if (!entryIssues(e).has(cat)) return false;
+          if (e.gg_approval === "approved") return false;
         }
         if (status === "payment_pendente" && e.payment_status !== "pendente") return false;
         if (status === "payment_inserido" && e.payment_status !== "inserido") return false;
@@ -282,16 +280,15 @@ export function useApPageDerived(opts: {
       cnpj_divergente: 0,
     };
     entries.forEach((e) => {
-      entryIssues(e).forEach((cat) => counts[cat]++);
+      if (e.gg_approval !== "approved") counts.sem_aprovacao++;
     });
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, docsByEntry, showApproval, hotelCnpj]);
+  }, [entries]);
 
   const issueEntries = useMemo(
-    () => entries.filter((e) => entryIssues(e).size > 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, docsByEntry, showApproval, hotelCnpj],
+    () => entries.filter((e) => e.gg_approval !== "approved"),
+    [entries],
   );
 
   // ── Totais financeiros ─────────────────────────────────────────────────
@@ -303,13 +300,20 @@ export function useApPageDerived(opts: {
     [entries],
   );
 
+  const totalToPayPeriod = useMemo(() => {
+    if (!dateFrom || !dateTo) return totalToPayToday;
+    return entries
+      .filter((e) => !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo)
+      .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+  }, [entries, dateFrom, dateTo, totalToPayToday]);
+
   const distributionTotal = useMemo(
     () => distributionEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
     [distributionEntries],
   );
 
   const balanceAmount = balance ? Number(balance.amount) : null;
-  const balanceDiff = balanceAmount !== null ? balanceAmount - totalToPayToday : null;
+  const balanceDiff = balanceAmount !== null ? balanceAmount - totalToPayPeriod : null;
 
   return {
     entries,
@@ -326,6 +330,7 @@ export function useApPageDerived(opts: {
     issueEntries,
     entryIssues,
     totalToPayToday,
+    totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   };

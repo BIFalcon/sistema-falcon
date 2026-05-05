@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Paperclip, Search, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -27,37 +27,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
-  notifyGgPendencies,
-  uploadApDocuments,
   uploadApReport,
-  useApDocuments,
   useApEntries,
-  useAttachDocumentToEntry,
-  useDeleteDocument,
-  useDetachDocumentFromEntry,
-  useLinkDocumentToEntry,
   useLatestApUpload,
-  useSetEntryApproval,
   useSetEntryPaymentStatus,
-  useSetPrimaryDocument,
   useTodayBankBalance,
   useUpsertBankBalance,
-  validateApDocument,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -65,13 +45,11 @@ import {
 import { useApPageDerived } from "@/hooks/useApPageDerived";
 import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
-import { fmtBRL, fmtDateTime } from "@/lib/formatters";
+import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
 
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
-import { LinkDocDialog } from "@/components/accounts-payable/LinkDocDialog";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
-import { ISSUE_CATEGORIES } from "@/lib/apIssueCategories";
 
 import { useMemo } from "react";
 
@@ -90,10 +68,9 @@ export default function ContasPagarPage() {
   const canMarkPaid = isMaster || isFinanceiroCoordenadora;
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
-  const canUploadDocs = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId } = useFilters();
+  const { hotelId, dateFrom, dateTo } = useFilters();
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -108,17 +85,10 @@ export default function ContasPagarPage() {
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
   const { data: balance } = useTodayBankBalance(hotelId);
-  const { data: documents = [] } = useApDocuments(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
-  const setApproval = useSetEntryApproval();
   const setPaymentStatus = useSetEntryPaymentStatus();
-  const linkDocMutation = useLinkDocumentToEntry();
-  const attachDocMutation = useAttachDocumentToEntry();
-  const detachDocMutation = useDetachDocumentFromEntry();
-  const setPrimaryDocMutation = useSetPrimaryDocument();
-  const deleteDocMutation = useDeleteDocument();
 
   // ── Estado local ───────────────────────────────────────────────────────
   const [balanceInput, setBalanceInput] = useState("");
@@ -129,21 +99,15 @@ export default function ContasPagarPage() {
   const [groupNd, setGroupNd] = useState(true);
   const [searchText, setSearchText] = useState<string>("");
   const [uploading, setUploading] = useState(false);
-  const [uploadingDocs, setUploadingDocs] = useState(false);
-  const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [deleteDocConfirm, setDeleteDocConfirm] = useState<
-    Parameters<typeof deleteDocMutation.mutateAsync>[0] | null
-  >(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const docsRef = useRef<HTMLInputElement>(null);
 
   // ── Derivações ─────────────────────────────────────────────────────────
   const derived = useApPageDerived({
     allEntriesRaw,
-    documents,
+    documents: [],
     balance,
     sourceSystem,
     period,
@@ -154,6 +118,8 @@ export default function ContasPagarPage() {
     showApproval,
     hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
     searchText,
+    dateFrom,
+    dateTo,
   });
 
   const {
@@ -162,14 +128,10 @@ export default function ContasPagarPage() {
     filtered,
     displayRows,
     categories,
-    docsByEntry,
-    allDocsByEntry,
-    unlinkedDocs,
     urgencyCounts,
     issueCounts,
     issueEntries,
-    entryIssues,
-    totalToPayToday,
+    totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
@@ -193,91 +155,6 @@ export default function ContasPagarPage() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function handleDocs(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length || !hotelId || !user) return;
-    setUploadingDocs(true);
-    try {
-      const n = await uploadApDocuments({ hotelId, files, userId: user.id });
-      toast.success(`${n} documento(s) enviado(s). Vincule-os aos lançamentos.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao enviar documentos");
-    } finally {
-      setUploadingDocs(false);
-      if (docsRef.current) docsRef.current.value = "";
-    }
-  }
-
-  async function handleApprove(entryId: string, approval: "approved" | "rejected" | "pending") {
-    if (!user || !hotelId) return;
-    try {
-      await setApproval.mutateAsync({ entryId, hotelId, approval, userId: user.id });
-      toast.success(
-        approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente",
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
-    }
-  }
-
-  async function handleAttach(docId: string, nfAmount: number | null) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await attachDocMutation.mutateAsync({
-        hotelId,
-        entryId: linkEntry.id,
-        documentId: docId,
-        nfAmount,
-      });
-      toast.success("Documento vinculado");
-      validateApDocument({ documentId: docId, entryId: linkEntry.id })
-        .then((r) => {
-          if (r.validation_status === "divergence") toast.warning("Divergência detectada pela IA");
-          else if (r.validation_status === "ok") toast.success("Documento validado pela IA");
-        })
-        .catch(() => {});
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao vincular");
-    }
-  }
-
-  async function handleDetach(d: { id: string }) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await detachDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
-      toast.success("Vínculo removido");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao desvincular");
-    }
-  }
-
-  async function handleSetPrimary(d: { id: string }) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await setPrimaryDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
-      toast.success("Documento principal atualizado");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro");
-    }
-  }
-
-  function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
-    if (!hotelId) return;
-    setDeleteDocConfirm(d);
-  }
-
-  async function executeDeleteDoc() {
-    if (!deleteDocConfirm) return;
-    try {
-      await deleteDocMutation.mutateAsync(deleteDocConfirm);
-      toast.success("Documento excluído");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir");
-    } finally {
-      setDeleteDocConfirm(null);
     }
   }
 
@@ -424,7 +301,14 @@ export default function ContasPagarPage() {
                 )}
               </div>
               <Stat label="Saldo informado" value={balanceAmount !== null ? fmtBRL(balanceAmount) : "—"} />
-              <Stat label="Total a pagar hoje" value={fmtBRL(totalToPayToday)} />
+              <Stat
+                label={
+                  dateFrom === dateTo
+                    ? `Total a pagar em ${fmtDate(dateFrom)}`
+                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
+                }
+                value={fmtBRL(totalToPayPeriod)}
+              />
               <Stat
                 label="Diferença"
                 value={balanceDiff !== null ? fmtBRL(balanceDiff) : "—"}
@@ -474,24 +358,14 @@ export default function ContasPagarPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Problemas identificados
               </h3>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {ISSUE_CATEGORIES
-                  .filter((cat) => cat.key !== "sem_aprovacao" || showApproval)
-                  .map((cat) => {
-                    const filterKey = `issue_${cat.key}` as StatusFilter;
-                    return (
-                      <UrgencyCell
-                        key={cat.key}
-                        label={cat.label}
-                        count={issueCounts[cat.key]}
-                        tone={cat.tone}
-                        active={status === filterKey}
-                        onClick={() =>
-                          setStatus(status === filterKey ? "all" : filterKey)
-                        }
-                      />
-                    );
-                  })}
+              <div className="mb-3">
+                <UrgencyCell
+                  label="Sem aprovação GG"
+                  count={issueCounts.sem_aprovacao}
+                  tone="warning"
+                  active={status === "issues"}
+                  onClick={() => setStatus(status === "issues" ? "all" : "issues")}
+                />
               </div>
               <Button
                 size="sm"
@@ -532,30 +406,6 @@ export default function ContasPagarPage() {
                   onChange={handleFile}
                   disabled={!canManage || !sourceSystem || uploading}
                 />
-                <input
-                  ref={docsRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.ofx,.xml,.png,.jpg,.jpeg"
-                  className="hidden"
-                  onChange={handleDocs}
-                  disabled={!canUploadDocs || uploadingDocs}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!canUploadDocs || uploadingDocs}
-                  onClick={() => docsRef.current?.click()}
-                  title="Enviar PDFs/OFX/XML para vincular manualmente"
-                >
-                  {uploadingDocs ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                  Importar Documentos
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -565,7 +415,6 @@ export default function ContasPagarPage() {
                     const data = displayRows.flatMap((row) => {
                       if (row.kind === "group") return [];
                       const e = row.entry;
-                      const d = docsByEntry.get(e.id);
                       return [{
                         Fornecedor: e.supplier,
                         CNPJ: e.cnpj ?? "",
@@ -576,8 +425,6 @@ export default function ContasPagarPage() {
                         "Forma de Pagamento": e.payment_method ?? "",
                         "Aprovação GG": e.gg_approval,
                         "Status Pagamento": e.payment_status,
-                        "Documento Vinculado": d?.file_name ?? "",
-                        "Validação IA": d?.validation_status ?? "",
                         Observação: e.observation ?? "",
                       }];
                     });
@@ -637,14 +484,11 @@ export default function ContasPagarPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  {showApproval && <SelectItem value="pending">Pendentes</SelectItem>}
-                  {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
-                  <SelectItem value="no_doc">Sem documento</SelectItem>
-                  <SelectItem value="issues">Com problema</SelectItem>
-                  <SelectItem value="payment_pendente">Pendente de inserção</SelectItem>
+                  <SelectItem value="issues">Sem aprovação do GG</SelectItem>
                   <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
                   <SelectItem value="payment_agendado">Agendado</SelectItem>
                   <SelectItem value="payment_pago">Pago</SelectItem>
+                  <SelectItem value="payment_pendente">Pendente</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -686,6 +530,16 @@ export default function ContasPagarPage() {
                       : "Selecione lançamentos para marcar status em lote"}
                   </div>
                   <div className="flex items-center gap-2">
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8"
+                        onClick={() => setNotifyOpen(true)}
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Notificar GG ({selectedIds.size})
+                      </Button>
+                    )}
                     {canMarkInsertedAgendado && (
                       <>
                         <Button
@@ -753,18 +607,16 @@ export default function ContasPagarPage() {
                     <TableHead>Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Forma</TableHead>
+                    <TableHead>Categoria</TableHead>
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
-                    <TableHead>Doc</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Carregando…
@@ -773,7 +625,7 @@ export default function ContasPagarPage() {
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -783,7 +635,8 @@ export default function ContasPagarPage() {
                     displayRows.map((row, idx) => {
                       if (row.kind === "group") {
                         const colSpan =
-                          (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1) + 1 +
+                          (showApproval ? 7 : 6) +
+                          (sourceSystem === "omie" ? 1 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
@@ -828,17 +681,11 @@ export default function ContasPagarPage() {
                         <ApEntryRow
                           key={e.id}
                           entry={e}
-                          doc={docsByEntry.get(e.id) ?? null}
                           sourceSystem={sourceSystem}
-                          canApprove={canApprove}
-                          canManage={canManage}
                           showApproval={showApproval}
                           selectable={canMarkInsertedAgendado || canMarkPaid}
                           selected={selectedIds.has(e.id)}
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
-                          onLink={() => setLinkEntry(e)}
-                          onApprove={(approval) => handleApprove(e.id, approval)}
-                          issues={entryIssues(e)}
                         />
                       );
                     })
@@ -869,8 +716,6 @@ export default function ContasPagarPage() {
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead>Aprovação GG</TableHead>
-                  <TableHead>Doc</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -878,15 +723,9 @@ export default function ContasPagarPage() {
                   <ApEntryRow
                     key={e.id}
                     entry={e}
-                    doc={docsByEntry.get(e.id) ?? null}
                     sourceSystem={sourceSystem}
-                    canApprove={canApprove}
-                    canManage={canManage}
                     showApproval={showApproval}
                     compact
-                    onLink={() => setLinkEntry(e)}
-                    onApprove={(approval) => handleApprove(e.id, approval)}
-                    issues={entryIssues(e)}
                   />
                 ))}
               </TableBody>
@@ -895,75 +734,17 @@ export default function ContasPagarPage() {
         </Card>
       )}
 
-      {/* Modal de vínculo de documento */}
-      <LinkDocDialog
-        open={!!linkEntry}
-        onClose={() => setLinkEntry(null)}
-        entry={linkEntry}
-        linkedDocs={linkEntry ? (allDocsByEntry.get(linkEntry.id) ?? []) : []}
-        primaryDoc={linkEntry ? (docsByEntry.get(linkEntry.id) ?? null) : null}
-        unlinkedDocs={unlinkedDocs}
-        onAttach={(documentId, nfAmount) =>
-          attachDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId,
-            nfAmount,
-          })
-        }
-        onDetach={(d) =>
-          detachDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId: d.id,
-          })
-        }
-        onSetPrimary={(d) =>
-          setPrimaryDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId: d.id,
-          })
-        }
-        onDelete={(d) =>
-          handleDeleteDoc({ hotelId: hotelId!, documentId: d.id, filePath: d.file_path })
-        }
-      />
-
-      <AlertDialog
-        open={!!deleteDocConfirm}
-        onOpenChange={(open) => { if (!open) setDeleteDocConfirm(null); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteDocConfirm?.filePath?.split("/").pop() ?? "Este documento"} será
-              removido permanentemente. Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={executeDeleteDoc}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Modal de notificação ao GG */}
       {hotelId && (
         <NotifyGgDialog
           open={notifyOpen}
           onClose={() => setNotifyOpen(false)}
           hotelId={hotelId}
-          issueEntries={issueEntries}
-          issueCounts={issueCounts}
-          showApproval={showApproval}
-          entryIssues={entryIssues}
+          selectedEntries={
+            selectedIds.size > 0
+              ? entries.filter((e) => selectedIds.has(e.id))
+              : issueEntries
+          }
         />
       )}
     </div>

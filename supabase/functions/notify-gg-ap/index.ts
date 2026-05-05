@@ -41,6 +41,10 @@ Deno.serve(async (req) => {
     const entryIds: string[] = Array.isArray(body.entry_ids) ? body.entry_ids : [];
     const dueFrom: string | null = body.due_from ? String(body.due_from) : null; // YYYY-MM-DD
     const dueTo: string | null = body.due_to ? String(body.due_to) : null;       // YYYY-MM-DD
+    const extraEmails: string[] = Array.isArray(body.extra_emails)
+      ? body.extra_emails.map((s: unknown) => String(s).trim()).filter(Boolean)
+      : [];
+    const customMessage: string | null = body.message ? String(body.message) : null;
     if (!hotelId || entryIds.length === 0) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,7 +83,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const recipients = (ggs ?? []) as { user_id: string; email: string; display_name: string | null }[];
+    const ggRecipients = (ggs ?? []) as { user_id: string; email: string; display_name: string | null }[];
+    const recipients = [
+      ...ggRecipients,
+      ...extraEmails.map((email) => ({ user_id: null as unknown as string, email, display_name: null })),
+    ];
     if (recipients.length === 0) {
       return new Response(JSON.stringify({ ok: true, sent: 0, recipients: 0, warning: "no_gg_for_hotel" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -109,13 +117,14 @@ Deno.serve(async (req) => {
       `Olá,\n\nVocê tem **${entries.length} lançamento(s)** com pendências em **${hotel?.name ?? "seu hotel"}** ` +
       `totalizando **${fmtBRL(total)}**:\n\n` +
       lines.join("\n") +
+      (customMessage ? `\n\n**Mensagem:**\n${customMessage}\n` : "") +
       `\n\n${cta}\n\n[Abrir Contas a Pagar](/financeiro/contas-pagar)`;
 
     const linkUrl = `/financeiro/contas-pagar`;
 
     // Inserir na fila (usa enqueue_workflow_notification existente)
     const recipientsJson = recipients.map((r) => ({
-      user_id: r.user_id,
+      user_id: r.user_id ?? null,
       email: r.email,
       role: "gg",
     }));
