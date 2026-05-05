@@ -388,7 +388,7 @@ Deno.serve(async (req) => {
     // 1. lê entries existentes (todos os campos que serão preservados)
     const { data: existing } = await admin
       .from("ap_entries")
-      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
+      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status")
       .eq("hotel_id", hotelId);
     const existingByKey = new Map<string, any>();
     const existingByLookup = new Map<string, any>();
@@ -464,6 +464,7 @@ Deno.serve(async (req) => {
           ...baseFields,
           // não sobrescreve aprovação/observação/documento
           observation: prev.observation ?? p.observation,
+          payment_status: prev.payment_status ?? "pendente",
         });
       } else {
         inserts.push({
@@ -474,6 +475,7 @@ Deno.serve(async (req) => {
           gg_approval_at: null,
           gg_approval_notes: null,
           primary_document_id: null,
+          payment_status: "pendente",
         });
       }
     }
