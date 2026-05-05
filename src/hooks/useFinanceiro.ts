@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ClosingStatus } from "@/lib/constants";
 
 export type DistributionDecision = "enviado" | "sem_distribuicao" | "pendente";
