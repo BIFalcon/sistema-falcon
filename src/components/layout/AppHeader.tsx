@@ -1,4 +1,5 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useLocation } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -22,8 +23,10 @@ import { MONTHS_PT } from "@/lib/constants";
 import { useEffect } from "react";
 
 export function AppHeader() {
-  const { hotelId, month, year, setHotelId, setMonth, setYear } = useFilters();
+  const { hotelId, month, year, dateFrom, dateTo, setHotelId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
   const { allowedHotels, profile, signOut, isMaster } = useAuth();
+  const { pathname } = useLocation();
+  const isFinanceiro = pathname.startsWith("/financeiro");
 
   // Garante que o hotel selecionado é permitido (ou null = todos quando master)
   useEffect(() => {
@@ -66,31 +69,51 @@ export function AppHeader() {
           </SelectContent>
         </Select>
 
-        <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-          <SelectTrigger className="w-[140px] h-9">
-            <SelectValue placeholder="Mês" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            {MONTHS_PT.map((m, i) => (
-              <SelectItem key={i} value={String(i + 1)}>
-                {m}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isFinanceiro ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <span className="text-xs text-muted-foreground">até</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            />
+          </div>
+        ) : (
+          <>
+            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Mês" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                {MONTHS_PT.map((m, i) => (
+                  <SelectItem key={i} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-          <SelectTrigger className="w-[100px] h-9">
-            <SelectValue placeholder="Ano" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
       </div>
 
       <DropdownMenu>
