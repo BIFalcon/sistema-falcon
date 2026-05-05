@@ -267,6 +267,32 @@ export function useDreIndicators(closingId: string | null | undefined) {
 }
 
 export function useDreAnalytics(input: { hotelIds: string[]; year: number }) {
+  return useDreAnalyticsImpl(input);
+}
+
+function convertParsedDreToDataset(parsed: ParsedDre, sourceName: string): DreAnalyticsDataset {
+  const nodes: DreLineNode[] = Object.entries(parsed.indicators)
+    .filter(([, v]) => v != null)
+    .map(([key, ind]) => {
+      const current = Array(12).fill(null) as (number | null)[];
+      const budget = Array(12).fill(null) as (number | null)[];
+      const previous = Array(12).fill(null) as (number | null)[];
+      const curSeries = parsed.currentSeries[key as IndicatorKey];
+      if (curSeries) curSeries.forEach((v, i) => { current[i] = v; });
+      const prevSeries = parsed.previousSeries[key as IndicatorKey];
+      if (prevSeries) prevSeries.forEach((v, i) => { previous[i] = v; });
+      return {
+        id: `1:${key}`,
+        label: ind!.label,
+        level: 1,
+        series: { current, budget, previous },
+        children: [],
+      };
+    });
+  return { tree: nodes, flat: nodes, hotelCount: 1, sourceNames: [sourceName] };
+}
+
+function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number }) {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["dre-analytics", input.hotelIds, input.year],
@@ -298,7 +324,14 @@ export function useDreAnalytics(input: { hotelIds: string[]; year: number }) {
           .from("closings")
           .download(version.file_url);
         if (downloadError) throw downloadError;
-        datasets.push(parseDreAnalyticsWorkbook(await file.arrayBuffer(), version.file_name));
+        const { data: closingMonth } = await supabase
+          .from("closings")
+          .select("month")
+          .eq("id", closing.id)
+          .single();
+        const fileObj = new File([await file.arrayBuffer()], version.file_name);
+        const parsed = await parseDreExcel(fileObj, { targetMonth: closingMonth?.month ?? 12 });
+        datasets.push(convertParsedDreToDataset(parsed, version.file_name));
       }
       if (!datasets.length) return null;
       return datasets.length === 1 ? datasets[0] : mergeDreDatasets(datasets);
