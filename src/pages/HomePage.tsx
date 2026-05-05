@@ -253,7 +253,7 @@ export default function HomePage() {
       });
     }
 
-    if (isMaster || hasRole("gop") || hasRole("gg") || hasRole("controladoria") || hasRole("operacoes")) {
+    if (isMaster || hasRole("gop") || hasRole("gg") || hasRole("controladoria") || hasRole("operacoes") || hasRole("viewer")) {
       cards.push({
         icon: <TrendingUp className="h-4 w-4" />,
         title: "Indicadores DRE",
@@ -281,7 +281,7 @@ export default function HomePage() {
       });
     }
 
-    if (isMaster || hasRole("gop") || hasRole("gg") || hasRole("operacoes")) {
+    if (isMaster || hasRole("gop") || hasRole("gg") || hasRole("operacoes") || hasRole("viewer")) {
       cards.push({
         icon: <Target className="h-4 w-4" />,
         title: "Metas GG",
@@ -292,7 +292,7 @@ export default function HomePage() {
       });
     }
 
-    if (isMaster || hasRole("rh") || hasRole("gop") || hasRole("gg") || hasRole("operacoes")) {
+    if (isMaster || hasRole("rh") || hasRole("gop") || hasRole("gg") || hasRole("operacoes") || hasRole("viewer")) {
       cards.push({
         icon: <Users className="h-4 w-4" />,
         title: "Turnover & Rotatividade",
