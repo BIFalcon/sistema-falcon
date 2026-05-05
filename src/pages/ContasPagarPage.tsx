@@ -535,6 +535,42 @@ export default function ContasPagarPage() {
                   Importar Documentos
                 </Button>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={displayRows.length === 0}
+                  onClick={() => {
+                    const data = displayRows.flatMap((row) => {
+                      if (row.kind === "group") return [];
+                      const e = row.entry;
+                      const d = docsByEntry.get(e.id);
+                      return [{
+                        Fornecedor: e.supplier,
+                        CNPJ: e.cnpj ?? "",
+                        "Nº Doc": e.document_number ?? "",
+                        Vencimento: e.due_date ?? "",
+                        Valor: Number(e.amount),
+                        Categoria: e.category ?? "",
+                        "Forma de Pagamento": e.payment_method ?? "",
+                        "Aprovação GG": e.gg_approval,
+                        "Status Pagamento": e.payment_status,
+                        "Documento Vinculado": d?.file_name ?? "",
+                        "Validação IA": d?.validation_status ?? "",
+                        Observação: e.observation ?? "",
+                      }];
+                    });
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Lançamentos");
+                    XLSX.writeFile(
+                      wb,
+                      `contas-a-pagar-${hotel?.name ?? "hotel"}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+                    );
+                  }}
+                >
+                  <FileDown className="h-4 w-4" /> Exportar Excel
+                </Button>
+                <Button
                   variant="default"
                   size="sm"
                   className="gap-2"
