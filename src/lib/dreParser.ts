@@ -284,20 +284,26 @@ function rowLabel(row: unknown[]): string | null {
  */
 function rowLabelAndLevel(
   row: unknown[],
+  firstMonthCol: number,
 ): { label: string; level: number } | null {
-  const levelCols = [
-    { col: 3, level: 1 },
-    { col: 4, level: 2 },
-    { col: 5, level: 3 },
-  ];
-  for (const { col, level } of levelCols) {
-    const cell = row[col];
+  const textCols: { col: number; text: string }[] = [];
+  for (let c = 2; c < firstMonthCol; c++) {
+    const cell = row[c];
     if (typeof cell === "string" && cell.trim().length > 1) {
-      return { label: cell.trim(), level };
+      textCols.push({ col: c, text: cell.trim() });
     }
   }
-  const label = rowLabel(row);
-  return label ? { label, level: 3 } : null;
+  if (textCols.length === 0) return null;
+  const COLUMN_HEADERS = /^(realizado|or[çc]ado|desvio|ano\s*anterior|acumulado|m[ée]dia|total|ytd|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i;
+  const validCols = textCols.filter((c) => !COLUMN_HEADERS.test(c.text));
+  if (validCols.length === 0) return null;
+  const minCol = Math.min(...validCols.map((c) => c.col));
+  const maxCol = Math.max(...validCols.map((c) => c.col));
+  const range = maxCol - minCol || 1;
+  const rightmost = validCols.reduce((a, b) => (a.col > b.col ? a : b));
+  const relPos = (rightmost.col - minCol) / range;
+  const level = relPos < 0.33 ? 1 : relPos < 0.66 ? 2 : 3;
+  return { label: rightmost.text, level };
 }
 
 /**
@@ -377,9 +383,27 @@ export async function parseDreExcel(
     }
   }
 
+  // Detecta a primeira coluna de mês para servir de referência ao
+  // determinar quais colunas são labels vs dados.
+  let firstMonthCol = 6;
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === "string") {
+        const norm = cell.trim().toLowerCase();
+        if (/^(janeiro|jan)/.test(norm)) {
+          firstMonthCol = c;
+          break;
+        }
+      }
+    }
+    if (firstMonthCol !== 6) break;
+  }
+
   rows.forEach((row, idx) => {
     if (!row || row.every((c) => c == null || c === "")) return;
-    const ll = rowLabelAndLevel(row);
+    const ll = rowLabelAndLevel(row, firstMonthCol);
     if (!ll) return;
     const { label, level } = ll;
     // Filtra labels estruturais que não devem aparecer no seletor de
@@ -394,6 +418,10 @@ export async function parseDreExcel(
       /^nivel$/i,
       /^nível$/i,
       /distribui[çc][aã]o\s+por\s+uh$/i,
+      /^>>>/,
+      /^resultado\s+acumulado/i,
+      /^lucro\s*\/\s*prejuízo\s+acumulado/i,
+      /^lucro\s+antes/i,
     ];
     if (STRUCTURAL_LABELS.some((rx) => rx.test(label))) return;
     if (/dre\s+\d{4}/i.test(label)) return;
