@@ -61,6 +61,25 @@ export function useLatestArUpload(kind: "to_invoice" | "open_folio") {
   });
 }
 
+/** Data máxima de `transaction_date` no acervo de A Faturar (filtrável por hotel). */
+export function useLatestToInvoiceDate(hotelId: string | null) {
+  return useQuery({
+    queryKey: ["ar-latest-ti-date", hotelId ?? "all"],
+    queryFn: async () => {
+      let q = supabase
+        .from("ar_to_invoice_entries")
+        .select("transaction_date")
+        .not("transaction_date", "is", null)
+        .order("transaction_date", { ascending: false })
+        .limit(1);
+      if (hotelId) q = q.eq("hotel_id", hotelId);
+      const { data, error } = await q.maybeSingle();
+      if (error) throw error;
+      return data?.transaction_date ?? null;
+    },
+  });
+}
+
 export function useUploadArReport() {
   const qc = useQueryClient();
   return useMutation({
