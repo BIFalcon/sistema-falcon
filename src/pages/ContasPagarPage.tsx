@@ -764,6 +764,7 @@ export default function ContasPagarPage() {
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
                           onLink={() => setLinkEntry(e)}
                           onApprove={(approval) => handleApprove(e.id, approval)}
+                          issues={entryIssues(e)}
                         />
                       );
                     })

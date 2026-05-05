@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import type { ApDocument, ApEntry, ApPaymentStatus, FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
+import type { IssueCategory } from "@/lib/apIssueCategories";
 
 interface EntryRowProps {
   entry: ApEntry;
@@ -24,6 +25,7 @@ interface EntryRowProps {
   onToggleSelected?: (v: boolean) => void;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
+  issues?: Set<IssueCategory>;
 }
 
 export function ApEntryRow({
@@ -39,6 +41,7 @@ export function ApEntryRow({
   onToggleSelected,
   onLink,
   onApprove,
+  issues,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -67,12 +70,20 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
-          {divergent && (
+          {issues?.has("cnpj_divergente") && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-destructive/40 text-destructive"
+            >
+              <AlertTriangle className="h-3 w-3" /> CNPJ divergente
+            </Badge>
+          )}
+          {(issues?.has("valor_divergente") || (!issues && divergent)) && (
             <Badge
               variant="outline"
               className="text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
             >
-              <AlertTriangle className="h-3 w-3" /> Divergência
+              <AlertTriangle className="h-3 w-3" /> Valor divergente
             </Badge>
           )}
         </div>
