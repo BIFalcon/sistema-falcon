@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
-import { INDICATOR_LABELS } from "@/lib/dreParser";
+import { INDICATOR_LABELS, getDreLineCategory } from "@/lib/dreParser";
 import type { IndicatorKey } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
@@ -115,6 +115,7 @@ export function useUploadDre() {
           line_type: "line",
           line_value: l.value,
           line_level: l.level ?? 3,
+          line_category: getDreLineCategory(l.label),
         }));
         // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
         // comparativos da Carta. Persistidas como indicadores extras com prefixo
@@ -319,12 +320,13 @@ function useDreAnalyticsImpl(input: {
           _month: number;
           line_level?: number | null;
           line_type?: string | null;
+          line_category?: string | null;
         };
         const allLines: LineRow[] = [];
         for (const closing of closings) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number, line_type, line_level")
+            .select("line_label, line_value, version_number, line_type, line_level, line_category")
             .eq("closing_id", closing.id)
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
@@ -442,6 +444,7 @@ function useDreAnalyticsImpl(input: {
         // de primeira aparição via Map).
         const linesByLabel = new Map<string, {
           level: number;
+          category: string;
           values: Map<number, number | null>;
         }>();
         for (const line of allLines) {
@@ -449,20 +452,21 @@ function useDreAnalyticsImpl(input: {
           const lbl = line.line_label;
           if (!lbl || lbl.startsWith("[")) continue;
           const level = (line.line_level ?? 3) as number;
+          const category = (line.line_category ?? "Despesas Específicas") as string;
           const month = line._month ?? input.month;
           if (!linesByLabel.has(lbl)) {
-            linesByLabel.set(lbl, { level, values: new Map() });
+            linesByLabel.set(lbl, { level, category, values: new Map() });
           }
           linesByLabel.get(lbl)!.values.set(month, line.line_value ?? null);
         }
 
-        for (const [lbl, { level, values }] of linesByLabel) {
+        for (const [lbl, { level, category, values }] of linesByLabel) {
           const current: (number | null)[] = Array(12).fill(null);
           for (const [m, v] of values) {
             current[m - 1] = v;
           }
           const node: DreLineNode = {
-            id: `${level}:${lbl.toLowerCase().trim()}`,
+            id: `${category}:${lbl.toLowerCase().trim()}`,
             label: lbl,
             level,
             series: {

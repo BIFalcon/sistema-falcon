@@ -21,6 +21,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
+const CATEGORY_ORDER = ["Topline", "Receitas", "Despesas", "Despesas Específicas"];
+
 /**
  * agg = "sum" para receitas/GOP (acumular no período)
  * agg = "avg" para taxas/médias (Ocupação, ADR, RevPAR)
@@ -440,7 +442,23 @@ export default function IndicadoresDrePage() {
             <Card className="p-4 shadow-soft">
               <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedIds.size} selecionadas</span></div>
               <div className="max-h-[620px] overflow-auto pr-1">
-                {dataset?.tree.map((node) => <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />)}
+                {CATEGORY_ORDER.map((cat) => {
+                  const catNodes = dataset?.flat.filter((n) =>
+                    n.id.startsWith(`${cat}:`) ||
+                    (!n.id.includes(":") && cat === "Despesas Específicas"),
+                  ) ?? [];
+                  if (catNodes.length === 0) return null;
+                  return (
+                    <div key={cat} className="mb-3">
+                      <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {cat}
+                      </div>
+                      {catNodes.map((node) => (
+                        <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             </Card>
 

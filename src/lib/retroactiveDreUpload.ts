@@ -13,7 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
-import { parseDreExcel, type ParsedDre } from "@/lib/dreParser";
+import { parseDreExcel, getDreLineCategory, type ParsedDre } from "@/lib/dreParser";
 
 export interface RetroUploadResult {
   monthsDetected: number[];
@@ -143,6 +143,8 @@ export async function uploadRetroactiveDre(input: {
         line_label: l.label,
         line_type: "line",
         line_value: l.value,
+        line_level: l.level ?? 3,
+        line_category: getDreLineCategory(l.label),
       }));
 
       const seriesRows: typeof indicatorRows = [];

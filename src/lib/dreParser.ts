@@ -13,6 +13,83 @@ import * as XLSX from "xlsx";
 
 export type DreTemplate = "DEFAULT" | "CONFINS" | "MERCURE" | "MANHATTAN";
 
+export const DRE_LINE_CATEGORIES: Record<string, string> = {
+  // TOPLINE
+  "taxa de ocupa": "Topline",
+  "número de apartamentos disp": "Topline",
+  "numero de apartamentos disp": "Topline",
+  "apartamentos ocupados": "Topline",
+  "número de hóspedes": "Topline",
+  "numero de hospedes": "Topline",
+  "fator de ocupa": "Topline",
+  "diária média": "Topline",
+  "diaria media": "Topline",
+  "revpar": "Topline",
+  "receita bruta total": "Topline",
+  "receita líquida total": "Topline",
+  "receita liquida total": "Topline",
+  "deduções da receita": "Topline",
+  "deducoes da receita": "Topline",
+  "despesas fixas totais": "Topline",
+  "despesas variáveis total": "Topline",
+  "despesas variaveis total": "Topline",
+  "despesas totais": "Topline",
+  "resultado operacional bruto": "Topline",
+  "resultado operacional líquido": "Topline",
+  "resultado operacional liquido": "Topline",
+  "lucro antes": "Topline",
+  "lucro líquido": "Topline",
+  "lucro liquido": "Topline",
+  "lucro / prejuízo a distribuir": "Topline",
+  "lucro / prejuizo a distribuir": "Topline",
+  "distribuição por uh": "Topline",
+  "distribuicao por uh": "Topline",
+  "por uh": "Topline",
+
+  // RECEITAS
+  "receita bruta de serviços": "Receitas",
+  "receita bruta de servicos": "Receitas",
+  "receita bruta a&b": "Receitas",
+  "receita financeira": "Receitas",
+  "outras receitas": "Receitas",
+
+  // DESPESAS
+  "impostos s/ vendas": "Despesas",
+  "despesas com pessoal": "Despesas",
+  "custo das mercadorias vendidas": "Despesas",
+  "despesas operacionais": "Despesas",
+  "despesas com prestadores": "Despesas",
+  "custos de hospedagem": "Despesas",
+  "despesas de utilidades": "Despesas",
+  "despesas com manutenção": "Despesas",
+  "despesas com manutencao": "Despesas",
+  "despesas com vendas": "Despesas",
+  "taxas accor": "Despesas",
+  "taxas de administração": "Despesas",
+  "taxas de administracao": "Despesas",
+  "despesas financeiras": "Despesas",
+  "total dos gastos de propriedade": "Despesas",
+  "total dos impostos sobre o lucro": "Despesas",
+  "total de taxas sobre": "Despesas",
+};
+
+export function getDreLineCategory(label: string): string {
+  const norm = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  for (const [key, cat] of Object.entries(DRE_LINE_CATEGORIES)) {
+    const nk = key
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    if (norm.startsWith(nk) || norm.includes(nk)) return cat;
+  }
+  if (norm.startsWith("(-)") || norm.startsWith("(+)")) return "Despesas Específicas";
+  return "Despesas Específicas";
+}
+
 export type IndicatorKey =
   | "ocupacao"
   | "adr"
