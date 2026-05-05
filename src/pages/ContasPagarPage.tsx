@@ -27,6 +27,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
@@ -123,6 +133,9 @@ export default function ContasPagarPage() {
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDocConfirm, setDeleteDocConfirm] = useState<
+    Parameters<typeof deleteDocMutation.mutateAsync>[0] | null
+  >(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const docsRef = useRef<HTMLInputElement>(null);
@@ -251,14 +264,20 @@ export default function ContasPagarPage() {
     }
   }
 
-  async function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
+  function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
     if (!hotelId) return;
-    if (!confirm(`Excluir documento "${d.filePath}"?`)) return;
+    setDeleteDocConfirm(d);
+  }
+
+  async function executeDeleteDoc() {
+    if (!deleteDocConfirm) return;
     try {
-      await deleteDocMutation.mutateAsync(d);
+      await deleteDocMutation.mutateAsync(deleteDocConfirm);
       toast.success("Documento excluído");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+    } finally {
+      setDeleteDocConfirm(null);
     }
   }
 
