@@ -185,11 +185,6 @@ export default function FinanceiroVisaoGeralPage() {
             title="Chargebacks"
             text="Chargebacks no período — disponível após integração com a Rede."
           />
-          <PlaceholderCard
-            icon={<Sparkles className="h-4 w-4" />}
-            title="Cashbacks"
-            text="Cashbacks recebidos no período — disponível após integração com a Rede."
-          />
         </div>
       </section>
 
