@@ -215,6 +215,7 @@ export default function IndicadoresDrePage() {
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
   const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
+  const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
     year,
@@ -248,7 +249,6 @@ export default function IndicadoresDrePage() {
     return next;
   });
 
-  const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const monthsWindow = useMemo(
     () => periodMonths(month, periodCfg.months),
     [month, periodCfg.months],
