@@ -337,6 +337,8 @@ export async function notifyGgPendencies(input: {
   entryIds: string[];
   dueFrom?: string | null;
   dueTo?: string | null;
+  extraEmails?: string[];
+  message?: string | null;
 }): Promise<{ ok: boolean; sent?: number; recipients?: number; error?: string }> {
   const { data, error } = await supabase.functions.invoke("notify-gg-ap", {
     body: {
@@ -344,6 +346,8 @@ export async function notifyGgPendencies(input: {
       entry_ids: input.entryIds,
       due_from: input.dueFrom ?? null,
       due_to: input.dueTo ?? null,
+      extra_emails: input.extraEmails ?? [],
+      message: input.message ?? null,
     },
   });
   if (error) throw error;
