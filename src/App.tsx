@@ -48,6 +48,19 @@ function RoleGuard({
   return <>{children}</>;
 }
 
+function HomeRedirect() {
+  const { roles, isMaster } = useAuth();
+  if (isMaster) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("financeiro" as AppRole)) return <Navigate to="/financeiro/contas-pagar" replace />;
+  if (roles.includes("gg" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("gop" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("controladoria" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("ri" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("rh" as AppRole)) return <Navigate to="/rh/turnover" replace />;
+  if (roles.includes("operacoes" as AppRole)) return <Navigate to="/metas" replace />;
+  return <Navigate to="/fechamento" replace />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -63,7 +76,7 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Navigate to="/fechamento" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
 
               {/* Fechamento */}
               <Route path="/fechamento" element={<FechamentoPage />} />
