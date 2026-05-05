@@ -121,7 +121,6 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, requireMaster: true },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel, requireMaster: true },
       { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail, requireMaster: true },
-      { title: "DRE retroativa", url: "/configuracoes/dre-retroativo", icon: FileSpreadsheet, requireMaster: true },
     ],
   },
 ];

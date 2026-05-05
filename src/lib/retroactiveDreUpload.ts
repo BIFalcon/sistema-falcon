@@ -35,13 +35,14 @@ export async function uploadRetroactiveDre(input: {
   year: number;
   file: File;
   userId: string;
+  upToMonth: number;
 }): Promise<RetroUploadResult> {
-  const { hotelId, year, file, userId } = input;
+  const { hotelId, year, file, userId, upToMonth } = input;
 
   // 1. Detecta quais meses (1..12) realmente têm dados no arquivo.
   const monthsDetected: number[] = [];
   const parsedByMonth = new Map<number, ParsedDre>();
-  for (let m = 1; m <= 12; m++) {
+  for (let m = 1; m <= upToMonth; m++) {
     try {
       const parsed = await parseDreExcel(file, { targetMonth: m });
       if (hasAnyData(parsed)) {
