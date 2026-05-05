@@ -81,9 +81,9 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "operacoes"] as AppRole[] },
-      { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "operacoes"] as AppRole[] },
-      { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: Users, soon: true, allowedRoles: ["gop", "gg", "rh", "operacoes"] as AppRole[] },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "operacoes", "viewer"] as AppRole[] },
+      { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "operacoes", "viewer"] as AppRole[] },
+      { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: Users, soon: true, allowedRoles: ["gop", "gg", "rh", "operacoes", "viewer"] as AppRole[] },
     ],
   },
   {
