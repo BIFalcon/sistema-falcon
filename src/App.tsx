@@ -88,7 +88,7 @@ const App = () => (
               <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
 
               {/* Análise */}
-              <Route path="/indicadores" element={<RoleGuard roles={["gop", "gg", "controladoria", "operacoes"]}><IndicadoresDrePage /></RoleGuard>} />
+              <Route path="/indicadores" element={<RoleGuard roles={["gop", "gg", "controladoria", "operacoes", "viewer"]}><IndicadoresDrePage /></RoleGuard>} />
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
