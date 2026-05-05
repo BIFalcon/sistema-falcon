@@ -30,7 +30,15 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import type { AppRole } from "./lib/constants";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 1000 * 60 * 5,
+    },
+  },
+});
 
 function RoleGuard({
   roles: allowed,
