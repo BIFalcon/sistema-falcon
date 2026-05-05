@@ -112,8 +112,7 @@ export function useUpdateClosingStatus() {
       const payload: Record<string, unknown> = { [field]: value };
       const { error } = await supabase
         .from("closings")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(payload as any)
+        .update(payload as Record<string, unknown> as never)
         .eq("id", closingId);
       if (error) throw error;
     },
