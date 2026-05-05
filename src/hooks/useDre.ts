@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
-import { INDICATOR_LABELS } from "@/lib/dreParser";
+import { INDICATOR_LABELS, getDreLineCategory } from "@/lib/dreParser";
 import type { IndicatorKey } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
@@ -115,6 +115,7 @@ export function useUploadDre() {
           line_type: "line",
           line_value: l.value,
           line_level: l.level ?? 3,
+          line_category: getDreLineCategory(l.label),
         }));
         // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
         // comparativos da Carta. Persistidas como indicadores extras com prefixo
