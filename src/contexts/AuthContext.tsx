@@ -69,24 +69,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // listener ANTES do getSession
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      const newUid = newSession?.user?.id ?? null;
+      // Atualiza session/user sempre (token refresh, etc.)
       setSession(newSession);
       setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        // CRÍTICO: marcar loading=true ANTES de deferir, senão há
-        // janela onde user!=null, roles=[] e loading=false — o que
-        // dispara redirect para /sem-permissao indevidamente.
-        setLoading(true);
-        // defer DB calls
-        setTimeout(() => {
-          loadUserData(newSession.user.id).finally(() => setLoading(false));
-        }, 0);
-      } else {
-        setProfile(null);
-        setRoles([]);
-        setUserHotels([]);
-        setAllHotels([]);
-        setLoading(false);
-      }
+
+      // Só recarrega dados do perfil quando o usuário REALMENTE muda
+      // (login/logout). Eventos como TOKEN_REFRESHED ou SIGNED_IN ao
+      // voltar para a aba não devem disparar reload — isso desmontava
+      // dialogs/forms abertos pelo usuário.
+      setUser((prevUser) => {
+        const prevUid = prevUser?.id ?? null;
+        if (newUid && newUid !== prevUid) {
+          setLoading(true);
+          setTimeout(() => {
+            loadUserData(newUid).finally(() => setLoading(false));
+          }, 0);
+        } else if (!newUid && prevUid) {
+          setProfile(null);
+          setRoles([]);
+          setUserHotels([]);
+          setAllHotels([]);
+          setLoading(false);
+        }
+        return newSession?.user ?? null;
+      });
     });
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
