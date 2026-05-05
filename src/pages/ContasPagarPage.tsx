@@ -16,7 +16,8 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileSpreadsheet, Loader2, Mail, Paperclip, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Paperclip, Search, Upload, Wallet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -113,6 +114,7 @@ export default function ContasPagarPage() {
   const [category, setCategory] = useState("all");
   const [hideTrivial, setHideTrivial] = useState(true);
   const [groupNd, setGroupNd] = useState(true);
+  const [searchText, setSearchText] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
@@ -135,6 +137,7 @@ export default function ContasPagarPage() {
     groupNd,
     showApproval,
     hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
+    searchText,
   });
 
   const {
@@ -549,6 +552,15 @@ export default function ContasPagarPage() {
             </div>
 
             {/* Filtros */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar fornecedor, CNPJ ou nº documento…"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
