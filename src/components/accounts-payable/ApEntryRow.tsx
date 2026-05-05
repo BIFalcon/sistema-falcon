@@ -91,12 +91,12 @@ export function ApEntryRow({
 
       {/* CNPJ — só OMIE e não-compact */}
       {!compact && sourceSystem === "omie" && (
-        <TableCell className="text-xs text-muted-foreground">{entry.cnpj ?? "—"}</TableCell>
+        <TableCell className="text-xs text-muted-foreground hidden md:table-cell">{entry.cnpj ?? "—"}</TableCell>
       )}
 
       {/* Nº Doc — não-compact */}
       {!compact && (
-        <TableCell className="text-xs">{entry.document_number ?? "—"}</TableCell>
+        <TableCell className="text-xs hidden md:table-cell">{entry.document_number ?? "—"}</TableCell>
       )}
 
       {/* Vencimento */}
@@ -109,7 +109,7 @@ export function ApEntryRow({
 
       {/* Categoria — não-compact */}
       {!compact && (
-        <TableCell className="text-xs text-muted-foreground">
+        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell">
           {entry.category ?? entry.payment_method ?? "—"}
         </TableCell>
       )}
