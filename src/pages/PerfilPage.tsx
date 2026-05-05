@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Camera, Loader2 } from "lucide-react";
+import { useAvatarUrl, useUploadAvatar } from "@/hooks/useProfileAvatar";
 
 export default function PerfilPage() {
   const { profile, refresh } = useAuth();
@@ -14,6 +16,21 @@ export default function PerfilPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: avatarUrl } = useAvatarUrl(profile?.user_id);
+  const uploadAvatar = useUploadAvatar();
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !profile?.user_id) return;
+    try {
+      await uploadAvatar.mutateAsync({ userId: profile.user_id, file });
+      toast.success("Foto atualizada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar foto");
+    }
+  }
 
   async function handleSaveName() {
     if (!profile) return;
@@ -61,9 +78,36 @@ export default function PerfilPage() {
 
       <Card className="p-5 shadow-soft space-y-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-accent/10 text-accent flex items-center justify-center font-semibold text-lg">
-            {(profile?.display_name ?? profile?.email ?? "U")[0].toUpperCase()}
-          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadAvatar.isPending}
+            className="group relative h-[60px] w-[60px] rounded-full bg-accent/10 text-accent flex items-center justify-center font-semibold text-lg overflow-hidden shrink-0"
+            title="Alterar foto"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+            ) : (
+              <span>{(profile?.display_name ?? profile?.email ?? "U")[0].toUpperCase()}</span>
+            )}
+            {uploadAvatar.isPending && (
+              <span className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </span>
+            )}
+            {!uploadAvatar.isPending && (
+              <span className="absolute bottom-0 right-0 h-5 w-5 rounded-full bg-foreground text-background items-center justify-center hidden group-hover:flex">
+                <Camera className="h-3 w-3" />
+              </span>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
           <div>
             <p className="font-semibold">{profile?.display_name ?? "—"}</p>
             <p className="text-xs text-muted-foreground">{profile?.email}</p>
