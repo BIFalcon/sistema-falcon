@@ -181,13 +181,21 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  // OMIE real: linha 0 = título, linha 1 = cabeçalho (115 colunas), linha 2 = vazia/totais, dados a partir do índice 2.
-  // Mantemos compat: detectamos a linha do cabeçalho buscando 'Vencimento'.
+  // OMIE real (planilha padrão de exportação):
+  // linha 0 = título "Contas a Pagar"
+  // linha 1 = cabeçalho com 9 colunas: Situação, CNPJ/CPF, Razão Social, Vencimento,
+  //           Categoria, Nota Fiscal, A Pagar ou Receber, Observação da Conta, Conta Corrente
+  // linha 2 = totalizador geral (sem fornecedor — será ignorado pelo filtro de supplier vazio)
+  // linhas 3+ = dados reais. Valores de "A Pagar ou Receber" são sempre negativos — usar Math.abs().
   if (rows.length < 3) return { entries: [], skipped: { other_bank: 0, no_amount: 0, no_supplier: 0 } };
   let headerIdx = 1;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const row = (rows[i] ?? []).map((c: any) => toAscii(normalize(c)));
-    if (row.includes("vencimento") && row.some((c) => c.includes("razao social"))) {
+    // Detecta cabeçalho pela presença de 'vencimento' E ('razao social' OU 'situacao')
+    if (row.includes("vencimento") && (
+      row.some((c) => c.includes("razao social")) ||
+      row.some((c) => c.includes("situacao"))
+    )) {
       headerIdx = i;
       break;
     }
@@ -214,7 +222,8 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   const colDue = findCol(headerArr, "vencimento");
   const colCategory = findCol(headerArr, "categoria");
   const colDoc = findCol(headerArr, "nota fiscal", "documento");
-  const colAmount = findCol(headerArr, "a pagar", "valor", "receber");
+  // Planilha real: "A Pagar ou Receber". Manter fallbacks para compatibilidade.
+  const colAmount = findCol(headerArr, "a pagar ou receber", "a pagar", "valor", "receber");
   const colObs = findCol(headerArr, "observacao da conta", "observacao", "observa");
   const colBank = findCol(headerArr, "conta corrente");
   const colPayMethod = findCol(headerArr, "forma de pagamento");
@@ -379,7 +388,7 @@ Deno.serve(async (req) => {
     // 1. lê entries existentes (todos os campos que serão preservados)
     const { data: existing } = await admin
       .from("ap_entries")
-      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at")
+      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status")
       .eq("hotel_id", hotelId);
     const existingByKey = new Map<string, any>();
     const existingByLookup = new Map<string, any>();
@@ -455,6 +464,7 @@ Deno.serve(async (req) => {
           ...baseFields,
           // não sobrescreve aprovação/observação/documento
           observation: prev.observation ?? p.observation,
+          payment_status: prev.payment_status ?? "pendente",
         });
       } else {
         inserts.push({
@@ -465,6 +475,7 @@ Deno.serve(async (req) => {
           gg_approval_at: null,
           gg_approval_notes: null,
           primary_document_id: null,
+          payment_status: "pendente",
         });
       }
     }

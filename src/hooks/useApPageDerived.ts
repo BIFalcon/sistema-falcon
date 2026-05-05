@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import type { ApDocument, ApEntry, FinancialSystem } from "@/hooks/useAccountsPayable";
 import { isWithinPeriod, type Period, type StatusFilter } from "@/lib/apPeriodFilter";
+import { type IssueCategory } from "@/lib/apIssueCategories";
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -40,13 +41,9 @@ export interface ApPageDerived {
     nextWeek: number;
     nextMonth: number;
   };
-  issueCounts: {
-    notApproved: number;
-    noDoc: number;
-    overdue: number;
-    divergent: number;
-  };
+  issueCounts: Record<IssueCategory, number>;
   issueEntries: ApEntry[];
+  entryIssues: (e: ApEntry) => Set<IssueCategory>;
   totalToPayToday: number;
   distributionTotal: number;
   balanceDiff: number | null;
@@ -65,6 +62,8 @@ export function useApPageDerived(opts: {
   hideTrivial: boolean;
   groupNd: boolean;
   showApproval: boolean;
+  hotelCnpj?: string | null;
+  searchText?: string;
 }): ApPageDerived {
   const {
     allEntriesRaw,
@@ -77,6 +76,8 @@ export function useApPageDerived(opts: {
     groupNd,
     showApproval,
     sourceSystem,
+    hotelCnpj,
+    searchText,
   } = opts;
 
   // ── Separação base ─────────────────────────────────────────────────────
@@ -140,6 +141,43 @@ export function useApPageDerived(opts: {
     return Array.from(set).sort();
   }, [entries]);
 
+  // ── Detecção de pendências por categoria ───────────────────────────────
+
+  /** Valor da NF diverge do valor do lançamento (> R$ 0,01 de diferença). */
+  const isValorDivergente = (e: ApEntry) => {
+    const doc = docsByEntry.get(e.id);
+    return (
+      doc?.validation_status === "divergence" ||
+      (doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01)
+    );
+  };
+
+  /** CNPJ do documento vinculado é diferente do CNPJ do hotel. */
+  const isCnpjDivergente = (e: ApEntry) => {
+    if (!hotelCnpj) return false;
+    const doc = docsByEntry.get(e.id);
+    if (!doc?.doc_cnpj) return false;
+    const norm = (s: string) => s.replace(/\D/g, "");
+    return norm(doc.doc_cnpj) !== norm(hotelCnpj);
+  };
+
+  /** Nenhum documento vinculado ao lançamento. */
+  const isSemDocumento = (e: ApEntry) => !e.primary_document_id;
+
+  /** GG ainda não aprovou (apenas para hotéis não-OMIE). */
+  const isSemAprovacao = (e: ApEntry) =>
+    showApproval && e.gg_approval !== "approved";
+
+  /** Retorna todas as categorias de pendência de um lançamento. */
+  const entryIssues = (e: ApEntry): Set<IssueCategory> => {
+    const s = new Set<IssueCategory>();
+    if (isSemAprovacao(e)) s.add("sem_aprovacao");
+    if (isSemDocumento(e)) s.add("sem_documento");
+    if (isValorDivergente(e)) s.add("valor_divergente");
+    if (isCnpjDivergente(e)) s.add("cnpj_divergente");
+    return s;
+  };
+
   // ── Filtro principal ───────────────────────────────────────────────────
   const filtered = useMemo(
     () =>
@@ -149,16 +187,30 @@ export function useApPageDerived(opts: {
         if (status === "approved" && e.gg_approval !== "approved") return false;
         if (status === "no_doc" && !!e.primary_document_id) return false;
         if (status === "issues") {
-          const overdue = e.omie_situation?.toLowerCase().includes("atras");
-          const noApproval = showApproval && e.gg_approval !== "approved";
-          const noDoc = !e.primary_document_id;
-          if (!overdue && !noApproval && !noDoc) return false;
+          if (entryIssues(e).size === 0) return false;
         }
+        if (status.startsWith("issue_")) {
+          const cat = status.replace("issue_", "") as IssueCategory;
+          if (!entryIssues(e).has(cat)) return false;
+        }
+        if (status === "payment_pendente" && e.payment_status !== "pendente") return false;
+        if (status === "payment_inserido" && e.payment_status !== "inserido") return false;
+        if (status === "payment_agendado" && e.payment_status !== "agendado") return false;
+        if (status === "payment_pago" && e.payment_status !== "pago") return false;
         if (category !== "all" && e.category !== category) return false;
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
+        if (searchText && searchText.trim()) {
+          const q = searchText.toLowerCase().trim();
+          if (
+            !e.supplier?.toLowerCase().includes(q) &&
+            !e.cnpj?.toLowerCase().includes(q) &&
+            !e.document_number?.toLowerCase().includes(q)
+          ) return false;
+        }
         return true;
       }),
-    [entries, period, status, category, hideTrivial, showApproval],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText],
   );
 
   // ── Agrupamento N/D ────────────────────────────────────────────────────
@@ -222,36 +274,24 @@ export function useApPageDerived(opts: {
   }, [entries]);
 
   // ── Problemas ──────────────────────────────────────────────────────────
-  const isDivergent = (e: ApEntry) => {
-    const doc = docsByEntry.get(e.id);
-    return (
-      doc?.validation_status === "divergence" ||
-      (doc?.nf_amount != null &&
-        Math.abs(Number(doc.nf_amount) - Number(e.amount)) > 0.01)
-    );
-  };
-
   const issueCounts = useMemo(() => {
-    let notApproved = 0, noDoc = 0, overdue = 0, divergent = 0;
+    const counts: Record<IssueCategory, number> = {
+      sem_aprovacao: 0,
+      sem_documento: 0,
+      valor_divergente: 0,
+      cnpj_divergente: 0,
+    };
     entries.forEach((e) => {
-      if (showApproval && e.gg_approval !== "approved") notApproved++;
-      if (!e.primary_document_id) noDoc++;
-      if (e.omie_situation?.toLowerCase().includes("atras")) overdue++;
-      if (isDivergent(e)) divergent++;
+      entryIssues(e).forEach((cat) => counts[cat]++);
     });
-    return { notApproved, noDoc, overdue, divergent };
-  }, [entries, docsByEntry, showApproval]);
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, docsByEntry, showApproval, hotelCnpj]);
 
   const issueEntries = useMemo(
-    () =>
-      entries.filter(
-        (e) =>
-          e.omie_situation?.toLowerCase().includes("atras") ||
-          (showApproval && e.gg_approval !== "approved") ||
-          !e.primary_document_id ||
-          isDivergent(e),
-      ),
-    [entries, docsByEntry, showApproval],
+    () => entries.filter((e) => entryIssues(e).size > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, docsByEntry, showApproval, hotelCnpj],
   );
 
   // ── Totais financeiros ─────────────────────────────────────────────────
@@ -284,6 +324,7 @@ export function useApPageDerived(opts: {
     urgencyCounts,
     issueCounts,
     issueEntries,
+    entryIssues,
     totalToPayToday,
     distributionTotal,
     balanceDiff,

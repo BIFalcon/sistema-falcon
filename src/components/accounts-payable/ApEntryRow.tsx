@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import type { ApDocument, ApEntry, ApPaymentStatus, FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
+import type { IssueCategory } from "@/lib/apIssueCategories";
 
 interface EntryRowProps {
   entry: ApEntry;
@@ -24,6 +25,7 @@ interface EntryRowProps {
   onToggleSelected?: (v: boolean) => void;
   onLink: () => void;
   onApprove: (a: "approved" | "rejected" | "pending") => void;
+  issues?: Set<IssueCategory>;
 }
 
 export function ApEntryRow({
@@ -39,6 +41,7 @@ export function ApEntryRow({
   onToggleSelected,
   onLink,
   onApprove,
+  issues,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -47,8 +50,19 @@ export function ApEntryRow({
     doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
   const divergent = doc?.validation_status === "divergence" || amountDivergent;
 
+  const paymentRowClass =
+    entry.payment_status === "pago"
+      ? "bg-emerald-500/10 dark:bg-emerald-500/10"
+      : entry.payment_status === "inserido"
+      ? "bg-sky-500/10 dark:bg-sky-500/10"
+      : entry.payment_status === "agendado"
+      ? "bg-violet-500/10 dark:bg-violet-500/10"
+      : "";
+
   return (
-    <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
+    <TableRow
+      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
+    >
       {selectable && (
         <TableCell className="w-8">
           <Checkbox
@@ -67,12 +81,20 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
-          {divergent && (
+          {issues?.has("cnpj_divergente") && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-destructive/40 text-destructive"
+            >
+              <AlertTriangle className="h-3 w-3" /> CNPJ divergente
+            </Badge>
+          )}
+          {(issues?.has("valor_divergente") || (!issues && divergent)) && (
             <Badge
               variant="outline"
               className="text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
             >
-              <AlertTriangle className="h-3 w-3" /> Divergência
+              <AlertTriangle className="h-3 w-3" /> Valor divergente
             </Badge>
           )}
         </div>

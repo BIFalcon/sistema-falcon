@@ -1,6 +1,5 @@
 /**
  * Modal de notificação ao GG sobre pendências em Contas a Pagar.
- * Extraído de ContasPagarPage — sem mudança de comportamento.
  */
 import { useState } from "react";
 import { Loader2, Mail } from "lucide-react";
@@ -18,30 +17,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { notifyGgPendencies, type ApEntry } from "@/hooks/useAccountsPayable";
 import { fmtBRL } from "@/lib/formatters";
-
-interface IssueCounts {
-  notApproved: number;
-  noDoc: number;
-  overdue: number;
-  divergent: number;
-}
+import { ISSUE_CATEGORIES, type IssueCategory } from "@/lib/apIssueCategories";
 
 interface NotifyGgDialogProps {
   open: boolean;
   onClose: () => void;
   hotelId: string;
-  /** Todos os lançamentos com algum problema, sem filtros adicionais. */
   issueEntries: ApEntry[];
-  issueCounts: IssueCounts;
+  issueCounts: Record<IssueCategory, number>;
   showApproval: boolean;
+  entryIssues: (e: ApEntry) => Set<IssueCategory>;
 }
 
-interface NotifyCats {
-  notApproved: boolean;
-  noDoc: boolean;
-  overdue: boolean;
-  divergent: boolean;
-}
+type CatFlags = Record<IssueCategory, boolean>;
 
 export function NotifyGgDialog({
   open,
@@ -50,30 +38,26 @@ export function NotifyGgDialog({
   issueEntries,
   issueCounts,
   showApproval,
+  entryIssues,
 }: NotifyGgDialogProps) {
-  const [cats, setCats] = useState<NotifyCats>({
-    notApproved: true,
-    noDoc: true,
-    overdue: true,
-    divergent: true,
+  const [cats, setCats] = useState<CatFlags>({
+    sem_aprovacao: true,
+    sem_documento: true,
+    valor_divergente: true,
+    cnpj_divergente: true,
   });
   const [hideTrivial, setHideTrivial] = useState(true);
   const [hideNd, setHideNd] = useState(false);
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
+  const [extraEmails, setExtraEmails] = useState<string>("");
   const [sending, setSending] = useState(false);
 
-  // Aplica os filtros do modal sobre os issueEntries recebidos
   const filtered = issueEntries.filter((e) => {
-    const overdue = !!e.omie_situation?.toLowerCase().includes("atras");
-    const noApproval = showApproval && e.gg_approval !== "approved";
-    const noDoc = !e.primary_document_id;
-    // divergência não é calculada aqui — issueEntries já chegou pré-filtrado
-
-    const matches =
-      (cats.notApproved && noApproval) ||
-      (cats.noDoc && noDoc) ||
-      (cats.overdue && overdue);
+    const issues = entryIssues(e);
+    const matches = ISSUE_CATEGORIES.some(
+      (cat) => cats[cat.key] && issues.has(cat.key),
+    );
     if (!matches) return false;
     if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
     if (hideNd) {
@@ -123,40 +107,24 @@ export function NotifyGgDialog({
         </p>
 
         <div className="space-y-3">
-          {/* Categorias */}
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Categorias
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {showApproval && (
-              <CatCheckbox
-                label="Sem aprovação GG"
-                count={issueCounts.notApproved}
-                checked={cats.notApproved}
-                onChange={(v) => setCats((s) => ({ ...s, notApproved: v }))}
-              />
-            )}
-            <CatCheckbox
-              label="Sem documento"
-              count={issueCounts.noDoc}
-              checked={cats.noDoc}
-              onChange={(v) => setCats((s) => ({ ...s, noDoc: v }))}
-            />
-            <CatCheckbox
-              label="Atrasados"
-              count={issueCounts.overdue}
-              checked={cats.overdue}
-              onChange={(v) => setCats((s) => ({ ...s, overdue: v }))}
-            />
-            <CatCheckbox
-              label="Divergência de valor"
-              count={issueCounts.divergent}
-              checked={cats.divergent}
-              onChange={(v) => setCats((s) => ({ ...s, divergent: v }))}
-            />
+            {ISSUE_CATEGORIES
+              .filter((cat) => cat.key !== "sem_aprovacao" || showApproval)
+              .map((cat) => (
+                <CatCheckbox
+                  key={cat.key}
+                  label={cat.label}
+                  description={cat.description}
+                  count={issueCounts[cat.key]}
+                  checked={cats[cat.key]}
+                  onChange={(v) => setCats((s) => ({ ...s, [cat.key]: v }))}
+                />
+              ))}
           </div>
 
-          {/* Filtros de data e trivial */}
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-2">
             Filtros
           </p>
@@ -175,6 +143,19 @@ export function NotifyGgDialog({
                 <Input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} />
               </div>
             </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">
+                E-mails adicionais (separados por vírgula)
+              </label>
+              <Input
+                placeholder="email1@exemplo.com, email2@exemplo.com"
+                value={extraEmails}
+                onChange={(e) => setExtraEmails(e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Receberão a notificação mesmo sem cadastro no sistema.
+              </p>
+            </div>
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <Checkbox
                 checked={hideTrivial}
@@ -188,7 +169,6 @@ export function NotifyGgDialog({
             </label>
           </div>
 
-          {/* Resumo */}
           <div className="rounded-md bg-muted/50 p-3 text-sm">
             Serão notificados <strong>{filtered.length}</strong> lançamento(s)
             {filtered.length > 0 && (
@@ -220,24 +200,31 @@ export function NotifyGgDialog({
   );
 }
 
-// ── CatCheckbox ──────────────────────────────────────────────────────────────
-
 function CatCheckbox({
   label,
+  description,
   count,
   checked,
   onChange,
 }: {
   label: string;
+  description: string;
   count: number;
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
-      <Checkbox checked={checked} onCheckedChange={(c) => onChange(!!c)} />
-      <span className="flex-1 text-sm">{label}</span>
-      <Badge variant="outline">{count}</Badge>
+    <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/40">
+      <Checkbox
+        checked={checked}
+        onCheckedChange={(c) => onChange(!!c)}
+        className="mt-0.5"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium leading-none">{label}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{description}</p>
+      </div>
+      <Badge variant="outline" className="shrink-0">{count}</Badge>
     </label>
   );
 }

@@ -16,7 +16,8 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileSpreadsheet, Loader2, Mail, Paperclip, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Paperclip, Search, Upload, Wallet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,7 @@ import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { LinkDocDialog } from "@/components/accounts-payable/LinkDocDialog";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
+import { ISSUE_CATEGORIES } from "@/lib/apIssueCategories";
 
 import { useMemo } from "react";
 
@@ -112,6 +114,7 @@ export default function ContasPagarPage() {
   const [category, setCategory] = useState("all");
   const [hideTrivial, setHideTrivial] = useState(true);
   const [groupNd, setGroupNd] = useState(true);
+  const [searchText, setSearchText] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
@@ -133,6 +136,8 @@ export default function ContasPagarPage() {
     hideTrivial,
     groupNd,
     showApproval,
+    hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
+    searchText,
   });
 
   const {
@@ -147,6 +152,7 @@ export default function ContasPagarPage() {
     urgencyCounts,
     issueCounts,
     issueEntries,
+    entryIssues,
     totalToPayToday,
     distributionTotal,
     balanceDiff,
@@ -446,31 +452,24 @@ export default function ContasPagarPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Problemas identificados
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                {showApproval && (
-                  <UrgencyCell
-                    label="Sem aprovação GG"
-                    count={issueCounts.notApproved}
-                    tone="warning"
-                    active={status === "issues"}
-                    onClick={() => setStatus(status === "issues" ? "all" : "issues")}
-                  />
-                )}
-                <UrgencyCell
-                  label="Sem documento"
-                  count={issueCounts.noDoc}
-                  tone="info"
-                  active={status === "no_doc"}
-                  onClick={() => setStatus(status === "no_doc" ? "all" : "no_doc")}
-                />
-                <UrgencyCell
-                  label="Atrasados"
-                  count={issueCounts.overdue}
-                  tone="danger"
-                  active={period === "overdue"}
-                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
-                />
-                <UrgencyCell label="Divergência valor" count={issueCounts.divergent} tone="amber" />
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {ISSUE_CATEGORIES
+                  .filter((cat) => cat.key !== "sem_aprovacao" || showApproval)
+                  .map((cat) => {
+                    const filterKey = `issue_${cat.key}` as StatusFilter;
+                    return (
+                      <UrgencyCell
+                        key={cat.key}
+                        label={cat.label}
+                        count={issueCounts[cat.key]}
+                        tone={cat.tone}
+                        active={status === filterKey}
+                        onClick={() =>
+                          setStatus(status === filterKey ? "all" : filterKey)
+                        }
+                      />
+                    );
+                  })}
               </div>
               <Button
                 size="sm"
@@ -536,6 +535,42 @@ export default function ContasPagarPage() {
                   Importar Documentos
                 </Button>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={displayRows.length === 0}
+                  onClick={() => {
+                    const data = displayRows.flatMap((row) => {
+                      if (row.kind === "group") return [];
+                      const e = row.entry;
+                      const d = docsByEntry.get(e.id);
+                      return [{
+                        Fornecedor: e.supplier,
+                        CNPJ: e.cnpj ?? "",
+                        "Nº Doc": e.document_number ?? "",
+                        Vencimento: e.due_date ?? "",
+                        Valor: Number(e.amount),
+                        Categoria: e.category ?? "",
+                        "Forma de Pagamento": e.payment_method ?? "",
+                        "Aprovação GG": e.gg_approval,
+                        "Status Pagamento": e.payment_status,
+                        "Documento Vinculado": d?.file_name ?? "",
+                        "Validação IA": d?.validation_status ?? "",
+                        Observação: e.observation ?? "",
+                      }];
+                    });
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Lançamentos");
+                    XLSX.writeFile(
+                      wb,
+                      `contas-a-pagar-${hotel?.name ?? "hotel"}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+                    );
+                  }}
+                >
+                  <FileDown className="h-4 w-4" /> Exportar Excel
+                </Button>
+                <Button
                   variant="default"
                   size="sm"
                   className="gap-2"
@@ -553,6 +588,15 @@ export default function ContasPagarPage() {
             </div>
 
             {/* Filtros */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar fornecedor, CNPJ ou nº documento…"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -575,6 +619,10 @@ export default function ContasPagarPage() {
                   {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
                   <SelectItem value="no_doc">Sem documento</SelectItem>
                   <SelectItem value="issues">Com problema</SelectItem>
+                  <SelectItem value="payment_pendente">Pendente de inserção</SelectItem>
+                  <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
+                  <SelectItem value="payment_agendado">Agendado</SelectItem>
+                  <SelectItem value="payment_pago">Pago</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -768,6 +816,7 @@ export default function ContasPagarPage() {
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
                           onLink={() => setLinkEntry(e)}
                           onApprove={(approval) => handleApprove(e.id, approval)}
+                          issues={entryIssues(e)}
                         />
                       );
                     })
@@ -815,6 +864,7 @@ export default function ContasPagarPage() {
                     compact
                     onLink={() => setLinkEntry(e)}
                     onApprove={(approval) => handleApprove(e.id, approval)}
+                    issues={entryIssues(e)}
                   />
                 ))}
               </TableBody>
@@ -867,6 +917,7 @@ export default function ContasPagarPage() {
           issueEntries={issueEntries}
           issueCounts={issueCounts}
           showApproval={showApproval}
+          entryIssues={entryIssues}
         />
       )}
     </div>
