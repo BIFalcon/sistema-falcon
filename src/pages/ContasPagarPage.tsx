@@ -50,6 +50,7 @@ import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
+import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
 
 import { useMemo } from "react";
 
@@ -247,12 +248,11 @@ export default function ContasPagarPage() {
 
       {/* Placeholder sem hotel */}
       {!hotelId && (
-        <Card className="p-12 text-center text-muted-foreground shadow-soft">
-          <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">
-            Selecione um hotel no filtro do topo para visualizar os lançamentos.
-          </p>
-        </Card>
+        <EmptyHotelState
+          icon={<Wallet className="h-12 w-12" />}
+          title="Contas a Pagar"
+          description="Selecione um hotel para visualizar e gerenciar os lançamentos financeiros."
+        />
       )}
 
       {hotelId && (
