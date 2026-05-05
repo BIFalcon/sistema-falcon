@@ -280,7 +280,7 @@ export function useDreIndicators(closingId: string | null | undefined) {
   });
 }
 
-export function useDreAnalytics(input: { hotelIds: string[]; year: number; month: number }) {
+export function useDreAnalytics(input: { hotelIds: string[]; year: number; month: number; periodMonths?: number }) {
   return useDreAnalyticsImpl(input);
 }
 
@@ -288,33 +288,51 @@ function useDreAnalyticsImpl(input: {
   hotelIds: string[];
   year: number;
   month: number;
+  periodMonths?: number;
 }) {
   return useQuery({
     enabled: input.hotelIds.length > 0,
-    queryKey: ["dre-analytics", input.hotelIds, input.year, input.month],
+    queryKey: ["dre-analytics", input.hotelIds, input.year, input.month, input.periodMonths ?? 1],
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
 
       for (const hotelId of input.hotelIds) {
-        const { data: closing } = await supabase
+        const nMonths = input.periodMonths ?? 1;
+        const startMonth = Math.max(1, input.month - nMonths + 1);
+        const monthRange = Array.from(
+          { length: input.month - startMonth + 1 },
+          (_, i) => startMonth + i,
+        );
+        const { data: closings } = await supabase
           .from("closings")
-          .select("id")
+          .select("id, month")
           .eq("hotel_id", hotelId)
           .eq("year", input.year)
-          .eq("month", input.month)
-          .maybeSingle();
-        if (!closing) continue;
+          .in("month", monthRange);
+        if (!closings?.length) continue;
 
-        const { data: lines, error } = await supabase
-          .from("dre_parsed_lines")
-          .select("line_label, line_value, version_number")
-          .eq("closing_id", closing.id)
-          .eq("line_type", "indicator")
-          .order("version_number", { ascending: false });
-        if (error || !lines?.length) continue;
-
-        const topVersion = lines[0].version_number;
-        const topLines = lines.filter((l) => l.version_number === topVersion);
+        type LineRow = {
+          line_label: string;
+          line_value: number | null;
+          version_number: number;
+          _month: number;
+        };
+        const allLines: LineRow[] = [];
+        for (const closing of closings) {
+          const { data: closingLines } = await supabase
+            .from("dre_parsed_lines")
+            .select("line_label, line_value, version_number")
+            .eq("closing_id", closing.id)
+            .eq("line_type", "indicator")
+            .order("version_number", { ascending: false });
+          if (!closingLines?.length) continue;
+          const topVer = closingLines[0].version_number;
+          const topLines = closingLines
+            .filter((l) => l.version_number === topVer)
+            .map((l) => ({ ...l, _month: closing.month }));
+          allLines.push(...topLines);
+        }
+        if (!allLines.length) continue;
 
         const seriesCur: Record<string, (number | null)[]> = {};
         const seriesPrev: Record<string, (number | null)[]> = {};
@@ -322,7 +340,7 @@ function useDreAnalyticsImpl(input: {
         const budgetIndicators: Record<string, number | null> = {};
         const indicators: Record<string, { label: string; value: number | null }> = {};
 
-        for (const line of topLines) {
+        for (const line of allLines) {
           const lbl = line.line_label;
           const val = line.line_value;
 
@@ -378,8 +396,19 @@ function useDreAnalyticsImpl(input: {
           const current = seriesCur[key] ?? Array(12).fill(null);
           const previous = seriesPrev[key] ?? Array(12).fill(null);
 
-          if (!seriesCur[key] && indicators[key]?.value != null) {
-            current[input.month - 1] = indicators[key].value;
+          for (const line of allLines) {
+            const lbl = line.line_label;
+            const indM = lbl.match(/^\[([^\]\s]+)\]/);
+            if (
+              indM &&
+              indM[1] === key &&
+              !lbl.startsWith("[series_") &&
+              !lbl.startsWith("[prev_") &&
+              !lbl.startsWith("[budget_")
+            ) {
+              const mIdx = (line._month ?? input.month) - 1;
+              if (current[mIdx] == null) current[mIdx] = line.line_value ?? null;
+            }
           }
 
           const budget = seriesBudget[key] ?? Array(12).fill(null);
