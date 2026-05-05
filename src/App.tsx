@@ -21,7 +21,6 @@ import ContasPagarPage from "./pages/ContasPagarPage";
 import ContasReceberPage from "./pages/ContasReceberPage";
 import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
-import UploadRetroativoDrePage from "./pages/UploadRetroativoDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -102,7 +101,6 @@ const App = () => (
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />
               <Route path="/configuracoes/hoteis" element={<RoleGuard masterOnly><HoteisPage /></RoleGuard>} />
               <Route path="/configuracoes/notificacoes" element={<RoleGuard masterOnly><NotificacoesPage /></RoleGuard>} />
-              <Route path="/configuracoes/dre-retroativo" element={<RoleGuard masterOnly><UploadRetroativoDrePage /></RoleGuard>} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
               <Route path="/perfil" element={<PerfilPage />} />
             </Route>

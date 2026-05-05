@@ -22,6 +22,7 @@ export default function UploadRetroativoDrePage() {
   const [hotelId, setHotelId] = useState<string>("");
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState<number>(currentYear);
+  const [upToMonth, setUpToMonth] = useState<number>(12);
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<RetroUploadResult | null>(null);
@@ -50,6 +51,7 @@ export default function UploadRetroativoDrePage() {
         year,
         file,
         userId: user.id,
+        upToMonth,
       });
       setResult(res);
       toast({
@@ -142,6 +144,22 @@ export default function UploadRetroativoDrePage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Processar até o mês</Label>
+            <Select value={String(upToMonth)} onValueChange={(v) => setUpToMonth(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                {MONTHS_PT.map((label, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
