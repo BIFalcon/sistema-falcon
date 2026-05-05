@@ -114,6 +114,7 @@ export function useUploadDre() {
           line_label: l.label,
           line_type: "line",
           line_value: l.value,
+          line_level: l.level ?? 3,
         }));
         // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
         // comparativos da Carta. Persistidas como indicadores extras com prefixo
