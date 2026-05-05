@@ -976,6 +976,7 @@ export type Database = {
           active: boolean
           brand: string
           brand_logo_url: string | null
+          cnpj: string | null
           cover_url: string | null
           created_at: string
           financial_system:
@@ -989,6 +990,7 @@ export type Database = {
           active?: boolean
           brand: string
           brand_logo_url?: string | null
+          cnpj?: string | null
           cover_url?: string | null
           created_at?: string
           financial_system?:
@@ -1002,6 +1004,7 @@ export type Database = {
           active?: boolean
           brand?: string
           brand_logo_url?: string | null
+          cnpj?: string | null
           cover_url?: string | null
           created_at?: string
           financial_system?:
