@@ -70,9 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // listener ANTES do getSession
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       const newUid = newSession?.user?.id ?? null;
-      // Atualiza session/user sempre (token refresh, etc.)
+      // Atualiza session sempre (token refresh, etc.)
       setSession(newSession);
-      setUser(newSession?.user ?? null);
 
       // Só recarrega dados do perfil quando o usuário REALMENTE muda
       // (login/logout). Eventos como TOKEN_REFRESHED ou SIGNED_IN ao
