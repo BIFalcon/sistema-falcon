@@ -318,6 +318,8 @@ function useDreAnalyticsImpl(input: {
 
         const seriesCur: Record<string, (number | null)[]> = {};
         const seriesPrev: Record<string, (number | null)[]> = {};
+        const seriesBudget: Record<string, (number | null)[]> = {};
+        const budgetIndicators: Record<string, number | null> = {};
         const indicators: Record<string, { label: string; value: number | null }> = {};
 
         for (const line of topLines) {
@@ -339,6 +341,20 @@ function useDreAnalyticsImpl(input: {
             const m = parseInt(mStr, 10) - 1;
             if (!seriesPrev[key]) seriesPrev[key] = Array(12).fill(null);
             seriesPrev[key][m] = val ?? null;
+            continue;
+          }
+
+          const budgetSeriesMatch = lbl.match(/^\[series_budget_(.+)_(\d+)\]$/);
+          if (budgetSeriesMatch) {
+            const [, key, mStr] = budgetSeriesMatch;
+            const m = parseInt(mStr, 10) - 1;
+            if (!seriesBudget[key]) seriesBudget[key] = Array(12).fill(null);
+            seriesBudget[key][m] = val ?? null;
+            continue;
+          }
+          const budgetIndMatch = lbl.match(/^\[budget_([^\]\s]+)\]/);
+          if (budgetIndMatch) {
+            budgetIndicators[budgetIndMatch[1]] = val ?? null;
             continue;
           }
 
@@ -366,13 +382,18 @@ function useDreAnalyticsImpl(input: {
             current[input.month - 1] = indicators[key].value;
           }
 
+          const budget = seriesBudget[key] ?? Array(12).fill(null);
+          if (!seriesBudget[key] && budgetIndicators[key] != null) {
+            budget[input.month - 1] = budgetIndicators[key];
+          }
+
           nodes.push({
             id: `1:${key}`,
             label: indicators[key]?.label ?? INDICATOR_LABELS[key as IndicatorKey] ?? key,
             level: 1,
             series: {
               current,
-              budget: Array(12).fill(null),
+              budget,
               previous,
             },
           children: [],
