@@ -74,6 +74,8 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
   { value: "gop", label: "Gerente de Operações (GOP)", scope: "Acesso à cartela de hotéis definida" },
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
+  { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
+  { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -427,7 +429,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const needsHotelSelection =
     !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg");
   const hasGlobalAccess =
-    isMasterFlag || ["controladoria", "financeiro", "ri"].includes(primaryRole);
+    isMasterFlag || ["controladoria", "financeiro", "ri", "rh", "operacoes"].includes(primaryRole);
 
   // Validações por etapa
   const canAdvanceStep1 =
