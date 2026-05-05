@@ -12,6 +12,7 @@ import { useFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
 import { MONTHS_PT } from "@/lib/constants";
+import { fmtBRL } from "@/lib/formatters";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -61,10 +62,6 @@ const chartConfig = {
   previous: { label: "Ano Anterior", color: "hsl(var(--muted-foreground))" },
 } satisfies ChartConfig;
 
-function brl(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 function pct(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
