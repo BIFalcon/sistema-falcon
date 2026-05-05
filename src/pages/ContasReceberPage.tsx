@@ -33,6 +33,7 @@ import {
   useToInvoiceEntries,
   useOpenFolioEntries,
   useLatestArUpload,
+  useLatestToInvoiceDate,
   useUploadArReport,
   useClientContracts,
   useUpsertContract,
@@ -48,13 +49,13 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
-import { fmtBRL } from "@/lib/formatters";
+import { fmtBRL, fmtDate } from "@/lib/formatters";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -198,6 +199,7 @@ function ToInvoiceSection({
     hotelId: hotelId || undefined,
   });
   const { data: lastUpload } = useLatestArUpload("to_invoice");
+  const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
   const { data: contracts } = useClientContracts(hotelId || null);
   const notifyTi = useNotifyGgToInvoice();
 
@@ -214,6 +216,12 @@ function ToInvoiceSection({
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
+      {latestTiDate && (
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 -mt-2 px-1">
+          <CalendarIcon className="h-3.5 w-3.5" />
+          Dados até <strong className="font-semibold">{fmtDate(latestTiDate)}</strong>
+        </p>
+      )}
 
       <Card className="p-5 shadow-soft space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -608,6 +616,11 @@ function OpenFolioSection({
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
   const [notifying, setNotifying] = useState<string | null>(null);
+  const [ofSearchText, setOfSearchText] = useState<string>("");
+  const [ofSort, setOfSort] = useState<{
+    col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open";
+    dir: "asc" | "desc";
+  }>({ col: "balance", dir: "desc" });
 
   // confirmation_numbers que possuem ao menos uma justificativa, indexados por hotel
   const justifiedByHotel = useMemo(() => {
@@ -684,7 +697,7 @@ function OpenFolioSection({
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
-    return visibleEntries
+    const base = visibleEntries
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
@@ -693,9 +706,50 @@ function OpenFolioSection({
         if (agingFilter === "mid") return d > 30 && d <= 90;
         return d > 90;
       })
-      .filter((e) => (unjustifiedOnly ? !isJustified(e) : true))
-      .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0));
-  }, [visibleEntries, selectedHotel, agingFilter, unjustifiedOnly, justifiedByHotel]);
+      .filter((e) => (unjustifiedOnly ? !isJustified(e) : true));
+
+    const q = ofSearchText.trim().toLowerCase();
+    const searched = q
+      ? base.filter((e) => {
+          const name = `${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase();
+          return (
+            name.includes(q) ||
+            (e.confirmation_number ?? "").toLowerCase().includes(q)
+          );
+        })
+      : base;
+
+    const sorted = [...searched].sort((a, b) => {
+      let va: string | number;
+      let vb: string | number;
+      if (ofSort.col === "guest_name") {
+        va = `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim();
+        vb = `${b.first_name ?? ""} ${b.last_name ?? ""}`.trim();
+      } else if (ofSort.col === "balance") {
+        va = Number(a.balance ?? 0);
+        vb = Number(b.balance ?? 0);
+      } else if (ofSort.col === "days_open") {
+        va = Number(a.days_open ?? 0);
+        vb = Number(b.days_open ?? 0);
+      } else {
+        va = a[ofSort.col] ?? "";
+        vb = b[ofSort.col] ?? "";
+      }
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+      return ofSort.dir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [visibleEntries, selectedHotel, agingFilter, unjustifiedOnly, justifiedByHotel, ofSearchText, ofSort]);
+
+  const handleOfSort = (col: typeof ofSort.col) => {
+    setOfSort((s) => ({
+      col,
+      dir: s.col === col && s.dir === "desc" ? "asc" : "desc",
+    }));
+  };
 
   return (
     <div className="space-y-5">
@@ -718,6 +772,10 @@ function OpenFolioSection({
           notifying={notifying === selectedHotel}
           onBack={() => setHotelId(null)}
           hideBack={isGgOnly}
+          searchText={ofSearchText}
+          setSearchText={setOfSearchText}
+          sort={ofSort}
+          onSort={handleOfSort}
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
@@ -803,6 +861,10 @@ function HotelOpenFolioDetail({
   notifying,
   onBack,
   hideBack,
+  searchText,
+  setSearchText,
+  sort,
+  onSort,
 }: {
   hotelId: string;
   hotelName: string;
@@ -817,6 +879,10 @@ function HotelOpenFolioDetail({
   notifying?: boolean;
   onBack: () => void;
   hideBack?: boolean;
+  searchText: string;
+  setSearchText: (v: string) => void;
+  sort: { col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open"; dir: "asc" | "desc" };
+  onSort: (col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open") => void;
 }) {
   const { data: notes = [] } = useOpenFolioNotes(hotelId);
   const [noteFor, setNoteFor] = useState<OpenFolioEntry | null>(null);
@@ -896,16 +962,25 @@ function HotelOpenFolioDetail({
           </Button>
         </div>
       </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          className="pl-9"
+          placeholder="Buscar hóspede ou nº de confirmação..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Hóspede</TableHead>
+              <SortableHead col="guest_name" label="Hóspede" sort={sort} onSort={onSort} />
               <TableHead>Confirmação</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-              <TableHead>Check-in</TableHead>
-              <TableHead>Check-out</TableHead>
-              <TableHead className="text-right">Em aberto</TableHead>
+              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
+              <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
+              <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
+              <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
               <TableHead>Previsto pagto</TableHead>
               <TableHead>Justificativa</TableHead>
             </TableRow>
@@ -1317,5 +1392,38 @@ function EmptyState({ text }: { text: string }) {
       <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-50" />
       {text}
     </div>
+  );
+}
+
+type OfSortCol = "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open";
+
+function SortableHead({
+  col,
+  label,
+  sort,
+  onSort,
+  align,
+}: {
+  col: OfSortCol;
+  label: string;
+  sort: { col: OfSortCol; dir: "asc" | "desc" };
+  onSort: (col: OfSortCol) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.col === col;
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-accent ${align === "right" ? "text-right" : ""}`}
+      onClick={() => onSort(col)}
+    >
+      <div className={`flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}>
+        {label}
+        {active ? (
+          sort.dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
   );
 }

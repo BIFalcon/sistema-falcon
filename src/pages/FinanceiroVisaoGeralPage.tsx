@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
-import { useAllApEntries, useAllTodayBankBalances } from "@/hooks/useAccountsPayable";
+import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
 import {
   ArrowDownCircle,
-  ArrowUpCircle,
   AlertTriangle,
   Wallet,
   Hourglass,
@@ -18,50 +17,7 @@ import {
   Sparkles,
   Clock,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { fmtBRL } from "@/lib/formatters";
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-function ymKey(iso: string) {
-  return iso.slice(0, 7);
-}
-function startOfWeekIso(d = new Date()) {
-  const date = new Date(d);
-  const day = date.getDay(); // 0 dom .. 6 sab
-  const diff = date.getDate() - day; // semana iniciando no domingo
-  date.setDate(diff);
-  return date.toISOString().slice(0, 10);
-}
-function endOfWeekIso(d = new Date()) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() + (6 - day);
-  date.setDate(diff);
-  return date.toISOString().slice(0, 10);
-}
-function monthLabel(ym: string) {
-  const [y, m] = ym.split("-").map(Number);
-  const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  return `${months[m - 1]}/${String(y).slice(2)}`;
-}
-
-/** Notas existentes (para identificar folios SEM justificativa) — RLS aplica. */
-function useAllOpenFolioNotes() {
-  return useQuery({
-    queryKey: ["of-notes-all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ar_open_folio_notes")
-        .select("hotel_id, confirmation_number, created_at")
-        .limit(5000);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
 
 export default function FinanceiroVisaoGeralPage() {
   const navigate = useNavigate();
@@ -73,19 +29,16 @@ export default function FinanceiroVisaoGeralPage() {
     : userHotels.map((h) => h.id);
 
   const { data: allHotels = [] } = useAllHotels();
-  const hotelById = useMemo(() => new Map(allHotels.map((h) => [h.id, h])), [allHotels]);
+  void allHotels;
 
   // Filtros globais (header)
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, dateFrom, dateTo } = useFilters();
   const hotelFilter = hotelId ?? "all";
-  const period = `${year}-${String(month).padStart(2, "0")}`;
 
   // Dados
-  const { data: apEntries = [], isLoading: apLoading } = useAllApEntries();
-  const { data: bankBalances = [] } = useAllTodayBankBalances();
+  const { data: apEntries = [] } = useAllApEntries();
   const { data: toInvoice = [] } = useToInvoiceEntries({ hotelId: null });
   const { data: openFolio = [] } = useOpenFolioEntries();
-  const { data: ofNotes = [] } = useAllOpenFolioNotes();
 
   // Filtro por hotel/aplicação de RLS no front
   const filterByScope = <T extends { hotel_id: string | null }>(arr: T[]) => {
@@ -100,170 +53,87 @@ export default function FinanceiroVisaoGeralPage() {
     return r;
   };
 
-  const apScoped = useMemo(() => filterByScope(apEntries), [apEntries, hotelFilter, seesAllHotels, restrictedHotelIds]);
-  const tiScoped = useMemo(() => filterByScope(toInvoice), [toInvoice, hotelFilter, seesAllHotels, restrictedHotelIds]);
-  const ofScoped = useMemo(() => filterByScope(openFolio), [openFolio, hotelFilter, seesAllHotels, restrictedHotelIds]);
+  const apScoped = useMemo(
+    () => filterByScope(apEntries),
+    [apEntries, hotelFilter, seesAllHotels, restrictedHotelIds],
+  );
+  const tiScoped = useMemo(
+    () => filterByScope(toInvoice),
+    [toInvoice, hotelFilter, seesAllHotels, restrictedHotelIds],
+  );
+  const ofScoped = useMemo(
+    () => filterByScope(openFolio),
+    [openFolio, hotelFilter, seesAllHotels, restrictedHotelIds],
+  );
 
-  // ===== Cards superiores =====
-  const today = todayIso();
-  const totalDueToday = useMemo(
-    () => apScoped.filter((e) => e.due_date === today && e.gg_approval !== "rejected")
-                  .reduce((s, e) => s + Number(e.amount ?? 0), 0),
-    [apScoped, today],
+  // ===== Cards superiores (usam date range) =====
+  const totalDuePeriod = useMemo(
+    () =>
+      apScoped
+        .filter(
+          (e) =>
+            e.due_date &&
+            e.due_date >= dateFrom &&
+            e.due_date <= dateTo &&
+            e.gg_approval !== "rejected",
+        )
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0),
+    [apScoped, dateFrom, dateTo],
   );
+
   const totalOverdue = useMemo(
-    () => apScoped.filter((e) => e.due_date && e.due_date < today && e.gg_approval !== "rejected")
-                  .reduce((s, e) => s + Number(e.amount ?? 0), 0),
-    [apScoped, today],
+    () =>
+      apScoped
+        .filter(
+          (e) =>
+            e.due_date &&
+            e.due_date < dateFrom &&
+            e.gg_approval !== "rejected",
+        )
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0),
+    [apScoped, dateFrom],
   );
-  const totalToInvoiceMonth = useMemo(() => {
-    return tiScoped
-      .filter((e) => e.transaction_date && ymKey(e.transaction_date) === period)
-      .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0);
-  }, [tiScoped, period]);
+
   const totalOpenFolio = useMemo(
     () => ofScoped.reduce((s, e) => s + Number(e.balance ?? 0), 0),
     [ofScoped],
   );
 
-  // ===== AP — Ranking semanal =====
-  const weekStart = startOfWeekIso();
-  const weekEnd = endOfWeekIso();
-  const apWeekRanking = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of apScoped) {
-      if (!e.due_date || e.due_date < weekStart || e.due_date > weekEnd) continue;
-      if (e.gg_approval === "rejected") continue;
-      map.set(e.hotel_id, (map.get(e.hotel_id) ?? 0) + Number(e.amount ?? 0));
-    }
-    return Array.from(map.entries())
-      .map(([id, total]) => ({ id, name: hotelById.get(id)?.name ?? id, total }))
-      .sort((a, b) => b.total - a.total);
-  }, [apScoped, weekStart, weekEnd, hotelById]);
+  // TODO: quando contratos estiverem cadastrados, filtrar por
+  // transaction_date + prazo_dias_contrato ao invés de transaction_date diretamente.
+  const totalToInvoicePeriod = useMemo(
+    () =>
+      tiScoped
+        .filter(
+          (e) =>
+            e.transaction_date &&
+            e.transaction_date >= dateFrom &&
+            e.transaction_date <= dateTo,
+        )
+        .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0),
+    [tiScoped, dateFrom, dateTo],
+  );
 
-  // Alertas críticos: hotéis com vencidos
-  const overdueHotels = useMemo(() => {
-    const map = new Map<string, { count: number; total: number }>();
-    for (const e of apScoped) {
-      if (!e.due_date || e.due_date >= today) continue;
-      if (e.gg_approval === "rejected") continue;
-      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0 };
-      cur.count++;
-      cur.total += Number(e.amount ?? 0);
-      map.set(e.hotel_id, cur);
-    }
-    return Array.from(map.entries())
-      .map(([id, v]) => ({ id, name: hotelById.get(id)?.name ?? id, ...v }))
-      .sort((a, b) => b.total - a.total);
-  }, [apScoped, today, hotelById]);
-
-  // Alertas críticos: saldo bancário insuficiente (saldo informado < total a pagar nos próximos 7 dias)
-  const insufficientBalance = useMemo(() => {
-    const next7 = new Date();
-    next7.setDate(next7.getDate() + 7);
-    const next7Iso = next7.toISOString().slice(0, 10);
-    const dueByHotel = new Map<string, number>();
-    for (const e of apScoped) {
-      if (!e.due_date || e.due_date > next7Iso || e.gg_approval === "rejected") continue;
-      dueByHotel.set(e.hotel_id, (dueByHotel.get(e.hotel_id) ?? 0) + Number(e.amount ?? 0));
-    }
-    const balByHotel = new Map<string, number>();
-    for (const b of bankBalances) {
-      balByHotel.set(b.hotel_id, Number(b.amount ?? 0));
-    }
-    const out: { id: string; name: string; due: number; balance: number }[] = [];
-    for (const [id, due] of dueByHotel) {
-      const bal = balByHotel.get(id);
-      if (bal != null && bal < due) {
-        out.push({ id, name: hotelById.get(id)?.name ?? id, due, balance: bal });
-      }
-    }
-    return out.sort((a, b) => (b.due - b.balance) - (a.due - a.balance));
-  }, [apScoped, bankBalances, hotelById]);
-
-  // ===== AR — Faturar últimos 3 meses + atual =====
-  const monthsBars = useMemo(() => {
-    const arr: { ym: string; total: number }[] = [];
-    const base = new Date(period + "-01T00:00:00");
-    for (let i = 3; i >= 0; i--) {
-      const d = new Date(base);
-      d.setMonth(d.getMonth() - i);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const total = tiScoped
-        .filter((e) => e.transaction_date && ymKey(e.transaction_date) === ym)
-        .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0);
-      arr.push({ ym, total });
-    }
-    return arr;
-  }, [tiScoped, period]);
-
-  // ===== AR — Open Folio ranking =====
-  const ofRanking = useMemo(() => {
-    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number }>();
-    for (const e of ofScoped) {
-      if (!e.hotel_id) continue;
-      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0 };
-      cur.count++;
-      cur.total += Number(e.balance ?? 0);
-      if (e.days_open != null) {
-        cur.daysSum += e.days_open;
-        cur.daysCount++;
-      }
-      map.set(e.hotel_id, cur);
-    }
-    return Array.from(map.entries())
-      .map(([id, v]) => ({
-        id,
-        name: hotelById.get(id)?.name ?? id,
-        count: v.count,
-        total: v.total,
-        avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [ofScoped, hotelById]);
-
-  // Hotéis com folios sem justificativa há mais de 48h
-  const noteByKey = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of ofNotes) set.add(`${n.hotel_id}|${n.confirmation_number}`);
-    return set;
-  }, [ofNotes]);
-  const stalled48h = useMemo(() => {
-    const cutoff = Date.now() - 48 * 3600 * 1000;
-    const map = new Map<string, number>();
-    for (const e of ofScoped) {
-      if (!e.hotel_id || !e.confirmation_number) continue;
-      const k = `${e.hotel_id}|${e.confirmation_number}`;
-      if (noteByKey.has(k)) continue;
-      // sem justificativa: considera "há mais de 48h" se days_open > 2 ou created_at antigo
-      const ageOk = (e.days_open ?? 0) > 2;
-      if (!ageOk) continue;
-      map.set(e.hotel_id, (map.get(e.hotel_id) ?? 0) + 1);
-    }
-    return new Set(map.keys());
-    void cutoff;
-  }, [ofScoped, noteByKey]);
-
-  const maxApBar = Math.max(1, ...apWeekRanking.map((r) => r.total));
-  const maxOfBar = Math.max(1, ...ofRanking.map((r) => r.total));
-  const maxMonthBar = Math.max(1, ...monthsBars.map((m) => m.total));
+  const saldoLiquido = totalOpenFolio - totalDuePeriod;
 
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Gestão · Financeiro</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+          Gestão · Financeiro
+        </p>
         <h1 className="text-2xl font-semibold">Visão Geral</h1>
         <p className="text-sm text-muted-foreground">
-          Dashboard executivo consolidando Contas a Pagar, Contas a Receber e indicadores financeiros.
+          Consolidado financeiro do período selecionado.
         </p>
       </div>
 
-      {/* Cards superiores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* BLOCO 1 — Cards principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <SummaryCard
           icon={<Wallet className="h-4 w-4" />}
-          label="A pagar hoje"
-          value={fmtBRL(totalDueToday)}
+          label="A pagar no período"
+          value={fmtBRL(totalDuePeriod)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-pagar")}
         />
@@ -276,8 +146,8 @@ export default function FinanceiroVisaoGeralPage() {
         />
         <SummaryCard
           icon={<ArrowDownCircle className="h-4 w-4" />}
-          label={`A faturar (${monthLabel(period)})`}
-          value={fmtBRL(totalToInvoiceMonth)}
+          label="A faturar no período"
+          value={fmtBRL(totalToInvoicePeriod)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-receber")}
         />
@@ -288,194 +158,63 @@ export default function FinanceiroVisaoGeralPage() {
           tone={totalOpenFolio > 0 ? "warning" : "default"}
           onClick={() => navigate("/financeiro/contas-receber")}
         />
+        <SummaryCard
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Saldo líquido"
+          value={fmtBRL(saldoLiquido)}
+          tone={saldoLiquido < 0 ? "destructive" : "default"}
+          subtitle="A receber − A pagar"
+        />
       </div>
 
-      {/* CONTAS A PAGAR */}
-      <section className="space-y-3">
-        <SectionHeader
-          icon={<ArrowUpCircle className="h-4 w-4" />}
-          title="Contas a Pagar"
-          subtitle="Ranking da semana atual e alertas críticos"
-        />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="p-5 shadow-soft lg:col-span-2 space-y-3">
-            <h3 className="text-sm font-semibold">Ranking semanal por hotel</h3>
-            {apLoading ? (
-              <p className="text-sm text-muted-foreground">Carregando…</p>
-            ) : apWeekRanking.length === 0 ? (
-              <EmptyHint text="Sem pagamentos previstos para esta semana." />
-            ) : (
-              <div className="space-y-2">
-                {apWeekRanking.slice(0, 12).map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => navigate("/financeiro/contas-pagar")}
-                    className="w-full flex items-center gap-3 group"
-                  >
-                    <div className="w-44 text-sm truncate text-left group-hover:text-accent transition-colors">{r.name}</div>
-                    <div className="flex-1 h-7 rounded bg-muted/40 overflow-hidden">
-                      <div
-                        className="h-full bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground"
-                        style={{ width: `${Math.max(2, (r.total / maxApBar) * 100)}%` }}
-                      >
-                        {fmtBRL(r.total)}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card className="p-5 shadow-soft space-y-3">
-            <h3 className="text-sm font-semibold">Alertas críticos</h3>
-            <div className="space-y-2">
-              {overdueHotels.length === 0 && insufficientBalance.length === 0 && (
-                <EmptyHint text="Sem alertas no momento." />
-              )}
-              {overdueHotels.slice(0, 5).map((h) => (
-                <button
-                  key={`ov-${h.id}`}
-                  onClick={() => navigate("/financeiro/contas-pagar")}
-                  className="w-full text-left p-2.5 rounded border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate">{h.name}</span>
-                    <Badge variant="destructive" className="text-[9px] shrink-0">vencidos</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {h.count} lançamento(s) · <strong className="text-destructive">{fmtBRL(h.total)}</strong>
-                  </p>
-                </button>
-              ))}
-              {insufficientBalance.slice(0, 5).map((h) => (
-                <button
-                  key={`ib-${h.id}`}
-                  onClick={() => navigate("/financeiro/contas-pagar")}
-                  className="w-full text-left p-2.5 rounded border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate">{h.name}</span>
-                    <Badge className="text-[9px] shrink-0 bg-amber-500 text-white hover:bg-amber-500/90">saldo baixo</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Saldo {fmtBRL(h.balance)} · 7d {fmtBRL(h.due)}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* CONTAS A RECEBER */}
-      <section className="space-y-3">
-        <SectionHeader
-          icon={<ArrowDownCircle className="h-4 w-4" />}
-          title="Contas a Receber"
-          subtitle="Faturamento mensal e folios em aberto por hotel"
-        />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="p-5 shadow-soft space-y-3">
-            <h3 className="text-sm font-semibold">A faturar — últimos meses</h3>
-            <div className="space-y-2">
-              {monthsBars.map((m) => (
-                <div
-                  key={m.ym}
-                  onClick={() => navigate("/financeiro/contas-receber")}
-                  className="cursor-pointer"
-                >
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-muted-foreground">{monthLabel(m.ym)}</span>
-                    <span className="font-semibold">{fmtBRL(m.total)}</span>
-                  </div>
-                  <div className="mt-1 h-2 rounded bg-muted overflow-hidden">
-                    <div className="h-full bg-accent" style={{ width: `${(m.total / maxMonthBar) * 100}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Card className="p-5 shadow-soft lg:col-span-2 space-y-3">
-            <h3 className="text-sm font-semibold">Open Folio por hotel</h3>
-            {ofRanking.length === 0 ? (
-              <EmptyHint text="Sem folios em aberto." />
-            ) : (
-              <div className="space-y-2">
-                {ofRanking.slice(0, 10).map((r) => {
-                  const tone =
-                    r.avgDays > 90 ? "bg-destructive/15 text-destructive border-destructive/30"
-                    : r.avgDays > 30 ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                    : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
-                  const stalled = stalled48h.has(r.id);
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => navigate("/financeiro/contas-receber")}
-                      className={`w-full text-left p-3 rounded border hover:border-accent transition-colors flex items-center gap-3 ${stalled ? "border-destructive/40 bg-destructive/5" : ""}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{r.name}</span>
-                          {stalled && <Badge variant="destructive" className="text-[9px]">+48h sem just.</Badge>}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{r.count} folio(s)</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">{fmtBRL(r.total)}</p>
-                        <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tone}`}>
-                          média {r.avgDays}d
-                        </span>
-                      </div>
-                      <div className="hidden md:block w-32 h-2 rounded bg-muted overflow-hidden">
-                        <div className="h-full bg-accent/70" style={{ width: `${(r.total / maxOfBar) * 100}%` }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
-      </section>
-
-      {/* JUROS & ANTECIPAÇÕES — placeholder */}
-      <section className="space-y-3">
-        <SectionHeader
-          icon={<TrendingUp className="h-4 w-4" />}
-          title="Juros & Antecipações"
-          subtitle="Em desenvolvimento"
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <PlaceholderCard
-            icon={<Sparkles className="h-4 w-4" />}
-            title="Juros pagos por hotel"
-            text="Dashboard de juros pagos por hotel — disponível em breve."
-          />
-          <PlaceholderCard
-            icon={<Clock className="h-4 w-4" />}
-            title="Antecipações de recebíveis"
-            text="Antecipações de recebíveis — disponível em breve."
-          />
-        </div>
-      </section>
-
-      {/* INTEGRAÇÃO REDE — placeholder */}
+      {/* BLOCO 2 — Recebíveis de cartão */}
       <section className="space-y-3">
         <SectionHeader
           icon={<CreditCard className="h-4 w-4" />}
-          title="Integração Rede"
-          subtitle="Aguardando conexão com a operadora"
+          title="Recebíveis de cartão"
+          subtitle="Disponível após integração com a Rede"
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <PlaceholderCard
             icon={<CreditCard className="h-4 w-4" />}
             title="Recebíveis de cartão"
-            text="Recebíveis de cartão — disponível após integração com a Rede."
+            text="Total de recebíveis de cartão no período — disponível após integração com a Rede."
           />
           <PlaceholderCard
             icon={<AlertTriangle className="h-4 w-4" />}
             title="Chargebacks"
-            text="Chargebacks — disponível após integração com a Rede."
+            text="Chargebacks no período — disponível após integração com a Rede."
+          />
+          <PlaceholderCard
+            icon={<Sparkles className="h-4 w-4" />}
+            title="Cashbacks"
+            text="Cashbacks recebidos no período — disponível após integração com a Rede."
+          />
+        </div>
+      </section>
+
+      {/* BLOCO 3 — Encargos financeiros */}
+      <section className="space-y-3">
+        <SectionHeader
+          icon={<TrendingUp className="h-4 w-4" />}
+          title="Encargos financeiros"
+          subtitle="Disponível em breve"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PlaceholderCard
+            icon={<Clock className="h-4 w-4" />}
+            title="Juros pagos no período"
+            text="Total de juros pagos no período selecionado — disponível em breve."
+          />
+          <PlaceholderCard
+            icon={<Clock className="h-4 w-4" />}
+            title="Antecipação de recebíveis"
+            text="Valor antecipado no período — disponível em breve."
+          />
+          <PlaceholderCard
+            icon={<Clock className="h-4 w-4" />}
+            title="Taxa de antecipação"
+            text="Taxa paga por antecipação no período — disponível em breve."
           />
         </div>
       </section>
@@ -488,12 +227,14 @@ function SummaryCard({
   label,
   value,
   tone,
+  subtitle,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   tone: "default" | "destructive" | "warning";
+  subtitle?: string;
   onClick?: () => void;
 }) {
   const toneClass =
@@ -502,18 +243,21 @@ function SummaryCard({
       : tone === "warning"
         ? "border-amber-500/30 bg-amber-500/5"
         : "";
-  const valueClass =
-    tone === "destructive" ? "text-destructive" : "";
+  const valueClass = tone === "destructive" ? "text-destructive" : "";
+  const Wrapper: React.ElementType = onClick ? "button" : "div";
   return (
-    <button
+    <Wrapper
       onClick={onClick}
-      className={`text-left p-4 rounded-lg border bg-card hover:border-accent hover:shadow-soft transition-all ${toneClass}`}
+      className={`text-left p-4 rounded-lg border bg-card transition-all ${onClick ? "hover:border-accent hover:shadow-soft" : ""} ${toneClass}`}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
         {icon} {label}
       </div>
       <p className={`mt-2 text-2xl font-semibold ${valueClass}`}>{value}</p>
-    </button>
+      {subtitle && (
+        <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>
+      )}
+    </Wrapper>
   );
 }
 
@@ -539,8 +283,4 @@ function PlaceholderCard({ icon, title, text }: { icon: React.ReactNode; title: 
       <p className="text-xs text-muted-foreground">{text}</p>
     </Card>
   );
-}
-
-function EmptyHint({ text }: { text: string }) {
-  return <p className="text-xs text-muted-foreground italic">{text}</p>;
 }
