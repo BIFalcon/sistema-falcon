@@ -215,7 +215,7 @@ export default function IndicadoresDrePage() {
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
   const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
-  const { data: dataset, isLoading } = useDreAnalytics({ hotelIds, year });
+  const { data: dataset, isLoading } = useDreAnalytics({ hotelIds, year, month });
 
   const selectedLines = useMemo(() => dataset?.flat.filter((line) => selectedIds.has(line.id)) ?? [], [dataset, selectedIds]);
   const divisorLine = useMemo(() => {

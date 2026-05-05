@@ -266,36 +266,49 @@ export function useDreIndicators(closingId: string | null | undefined) {
   });
 }
 
-export function useDreAnalytics(input: { hotelIds: string[]; year: number }) {
+export function useDreAnalytics(input: { hotelIds: string[]; year: number; month: number }) {
   return useDreAnalyticsImpl(input);
 }
 
 function convertParsedDreToDataset(parsed: ParsedDre, sourceName: string): DreAnalyticsDataset {
-  const nodes: DreLineNode[] = Object.entries(parsed.indicators)
-    .filter(([, v]) => v != null)
-    .map(([key, ind]) => {
-      const current = Array(12).fill(null) as (number | null)[];
-      const budget = Array(12).fill(null) as (number | null)[];
-      const previous = Array(12).fill(null) as (number | null)[];
-      const curSeries = parsed.currentSeries[key as IndicatorKey];
-      if (curSeries) curSeries.forEach((v, i) => { current[i] = v; });
-      const prevSeries = parsed.previousSeries[key as IndicatorKey];
-      if (prevSeries) prevSeries.forEach((v, i) => { previous[i] = v; });
-      return {
-        id: `1:${key}`,
-        label: ind!.label,
-        level: 1,
-        series: { current, budget, previous },
-        children: [],
-      };
+  const nodes: DreLineNode[] = [];
+  const allKeys = Object.keys(parsed.indicators) as IndicatorKey[];
+  for (const key of allKeys) {
+    const ind = parsed.indicators[key];
+    if (!ind) continue;
+    const current = Array(12).fill(null) as (number | null)[];
+    const budget = Array(12).fill(null) as (number | null)[];
+    const previous = Array(12).fill(null) as (number | null)[];
+    const curSeries = parsed.currentSeries[key];
+    if (curSeries) curSeries.forEach((v, i) => { current[i] = v ?? null; });
+    else if (ind.value != null) {
+      const col = parsed.monthColumnIndex;
+      if (col != null) current[col] = ind.value;
+    }
+    const prevSeries = parsed.previousSeries[key];
+    if (prevSeries) {
+      prevSeries.forEach((v, i) => { previous[i] = v ?? null; });
+    } else {
+      const prevVal = parsed.previousIndicators?.[key];
+      if (prevVal != null && parsed.monthColumnIndex != null) {
+        previous[parsed.monthColumnIndex] = prevVal;
+      }
+    }
+    nodes.push({
+      id: `1:${key}`,
+      label: ind.label,
+      level: 1,
+      series: { current, budget, previous },
+      children: [],
     });
+  }
   return { tree: nodes, flat: nodes, hotelCount: 1, sourceNames: [sourceName] };
 }
 
-function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number }) {
+function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number; month: number }) {
   return useQuery({
     enabled: input.hotelIds.length > 0,
-    queryKey: ["dre-analytics", input.hotelIds, input.year],
+    queryKey: ["dre-analytics", input.hotelIds, input.year, input.month],
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
       for (const hotelId of input.hotelIds) {
@@ -304,7 +317,7 @@ function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number }) {
           .select("id, hotel_id, year")
           .eq("hotel_id", hotelId)
           .eq("year", input.year)
-          .order("month", { ascending: false })
+          .eq("month", input.month)
           .limit(1)
           .maybeSingle();
         if (closingError) throw closingError;
@@ -324,13 +337,8 @@ function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number }) {
           .from("closings")
           .download(version.file_url);
         if (downloadError) throw downloadError;
-        const { data: closingMonth } = await supabase
-          .from("closings")
-          .select("month")
-          .eq("id", closing.id)
-          .single();
         const fileObj = new File([await file.arrayBuffer()], version.file_name);
-        const parsed = await parseDreExcel(fileObj, { targetMonth: closingMonth?.month ?? 12 });
+        const parsed = await parseDreExcel(fileObj, { targetMonth: input.month });
         datasets.push(convertParsedDreToDataset(parsed, version.file_name));
       }
       if (!datasets.length) return null;
