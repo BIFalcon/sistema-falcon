@@ -81,3 +81,30 @@ export function useProcessNotifications() {
     },
   });
 }
+
+/** Conta notificações pendentes para o usuário logado (refetch a cada 30s). */
+export function usePendingNotificationCount() {
+  const { data: user } = useQuery({
+    queryKey: ["auth-user"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    },
+  });
+
+  return useQuery({
+    queryKey: ["notification-count-pending", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return 0;
+      const { count, error } = await supabase
+        .from("notification_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_user_id", user.id)
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30_000,
+  });
+}

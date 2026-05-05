@@ -22,6 +22,7 @@ import ContasReceberPage from "./pages/ContasReceberPage";
 import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import UploadRetroativoDrePage from "./pages/UploadRetroativoDrePage";
+import PerfilPage from "./pages/PerfilPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -74,6 +75,7 @@ const App = () => (
               <Route path="/configuracoes/notificacoes" element={<NotificacoesPage />} />
               <Route path="/configuracoes/dre-retroativo" element={<UploadRetroativoDrePage />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
+              <Route path="/perfil" element={<PerfilPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

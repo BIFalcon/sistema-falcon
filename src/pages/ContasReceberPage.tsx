@@ -56,6 +56,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -264,7 +265,7 @@ function ToInvoiceSection({
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
+          <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
         ) : visibleEntries.length === 0 ? (
           <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
         ) : !hotelId ? (
@@ -756,7 +757,7 @@ function OpenFolioSection({
       <UploadCard kind="open_folio" lastUpload={lastUpload} isManager={isManager} />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando…</p>
+        <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
       ) : selectedHotel ? (
         <HotelOpenFolioDetail
           hotelId={selectedHotel}

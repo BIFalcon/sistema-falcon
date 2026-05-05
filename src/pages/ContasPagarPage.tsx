@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -27,6 +27,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
@@ -50,6 +60,8 @@ import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
+import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 import { useMemo } from "react";
 
@@ -101,6 +113,8 @@ export default function ContasPagarPage() {
   const [uploading, setUploading] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -143,6 +157,17 @@ export default function ContasPagarPage() {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f || !hotelId || !sourceSystem) return;
+    if (fileRef.current) fileRef.current.value = "";
+    if (entries.length > 0) {
+      setPendingFile(f);
+      setReimportConfirmOpen(true);
+      return;
+    }
+    await executeUpload(f);
+  }
+
+  async function executeUpload(f: File) {
+    if (!hotelId || !sourceSystem) return;
     setUploading(true);
     try {
       const r = await uploadApReport({ hotelId, sourceSystem, file: f });
@@ -154,7 +179,7 @@ export default function ContasPagarPage() {
       toast.error(err instanceof Error ? err.message : "Erro ao importar");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setPendingFile(null);
     }
   }
 
@@ -170,10 +195,33 @@ export default function ContasPagarPage() {
       toast.error("Sem permissão para alterar status");
       return;
     }
+    // Captura status anterior para permitir desfazer
+    const previousByEntry = new Map<string, ApPaymentStatus>();
+    for (const e of entries) {
+      if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
+    }
+    const prevStatus = previousByEntry.get(ids[0]) ?? "pendente";
     try {
       await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
-      toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`);
       setSelectedIds(new Set());
+      toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            try {
+              await setPaymentStatus.mutateAsync({
+                hotelId,
+                entryIds: ids,
+                status: prevStatus,
+              });
+              toast.success("Ação desfeita.");
+            } catch {
+              toast.error("Não foi possível desfazer.");
+            }
+          },
+        },
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar status");
     }
@@ -247,12 +295,11 @@ export default function ContasPagarPage() {
 
       {/* Placeholder sem hotel */}
       {!hotelId && (
-        <Card className="p-12 text-center text-muted-foreground shadow-soft">
-          <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">
-            Selecione um hotel no filtro do topo para visualizar os lançamentos.
-          </p>
-        </Card>
+        <EmptyHotelState
+          icon={<Wallet className="h-12 w-12" />}
+          title="Contas a Pagar"
+          description="Selecione um hotel para visualizar e gerenciar os lançamentos financeiros."
+        />
       )}
 
       {hotelId && (
@@ -491,6 +538,47 @@ export default function ContasPagarPage() {
               </label>
             </div>
 
+            {(() => {
+              const activeFilterCount = [
+                period !== "all",
+                status !== "all",
+                category !== "all",
+                searchText !== "",
+                !hideTrivial,
+              ].filter(Boolean).length;
+              const hasActiveFilters = activeFilterCount > 0 || !groupNd;
+              if (!hasActiveFilters) return null;
+              return (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-accent" />
+                    <span className="text-accent font-medium">
+                      {activeFilterCount} filtro{activeFilterCount !== 1 ? "s" : ""} ativo
+                      {activeFilterCount !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      · mostrando {filtered.length} de {entries.length} lançamentos
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-accent hover:text-accent"
+                    onClick={() => {
+                      setPeriod("all");
+                      setStatus("all");
+                      setCategory("all");
+                      setSearchText("");
+                      setHideTrivial(true);
+                      setGroupNd(true);
+                    }}
+                  >
+                    Limpar filtros
+                  </Button>
+                </div>
+              );
+            })()}
+
             {/* Tabela */}
             <div className="border rounded-md overflow-hidden">
               {/* Barra de ações em lote */}
@@ -575,25 +663,21 @@ export default function ContasPagarPage() {
                       </TableHead>
                     )}
                     <TableHead>Fornecedor</TableHead>
-                    {sourceSystem === "omie" && <TableHead>CNPJ</TableHead>}
-                    <TableHead>Nº Doc</TableHead>
+                    {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
+                    <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
-                        className="text-center text-sm text-muted-foreground py-8"
-                      >
-                        Carregando…
-                      </TableCell>
-                    </TableRow>
+                    <TableSkeleton
+                      rows={8}
+                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                    />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
@@ -719,6 +803,38 @@ export default function ContasPagarPage() {
           }
         />
       )}
+
+      <AlertDialog
+        open={reimportConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReimportConfirmOpen(false);
+            setPendingFile(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Substituir lançamentos existentes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Já existem <strong>{entries.length}</strong> lançamentos importados para este hotel.
+              O novo arquivo vai atualizar os dados existentes — status de pagamento e aprovações
+              já registrados serão preservados. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setReimportConfirmOpen(false);
+                if (pendingFile) executeUpload(pendingFile);
+              }}
+            >
+              Continuar importação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

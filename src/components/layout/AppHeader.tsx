@@ -1,5 +1,5 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -16,17 +16,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon, Bell, Settings } from "lucide-react";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
 import { useEffect } from "react";
+import { usePendingNotificationCount } from "@/hooks/useNotifications";
 
 export function AppHeader() {
   const { hotelId, month, year, dateFrom, dateTo, setHotelId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
   const { allowedHotels, profile, signOut, isMaster } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
+  const { data: pendingCount = 0 } = usePendingNotificationCount();
 
   // Garante que o hotel selecionado é permitido (ou null = todos quando master)
   useEffect(() => {
@@ -116,6 +119,23 @@ export function AppHeader() {
         )}
       </div>
 
+      <div className="relative">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 w-9 p-0 relative"
+          onClick={() => navigate("/configuracoes/notificacoes")}
+          title="Notificações pendentes"
+        >
+          <Bell className="h-4 w-4" />
+          {pendingCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center leading-none">
+              {pendingCount > 99 ? "99+" : pendingCount}
+            </span>
+          )}
+        </Button>
+      </div>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="gap-2">
@@ -134,6 +154,11 @@ export function AppHeader() {
               <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate("/perfil")}>
+            <Settings className="mr-2 h-4 w-4" />
+            Meu perfil
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
