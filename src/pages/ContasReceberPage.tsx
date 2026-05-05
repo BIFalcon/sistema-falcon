@@ -1051,41 +1051,6 @@ function NoteDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    <AlertDialog
-      open={!!contractToDelete}
-      onOpenChange={(open) => { if (!open) setContractToDelete(null); }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Remover contrato?</AlertDialogTitle>
-          <AlertDialogDescription>
-            O prazo de pagamento desta conta será removido. Isso pode afetar
-            o cálculo de vencimentos no Open Folio.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={async () => {
-              if (!contractToDelete) return;
-              try {
-                await del.mutateAsync(contractToDelete);
-                toast.success("Contrato removido");
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erro");
-              } finally {
-                setContractToDelete(null);
-              }
-            }}
-          >
-            Remover
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    </>
   );
 }
 
