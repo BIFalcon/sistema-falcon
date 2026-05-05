@@ -185,7 +185,7 @@ function VariationPill({ value }: { value: number | null }) {
 }
 
 function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set<string>; toggle: (id: string) => void }) {
-  const [open, setOpen] = useState(node.level < 2);
+  const [open, setOpen] = useState(node.level === 1);
   const hasChildren = node.children.length > 0;
   return (
     <div>
@@ -442,23 +442,38 @@ export default function IndicadoresDrePage() {
             <Card className="p-4 shadow-soft">
               <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedIds.size} selecionadas</span></div>
               <div className="max-h-[620px] overflow-auto pr-1">
-                {CATEGORY_ORDER.map((cat) => {
-                  const catNodes = dataset?.flat.filter((n) =>
-                    n.id.startsWith(`${cat}:`) ||
-                    (!n.id.includes(":") && cat === "Despesas Específicas"),
+                {(() => {
+                  const kpiNodes = dataset?.tree.filter((n) =>
+                    /^\d+:[a-z_]+$/.test(n.id)
                   ) ?? [];
-                  if (catNodes.length === 0) return null;
+                  const dreNodes = dataset?.tree.filter((n) =>
+                    !/^\d+:[a-z_]+$/.test(n.id)
+                  ) ?? [];
                   return (
-                    <div key={cat} className="mb-3">
-                      <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {cat}
-                      </div>
-                      {catNodes.map((node) => (
-                        <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />
-                      ))}
-                    </div>
+                    <>
+                      {kpiNodes.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
+                            Indicadores principais
+                          </p>
+                          {kpiNodes.map((node) => (
+                            <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />
+                          ))}
+                        </div>
+                      )}
+                      {dreNodes.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
+                            Linhas da DRE
+                          </p>
+                          {dreNodes.map((node) => (
+                            <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </div>
             </Card>
 
