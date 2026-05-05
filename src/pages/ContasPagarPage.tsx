@@ -571,6 +571,10 @@ export default function ContasPagarPage() {
                   {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
                   <SelectItem value="no_doc">Sem documento</SelectItem>
                   <SelectItem value="issues">Com problema</SelectItem>
+                  <SelectItem value="payment_pendente">Pendente de inserção</SelectItem>
+                  <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
+                  <SelectItem value="payment_agendado">Agendado</SelectItem>
+                  <SelectItem value="payment_pago">Pago</SelectItem>
                 </SelectContent>
               </Select>
 
