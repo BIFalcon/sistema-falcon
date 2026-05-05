@@ -305,6 +305,21 @@ export async function parseDreExcel(
     const ll = rowLabelAndLevel(row);
     if (!ll) return;
     const { label, level } = ll;
+    // Filtra labels estruturais que não devem aparecer no seletor de
+    // Indicadores DRE (cabeçalhos de seção, títulos de planilha etc.).
+    const STRUCTURAL_LABELS = [
+      /^dre(\s|$)/i,
+      /^topline$/i,
+      /^receitas?$/i,
+      /^despesas?$/i,
+      /^resultado$/i,
+      /^acumulado$/i,
+      /^nivel$/i,
+      /^nível$/i,
+      /distribui[çc][aã]o\s+por\s+uh$/i,
+    ];
+    if (STRUCTURAL_LABELS.some((rx) => rx.test(label))) return;
+    if (/dre\s+\d{4}/i.test(label)) return;
     let value = rowValueAt(row, monthCol, aggregateCols);
     // CONFINS: "UHs Pool: 280" — extrai o número embutido no rótulo
     if (value == null) {
