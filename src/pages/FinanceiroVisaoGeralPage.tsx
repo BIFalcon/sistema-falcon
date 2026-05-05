@@ -20,10 +20,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { fmtBRL } from "@/lib/formatters";
 
-function fmtBRL(n: number | null | undefined) {
-  return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
