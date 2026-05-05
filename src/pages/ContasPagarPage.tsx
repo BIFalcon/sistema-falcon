@@ -171,10 +171,33 @@ export default function ContasPagarPage() {
       toast.error("Sem permissão para alterar status");
       return;
     }
+    // Captura status anterior para permitir desfazer
+    const previousByEntry = new Map<string, ApPaymentStatus>();
+    for (const e of entries) {
+      if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
+    }
+    const prevStatus = previousByEntry.get(ids[0]) ?? "pendente";
     try {
       await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
-      toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`);
       setSelectedIds(new Set());
+      toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            try {
+              await setPaymentStatus.mutateAsync({
+                hotelId,
+                entryIds: ids,
+                status: prevStatus,
+              });
+              toast.success("Ação desfeita.");
+            } catch {
+              toast.error("Não foi possível desfazer.");
+            }
+          },
+        },
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar status");
     }
