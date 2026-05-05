@@ -139,6 +139,19 @@ export function useUploadDre() {
         };
         pushSeries("cur", parsed.currentSeries);
         pushSeries("prev", parsed.previousSeries);
+        pushSeries("budget", parsed.budgetSeries);
+        // Indicadores orçados do mês
+        const budgetIndicatorRows: typeof indicatorRows = [];
+        for (const [k, v] of Object.entries(parsed.budgetIndicators ?? {})) {
+          if (v == null) continue;
+          budgetIndicatorRows.push({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[budget_${k}]`,
+            line_type: "indicator",
+            line_value: v,
+          });
+        }
         // Indicadores do mesmo mês do ano anterior (p/ painel "Indicadores
         // extraídos" e prompt da IA): persistidos com prefixo [prev_<key>].
         const prevIndicatorRows: typeof indicatorRows = [];
@@ -152,9 +165,9 @@ export function useUploadDre() {
             line_value: v,
           });
         }
-        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length) {
+        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length) {
           await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows,
+            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows,
           ]);
         }
 
