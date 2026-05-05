@@ -25,9 +25,9 @@ const MONTHS = [
 ];
 
 const REQUIRED_SHEETS: Record<DreSeriesKey, RegExp> = {
-  current: /^dre$/i,
-  budget: /^or[çc]amento$/i,
-  previous: /^ano\s+anterior$/i,
+  current: /^dre(\s|$|_|-)/i,
+  budget: /or[çc]amento/i,
+  previous: /ano\s*anterior/i,
 };
 
 function normalize(text: string) {
@@ -85,8 +85,18 @@ function extractRows(rows: unknown[][], trimRealized: boolean) {
   const monthCols = findMonthColumns(rows);
   const out = new Map<string, DreLineNode>();
   for (const row of rows) {
-    const level = asNumber(row[1]);
-    if (!level || level < 1 || level > 3) continue;
+    // Tenta coluna 1 como nível (modelo padrão Falcon).
+    // Se não encontrar número válido, infere nível 1 como fallback
+    // para planilhas que não têm coluna de nível explícita.
+    let level = asNumber(row[1]);
+    if (!level || level < 1 || level > 3) {
+      // Fallback: verifica se a linha tem pelo menos um valor numérico
+      // mensal — se sim, trata como nível 1
+      const hasMonthValue = Array.from(findMonthColumns(rows).values())
+        .some((c) => asNumber(row[c]) != null);
+      if (!hasMonthValue) continue;
+      level = 1;
+    }
     const label = extractLabel(row);
     if (!label) continue;
     const series = Array.from({ length: 12 }, (_, i) => asNumber(row[monthCols.get(i + 1) ?? -1]));
