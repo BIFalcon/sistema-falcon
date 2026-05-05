@@ -861,6 +861,10 @@ function HotelOpenFolioDetail({
   notifying,
   onBack,
   hideBack,
+  searchText,
+  setSearchText,
+  sort,
+  onSort,
 }: {
   hotelId: string;
   hotelName: string;
@@ -875,6 +879,10 @@ function HotelOpenFolioDetail({
   notifying?: boolean;
   onBack: () => void;
   hideBack?: boolean;
+  searchText: string;
+  setSearchText: (v: string) => void;
+  sort: { col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open"; dir: "asc" | "desc" };
+  onSort: (col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open") => void;
 }) {
   const { data: notes = [] } = useOpenFolioNotes(hotelId);
   const [noteFor, setNoteFor] = useState<OpenFolioEntry | null>(null);
@@ -954,16 +962,25 @@ function HotelOpenFolioDetail({
           </Button>
         </div>
       </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          className="pl-9"
+          placeholder="Buscar hóspede ou nº de confirmação..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Hóspede</TableHead>
+              <SortableHead col="guest_name" label="Hóspede" sort={sort} onSort={onSort} />
               <TableHead>Confirmação</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-              <TableHead>Check-in</TableHead>
-              <TableHead>Check-out</TableHead>
-              <TableHead className="text-right">Em aberto</TableHead>
+              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
+              <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
+              <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
+              <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
               <TableHead>Previsto pagto</TableHead>
               <TableHead>Justificativa</TableHead>
             </TableRow>
