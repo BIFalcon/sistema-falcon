@@ -147,7 +147,7 @@ export async function uploadRetroactiveDre(input: {
 
       const seriesRows: typeof indicatorRows = [];
       const pushSeries = (
-        scope: "cur" | "prev",
+        scope: "cur" | "prev" | "budget",
         map: typeof parsed.currentSeries,
       ) => {
         for (const [k, arr] of Object.entries(map ?? {})) {
@@ -166,6 +166,7 @@ export async function uploadRetroactiveDre(input: {
       };
       pushSeries("cur", parsed.currentSeries);
       pushSeries("prev", parsed.previousSeries);
+      pushSeries("budget", parsed.budgetSeries);
 
       const prevIndicatorRows: typeof indicatorRows = [];
       for (const [k, v] of Object.entries(parsed.previousIndicators ?? {})) {
@@ -179,11 +180,24 @@ export async function uploadRetroactiveDre(input: {
         });
       }
 
+      const budgetIndicatorRows: typeof indicatorRows = [];
+      for (const [k, v] of Object.entries(parsed.budgetIndicators ?? {})) {
+        if (v == null) continue;
+        budgetIndicatorRows.push({
+          closing_id: closingId!,
+          version_number: nextVersion,
+          line_label: `[budget_${k}]`,
+          line_type: "indicator",
+          line_value: v,
+        });
+      }
+
       if (
         indicatorRows.length ||
         otherRows.length ||
         seriesRows.length ||
-        prevIndicatorRows.length
+        prevIndicatorRows.length ||
+        budgetIndicatorRows.length
       ) {
         await supabase
           .from("dre_parsed_lines")
@@ -192,6 +206,7 @@ export async function uploadRetroactiveDre(input: {
             ...otherRows,
             ...seriesRows,
             ...prevIndicatorRows,
+            ...budgetIndicatorRows,
           ]);
       }
 
