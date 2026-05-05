@@ -1,3 +1,5 @@
+// GG pode ver esta página (somente leitura — sem botões de ação).
+// Dados já são filtrados pelo hotel do GG via allowedHotels no AuthContext.
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
