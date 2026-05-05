@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
@@ -13,6 +15,9 @@ import { useDreAnalytics } from "@/hooks/useDre";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
 import { MONTHS_PT } from "@/lib/constants";
 import { fmtBRL } from "@/lib/formatters";
+import { uploadRetroactiveDre } from "@/lib/retroactiveDreUpload";
+import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -195,8 +200,15 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
 }
 
 export default function IndicadoresDrePage() {
-  const { allowedHotels, isMaster } = useAuth();
+  const { allowedHotels, isMaster, user } = useAuth();
   const { hotelId, month, year } = useFilters();
+  const queryClient = useQueryClient();
+  const [retroOpen, setRetroOpen] = useState(false);
+  const [retroHotelId, setRetroHotelId] = useState<string>("");
+  const [retroYear, setRetroYear] = useState<number>(new Date().getFullYear());
+  const [retroUpToMonth, setRetroUpToMonth] = useState<number>(12);
+  const [retroFile, setRetroFile] = useState<File | null>(null);
+  const [retroSubmitting, setRetroSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   const [metric, setMetric] = useState("value");
@@ -253,12 +265,103 @@ export default function IndicadoresDrePage() {
           <p className="text-sm text-muted-foreground">{hotelId ? "Hotel selecionado" : `${hotelIds.length} hotéis`} · {month === 0 ? "Acumulado do ano" : MONTHS_PT[month - 1]} de {year}</p>
         </div>
         {isMaster && (
-          <Button asChild variant="outline" size="sm">
-            <Link to="/configuracoes/dre-retroativo">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload retroativo
-            </Link>
-          </Button>
+          <Dialog open={retroOpen} onOpenChange={setRetroOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload retroativo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Upload retroativo de DRE</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Hotel</Label>
+                  <Select value={retroHotelId} onValueChange={setRetroHotelId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o hotel" /></SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {allowedHotels.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Ano</Label>
+                    <Select value={String(retroYear)} onValueChange={(v) => setRetroYear(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        {[new Date().getFullYear() - 3, new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()].map((y) => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Processar até o mês</Label>
+                    <Select value={String(retroUpToMonth)} onValueChange={(v) => setRetroUpToMonth(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        {MONTHS_PT.map((label, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="retro-file">Arquivo da DRE (.xlsx)</Label>
+                  <Input
+                    id="retro-file"
+                    type="file"
+                    accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={(e) => setRetroFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  disabled={retroSubmitting || !retroHotelId || !retroFile || !user}
+                  onClick={async () => {
+                    if (!user || !retroHotelId || !retroFile) return;
+                    setRetroSubmitting(true);
+                    try {
+                      const res = await uploadRetroactiveDre({
+                        hotelId: retroHotelId,
+                        year: retroYear,
+                        file: retroFile,
+                        userId: user.id,
+                        upToMonth: retroUpToMonth,
+                      });
+                      toast({
+                        title: "DRE enviada",
+                        description: res.monthsProcessed.length > 0
+                          ? `${res.monthsProcessed.length} mês(es) processado(s): ${res.monthsProcessed.map((m) => MONTHS_PT[m - 1]).join(", ")}`
+                          : "Nenhum mês com dados encontrado.",
+                      });
+                      setRetroFile(null);
+                      setRetroOpen(false);
+                      queryClient.invalidateQueries({ queryKey: ["dre-analytics"] });
+                    } catch (err) {
+                      toast({
+                        title: "Erro no upload",
+                        description: err instanceof Error ? err.message : "Falha desconhecida",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setRetroSubmitting(false);
+                    }
+                  }}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {retroSubmitting ? "Processando…" : "Carregar DRE"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 
