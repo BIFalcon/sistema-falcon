@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Paperclip, Search, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -27,37 +27,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
-  notifyGgPendencies,
-  uploadApDocuments,
   uploadApReport,
-  useApDocuments,
   useApEntries,
-  useAttachDocumentToEntry,
-  useDeleteDocument,
-  useDetachDocumentFromEntry,
-  useLinkDocumentToEntry,
   useLatestApUpload,
-  useSetEntryApproval,
   useSetEntryPaymentStatus,
-  useSetPrimaryDocument,
   useTodayBankBalance,
   useUpsertBankBalance,
-  validateApDocument,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -65,13 +45,11 @@ import {
 import { useApPageDerived } from "@/hooks/useApPageDerived";
 import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
-import { fmtBRL, fmtDateTime } from "@/lib/formatters";
+import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
 
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
-import { LinkDocDialog } from "@/components/accounts-payable/LinkDocDialog";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
-import { ISSUE_CATEGORIES } from "@/lib/apIssueCategories";
 
 import { useMemo } from "react";
 
@@ -90,10 +68,9 @@ export default function ContasPagarPage() {
   const canMarkPaid = isMaster || isFinanceiroCoordenadora;
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
-  const canUploadDocs = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId } = useFilters();
+  const { hotelId, dateFrom, dateTo } = useFilters();
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -108,17 +85,10 @@ export default function ContasPagarPage() {
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
   const { data: balance } = useTodayBankBalance(hotelId);
-  const { data: documents = [] } = useApDocuments(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
-  const setApproval = useSetEntryApproval();
   const setPaymentStatus = useSetEntryPaymentStatus();
-  const linkDocMutation = useLinkDocumentToEntry();
-  const attachDocMutation = useAttachDocumentToEntry();
-  const detachDocMutation = useDetachDocumentFromEntry();
-  const setPrimaryDocMutation = useSetPrimaryDocument();
-  const deleteDocMutation = useDeleteDocument();
 
   // ── Estado local ───────────────────────────────────────────────────────
   const [balanceInput, setBalanceInput] = useState("");
@@ -129,21 +99,15 @@ export default function ContasPagarPage() {
   const [groupNd, setGroupNd] = useState(true);
   const [searchText, setSearchText] = useState<string>("");
   const [uploading, setUploading] = useState(false);
-  const [uploadingDocs, setUploadingDocs] = useState(false);
-  const [linkEntry, setLinkEntry] = useState<ApEntry | null>(null);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [deleteDocConfirm, setDeleteDocConfirm] = useState<
-    Parameters<typeof deleteDocMutation.mutateAsync>[0] | null
-  >(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const docsRef = useRef<HTMLInputElement>(null);
 
   // ── Derivações ─────────────────────────────────────────────────────────
   const derived = useApPageDerived({
     allEntriesRaw,
-    documents,
+    documents: [],
     balance,
     sourceSystem,
     period,
@@ -154,6 +118,8 @@ export default function ContasPagarPage() {
     showApproval,
     hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
     searchText,
+    dateFrom,
+    dateTo,
   });
 
   const {
@@ -162,14 +128,10 @@ export default function ContasPagarPage() {
     filtered,
     displayRows,
     categories,
-    docsByEntry,
-    allDocsByEntry,
-    unlinkedDocs,
     urgencyCounts,
     issueCounts,
     issueEntries,
-    entryIssues,
-    totalToPayToday,
+    totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
@@ -193,91 +155,6 @@ export default function ContasPagarPage() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function handleDocs(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length || !hotelId || !user) return;
-    setUploadingDocs(true);
-    try {
-      const n = await uploadApDocuments({ hotelId, files, userId: user.id });
-      toast.success(`${n} documento(s) enviado(s). Vincule-os aos lançamentos.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao enviar documentos");
-    } finally {
-      setUploadingDocs(false);
-      if (docsRef.current) docsRef.current.value = "";
-    }
-  }
-
-  async function handleApprove(entryId: string, approval: "approved" | "rejected" | "pending") {
-    if (!user || !hotelId) return;
-    try {
-      await setApproval.mutateAsync({ entryId, hotelId, approval, userId: user.id });
-      toast.success(
-        approval === "approved" ? "Aprovado" : approval === "rejected" ? "Recusado" : "Pendente",
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
-    }
-  }
-
-  async function handleAttach(docId: string, nfAmount: number | null) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await attachDocMutation.mutateAsync({
-        hotelId,
-        entryId: linkEntry.id,
-        documentId: docId,
-        nfAmount,
-      });
-      toast.success("Documento vinculado");
-      validateApDocument({ documentId: docId, entryId: linkEntry.id })
-        .then((r) => {
-          if (r.validation_status === "divergence") toast.warning("Divergência detectada pela IA");
-          else if (r.validation_status === "ok") toast.success("Documento validado pela IA");
-        })
-        .catch(() => {});
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao vincular");
-    }
-  }
-
-  async function handleDetach(d: { id: string }) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await detachDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
-      toast.success("Vínculo removido");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao desvincular");
-    }
-  }
-
-  async function handleSetPrimary(d: { id: string }) {
-    if (!linkEntry || !hotelId) return;
-    try {
-      await setPrimaryDocMutation.mutateAsync({ hotelId, entryId: linkEntry.id, documentId: d.id });
-      toast.success("Documento principal atualizado");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro");
-    }
-  }
-
-  function handleDeleteDoc(d: Parameters<typeof deleteDocMutation.mutateAsync>[0]) {
-    if (!hotelId) return;
-    setDeleteDocConfirm(d);
-  }
-
-  async function executeDeleteDoc() {
-    if (!deleteDocConfirm) return;
-    try {
-      await deleteDocMutation.mutateAsync(deleteDocConfirm);
-      toast.success("Documento excluído");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir");
-    } finally {
-      setDeleteDocConfirm(null);
     }
   }
 
