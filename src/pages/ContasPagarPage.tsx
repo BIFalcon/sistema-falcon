@@ -607,18 +607,16 @@ export default function ContasPagarPage() {
                     <TableHead>Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Forma</TableHead>
+                    <TableHead>Categoria</TableHead>
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
-                    <TableHead>Doc</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Carregando…
@@ -627,7 +625,7 @@ export default function ContasPagarPage() {
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 9 : 8) + 1 + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -637,7 +635,8 @@ export default function ContasPagarPage() {
                     displayRows.map((row, idx) => {
                       if (row.kind === "group") {
                         const colSpan =
-                          (sourceSystem === "omie" ? 9 : 8) - (showApproval ? 0 : 1) + 1 +
+                          (showApproval ? 7 : 6) +
+                          (sourceSystem === "omie" ? 1 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
@@ -682,17 +681,11 @@ export default function ContasPagarPage() {
                         <ApEntryRow
                           key={e.id}
                           entry={e}
-                          doc={docsByEntry.get(e.id) ?? null}
                           sourceSystem={sourceSystem}
-                          canApprove={canApprove}
-                          canManage={canManage}
                           showApproval={showApproval}
                           selectable={canMarkInsertedAgendado || canMarkPaid}
                           selected={selectedIds.has(e.id)}
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
-                          onLink={() => setLinkEntry(e)}
-                          onApprove={(approval) => handleApprove(e.id, approval)}
-                          issues={entryIssues(e)}
                         />
                       );
                     })
@@ -723,8 +716,6 @@ export default function ContasPagarPage() {
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead>Aprovação GG</TableHead>
-                  <TableHead>Doc</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -732,15 +723,9 @@ export default function ContasPagarPage() {
                   <ApEntryRow
                     key={e.id}
                     entry={e}
-                    doc={docsByEntry.get(e.id) ?? null}
                     sourceSystem={sourceSystem}
-                    canApprove={canApprove}
-                    canManage={canManage}
                     showApproval={showApproval}
                     compact
-                    onLink={() => setLinkEntry(e)}
-                    onApprove={(approval) => handleApprove(e.id, approval)}
-                    issues={entryIssues(e)}
                   />
                 ))}
               </TableBody>
@@ -749,75 +734,17 @@ export default function ContasPagarPage() {
         </Card>
       )}
 
-      {/* Modal de vínculo de documento */}
-      <LinkDocDialog
-        open={!!linkEntry}
-        onClose={() => setLinkEntry(null)}
-        entry={linkEntry}
-        linkedDocs={linkEntry ? (allDocsByEntry.get(linkEntry.id) ?? []) : []}
-        primaryDoc={linkEntry ? (docsByEntry.get(linkEntry.id) ?? null) : null}
-        unlinkedDocs={unlinkedDocs}
-        onAttach={(documentId, nfAmount) =>
-          attachDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId,
-            nfAmount,
-          })
-        }
-        onDetach={(d) =>
-          detachDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId: d.id,
-          })
-        }
-        onSetPrimary={(d) =>
-          setPrimaryDocMutation.mutateAsync({
-            hotelId: hotelId!,
-            entryId: linkEntry!.id,
-            documentId: d.id,
-          })
-        }
-        onDelete={(d) =>
-          handleDeleteDoc({ hotelId: hotelId!, documentId: d.id, filePath: d.file_path })
-        }
-      />
-
-      <AlertDialog
-        open={!!deleteDocConfirm}
-        onOpenChange={(open) => { if (!open) setDeleteDocConfirm(null); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteDocConfirm?.filePath?.split("/").pop() ?? "Este documento"} será
-              removido permanentemente. Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={executeDeleteDoc}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Modal de notificação ao GG */}
       {hotelId && (
         <NotifyGgDialog
           open={notifyOpen}
           onClose={() => setNotifyOpen(false)}
           hotelId={hotelId}
-          issueEntries={issueEntries}
-          issueCounts={issueCounts}
-          showApproval={showApproval}
-          entryIssues={entryIssues}
+          selectedEntries={
+            selectedIds.size > 0
+              ? entries.filter((e) => selectedIds.has(e.id))
+              : issueEntries
+          }
         />
       )}
     </div>
