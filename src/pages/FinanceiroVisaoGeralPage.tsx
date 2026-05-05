@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
-function brl(n: number | null | undefined) {
+function fmtBRL(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function todayIso() {
@@ -265,28 +265,28 @@ export default function FinanceiroVisaoGeralPage() {
         <SummaryCard
           icon={<Wallet className="h-4 w-4" />}
           label="A pagar hoje"
-          value={brl(totalDueToday)}
+          value={fmtBRL(totalDueToday)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-pagar")}
         />
         <SummaryCard
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Em atraso"
-          value={brl(totalOverdue)}
+          value={fmtBRL(totalOverdue)}
           tone={totalOverdue > 0 ? "destructive" : "default"}
           onClick={() => navigate("/financeiro/contas-pagar")}
         />
         <SummaryCard
           icon={<ArrowDownCircle className="h-4 w-4" />}
           label={`A faturar (${monthLabel(period)})`}
-          value={brl(totalToInvoiceMonth)}
+          value={fmtBRL(totalToInvoiceMonth)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-receber")}
         />
         <SummaryCard
           icon={<Hourglass className="h-4 w-4" />}
           label="Open Folio em aberto"
-          value={brl(totalOpenFolio)}
+          value={fmtBRL(totalOpenFolio)}
           tone={totalOpenFolio > 0 ? "warning" : "default"}
           onClick={() => navigate("/financeiro/contas-receber")}
         />
@@ -320,7 +320,7 @@ export default function FinanceiroVisaoGeralPage() {
                         className="h-full bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground"
                         style={{ width: `${Math.max(2, (r.total / maxApBar) * 100)}%` }}
                       >
-                        {brl(r.total)}
+                        {fmtBRL(r.total)}
                       </div>
                     </div>
                   </button>
@@ -345,7 +345,7 @@ export default function FinanceiroVisaoGeralPage() {
                     <Badge variant="destructive" className="text-[9px] shrink-0">vencidos</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {h.count} lançamento(s) · <strong className="text-destructive">{brl(h.total)}</strong>
+                    {h.count} lançamento(s) · <strong className="text-destructive">{fmtBRL(h.total)}</strong>
                   </p>
                 </button>
               ))}
@@ -360,7 +360,7 @@ export default function FinanceiroVisaoGeralPage() {
                     <Badge className="text-[9px] shrink-0 bg-amber-500 text-white hover:bg-amber-500/90">saldo baixo</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Saldo {brl(h.balance)} · 7d {brl(h.due)}
+                    Saldo {fmtBRL(h.balance)} · 7d {fmtBRL(h.due)}
                   </p>
                 </button>
               ))}
@@ -388,7 +388,7 @@ export default function FinanceiroVisaoGeralPage() {
                 >
                   <div className="flex items-baseline justify-between text-xs">
                     <span className="text-muted-foreground">{monthLabel(m.ym)}</span>
-                    <span className="font-semibold">{brl(m.total)}</span>
+                    <span className="font-semibold">{fmtBRL(m.total)}</span>
                   </div>
                   <div className="mt-1 h-2 rounded bg-muted overflow-hidden">
                     <div className="h-full bg-accent" style={{ width: `${(m.total / maxMonthBar) * 100}%` }} />
@@ -423,7 +423,7 @@ export default function FinanceiroVisaoGeralPage() {
                         <p className="text-xs text-muted-foreground">{r.count} folio(s)</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">{brl(r.total)}</p>
+                        <p className="text-sm font-semibold">{fmtBRL(r.total)}</p>
                         <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tone}`}>
                           média {r.avgDays}d
                         </span>

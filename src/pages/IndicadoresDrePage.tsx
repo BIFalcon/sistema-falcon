@@ -297,7 +297,7 @@ export default function IndicadoresDrePage() {
               const bud = computeCardValue(card, dataset, monthsWindow, "budget");
               const prev = computeCardValue(card, dataset, monthsWindow, "previous");
               const fmt = (v: number | null) =>
-                card.format === "pct" ? pct(v) : brl(v);
+                card.format === "pct" ? pct(v) : fmtBRL(v);
               return (
                 <Card key={card.title} className="p-4 shadow-soft">
                   <h3 className="text-sm font-semibold mb-3">{card.title}</h3>

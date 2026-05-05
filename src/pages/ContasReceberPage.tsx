@@ -45,7 +45,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 
-function brl(n: number | null | undefined) {
+function fmtBRL(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function ymKey(iso: string) {
@@ -319,7 +319,7 @@ function MonthlyOverview({
             <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">
               {formatYM(ym)}
             </p>
-            <p className="text-xl font-semibold mt-1">{brl(total)}</p>
+            <p className="text-xl font-semibold mt-1">{fmtBRL(total)}</p>
             <div className="mt-2 h-1.5 rounded bg-muted overflow-hidden">
               <div
                 className="h-full bg-accent"
@@ -378,7 +378,7 @@ function MonthBreakdown({
                 <TableRow key={day} className="cursor-pointer" onClick={() => onPickDay(day)}>
                   <TableCell className="font-medium">{formatDay(day)}</TableCell>
                   <TableCell className="text-right">{count}</TableCell>
-                  <TableCell className="text-right font-semibold">{brl(total)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmtBRL(total)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm">Ver clientes</Button>
                   </TableCell>
@@ -444,7 +444,7 @@ function DayBreakdown({
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
-                  <TableCell className="text-right font-semibold">{brl(e.amount)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
                   </TableCell>
@@ -556,7 +556,7 @@ function ConsolidatedRanking({
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
         <h3 className="text-sm font-semibold">Ranking por hotel</h3>
-        <span className="text-xs text-muted-foreground">Total: <strong>{brl(grand)}</strong></span>
+        <span className="text-xs text-muted-foreground">Total: <strong>{fmtBRL(grand)}</strong></span>
       </div>
       <div className="space-y-2">
         {ranking.map((r) => (
@@ -567,7 +567,7 @@ function ConsolidatedRanking({
                 className="h-full bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground"
                 style={{ width: `${Math.max(2, (r.total / max) * 100)}%` }}
               >
-                {brl(r.total)}
+                {fmtBRL(r.total)}
               </div>
             </div>
           </div>
@@ -753,7 +753,7 @@ function OpenFolioSection({
                       </p>
                     </button>
                     <div className="text-right">
-                      <p className="text-lg font-semibold">{brl(s.total)}</p>
+                      <p className="text-lg font-semibold">{fmtBRL(s.total)}</p>
                       <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${tone}`}>
                         média {s.avgDays}d
                       </span>
@@ -919,7 +919,7 @@ function HotelOpenFolioDetail({
                   <TableRow key={e.id}>
                     <TableCell className="text-sm">{fullName(e)}</TableCell>
                     <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
-                    <TableCell className="text-right font-semibold">{brl(e.balance)}</TableCell>
+                    <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
                     <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
                     <TableCell className="text-xs">{e.departure_date ? formatDay(e.departure_date) : "—"}</TableCell>
                     <TableCell className={`text-right text-xs font-semibold ${tone}`}>{aging}d</TableCell>
@@ -1004,7 +1004,7 @@ function NoteDialog({
         <DialogHeader>
           <DialogTitle>Justificativa do folio</DialogTitle>
           <DialogDescription>
-            {entry && <>{fullName(entry)} · {entry.confirmation_number} · {brl(entry.balance)}</>}
+            {entry && <>{fullName(entry)} · {entry.confirmation_number} · {fmtBRL(entry.balance)}</>}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
