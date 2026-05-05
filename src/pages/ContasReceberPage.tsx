@@ -123,8 +123,10 @@ function exportOpenFolioToExcel(
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster, userHotels } = useAuth();
+  const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora } = useAuth();
   const isManager = isMaster || hasRole("financeiro");
+  // Quem pode importar relatórios AR: master ou coordenadora (equipe e GG não importam)
+  const canImportAr = isMaster || isFinanceiroCoordenadora;
   // Quem vê todos os hotéis: master, financeiro, controladoria, ri
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
@@ -151,6 +153,7 @@ export default function ContasReceberPage() {
         <TabsContent value="to_invoice" className="mt-5">
           <ToInvoiceSection
             isManager={isManager}
+            canImportAr={canImportAr}
             seesAllHotels={seesAllHotels}
             restrictedHotelIds={restrictedHotelIds}
             isGgOnly={isGgOnly}
@@ -159,6 +162,7 @@ export default function ContasReceberPage() {
         <TabsContent value="open_folio" className="mt-5">
           <OpenFolioSection
             isManager={isManager}
+            canImportAr={canImportAr}
             seesAllHotels={seesAllHotels}
             restrictedHotelIds={restrictedHotelIds}
             isGgOnly={isGgOnly}
@@ -173,11 +177,13 @@ export default function ContasReceberPage() {
 
 function ToInvoiceSection({
   isManager,
+  canImportAr,
   seesAllHotels,
   restrictedHotelIds,
   isGgOnly,
 }: {
   isManager: boolean;
+  canImportAr: boolean;
   seesAllHotels: boolean;
   restrictedHotelIds: string[] | null;
   isGgOnly: boolean;
@@ -216,7 +222,7 @@ function ToInvoiceSection({
 
   return (
     <div className="space-y-5">
-      <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
+      <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={canImportAr} />
       {latestTiDate && (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 -mt-2 px-1">
           <CalendarIcon className="h-3.5 w-3.5" />
@@ -598,11 +604,13 @@ function ConsolidatedRanking({
 
 function OpenFolioSection({
   isManager,
+  canImportAr,
   seesAllHotels,
   restrictedHotelIds,
   isGgOnly,
 }: {
   isManager: boolean;
+  canImportAr: boolean;
   seesAllHotels: boolean;
   restrictedHotelIds: string[] | null;
   isGgOnly: boolean;
@@ -754,7 +762,7 @@ function OpenFolioSection({
 
   return (
     <div className="space-y-5">
-      <UploadCard kind="open_folio" lastUpload={lastUpload} isManager={isManager} />
+      <UploadCard kind="open_folio" lastUpload={lastUpload} isManager={canImportAr} />
 
       {isLoading ? (
         <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>

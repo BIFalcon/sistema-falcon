@@ -26,8 +26,40 @@ import PerfilPage from "./pages/PerfilPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
+import type { AppRole } from "./lib/constants";
 
 const queryClient = new QueryClient();
+
+function RoleGuard({
+  roles: allowed,
+  children,
+  masterOnly = false,
+}: {
+  roles?: AppRole[];
+  children: React.ReactNode;
+  masterOnly?: boolean;
+}) {
+  const { isMaster, roles } = useAuth();
+  if (masterOnly && !isMaster) return <Navigate to="/" replace />;
+  if (allowed && !isMaster && !allowed.some((r) => roles.includes(r))) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function HomeRedirect() {
+  const { roles, isMaster } = useAuth();
+  if (isMaster) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("financeiro" as AppRole)) return <Navigate to="/financeiro/contas-pagar" replace />;
+  if (roles.includes("gg" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("gop" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("controladoria" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("ri" as AppRole)) return <Navigate to="/fechamento" replace />;
+  if (roles.includes("rh" as AppRole)) return <Navigate to="/rh/turnover" replace />;
+  if (roles.includes("operacoes" as AppRole)) return <Navigate to="/metas" replace />;
+  return <Navigate to="/fechamento" replace />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -44,36 +76,36 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Navigate to="/fechamento" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
 
               {/* Fechamento */}
               <Route path="/fechamento" element={<FechamentoPage />} />
               <Route path="/fechamento/dre" element={<DrePage />} />
               <Route path="/fechamento/carta" element={<CartaPage />} />
-              <Route path="/fechamento/financeiro" element={<FinanceiroPage />} />
-              <Route path="/fechamento/envio" element={<EnvioPage />} />
-              <Route path="/fechamento/performance" element={<PerformanceSlaPage />} />
+              <Route path="/fechamento/financeiro" element={<RoleGuard roles={["financeiro"]}><FinanceiroPage /></RoleGuard>} />
+              <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />
+              <Route path="/fechamento/performance" element={<RoleGuard masterOnly><PerformanceSlaPage /></RoleGuard>} />
 
               {/* Compat: rotas antigas */}
               <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
               <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
 
               {/* Análise */}
-              <Route path="/indicadores" element={<IndicadoresDrePage />} />
+              <Route path="/indicadores" element={<RoleGuard roles={["gop", "gg", "controladoria", "operacoes"]}><IndicadoresDrePage /></RoleGuard>} />
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
-              <Route path="/financeiro" element={<FinanceiroVisaoGeralPage />} />
-              <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
-              <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
+              <Route path="/financeiro" element={<RoleGuard roles={["financeiro", "gg"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["financeiro"]}><ContasPagarPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/rh" element={<EmBreve />} />
               <Route path="/controladoria" element={<EmBreve />} />
 
               {/* Configurações */}
-              <Route path="/configuracoes/usuarios" element={<UsuariosPage />} />
-              <Route path="/configuracoes/hoteis" element={<HoteisPage />} />
-              <Route path="/configuracoes/notificacoes" element={<NotificacoesPage />} />
-              <Route path="/configuracoes/dre-retroativo" element={<UploadRetroativoDrePage />} />
+              <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />
+              <Route path="/configuracoes/hoteis" element={<RoleGuard masterOnly><HoteisPage /></RoleGuard>} />
+              <Route path="/configuracoes/notificacoes" element={<RoleGuard masterOnly><NotificacoesPage /></RoleGuard>} />
+              <Route path="/configuracoes/dre-retroativo" element={<RoleGuard masterOnly><UploadRetroativoDrePage /></RoleGuard>} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
               <Route path="/perfil" element={<PerfilPage />} />
             </Route>

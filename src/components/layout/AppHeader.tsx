@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, User as UserIcon, Bell, Settings, X } from "lucide-react";
+import { LogOut, User as UserIcon, Bell, Settings, X, Hotel } from "lucide-react";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
@@ -25,7 +25,7 @@ import { usePendingNotificationCount } from "@/hooks/useNotifications";
 
 export function AppHeader() {
   const { hotelId, month, year, dateFrom, dateTo, setHotelId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
-  const { allowedHotels, profile, signOut, isMaster } = useAuth();
+  const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
@@ -41,6 +41,13 @@ export function AppHeader() {
     }
   }, [allowedHotels, hotelId, isMaster, setHotelId]);
 
+  // GG: forçar sempre o único hotel permitido
+  useEffect(() => {
+    if (isGg && allowedHotels.length === 1 && hotelId !== allowedHotels[0].id) {
+      setHotelId(allowedHotels[0].id);
+    }
+  }, [isGg, allowedHotels, hotelId, setHotelId]);
+
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
@@ -55,22 +62,29 @@ export function AppHeader() {
           Filtros
         </span>
 
-        <Select
-          value={hotelId ?? "__all__"}
-          onValueChange={(v) => setHotelId(v === "__all__" ? null : v)}
-        >
-          <SelectTrigger className="w-[220px] h-9">
-            <SelectValue placeholder="Hotel" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            {isMaster && <SelectItem value="__all__">Todos os hotéis</SelectItem>}
-            {allowedHotels.map((h) => (
-              <SelectItem key={h.id} value={h.id}>
-                {h.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isGg ? (
+          <div className="h-9 px-3 flex items-center gap-2 rounded-md border border-input bg-muted/50 text-sm font-medium min-w-[180px]">
+            <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
+          </div>
+        ) : (
+          <Select
+            value={hotelId ?? "__all__"}
+            onValueChange={(v) => setHotelId(v === "__all__" ? null : v)}
+          >
+            <SelectTrigger className="w-[220px] h-9">
+              <SelectValue placeholder="Hotel" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              {isMaster && <SelectItem value="__all__">Todos os hotéis</SelectItem>}
+              {allowedHotels.map((h) => (
+                <SelectItem key={h.id} value={h.id}>
+                  {h.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {isFinanceiro ? (
           <div className="flex items-center gap-2">
