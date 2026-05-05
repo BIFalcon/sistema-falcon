@@ -1583,6 +1583,9 @@ export type Database = {
         | "ri"
         | "financeiro"
         | "gg"
+        | "viewer"
+        | "rh"
+        | "operacoes"
       ar_gg_status: "pendente" | "faturado" | "nao_faturado"
       closing_stage: "dre" | "carta" | "financeiro" | "envio"
       closing_status:
@@ -1753,6 +1756,9 @@ export const Constants = {
         "ri",
         "financeiro",
         "gg",
+        "viewer",
+        "rh",
+        "operacoes",
       ],
       ar_gg_status: ["pendente", "faturado", "nao_faturado"],
       closing_stage: ["dre", "carta", "financeiro", "envio"],
