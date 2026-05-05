@@ -863,6 +863,7 @@ export default function ContasPagarPage() {
           issueEntries={issueEntries}
           issueCounts={issueCounts}
           showApproval={showApproval}
+          entryIssues={entryIssues}
         />
       )}
     </div>
