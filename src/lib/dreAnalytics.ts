@@ -58,49 +58,81 @@ function monthFromCell(cell: unknown): number | null {
   return null;
 }
 
-function findMonthColumns(rows: unknown[][]) {
-  const cols = new Map<number, number>();
+function findSheetStructure(rows: unknown[][]): {
+  levelCol: number | null;
+  labelCols: number[];
+  monthCols: Map<number, number>;
+} {
+  const monthCols = new Map<number, number>();
   for (let r = 0; r < Math.min(rows.length, 40); r++) {
-    rows[r]?.forEach((cell, c) => {
+    (rows[r] ?? []).forEach((cell, c) => {
       const month = monthFromCell(cell);
-      if (month && !cols.has(month)) cols.set(month, c);
+      if (month && !monthCols.has(month)) monthCols.set(month, c);
     });
   }
-  return cols;
-}
-
-function extractLabel(row: unknown[]) {
-  for (let c = 0; c < row.length; c++) {
-    if (c === 1 || monthFromCell(row[c])) continue;
-    if (typeof row[c] !== "string") continue;
-    const value = String(row[c]).trim();
-    const norm = normalize(value);
-    if (!value || norm === "nivel" || norm === "nível" || norm === "realizado" || norm === "orcamento") continue;
-    return value;
+  let levelCol: number | null = null;
+  for (let c = 0; c <= 5; c++) {
+    const nums = rows.slice(0, 80)
+      .map((r) => asNumber((r ?? [])[c]))
+      .filter((v): v is number => v === 1 || v === 2 || v === 3);
+    if (nums.length >= 5) { levelCol = c; break; }
   }
-  return null;
+  const monthColSet = new Set(monthCols.values());
+  const freq: Record<number, number> = {};
+  const SKIP = ['janeiro','fevereiro','março','marco','abril','maio','junho',
+    'julho','agosto','setembro','outubro','novembro','dezembro',
+    'total','média','media','nivel','nível','jan','fev','mar','abr',
+    'mai','jun','jul','ago','set','out','nov','dez'];
+  for (const row of rows.slice(0, 120)) {
+    (row ?? []).forEach((cell, c) => {
+      if (c === levelCol || monthColSet.has(c)) return;
+      if (typeof cell !== 'string') return;
+      const t = cell.trim();
+      const norm = normalize(t);
+      if (t.length < 3) return;
+      if (SKIP.some((s) => norm.startsWith(s))) return;
+      freq[c] = (freq[c] ?? 0) + 1;
+    });
+  }
+  const labelCols = Object.entries(freq)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([c]) => Number(c));
+  return { levelCol, labelCols, monthCols };
 }
 
-function extractRows(rows: unknown[][], trimRealized: boolean) {
-  const monthCols = findMonthColumns(rows);
+function extractRows(rows: unknown[][], sheetKey: DreSeriesKey) {
+  const { levelCol, labelCols, monthCols } = findSheetStructure(rows);
   const out = new Map<string, DreLineNode>();
   for (const row of rows) {
-    // Tenta coluna 1 como nível (modelo padrão Falcon).
-    // Se não encontrar número válido, infere nível 1 como fallback
-    // para planilhas que não têm coluna de nível explícita.
-    let level = asNumber(row[1]);
+    if (!row) continue;
+    let level: number | null = levelCol != null ? asNumber(row[levelCol]) : null;
     if (!level || level < 1 || level > 3) {
-      // Fallback: verifica se a linha tem pelo menos um valor numérico
-      // mensal — se sim, trata como nível 1
-      const hasMonthValue = Array.from(findMonthColumns(rows).values())
-        .some((c) => asNumber(row[c]) != null);
-      if (!hasMonthValue) continue;
-      level = 1;
+      const hasDetailLabel = labelCols[0] != null &&
+        typeof row[labelCols[0]] === 'string' &&
+        String(row[labelCols[0]]).trim().length > 2;
+      const hasGroupLabel = labelCols[1] != null &&
+        typeof row[labelCols[1]] === 'string' &&
+        String(row[labelCols[1]]).trim().length > 2;
+      if (hasDetailLabel) level = 3;
+      else if (hasGroupLabel) level = 2;
+      else continue;
     }
-    const label = extractLabel(row);
+    let label: string | null = null;
+    for (const col of labelCols) {
+      const v = typeof row[col] === 'string' ? String(row[col]).trim() : null;
+      if (v && v.length > 2) { label = v; break; }
+    }
     if (!label) continue;
-    const series = Array.from({ length: 12 }, (_, i) => asNumber(row[monthCols.get(i + 1) ?? -1]));
-    if (trimRealized) {
+    const norm = normalize(label);
+    const STRUCTURAL = ['dre','topline','receitas','despesas','deducoes',
+      'orcamento','ano anterior','resumo'];
+    if (STRUCTURAL.some((s) => norm.startsWith(s) && norm.length < s.length + 10)) continue;
+    const series: (number | null)[] = Array.from({ length: 12 }, (_, i) => {
+      const col = monthCols.get(i + 1);
+      return col != null ? asNumber(row[col]) : null;
+    });
+    if (sheetKey === 'current') {
       let last = -1;
       series.forEach((v, i) => { if (v != null && v !== 0) last = i; });
       for (let i = last + 1; i < series.length; i++) series[i] = null;
@@ -128,7 +160,7 @@ export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: strin
     const sheetName = wb.SheetNames.find((name) => rx.test(name.trim()));
     if (!sheetName) continue;
     const rows: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false, defval: null, raw: true });
-    for (const node of extractRows(rows, seriesKey === "current").values()) {
+    for (const node of extractRows(rows, seriesKey).values()) {
       const existing = byKey.get(node.id);
       if (existing) existing.series[seriesKey] = node.series.current;
       else byKey.set(node.id, { ...node, series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null), [seriesKey]: node.series.current } });
