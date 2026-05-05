@@ -44,10 +44,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
+import { fmtBRL } from "@/lib/formatters";
 
-function fmtBRL(n: number | null | undefined) {
-  return Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
 }
