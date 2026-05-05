@@ -813,6 +813,7 @@ export type Database = {
           closing_id: string
           created_at: string
           id: string
+          line_category: string | null
           line_label: string
           line_level: number | null
           line_type: string
@@ -823,6 +824,7 @@ export type Database = {
           closing_id: string
           created_at?: string
           id?: string
+          line_category?: string | null
           line_label: string
           line_level?: number | null
           line_type?: string
@@ -833,6 +835,7 @@ export type Database = {
           closing_id?: string
           created_at?: string
           id?: string
+          line_category?: string | null
           line_label?: string
           line_level?: number | null
           line_type?: string
