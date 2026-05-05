@@ -23,6 +23,7 @@ import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import UploadRetroativoDrePage from "./pages/UploadRetroativoDrePage";
 import PerfilPage from "./pages/PerfilPage";
+import HomePage from "./pages/HomePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -48,19 +49,6 @@ function RoleGuard({
   return <>{children}</>;
 }
 
-function HomeRedirect() {
-  const { roles, isMaster } = useAuth();
-  if (isMaster) return <Navigate to="/fechamento" replace />;
-  if (roles.includes("financeiro" as AppRole)) return <Navigate to="/financeiro/contas-pagar" replace />;
-  if (roles.includes("gg" as AppRole)) return <Navigate to="/fechamento" replace />;
-  if (roles.includes("gop" as AppRole)) return <Navigate to="/fechamento" replace />;
-  if (roles.includes("controladoria" as AppRole)) return <Navigate to="/fechamento" replace />;
-  if (roles.includes("ri" as AppRole)) return <Navigate to="/fechamento" replace />;
-  if (roles.includes("rh" as AppRole)) return <Navigate to="/rh/turnover" replace />;
-  if (roles.includes("operacoes" as AppRole)) return <Navigate to="/metas" replace />;
-  return <Navigate to="/fechamento" replace />;
-}
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -76,7 +64,8 @@ const App = () => (
 
             {/* Protegidas */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<HomeRedirect />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/home" element={<HomePage />} />
 
               {/* Fechamento */}
               <Route path="/fechamento" element={<FechamentoPage />} />
