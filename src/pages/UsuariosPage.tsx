@@ -430,7 +430,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const needsHotelSelection =
     !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg");
   const hasGlobalAccess =
-    isMasterFlag || ["controladoria", "financeiro", "ri", "rh", "operacoes"].includes(primaryRole);
+    isMasterFlag || ["controladoria", "financeiro", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
 
   // Validações por etapa
   const canAdvanceStep1 =
