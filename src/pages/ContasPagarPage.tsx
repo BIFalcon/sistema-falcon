@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -537,6 +537,47 @@ export default function ContasPagarPage() {
                 Agrupar lançamentos N/D do mesmo fornecedor e data
               </label>
             </div>
+
+            {(() => {
+              const activeFilterCount = [
+                period !== "all",
+                status !== "all",
+                category !== "all",
+                searchText !== "",
+                !hideTrivial,
+              ].filter(Boolean).length;
+              const hasActiveFilters = activeFilterCount > 0 || !groupNd;
+              if (!hasActiveFilters) return null;
+              return (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-accent" />
+                    <span className="text-accent font-medium">
+                      {activeFilterCount} filtro{activeFilterCount !== 1 ? "s" : ""} ativo
+                      {activeFilterCount !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      · mostrando {filtered.length} de {entries.length} lançamentos
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-accent hover:text-accent"
+                    onClick={() => {
+                      setPeriod("all");
+                      setStatus("all");
+                      setCategory("all");
+                      setSearchText("");
+                      setHideTrivial(true);
+                      setGroupNd(true);
+                    }}
+                  >
+                    Limpar filtros
+                  </Button>
+                </div>
+              );
+            })()}
 
             {/* Tabela */}
             <div className="border rounded-md overflow-hidden">
