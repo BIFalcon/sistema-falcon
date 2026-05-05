@@ -663,11 +663,11 @@ export default function ContasPagarPage() {
                       </TableHead>
                     )}
                     <TableHead>Fornecedor</TableHead>
-                    {sourceSystem === "omie" && <TableHead>CNPJ</TableHead>}
-                    <TableHead>Nº Doc</TableHead>
+                    {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
+                    <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
                   </TableRow>
