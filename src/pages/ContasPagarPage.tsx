@@ -301,7 +301,14 @@ export default function ContasPagarPage() {
                 )}
               </div>
               <Stat label="Saldo informado" value={balanceAmount !== null ? fmtBRL(balanceAmount) : "—"} />
-              <Stat label="Total a pagar hoje" value={fmtBRL(totalToPayToday)} />
+              <Stat
+                label={
+                  dateFrom === dateTo
+                    ? `Total a pagar em ${fmtDate(dateFrom)}`
+                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
+                }
+                value={fmtBRL(totalToPayPeriod)}
+              />
               <Stat
                 label="Diferença"
                 value={balanceDiff !== null ? fmtBRL(balanceDiff) : "—"}
@@ -351,24 +358,14 @@ export default function ContasPagarPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Problemas identificados
               </h3>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {ISSUE_CATEGORIES
-                  .filter((cat) => cat.key !== "sem_aprovacao" || showApproval)
-                  .map((cat) => {
-                    const filterKey = `issue_${cat.key}` as StatusFilter;
-                    return (
-                      <UrgencyCell
-                        key={cat.key}
-                        label={cat.label}
-                        count={issueCounts[cat.key]}
-                        tone={cat.tone}
-                        active={status === filterKey}
-                        onClick={() =>
-                          setStatus(status === filterKey ? "all" : filterKey)
-                        }
-                      />
-                    );
-                  })}
+              <div className="mb-3">
+                <UrgencyCell
+                  label="Sem aprovação GG"
+                  count={issueCounts.sem_aprovacao}
+                  tone="warning"
+                  active={status === "issues"}
+                  onClick={() => setStatus(status === "issues" ? "all" : "issues")}
+                />
               </div>
               <Button
                 size="sm"
@@ -409,30 +406,6 @@ export default function ContasPagarPage() {
                   onChange={handleFile}
                   disabled={!canManage || !sourceSystem || uploading}
                 />
-                <input
-                  ref={docsRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.ofx,.xml,.png,.jpg,.jpeg"
-                  className="hidden"
-                  onChange={handleDocs}
-                  disabled={!canUploadDocs || uploadingDocs}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!canUploadDocs || uploadingDocs}
-                  onClick={() => docsRef.current?.click()}
-                  title="Enviar PDFs/OFX/XML para vincular manualmente"
-                >
-                  {uploadingDocs ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                  Importar Documentos
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -442,7 +415,6 @@ export default function ContasPagarPage() {
                     const data = displayRows.flatMap((row) => {
                       if (row.kind === "group") return [];
                       const e = row.entry;
-                      const d = docsByEntry.get(e.id);
                       return [{
                         Fornecedor: e.supplier,
                         CNPJ: e.cnpj ?? "",
@@ -453,8 +425,6 @@ export default function ContasPagarPage() {
                         "Forma de Pagamento": e.payment_method ?? "",
                         "Aprovação GG": e.gg_approval,
                         "Status Pagamento": e.payment_status,
-                        "Documento Vinculado": d?.file_name ?? "",
-                        "Validação IA": d?.validation_status ?? "",
                         Observação: e.observation ?? "",
                       }];
                     });
@@ -514,14 +484,11 @@ export default function ContasPagarPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  {showApproval && <SelectItem value="pending">Pendentes</SelectItem>}
-                  {showApproval && <SelectItem value="approved">Aprovados</SelectItem>}
-                  <SelectItem value="no_doc">Sem documento</SelectItem>
-                  <SelectItem value="issues">Com problema</SelectItem>
-                  <SelectItem value="payment_pendente">Pendente de inserção</SelectItem>
+                  <SelectItem value="issues">Sem aprovação do GG</SelectItem>
                   <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
                   <SelectItem value="payment_agendado">Agendado</SelectItem>
                   <SelectItem value="payment_pago">Pago</SelectItem>
+                  <SelectItem value="payment_pendente">Pendente</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -563,6 +530,16 @@ export default function ContasPagarPage() {
                       : "Selecione lançamentos para marcar status em lote"}
                   </div>
                   <div className="flex items-center gap-2">
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8"
+                        onClick={() => setNotifyOpen(true)}
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Notificar GG ({selectedIds.size})
+                      </Button>
+                    )}
                     {canMarkInsertedAgendado && (
                       <>
                         <Button
