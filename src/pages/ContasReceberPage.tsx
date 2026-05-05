@@ -1394,3 +1394,36 @@ function EmptyState({ text }: { text: string }) {
     </div>
   );
 }
+
+type OfSortCol = "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open";
+
+function SortableHead({
+  col,
+  label,
+  sort,
+  onSort,
+  align,
+}: {
+  col: OfSortCol;
+  label: string;
+  sort: { col: OfSortCol; dir: "asc" | "desc" };
+  onSort: (col: OfSortCol) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.col === col;
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-accent ${align === "right" ? "text-right" : ""}`}
+      onClick={() => onSort(col)}
+    >
+      <div className={`flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}>
+        {label}
+        {active ? (
+          sort.dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
+}
