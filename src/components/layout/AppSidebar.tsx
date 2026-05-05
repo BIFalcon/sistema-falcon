@@ -43,6 +43,7 @@ import {
 import falconLogo from "@/assets/falcon-logo-white.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
+import { useAvatarUrl } from "@/hooks/useProfileAvatar";
 
 type LeafItem = {
   title: string;
@@ -269,16 +270,47 @@ export function AppSidebar() {
 
       {!collapsed && (
         <SidebarFooter className="border-t border-sidebar-border p-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-sidebar-foreground truncate">
-              {profile?.display_name ?? profile?.email ?? "Usuário"}
-            </span>
-            <span className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wider">
-              {roleLabel}
-            </span>
-          </div>
+          <SidebarUserFooter
+            displayName={profile?.display_name ?? profile?.email ?? "Usuário"}
+            roleLabel={roleLabel}
+            userId={profile?.user_id}
+            initial={(profile?.display_name ?? profile?.email ?? "U")[0].toUpperCase()}
+          />
         </SidebarFooter>
       )}
     </Sidebar>
+  );
+}
+
+function SidebarUserFooter({
+  displayName,
+  roleLabel,
+  userId,
+  initial,
+}: {
+  displayName: string;
+  roleLabel: string;
+  userId: string | null | undefined;
+  initial: string;
+}) {
+  const { data: avatarUrl } = useAvatarUrl(userId);
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="h-8 w-8 rounded-full bg-sidebar-accent/20 text-sidebar-foreground flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initial
+        )}
+      </div>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-xs font-medium text-sidebar-foreground truncate">
+          {displayName}
+        </span>
+        <span className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wider truncate">
+          {roleLabel}
+        </span>
+      </div>
+    </div>
   );
 }
