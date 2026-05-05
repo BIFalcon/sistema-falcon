@@ -625,7 +625,8 @@ function OpenFolioSection({
         body: { hotel_id: hotelId },
       });
       if (error) throw error;
-      if ((data as any)?.hotels_notified > 0) {
+      const result = data as { hotels_notified?: number } | null;
+      if ((result?.hotels_notified ?? 0) > 0) {
         toast.success(`GG de ${hotelName} notificado por e-mail`);
       } else {
         toast.warning(`Nenhum GG ativo encontrado para ${hotelName}`);
