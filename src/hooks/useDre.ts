@@ -321,9 +321,8 @@ function useDreAnalyticsImpl(input: {
         for (const closing of closings) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number")
+            .select("line_label, line_value, version_number, line_type")
             .eq("closing_id", closing.id)
-            .eq("line_type", "indicator")
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
           const topVer = closingLines[0].version_number;
@@ -429,10 +428,41 @@ function useDreAnalyticsImpl(input: {
           });
         }
 
-        if (nodes.length) {
+        // Monta nós de nível 3 para linhas detalhadas da DRE
+        const detailNodes: DreLineNode[] = [];
+        const detailLabels = new Set<string>();
+        for (const line of allLines) {
+          const lbl = line.line_label;
+          const lineType = (line as any).line_type;
+          if (lineType !== "line") continue;
+          if (!lbl || lbl.startsWith("[")) continue;
+          if (detailLabels.has(lbl)) continue;
+          detailLabels.add(lbl);
+          const current: (number | null)[] = Array(12).fill(null);
+          for (const l of allLines) {
+            if ((l as any).line_type !== "line") continue;
+            if (l.line_label !== lbl) continue;
+            const mIdx = ((l as any)._month ?? input.month) - 1;
+            if (current[mIdx] == null) current[mIdx] = l.line_value ?? null;
+          }
+          detailNodes.push({
+            id: `3:${lbl.toLowerCase().trim()}`,
+            label: lbl,
+            level: 3,
+            series: {
+              current,
+              budget: Array(12).fill(null),
+              previous: Array(12).fill(null),
+            },
+            children: [],
+          });
+        }
+
+        const allNodes = [...nodes, ...detailNodes];
+        if (allNodes.length) {
           datasets.push({
             tree: nodes,
-            flat: nodes,
+            flat: allNodes,
             hotelCount: 1,
             sourceNames: [hotelId],
           });
