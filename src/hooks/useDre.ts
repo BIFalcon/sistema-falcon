@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
-import type { ParsedDre, IndicatorKey } from "@/lib/dreParser";
+import { INDICATOR_LABELS } from "@/lib/dreParser";
+import type { IndicatorKey } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
   estimateDistribution,
@@ -270,107 +271,111 @@ export function useDreAnalytics(input: { hotelIds: string[]; year: number; month
   return useDreAnalyticsImpl(input);
 }
 
-function convertParsedDreToDataset(
-  parsed: ParsedDre,
-  sourceName: string,
-): DreAnalyticsDataset {
-  const nodes: DreLineNode[] = [];
-  // Monta um nó para cada indicador-chave com séries completas
-  for (const [key, ind] of Object.entries(parsed.indicators)) {
-    if (!ind) continue;
-    const k = key as IndicatorKey;
-    // Série realizada Jan-Dez
-    const current: (number | null)[] = Array(12).fill(null);
-    const curSeries = parsed.currentSeries[k];
-    if (curSeries) {
-      curSeries.forEach((v, i) => { current[i] = v ?? null; });
-    } else if (ind.value != null && parsed.monthColumnIndex != null) {
-      current[parsed.monthColumnIndex] = ind.value;
-    }
-    // Série ano anterior Jan-Dez
-    const previous: (number | null)[] = Array(12).fill(null);
-    const prevSeries = parsed.previousSeries[k];
-    if (prevSeries) {
-      prevSeries.forEach((v, i) => { previous[i] = v ?? null; });
-    } else if (parsed.previousIndicators?.[k] != null && parsed.monthColumnIndex != null) {
-      previous[parsed.monthColumnIndex] = parsed.previousIndicators[k] ?? null;
-    }
-    // Orçado: por enquanto vazio (virá de futura integração)
-    const budget: (number | null)[] = Array(12).fill(null);
-    nodes.push({
-      id: `1:${key}`,
-      label: ind.label,
-      level: 1,
-      series: { current, budget, previous },
-      children: [],
-    });
-  }
-  // Adiciona todas as linhas da DRE como nós de nível 3
-  // para alimentar o seletor "Linhas da DRE" no gráfico
-  for (const line of parsed.lines) {
-    if (!line.label || line.value == null) continue;
-    const id = `3:${line.label.toLowerCase().trim()}`;
-    if (nodes.find((n) => n.id === id)) continue;
-    const current: (number | null)[] = Array(12).fill(null);
-    if (parsed.monthColumnIndex != null) {
-      current[parsed.monthColumnIndex] = line.value;
-    }
-    nodes.push({
-      id,
-      label: line.label,
-      level: 3,
-      series: {
-        current,
-        budget: Array(12).fill(null),
-        previous: Array(12).fill(null),
-      },
-      children: [],
-    });
-  }
-  return {
-    tree: nodes.filter((n) => n.level === 1),
-    flat: nodes,
-    hotelCount: 1,
-    sourceNames: [sourceName],
-  };
-}
-
-function useDreAnalyticsImpl(input: { hotelIds: string[]; year: number; month: number }) {
+function useDreAnalyticsImpl(input: {
+  hotelIds: string[];
+  year: number;
+  month: number;
+}) {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["dre-analytics", input.hotelIds, input.year, input.month],
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
+
       for (const hotelId of input.hotelIds) {
-        const { data: closing, error: closingError } = await supabase
+        const { data: closing } = await supabase
           .from("closings")
-          .select("id, hotel_id, year")
+          .select("id")
           .eq("hotel_id", hotelId)
           .eq("year", input.year)
           .eq("month", input.month)
-          .limit(1)
           .maybeSingle();
-        if (closingError) throw closingError;
         if (!closing) continue;
 
-        const { data: version, error: versionError } = await supabase
-          .from("dre_versions")
-          .select("file_url, file_name, version_number")
+        const { data: lines, error } = await supabase
+          .from("dre_parsed_lines")
+          .select("line_label, line_value, version_number")
           .eq("closing_id", closing.id)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (versionError) throw versionError;
-        if (!version?.file_url) continue;
+          .eq("line_type", "indicator")
+          .order("version_number", { ascending: false });
+        if (error || !lines?.length) continue;
 
-        const { data: file, error: downloadError } = await supabase.storage
-          .from("closings")
-          .download(version.file_url);
-        if (downloadError) throw downloadError;
-        const fileObj = new File([await file.arrayBuffer()], version.file_name);
-        const parsed = await parseDreExcel(fileObj, { targetMonth: input.month });
-        datasets.push(convertParsedDreToDataset(parsed, version.file_name));
+        const topVersion = lines[0].version_number;
+        const topLines = lines.filter((l) => l.version_number === topVersion);
+
+        const seriesCur: Record<string, (number | null)[]> = {};
+        const seriesPrev: Record<string, (number | null)[]> = {};
+        const indicators: Record<string, { label: string; value: number | null }> = {};
+
+        for (const line of topLines) {
+          const lbl = line.line_label;
+          const val = line.line_value;
+
+          const curMatch = lbl.match(/^\[series_cur_(.+)_(\d+)\]$/);
+          if (curMatch) {
+            const [, key, mStr] = curMatch;
+            const m = parseInt(mStr, 10) - 1;
+            if (!seriesCur[key]) seriesCur[key] = Array(12).fill(null);
+            seriesCur[key][m] = val ?? null;
+            continue;
+          }
+
+          const prevMatch = lbl.match(/^\[series_prev_(.+)_(\d+)\]$/);
+          if (prevMatch) {
+            const [, key, mStr] = prevMatch;
+            const m = parseInt(mStr, 10) - 1;
+            if (!seriesPrev[key]) seriesPrev[key] = Array(12).fill(null);
+            seriesPrev[key][m] = val ?? null;
+            continue;
+          }
+
+          const indMatch = lbl.match(/^\[([^\]]+)\]$/);
+          if (indMatch && !indMatch[1].startsWith("prev_")) {
+            const key = indMatch[1];
+            indicators[key] = {
+              label: INDICATOR_LABELS[key as IndicatorKey] ?? key,
+              value: val ?? null,
+            };
+          }
+        }
+
+        const nodes: DreLineNode[] = [];
+        const allKeys = new Set([
+          ...Object.keys(seriesCur),
+          ...Object.keys(indicators),
+        ]);
+
+        for (const key of allKeys) {
+          const current = seriesCur[key] ?? Array(12).fill(null);
+          const previous = seriesPrev[key] ?? Array(12).fill(null);
+
+          if (!seriesCur[key] && indicators[key]?.value != null) {
+            current[input.month - 1] = indicators[key].value;
+          }
+
+          nodes.push({
+            id: `1:${key}`,
+            label: indicators[key]?.label ?? INDICATOR_LABELS[key as IndicatorKey] ?? key,
+            level: 1,
+            series: {
+              current,
+              budget: Array(12).fill(null),
+              previous,
+            },
+          children: [],
+          });
+        }
+
+        if (nodes.length) {
+          datasets.push({
+            tree: nodes,
+            flat: nodes,
+            hotelCount: 1,
+            sourceNames: [hotelId],
+          });
+        }
       }
+
       if (!datasets.length) return null;
       return datasets.length === 1 ? datasets[0] : mergeDreDatasets(datasets);
     },
