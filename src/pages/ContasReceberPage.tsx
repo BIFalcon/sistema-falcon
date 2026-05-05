@@ -616,6 +616,11 @@ function OpenFolioSection({
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
   const [notifying, setNotifying] = useState<string | null>(null);
+  const [ofSearchText, setOfSearchText] = useState<string>("");
+  const [ofSort, setOfSort] = useState<{
+    col: "guest_name" | "balance" | "arrival_date" | "departure_date" | "days_open";
+    dir: "asc" | "desc";
+  }>({ col: "balance", dir: "desc" });
 
   // confirmation_numbers que possuem ao menos uma justificativa, indexados por hotel
   const justifiedByHotel = useMemo(() => {
@@ -692,7 +697,7 @@ function OpenFolioSection({
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
-    return visibleEntries
+    const base = visibleEntries
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
@@ -701,9 +706,50 @@ function OpenFolioSection({
         if (agingFilter === "mid") return d > 30 && d <= 90;
         return d > 90;
       })
-      .filter((e) => (unjustifiedOnly ? !isJustified(e) : true))
-      .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0));
-  }, [visibleEntries, selectedHotel, agingFilter, unjustifiedOnly, justifiedByHotel]);
+      .filter((e) => (unjustifiedOnly ? !isJustified(e) : true));
+
+    const q = ofSearchText.trim().toLowerCase();
+    const searched = q
+      ? base.filter((e) => {
+          const name = `${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase();
+          return (
+            name.includes(q) ||
+            (e.confirmation_number ?? "").toLowerCase().includes(q)
+          );
+        })
+      : base;
+
+    const sorted = [...searched].sort((a, b) => {
+      let va: string | number;
+      let vb: string | number;
+      if (ofSort.col === "guest_name") {
+        va = `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim();
+        vb = `${b.first_name ?? ""} ${b.last_name ?? ""}`.trim();
+      } else if (ofSort.col === "balance") {
+        va = Number(a.balance ?? 0);
+        vb = Number(b.balance ?? 0);
+      } else if (ofSort.col === "days_open") {
+        va = Number(a.days_open ?? 0);
+        vb = Number(b.days_open ?? 0);
+      } else {
+        va = a[ofSort.col] ?? "";
+        vb = b[ofSort.col] ?? "";
+      }
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+      return ofSort.dir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [visibleEntries, selectedHotel, agingFilter, unjustifiedOnly, justifiedByHotel, ofSearchText, ofSort]);
+
+  const handleOfSort = (col: typeof ofSort.col) => {
+    setOfSort((s) => ({
+      col,
+      dir: s.col === col && s.dir === "desc" ? "asc" : "desc",
+    }));
+  };
 
   return (
     <div className="space-y-5">
@@ -726,6 +772,10 @@ function OpenFolioSection({
           notifying={notifying === selectedHotel}
           onBack={() => setHotelId(null)}
           hideBack={isGgOnly}
+          searchText={ofSearchText}
+          setSearchText={setOfSearchText}
+          sort={ofSort}
+          onSort={handleOfSort}
         />
       ) : (
         <Card className="p-5 shadow-soft space-y-3">
