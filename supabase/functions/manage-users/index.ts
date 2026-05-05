@@ -17,7 +17,10 @@ type AppRole =
   | "gop"
   | "ri"
   | "financeiro"
-  | "gg";
+  | "gg"
+  | "rh"
+  | "operacoes"
+  | "viewer";
 
 type Action =
   | "invite"
