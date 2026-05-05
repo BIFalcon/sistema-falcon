@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, User as UserIcon, Bell, Settings } from "lucide-react";
+import { LogOut, User as UserIcon, Bell, Settings, X } from "lucide-react";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
@@ -87,6 +87,20 @@ export function AppHeader() {
               onChange={(e) => setDateTo(e.target.value)}
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             />
+            {(dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                title="Limpar datas"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         ) : (
           <>
