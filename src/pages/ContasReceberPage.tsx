@@ -123,8 +123,10 @@ function exportOpenFolioToExcel(
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster, userHotels } = useAuth();
+  const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora } = useAuth();
   const isManager = isMaster || hasRole("financeiro");
+  // Quem pode importar relatórios AR: master ou coordenadora (equipe e GG não importam)
+  const canImportAr = isMaster || isFinanceiroCoordenadora;
   // Quem vê todos os hotéis: master, financeiro, controladoria, ri
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
@@ -151,6 +153,7 @@ export default function ContasReceberPage() {
         <TabsContent value="to_invoice" className="mt-5">
           <ToInvoiceSection
             isManager={isManager}
+            canImportAr={canImportAr}
             seesAllHotels={seesAllHotels}
             restrictedHotelIds={restrictedHotelIds}
             isGgOnly={isGgOnly}
@@ -159,6 +162,7 @@ export default function ContasReceberPage() {
         <TabsContent value="open_folio" className="mt-5">
           <OpenFolioSection
             isManager={isManager}
+            canImportAr={canImportAr}
             seesAllHotels={seesAllHotels}
             restrictedHotelIds={restrictedHotelIds}
             isGgOnly={isGgOnly}
