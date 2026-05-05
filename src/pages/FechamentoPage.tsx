@@ -8,7 +8,7 @@ import { CheckCircle2, Clock, AlertCircle, FileSpreadsheet } from "lucide-react"
 import { useMemo } from "react";
 
 export default function Index() {
-  const { profile, isMaster, allowedHotels } = useAuth();
+  const { isMaster, allowedHotels } = useAuth();
   const { hotelId, month, year } = useFilters();
   const { data: closings = [] } = useClosings({ hotelId, month, year });
 
@@ -33,19 +33,18 @@ export default function Index() {
     return { approved, inProgress, pending, returned, total: closings.length || allowedHotels.length };
   }, [closings, allowedHotels.length]);
 
-  const greeting = `Olá, ${profile?.display_name ?? profile?.email?.split("@")[0] ?? ""}`;
-
   return (
     <div className="space-y-6 max-w-[1400px]">
-      <header className="space-y-1">
+      <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-          Workflow de Fechamento
+          Operação
         </p>
-        <h1 className="text-3xl font-semibold text-foreground">{greeting}</h1>
+        <h1 className="text-2xl font-semibold">Fechamento</h1>
         <p className="text-sm text-muted-foreground">
-          {MONTHS_PT[month - 1]} de {year} · {isMaster ? "Visão Master" : `${allowedHotels.length} ${allowedHotels.length === 1 ? "hotel acessível" : "hotéis acessíveis"}`}
+          {MONTHS_PT[month - 1]} de {year} ·{" "}
+          {isMaster ? "Visão Master" : `${allowedHotels.length} ${allowedHotels.length === 1 ? "hotel acessível" : "hotéis acessíveis"}`}
         </p>
-      </header>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Hotéis no período" value={stats.total} icon={<FileSpreadsheet className="h-4 w-4 text-accent" />} />
