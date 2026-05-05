@@ -120,7 +120,7 @@ export function useUploadDre() {
         // [series_<scope>_<key>_<mes>] (mes 1..12).
         const seriesRows: typeof indicatorRows = [];
         const pushSeries = (
-          scope: "cur" | "prev",
+          scope: "cur" | "prev" | "budget",
           map: typeof parsed.currentSeries,
         ) => {
           for (const [k, arr] of Object.entries(map ?? {})) {
