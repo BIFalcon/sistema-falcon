@@ -317,10 +317,8 @@ export default function ContasPagarPage() {
             </div>
           </Card>
 
-          {/* Painéis de alerta */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Urgência */}
-            <Card className="p-5 shadow-soft">
+          {/* Urgência */}
+          <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Urgência de pagamento
               </h3>
@@ -351,33 +349,7 @@ export default function ContasPagarPage() {
                   <p className="text-base font-bold">{fmtBRL(distributionTotal)}</p>
                 </div>
               )}
-            </Card>
-
-            {/* Problemas */}
-            <Card className="p-5 shadow-soft">
-              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
-                Problemas identificados
-              </h3>
-              <div className="mb-3">
-                <UrgencyCell
-                  label="Sem aprovação GG"
-                  count={issueCounts.sem_aprovacao}
-                  tone="warning"
-                  active={status === "issues"}
-                  onClick={() => setStatus(status === "issues" ? "all" : "issues")}
-                />
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full gap-2"
-                disabled={!canManage || issueEntries.length === 0}
-                onClick={() => setNotifyOpen(true)}
-              >
-                <Mail className="h-4 w-4" /> Notificar GG ({issueEntries.length})
-              </Button>
-            </Card>
-          </div>
+          </Card>
 
           {/* Importação + filtros + tabela */}
           <Card className="p-5 shadow-soft space-y-4">
