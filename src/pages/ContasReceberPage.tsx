@@ -177,11 +177,13 @@ export default function ContasReceberPage() {
 
 function ToInvoiceSection({
   isManager,
+  canImportAr,
   seesAllHotels,
   restrictedHotelIds,
   isGgOnly,
 }: {
   isManager: boolean;
+  canImportAr: boolean;
   seesAllHotels: boolean;
   restrictedHotelIds: string[] | null;
   isGgOnly: boolean;
@@ -220,7 +222,7 @@ function ToInvoiceSection({
 
   return (
     <div className="space-y-5">
-      <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
+      <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={canImportAr} />
       {latestTiDate && (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 -mt-2 px-1">
           <CalendarIcon className="h-3.5 w-3.5" />
@@ -602,11 +604,13 @@ function ConsolidatedRanking({
 
 function OpenFolioSection({
   isManager,
+  canImportAr,
   seesAllHotels,
   restrictedHotelIds,
   isGgOnly,
 }: {
   isManager: boolean;
+  canImportAr: boolean;
   seesAllHotels: boolean;
   restrictedHotelIds: string[] | null;
   isGgOnly: boolean;
