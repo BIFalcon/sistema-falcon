@@ -762,7 +762,7 @@ function OpenFolioSection({
 
   return (
     <div className="space-y-5">
-      <UploadCard kind="open_folio" lastUpload={lastUpload} isManager={isManager} />
+      <UploadCard kind="open_folio" lastUpload={lastUpload} isManager={canImportAr} />
 
       {isLoading ? (
         <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
