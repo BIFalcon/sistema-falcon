@@ -8,6 +8,12 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import type { ApEntry, ApPaymentStatus, FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface EntryRowProps {
   entry: ApEntry;
@@ -145,28 +151,42 @@ function ApprovalBadge({ status }: { status: string }) {
   );
 }
 
+const STATUS_TOOLTIPS: Record<ApPaymentStatus, string> = {
+  pendente: "Aguardando inserção no banco",
+  inserido: "Inserido no banco — aguardando compensação",
+  agendado: "Agendado para pagamento futuro",
+  pago: "Pagamento confirmado",
+};
+
 export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
-  if (status === "pago")
-    return (
+  const badge =
+    status === "pago" ? (
       <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
         <Banknote className="h-3 w-3" /> Pago
       </Badge>
-    );
-  if (status === "inserido")
-    return (
+    ) : status === "inserido" ? (
       <Badge variant="outline" className="gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400">
         <CheckCircle2 className="h-3 w-3" /> Inserido
       </Badge>
-    );
-  if (status === "agendado")
-    return (
+    ) : status === "agendado" ? (
       <Badge variant="outline" className="gap-1 border-violet-500/40 text-violet-700 dark:text-violet-400">
         <CalendarClock className="h-3 w-3" /> Agendado
       </Badge>
+    ) : (
+      <Badge variant="outline" className="gap-1 border-muted-foreground/30 text-muted-foreground">
+        <CircleDashed className="h-3 w-3" /> Pendente
+      </Badge>
     );
   return (
-    <Badge variant="outline" className="gap-1 border-muted-foreground/30 text-muted-foreground">
-      <CircleDashed className="h-3 w-3" /> Pendente
-    </Badge>
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block">{badge}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p className="text-xs">{STATUS_TOOLTIPS[status] ?? status}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
