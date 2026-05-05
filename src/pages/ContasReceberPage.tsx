@@ -33,6 +33,7 @@ import {
   useToInvoiceEntries,
   useOpenFolioEntries,
   useLatestArUpload,
+  useLatestToInvoiceDate,
   useUploadArReport,
   useClientContracts,
   useUpsertContract,
@@ -48,13 +49,13 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
-import { fmtBRL } from "@/lib/formatters";
+import { fmtBRL, fmtDate } from "@/lib/formatters";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -198,6 +199,7 @@ function ToInvoiceSection({
     hotelId: hotelId || undefined,
   });
   const { data: lastUpload } = useLatestArUpload("to_invoice");
+  const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
   const { data: contracts } = useClientContracts(hotelId || null);
   const notifyTi = useNotifyGgToInvoice();
 
@@ -214,6 +216,12 @@ function ToInvoiceSection({
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={isManager} />
+      {latestTiDate && (
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 -mt-2 px-1">
+          <CalendarIcon className="h-3.5 w-3.5" />
+          Dados até <strong className="font-semibold">{fmtDate(latestTiDate)}</strong>
+        </p>
+      )}
 
       <Card className="p-5 shadow-soft space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
