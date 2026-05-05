@@ -1073,6 +1073,9 @@ function ContractsDialog({
   const upsert = useUpsertContract();
   const del = useDeleteContract();
   const [form, setForm] = useState({ account_number: "", account_name: "", payment_term_days: "", notes: "" });
+  const [contractToDelete, setContractToDelete] = useState<
+    { id: string; hotel_id: string } | null
+  >(null);
 
   async function add() {
     if (!user) return;
@@ -1102,6 +1105,7 @@ function ContractsDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -1158,15 +1162,11 @@ function ContractsDialog({
                     <TableCell className="text-xs text-muted-foreground">{c.notes ?? ""}</TableCell>
                     <TableCell className="text-right">
                       {canEdit && (
-                        <Button variant="ghost" size="sm" onClick={async () => {
-                          if (!confirm("Remover contrato?")) return;
-                          try {
-                            await del.mutateAsync({ id: c.id, hotel_id: hotelId });
-                            toast.success("Contrato removido");
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Erro");
-                          }
-                        }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setContractToDelete({ id: c.id, hotel_id: hotelId })}
+                        >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       )}
