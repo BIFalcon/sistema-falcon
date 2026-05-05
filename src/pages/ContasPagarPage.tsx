@@ -449,31 +449,24 @@ export default function ContasPagarPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Problemas identificados
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                {showApproval && (
-                  <UrgencyCell
-                    label="Sem aprovação GG"
-                    count={issueCounts.notApproved}
-                    tone="warning"
-                    active={status === "issues"}
-                    onClick={() => setStatus(status === "issues" ? "all" : "issues")}
-                  />
-                )}
-                <UrgencyCell
-                  label="Sem documento"
-                  count={issueCounts.noDoc}
-                  tone="info"
-                  active={status === "no_doc"}
-                  onClick={() => setStatus(status === "no_doc" ? "all" : "no_doc")}
-                />
-                <UrgencyCell
-                  label="Atrasados"
-                  count={issueCounts.overdue}
-                  tone="danger"
-                  active={period === "overdue"}
-                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
-                />
-                <UrgencyCell label="Divergência valor" count={issueCounts.divergent} tone="amber" />
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {ISSUE_CATEGORIES
+                  .filter((cat) => cat.key !== "sem_aprovacao" || showApproval)
+                  .map((cat) => {
+                    const filterKey = `issue_${cat.key}` as StatusFilter;
+                    return (
+                      <UrgencyCell
+                        key={cat.key}
+                        label={cat.label}
+                        count={issueCounts[cat.key]}
+                        tone={cat.tone}
+                        active={status === filterKey}
+                        onClick={() =>
+                          setStatus(status === filterKey ? "all" : filterKey)
+                        }
+                      />
+                    );
+                  })}
               </div>
               <Button
                 size="sm"
