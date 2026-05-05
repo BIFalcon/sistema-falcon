@@ -60,6 +60,7 @@ import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { LinkDocDialog } from "@/components/accounts-payable/LinkDocDialog";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
+import { ISSUE_CATEGORIES } from "@/lib/apIssueCategories";
 
 import { useMemo } from "react";
 
@@ -133,6 +134,7 @@ export default function ContasPagarPage() {
     hideTrivial,
     groupNd,
     showApproval,
+    hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
   });
 
   const {
@@ -147,6 +149,7 @@ export default function ContasPagarPage() {
     urgencyCounts,
     issueCounts,
     issueEntries,
+    entryIssues,
     totalToPayToday,
     distributionTotal,
     balanceDiff,
