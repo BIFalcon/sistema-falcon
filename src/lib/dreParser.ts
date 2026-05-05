@@ -58,6 +58,8 @@ export interface ParsedDre {
    * para exibir lado a lado na Carta (ex.: "Ocupação 55% / Ano anterior 39%").
    */
   previousIndicators: Partial<Record<IndicatorKey, number | null>>;
+  budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
+  budgetIndicators: Partial<Record<IndicatorKey, number | null>>;
 }
 
 /**
@@ -339,6 +341,37 @@ export async function parseDreExcel(
     warnings.push('Aba "ANO ANTERIOR" não localizada — gráficos comparativos sem série prévia.');
   }
 
+  // Aba "Orçamento" — série Jan-Dez dos valores orçados
+  const budgetSheetName = wb.SheetNames.find((n) => /or[çc]amento/i.test(n));
+  let budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
+  let budgetIndicators: Partial<Record<IndicatorKey, number | null>> = {};
+  if (budgetSheetName) {
+    const budgetWs = wb.Sheets[budgetSheetName];
+    if (budgetWs) {
+      const budgetRows: unknown[][] = XLSX.utils.sheet_to_json(budgetWs, {
+        header: 1, blankrows: false, defval: null, raw: true,
+      });
+      budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS);
+      if (targetMonth) {
+        const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth);
+        const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
+        const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
+        for (const k of allKeys) {
+          const rxs = INDICATORS.find((i) => i.key === k)?.rx ?? [];
+          for (const row of budgetRows) {
+            const lbl = rowLabel(row ?? []);
+            if (!lbl) continue;
+            if (rxs.some((rx) => rx.test(lbl))) {
+              const v = rowValueAt(row, budgetMonthCol);
+              budgetIndicators[k] = typeof v === "number" ? v : null;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   return {
     template,
     sheetUsed: sheetName,
@@ -350,6 +383,8 @@ export async function parseDreExcel(
     currentSeries,
     previousSeries,
     previousIndicators,
+    budgetSeries,
+    budgetIndicators,
   };
 }
 
