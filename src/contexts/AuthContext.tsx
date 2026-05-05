@@ -21,6 +21,7 @@ interface AuthContextValue {
   allowedHotels: Hotel[];
   loading: boolean;
   isMaster: boolean;
+  isGg: boolean;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: () => boolean;
   /** Sub-papel do financeiro: equipe (ops) ou coordenadora (chefe). */
@@ -121,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     allowedHotels,
     loading,
     isMaster,
+    isGg: roles.includes("gg" as AppRole),
     hasRole: (r) => roles.includes(r),
     hasAnyRole: () => roles.length > 0,
     financeiroSubrole,
