@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/collapsible";
 import falconLogo from "@/assets/falcon-logo-white.png";
 import { useAuth } from "@/contexts/AuthContext";
-import { ROLE_LABELS } from "@/lib/constants";
+import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 type LeafItem = {
   title: string;
@@ -50,6 +50,7 @@ type LeafItem = {
   soon?: boolean;
   end?: boolean;
   requireMaster?: boolean;
+  allowedRoles?: AppRole[];
 };
 
 type GroupItem = LeafItem & {
@@ -68,8 +69,8 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Visão Geral", url: "/fechamento", icon: LayoutGrid, end: true },
           { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet },
           { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail },
-          { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet },
-          { title: "Envio", url: "/fechamento/envio", icon: Send, soon: true },
+          { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet, allowedRoles: ["financeiro"] as AppRole[] },
+          { title: "Envio", url: "/fechamento/envio", icon: Send, allowedRoles: ["ri"] as AppRole[] },
           { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge, requireMaster: true },
         ],
       },
@@ -78,8 +79,9 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp },
-      { title: "Metas GG", url: "/metas", icon: Target, soon: true },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "operacoes"] as AppRole[] },
+      { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "operacoes"] as AppRole[] },
+      { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: Users, soon: true, allowedRoles: ["gop", "gg", "rh", "operacoes"] as AppRole[] },
     ],
   },
   {
@@ -89,22 +91,33 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Financeiro",
         url: "/financeiro",
         icon: Wallet,
+        allowedRoles: ["financeiro"] as AppRole[],
         children: [
           { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true },
           { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle },
           { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle },
         ],
       },
-      { title: "RH & People", url: "/rh", icon: Users, soon: true },
-      { title: "Controladoria", url: "/controladoria", icon: ShieldCheck, soon: true },
+      {
+        title: "Financeiro",
+        url: "/financeiro",
+        icon: Wallet,
+        allowedRoles: ["gg"] as AppRole[],
+        children: [
+          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true },
+          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle },
+        ],
+      },
+      { title: "RH & People", url: "/rh", icon: Users, soon: true, allowedRoles: ["rh"] as AppRole[] },
+      { title: "Controladoria", url: "/controladoria", icon: ShieldCheck, soon: true, allowedRoles: ["controladoria"] as AppRole[] },
     ],
   },
   {
     label: "Configurações",
     items: [
-      { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog },
-      { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel },
-      { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail },
+      { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, requireMaster: true },
+      { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel, requireMaster: true },
+      { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail, requireMaster: true },
       { title: "DRE retroativa", url: "/configuracoes/dre-retroativo", icon: FileSpreadsheet, requireMaster: true },
     ],
   },
@@ -167,7 +180,12 @@ export function AppSidebar() {
                   const parentActive = isActiveUrl(item.url, false);
 
                   if (!hasChildren) {
-                    if (item.requireMaster && !isMaster && !roles.includes("processos")) return null;
+                    const allowed = item.requireMaster
+                      ? (isMaster || roles.includes("processos"))
+                      : item.allowedRoles
+                        ? (isMaster || item.allowedRoles.some((r) => roles.includes(r)))
+                        : true;
+                    if (!allowed) return null;
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild isActive={isActiveUrl(item.url, item.end)}>
@@ -181,9 +199,16 @@ export function AppSidebar() {
                     );
                   }
 
+                  const groupAllowed = item.requireMaster
+                    ? (isMaster || roles.includes("processos"))
+                    : item.allowedRoles
+                      ? (isMaster || item.allowedRoles.some((r) => roles.includes(r)))
+                      : true;
+                  if (!groupAllowed) return null;
+
                   return (
                     <Collapsible
-                      key={item.url}
+                      key={item.url + (item.allowedRoles?.join(",") ?? "")}
                       defaultOpen={parentActive}
                       className="group/collapsible"
                     >
@@ -202,7 +227,11 @@ export function AppSidebar() {
                           <CollapsibleContent>
                             <SidebarMenuSub>
                               {item.children!
-                                .filter((child) => !(child.requireMaster && !isMaster && !roles.includes("processos")))
+                                .filter((child) => {
+                                  if (child.requireMaster) return isMaster || roles.includes("processos");
+                                  if (child.allowedRoles) return isMaster || child.allowedRoles.some((r) => roles.includes(r));
+                                  return true;
+                                })
                                 .map((child) => (
                                 <SidebarMenuSubItem key={child.url}>
                                   <SidebarMenuSubButton
