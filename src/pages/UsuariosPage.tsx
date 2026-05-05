@@ -76,6 +76,7 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
   { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
+  { value: "viewer", label: "Visualizador", scope: "Acesso somente leitura à seção de Análise" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
