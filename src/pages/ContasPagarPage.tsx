@@ -27,6 +27,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
@@ -103,6 +113,8 @@ export default function ContasPagarPage() {
   const [uploading, setUploading] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +157,17 @@ export default function ContasPagarPage() {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f || !hotelId || !sourceSystem) return;
+    if (fileRef.current) fileRef.current.value = "";
+    if (entries.length > 0) {
+      setPendingFile(f);
+      setReimportConfirmOpen(true);
+      return;
+    }
+    await executeUpload(f);
+  }
+
+  async function executeUpload(f: File) {
+    if (!hotelId || !sourceSystem) return;
     setUploading(true);
     try {
       const r = await uploadApReport({ hotelId, sourceSystem, file: f });
@@ -156,7 +179,7 @@ export default function ContasPagarPage() {
       toast.error(err instanceof Error ? err.message : "Erro ao importar");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setPendingFile(null);
     }
   }
 
@@ -739,6 +762,38 @@ export default function ContasPagarPage() {
           }
         />
       )}
+
+      <AlertDialog
+        open={reimportConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReimportConfirmOpen(false);
+            setPendingFile(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Substituir lançamentos existentes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Já existem <strong>{entries.length}</strong> lançamentos importados para este hotel.
+              O novo arquivo vai atualizar os dados existentes — status de pagamento e aprovações
+              já registrados serão preservados. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setReimportConfirmOpen(false);
+                if (pendingFile) executeUpload(pendingFile);
+              }}
+            >
+              Continuar importação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
