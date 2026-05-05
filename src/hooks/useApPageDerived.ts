@@ -188,15 +188,8 @@ export function useApPageDerived(opts: {
     () =>
       entries.filter((e) => {
         if (!isWithinPeriod(e.due_date, period)) return false;
-        if (status === "pending" && e.gg_approval !== "pending") return false;
-        if (status === "approved" && e.gg_approval !== "approved") return false;
-        if (status === "no_doc" && !!e.primary_document_id) return false;
         if (status === "issues") {
-          if (entryIssues(e).size === 0) return false;
-        }
-        if (status.startsWith("issue_")) {
-          const cat = status.replace("issue_", "") as IssueCategory;
-          if (!entryIssues(e).has(cat)) return false;
+          if (e.gg_approval === "approved") return false;
         }
         if (status === "payment_pendente" && e.payment_status !== "pendente") return false;
         if (status === "payment_inserido" && e.payment_status !== "inserido") return false;
