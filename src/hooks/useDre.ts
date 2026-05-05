@@ -329,8 +329,8 @@ function useDreAnalyticsImpl(input: {
             continue;
           }
 
-          const indMatch = lbl.match(/^\[([^\]]+)\]$/);
-          if (indMatch && !indMatch[1].startsWith("prev_")) {
+          const indMatch = lbl.match(/^\[([^\]\s]+)\]/);
+          if (indMatch && !indMatch[1].startsWith("prev_") && !indMatch[1].startsWith("series_")) {
             const key = indMatch[1];
             indicators[key] = {
               label: INDICATOR_LABELS[key as IndicatorKey] ?? key,
