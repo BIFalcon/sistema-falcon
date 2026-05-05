@@ -14,18 +14,11 @@ export type Period =
 
 export type StatusFilter =
   | "all"
-  | "pending"
-  | "approved"
   | "issues"
-  | "no_doc"
   | "payment_pendente"
   | "payment_inserido"
   | "payment_agendado"
-  | "payment_pago"
-  | "issue_sem_aprovacao"
-  | "issue_sem_documento"
-  | "issue_valor_divergente"
-  | "issue_cnpj_divergente";
+  | "payment_pago";
 
 /**
  * Verifica se uma data de vencimento se enquadra no período selecionado.
