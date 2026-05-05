@@ -51,6 +51,7 @@ import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
 import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 import { useMemo } from "react";
 
@@ -609,14 +610,10 @@ export default function ContasPagarPage() {
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
-                        className="text-center text-sm text-muted-foreground py-8"
-                      >
-                        Carregando…
-                      </TableCell>
-                    </TableRow>
+                    <TableSkeleton
+                      rows={8}
+                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                    />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
