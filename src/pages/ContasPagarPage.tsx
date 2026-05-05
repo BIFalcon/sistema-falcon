@@ -30,7 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
-import { useAllHotels } from "@/hooks/useHotelAssets";
+import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   notifyGgPendencies,
   uploadApDocuments,
@@ -84,8 +84,11 @@ export default function ContasPagarPage() {
 
   const { data: hotels = [] } = useAllHotels();
   const { hotelId } = useFilters();
-  const hotel = useMemo(() => hotels.find((h) => h.id === hotelId) ?? null, [hotels, hotelId]);
-  const sourceSystem = (hotel as any)?.financial_system as FinancialSystem | null;
+  const hotel = useMemo(
+    () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
+    [hotels, hotelId],
+  );
+  const sourceSystem = (hotel?.financial_system ?? null) as FinancialSystem | null;
   const isOmie = sourceSystem === "omie";
   // Hotéis OMIE não têm aprovação GG no Falcon — correção é feita direto no OMIE.
   const showApproval = !isOmie;
