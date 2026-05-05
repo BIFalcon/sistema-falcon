@@ -50,8 +50,19 @@ export function ApEntryRow({
     doc?.nf_amount != null && Math.abs(Number(doc.nf_amount) - Number(entry.amount)) > 0.01;
   const divergent = doc?.validation_status === "divergence" || amountDivergent;
 
+  const paymentRowClass =
+    entry.payment_status === "pago"
+      ? "bg-emerald-500/10 dark:bg-emerald-500/10"
+      : entry.payment_status === "inserido"
+      ? "bg-sky-500/10 dark:bg-sky-500/10"
+      : entry.payment_status === "agendado"
+      ? "bg-violet-500/10 dark:bg-violet-500/10"
+      : "";
+
   return (
-    <TableRow className={`${overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}>
+    <TableRow
+      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
+    >
       {selectable && (
         <TableCell className="w-8">
           <Checkbox
