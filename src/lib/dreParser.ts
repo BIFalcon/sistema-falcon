@@ -41,7 +41,7 @@ export interface ParsedDre {
   template: DreTemplate;
   sheetUsed: string;
   indicators: Record<IndicatorKey, IndicatorHit | null>;
-  lines: { row: number; label: string; value: number | null }[];
+  lines: { row: number; label: string; value: number | null; level?: number }[];
   warnings: string[];
   monthColumnIndex: number | null;
   monthHeaderLabel: string | null;
@@ -201,6 +201,29 @@ function rowLabel(row: unknown[]): string | null {
 }
 
 /**
+ * Extrai label e nível hierárquico baseado na coluna onde o texto aparece.
+ * Convenção: col 3 = nível 1, col 4 = nível 2, col 5 = nível 3.
+ * Fallback: usa rowLabel + nível 3.
+ */
+function rowLabelAndLevel(
+  row: unknown[],
+): { label: string; level: number } | null {
+  const levelCols = [
+    { col: 3, level: 1 },
+    { col: 4, level: 2 },
+    { col: 5, level: 3 },
+  ];
+  for (const { col, level } of levelCols) {
+    const cell = row[col];
+    if (typeof cell === "string" && cell.trim().length > 1) {
+      return { label: cell.trim(), level };
+    }
+  }
+  const label = rowLabel(row);
+  return label ? { label, level: 3 } : null;
+}
+
+/**
  * Retorna o valor da linha para uma coluna específica. Se a coluna estiver
  * vazia, faz fallback para o último número finito não-zero da linha.
  *
@@ -279,15 +302,16 @@ export async function parseDreExcel(
 
   rows.forEach((row, idx) => {
     if (!row || row.every((c) => c == null || c === "")) return;
-    const label = rowLabel(row);
-    if (!label) return;
+    const ll = rowLabelAndLevel(row);
+    if (!ll) return;
+    const { label, level } = ll;
     let value = rowValueAt(row, monthCol, aggregateCols);
     // CONFINS: "UHs Pool: 280" — extrai o número embutido no rótulo
     if (value == null) {
       const m = label.match(/(\d{2,5})\s*$/);
       if (m) value = Number(m[1]);
     }
-    lines.push({ row: idx + 1, label, value });
+    lines.push({ row: idx + 1, label, value, level });
     for (const ind of INDICATORS) {
       if (indicators[ind.key]) continue;
       if (ind.rx.some((rx) => rx.test(label))) {

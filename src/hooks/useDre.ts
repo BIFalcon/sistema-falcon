@@ -114,6 +114,7 @@ export function useUploadDre() {
           line_label: l.label,
           line_type: "line",
           line_value: l.value,
+          line_level: l.level ?? 3,
         }));
         // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
         // comparativos da Carta. Persistidas como indicadores extras com prefixo
@@ -316,19 +317,21 @@ function useDreAnalyticsImpl(input: {
           line_value: number | null;
           version_number: number;
           _month: number;
+          line_level?: number | null;
+          line_type?: string | null;
         };
         const allLines: LineRow[] = [];
         for (const closing of closings) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number, line_type")
+            .select("line_label, line_value, version_number, line_type, line_level")
             .eq("closing_id", closing.id)
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
           const topVer = closingLines[0].version_number;
           const topLines = closingLines
             .filter((l) => l.version_number === topVer)
-            .map((l) => ({ ...l, _month: closing.month }));
+            .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[];
           allLines.push(...topLines);
         }
         if (!allLines.length) continue;
@@ -428,41 +431,69 @@ function useDreAnalyticsImpl(input: {
           });
         }
 
-        // Monta nós de nível 3 para linhas detalhadas da DRE
-        const detailNodes: DreLineNode[] = [];
-        const detailLabels = new Set<string>();
+        // Reconstrói árvore hierárquica a partir das linhas detalhadas
+        // mantendo a ordem original da planilha.
+        const rootNodes: DreLineNode[] = [];
+        let lastL1: DreLineNode | null = null;
+        let lastL2: DreLineNode | null = null;
+        const seenIds = new Set<string>();
+
+        // Agrupa linhas por label combinando meses do período (mantém ordem
+        // de primeira aparição via Map).
+        const linesByLabel = new Map<string, {
+          level: number;
+          values: Map<number, number | null>;
+        }>();
         for (const line of allLines) {
+          if (line.line_type !== "line") continue;
           const lbl = line.line_label;
-          const lineType = (line as any).line_type;
-          if (lineType !== "line") continue;
           if (!lbl || lbl.startsWith("[")) continue;
-          if (detailLabels.has(lbl)) continue;
-          detailLabels.add(lbl);
-          const current: (number | null)[] = Array(12).fill(null);
-          for (const l of allLines) {
-            if ((l as any).line_type !== "line") continue;
-            if (l.line_label !== lbl) continue;
-            const mIdx = ((l as any)._month ?? input.month) - 1;
-            if (current[mIdx] == null) current[mIdx] = l.line_value ?? null;
+          const level = (line.line_level ?? 3) as number;
+          const month = line._month ?? input.month;
+          if (!linesByLabel.has(lbl)) {
+            linesByLabel.set(lbl, { level, values: new Map() });
           }
-          detailNodes.push({
-            id: `3:${lbl.toLowerCase().trim()}`,
+          linesByLabel.get(lbl)!.values.set(month, line.line_value ?? null);
+        }
+
+        for (const [lbl, { level, values }] of linesByLabel) {
+          const current: (number | null)[] = Array(12).fill(null);
+          for (const [m, v] of values) {
+            current[m - 1] = v;
+          }
+          const node: DreLineNode = {
+            id: `${level}:${lbl.toLowerCase().trim()}`,
             label: lbl,
-            level: 3,
+            level,
             series: {
               current,
               budget: Array(12).fill(null),
               previous: Array(12).fill(null),
             },
             children: [],
-          });
+          };
+          if (seenIds.has(node.id)) continue;
+          seenIds.add(node.id);
+          if (level === 1) {
+            rootNodes.push(node);
+            lastL1 = node;
+            lastL2 = null;
+          } else if (level === 2) {
+            (lastL1?.children ?? rootNodes).push(node);
+            lastL2 = node;
+          } else {
+            (lastL2?.children ?? lastL1?.children ?? rootNodes).push(node);
+          }
         }
 
-        const allNodes = [...nodes, ...detailNodes];
-        if (allNodes.length) {
+        const flattenNodes = (ns: DreLineNode[]): DreLineNode[] =>
+          ns.flatMap((n) => [n, ...flattenNodes(n.children)]);
+        const allFlat = [...nodes, ...flattenNodes(rootNodes)];
+
+        if (nodes.length || rootNodes.length) {
           datasets.push({
-            tree: nodes,
-            flat: allNodes,
+            tree: [...nodes, ...rootNodes],
+            flat: allFlat,
             hotelCount: 1,
             sourceNames: [hotelId],
           });
