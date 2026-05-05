@@ -1,0 +1,1 @@
+ALTER TABLE public.dre_parsed_lines ADD COLUMN IF NOT EXISTS line_level int DEFAULT 3;
