@@ -930,6 +930,30 @@ export default function ContasPagarPage() {
         }
       />
 
+      <AlertDialog
+        open={!!deleteDocConfirm}
+        onOpenChange={(open) => { if (!open) setDeleteDocConfirm(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDocConfirm?.filePath?.split("/").pop() ?? "Este documento"} será
+              removido permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDeleteDoc}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Modal de notificação ao GG */}
       {hotelId && (
         <NotifyGgDialog
