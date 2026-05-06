@@ -644,6 +644,48 @@ function matchMonth(norm: string, targetMonth: number): boolean {
   return false;
 }
 
+function extractHeaderYear(cell: unknown): number | null {
+  if (typeof cell === "number" && Number.isInteger(cell) && cell >= 1900 && cell <= 2100) return cell;
+  if (typeof cell !== "string") return null;
+  const text = cell.trim().toLowerCase();
+  const four = text.match(/\b(19|20)\d{2}\b/);
+  if (four) return Number(four[0]);
+  const two = text.match(/(?:^|[\s\/-])(\d{2})(?:$|[\s\/-])/);
+  if (!two) return null;
+  const yy = Number(two[1]);
+  return yy >= 80 ? 1900 + yy : 2000 + yy;
+}
+
+function parseHeaderDate(cell: unknown): { month: number; year: number } | null {
+  if (cell instanceof Date) return { month: cell.getMonth() + 1, year: cell.getFullYear() };
+  if (typeof cell !== "string") return null;
+  const text = cell.trim().toLowerCase();
+  const iso = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
+  if (iso) return { year: Number(iso[1]), month: Number(iso[2]) };
+  const br = text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|(?:19|20)\d{2})\b/);
+  if (br) {
+    const yy = Number(br[3]);
+    return { month: Number(br[2]), year: yy < 100 ? 2000 + yy : yy };
+  }
+  return null;
+}
+
+function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined, rowIndex: number, colIndex: number): number | null {
+  const candidates: unknown[] = [];
+  for (let r = Math.max(0, rowIndex - 1); r <= Math.min(rows.length - 1, rowIndex + 1); r++) {
+    const rawRow = rows[r] ?? [];
+    const displayRow = displayRows?.[r] ?? [];
+    for (let c = Math.max(0, colIndex - 8); c <= Math.min(Math.max(rawRow.length, displayRow.length) - 1, colIndex + 1); c++) {
+      candidates.push(rawRow[c], displayRow[c]);
+    }
+  }
+  for (const candidate of candidates) {
+    const year = extractHeaderYear(candidate);
+    if (year) return year;
+  }
+  return null;
+}
+
 /**
  * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
  * coluna correspondente ao mês alvo (1=Jan ... 12=Dez), além do label.
@@ -652,37 +694,33 @@ function findMonthColumn(
   rows: unknown[][],
   targetMonth: number,
   targetYear?: number,
+  displayRows?: unknown[][],
 ): { headerRow: number; colIndex: number; label: string } | null {
-  let dateMatch: { headerRow: number; colIndex: number; label: string } | null = null;
+  let fallbackMatch: { headerRow: number; colIndex: number; label: string } | null = null;
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
-    for (let c = 0; c < row.length; c++) {
-      const cell = row[c];
-      if (typeof cell === "string") {
+    const displayRow = displayRows?.[r] ?? [];
+    const width = Math.max(row.length, displayRow.length);
+    for (let c = 0; c < width; c++) {
+      const cells = [row[c], displayRow[c]];
+      for (const cell of cells) {
+        const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
+        const date = parseHeaderDate(cell);
+        if (date?.month === targetMonth) {
+          if (!targetYear || date.year === targetYear) return { headerRow: r, colIndex: c, label };
+          continue;
+        }
+        if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
-        if (matchMonth(norm, targetMonth)) {
-          return { headerRow: r, colIndex: c, label: cell.trim() };
-        }
-      }
-      // CONFINS: cabeçalho com Date object (ex.: 2026-01-01).
-      // Se targetYear for informado, exige match exato de ano para evitar
-      // pegar uma coluna de outro ano (planilhas com 2025 e 2026 no header).
-      if (cell instanceof Date) {
-        const sameMonth = cell.getMonth() + 1 === targetMonth;
-        const sameYear = targetYear ? cell.getFullYear() === targetYear : true;
-        if (sameMonth && sameYear) {
-          // Match exato de ano tem prioridade — retorna imediatamente.
-          if (targetYear) {
-            return { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
-          }
-          if (dateMatch === null) {
-            dateMatch = { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
-          }
-        }
+        if (!matchMonth(norm, targetMonth)) continue;
+        const year = extractHeaderYear(cell) ?? inferHeaderYear(rows, displayRows, r, c);
+        if (targetYear && year && year !== targetYear) continue;
+        if (!targetYear || year === targetYear) return { headerRow: r, colIndex: c, label };
+        fallbackMatch ??= { headerRow: r, colIndex: c, label };
       }
     }
   }
-  return dateMatch;
+  return fallbackMatch;
 }
 
 /** Extrai label da linha (primeira string não-vazia). */
