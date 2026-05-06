@@ -1063,7 +1063,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: false,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
-      prevLines = readSheetLines(prevRows);
+      prevLines = readSheetLines(prevRows, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
@@ -1103,7 +1103,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: false,
       });
       budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS, targetYear, budgetDisplayRows);
-      budgetLines = readSheetLines(budgetRows);
+      budgetLines = readSheetLines(budgetRows, targetYear, budgetDisplayRows);
       if (targetMonth) {
         const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear, budgetDisplayRows);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
