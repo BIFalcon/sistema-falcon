@@ -29,15 +29,26 @@ export default function DrePage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
-  // Se chegamos sem ?closing= mas há hotel/mês/ano, garantimos o closing
+  // Quando o filtro de hotel/mês/ano muda (e não viemos via ?closing= explícito),
+  // re-resolve o closing correspondente. Sem isso, a página fica presa no
+  // primeiro closing carregado até o usuário atualizar a página.
   useEffect(() => {
-    if (!resolvedId && hotelId) {
-      ensure
-        .mutateAsync({ hotelId, month, year })
-        .then((c) => setResolvedId(c.id))
-        .catch((err) => toast.error(err.message));
+    if (closingIdParam) return; // navegação direta com id
+    if (!hotelId) {
+      setResolvedId(null);
+      return;
     }
-  }, [resolvedId, hotelId, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    ensure
+      .mutateAsync({ hotelId, month, year })
+      .then((c) => {
+        if (!cancelled) setResolvedId(c.id);
+      })
+      .catch((err) => toast.error(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [closingIdParam, hotelId, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
   const { data: versions = [] } = useDreVersions(resolvedId);
