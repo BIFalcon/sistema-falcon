@@ -709,21 +709,19 @@ export default function IndicadoresDrePage() {
                     tickFormatter={(v) => {
                       const abs = Math.abs(Number(v));
                       if (showAsPct) return `${(abs * 100).toFixed(1)}%`;
-                      const isPct = selectedLines.some((l) =>
-                        /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
-                      );
-                      if (isPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
+                      if (chartValueIsPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
                       return abs.toLocaleString("pt-BR", { notation: "compact" });
                     }}
                   />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
-                        formatter={(value) =>
-                          showAsPct
-                            ? `${(Number(value) * 100).toFixed(2)}%`
-                            : Number(value).toLocaleString("pt-BR")
-                        }
+                        formatter={(value, name) => (
+                          <>
+                            <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
+                            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
+                          </>
+                        )}
                       />
                     }
                   />
