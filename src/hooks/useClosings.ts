@@ -29,21 +29,25 @@ export interface ClosingRow {
  */
 export function useClosings(params: { month: number; year: number; hotelId?: string | null }) {
   const { month, year, hotelId } = params;
-  // Fetch all closings for the period once; filter by hotel on the client so
-  // switching the hotel filter is instant and doesn't trigger a network roundtrip.
+  // Fetch the full year once and filter month/hotel on the client. The closings
+  // table is small (dezenas de linhas), so isso elimina o roundtrip ao trocar
+  // qualquer filtro — UI instantânea.
   return useQuery({
-    queryKey: ["closings", year, month],
+    queryKey: ["closings", year],
     queryFn: async (): Promise<ClosingRow[]> => {
       const { data, error } = await supabase
         .from("closings")
         .select("*")
-        .eq("month", month)
         .eq("year", year)
         .order("hotel_id");
       if (error) throw error;
       return (data ?? []) as ClosingRow[];
     },
-    select: (rows) => (hotelId ? rows.filter((c) => c.hotel_id === hotelId) : rows),
+    select: (rows) => {
+      let filtered = rows.filter((c) => c.month === month);
+      if (hotelId) filtered = filtered.filter((c) => c.hotel_id === hotelId);
+      return filtered;
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
