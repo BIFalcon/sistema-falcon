@@ -686,6 +686,11 @@ function useDreAnalyticsImpl(input: {
         // Busca série de budget para um label da árvore fixa
         const findBudgetForLabel = (label: string): (number | null)[] => {
           const norm = normLabel(label);
+          // 1. Linha detalhada do orçamento (série anual completa via [bline_M])
+          for (const [lbl, series] of budgetDetailSeries) {
+            if (looseLabelMatch(lbl, label)) return series;
+          }
+          // 2. Indicadores parseados (séries mensais ou valor único)
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesBudget[ind.key]) return seriesBudget[ind.key]!;
@@ -696,24 +701,21 @@ function useDreAnalyticsImpl(input: {
               }
             }
           }
-          // 2. Linha detalhada do orçamento (série anual completa)
-          for (const [lbl, series] of budgetDetailSeries) {
-            if (looseLabelMatch(lbl, label)) return series;
-          }
           return Array(12).fill(null);
         };
 
         // Busca série de ano anterior para um label da árvore fixa
         const findPreviousForLabel = (label: string): (number | null)[] => {
           const norm = normLabel(label);
+          // 1. Linha detalhada do ano anterior (série anual completa via [pline_M])
+          for (const [lbl, series] of prevDetailSeries) {
+            if (looseLabelMatch(lbl, label)) return series;
+          }
+          // 2. Indicadores parseados
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesPrev[ind.key]) return seriesPrev[ind.key]!;
             }
-          }
-          // 2. Linha detalhada do ano anterior (série anual completa)
-          for (const [lbl, series] of prevDetailSeries) {
-            if (looseLabelMatch(lbl, label)) return series;
           }
           return Array(12).fill(null);
         };
