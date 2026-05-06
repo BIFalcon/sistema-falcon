@@ -781,6 +781,7 @@ export async function parseDreExcel(
   // Detecta a primeira coluna de mês para servir de referência ao
   // determinar quais colunas são labels vs dados.
   let firstMonthCol = 6;
+  let firstMonthColFound = false;
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
@@ -789,16 +790,19 @@ export async function parseDreExcel(
         const norm = cell.trim().toLowerCase();
         if (/^(janeiro|jan)/.test(norm)) {
           firstMonthCol = c;
+          firstMonthColFound = true;
           break;
         }
       }
-      // CONFINS: mês como Date object
       if (cell instanceof Date && cell.getMonth() === 0) {
-        if (firstMonthCol === 6) firstMonthCol = c; // só se não achou string
+        if (!firstMonthColFound) {
+          firstMonthCol = c;
+          firstMonthColFound = true;
+        }
         break;
       }
     }
-    if (firstMonthCol !== 6) break;
+    if (firstMonthColFound) break;
   }
 
   rows.forEach((row, idx) => {
