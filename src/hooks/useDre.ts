@@ -174,7 +174,7 @@ export function useUploadDre() {
         if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length) {
           await supabase.from("dre_parsed_lines").insert([
             ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows,
-          ] as never);
+          ]);
         }
 
         // === Estimativa de distribuição ===
