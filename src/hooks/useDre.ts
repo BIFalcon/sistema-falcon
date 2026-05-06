@@ -358,7 +358,9 @@ function useDreAnalyticsImpl(input: {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["dre-analytics", input.hotelIds, input.year, input.month, input.periodMonths ?? 1],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
