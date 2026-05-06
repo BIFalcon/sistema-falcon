@@ -5,7 +5,7 @@ import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
 import { INDICATOR_LABELS, getDreLineCategory, getDreLineCategorization } from "@/lib/dreParser";
 import type { IndicatorKey } from "@/lib/dreParser";
-import { DRE_FIXED_TREE, type DreTreeNode } from "@/lib/dreParser";
+import { DRE_FIXED_TREE, INDICATORS, type DreTreeNode } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
   estimateDistribution,
