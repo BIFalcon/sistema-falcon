@@ -564,9 +564,36 @@ function useDreAnalyticsImpl(input: {
           return Array(12).fill(null);
         };
 
+        // Busca série de budget para um label da árvore fixa
+        const findBudgetForLabel = (label: string): (number | null)[] => {
+          for (const ind of INDICATORS) {
+            if (ind.rx.some((rx) => rx.test(label))) {
+              if (seriesBudget[ind.key]) return seriesBudget[ind.key]!;
+              if (budgetIndicators[ind.key] != null) {
+                const s: (number | null)[] = Array(12).fill(null);
+                s[input.month - 1] = budgetIndicators[ind.key];
+                return s;
+              }
+            }
+          }
+          return Array(12).fill(null);
+        };
+
+        // Busca série de ano anterior para um label da árvore fixa
+        const findPreviousForLabel = (label: string): (number | null)[] => {
+          for (const ind of INDICATORS) {
+            if (ind.rx.some((rx) => rx.test(label))) {
+              if (seriesPrev[ind.key]) return seriesPrev[ind.key]!;
+            }
+          }
+          return Array(12).fill(null);
+        };
+
         // Converte DreTreeNode em DreLineNode recursivamente
         const buildFixedNode = (treeNode: DreTreeNode, depth: number): DreLineNode => {
-          const current = findSeriesForLabel(treeNode.label);
+          const current  = findSeriesForLabel(treeNode.label);
+          const budget   = findBudgetForLabel(treeNode.label);
+          const previous = findPreviousForLabel(treeNode.label);
           const children = (treeNode.children ?? []).map((child) =>
             buildFixedNode(child, depth + 1)
           );
@@ -574,11 +601,7 @@ function useDreAnalyticsImpl(input: {
             id: `fixed:${depth}:${treeNode.label.toLowerCase().trim()}`,
             label: treeNode.label,
             level: Math.min(depth + 1, 3) as 1 | 2 | 3,
-            series: {
-              current,
-              budget: Array(12).fill(null),
-              previous: Array(12).fill(null),
-            },
+            series: { current, budget, previous },
             children,
           };
         };
