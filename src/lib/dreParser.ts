@@ -538,7 +538,7 @@ export interface ParsedDre {
  * para tentar bater com o rótulo da linha (mais à esquerda da linha).
  * Os regex foram construídos a partir das planilhas reais dos 4 modelos.
  */
-const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
+export const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
   { key: "uhs_total", rx: [/^n[úu]mero\s+de\s+apartamentos$/i, /^n[úu]mero\s+de\s+apartamentos\s+no/i, /^uhs?\s+pool/i] },
   { key: "uhs_disponiveis", rx: [/n[úu]mero\s+de\s+apartamentos\s+dispon/i, /^apartamentos\s+dispon[íi]veis/i, /uhs?\s+dispon/i] },
   { key: "roomnights", rx: [/^roomnights$/i, /^room\s*nights?$/i, /^apartamentos\s+ocupados/i] },
