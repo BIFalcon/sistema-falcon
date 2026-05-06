@@ -185,8 +185,14 @@ function VariationPill({ value }: { value: number | null }) {
 }
 
 function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set<string>; toggle: (id: string) => void }) {
-  const [open, setOpen] = useState(node.level === 1);
+  const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
+  const fontClass =
+    node.level === 1
+      ? "text-sm font-semibold"
+      : node.level === 2
+      ? "text-sm font-medium text-foreground/80"
+      : "text-xs text-muted-foreground";
   return (
     <div>
       <div className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/70" style={{ paddingLeft: `${(node.level - 1) * 16 + 8}px` }}>
@@ -194,7 +200,7 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
           {hasChildren ? open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" /> : <span />}
         </Button>
         <Checkbox checked={selected.has(node.id)} onCheckedChange={() => toggle(node.id)} />
-        <span className={node.level === 1 ? "text-sm font-semibold" : "text-sm text-foreground"}>{node.label}</span>
+        <span className={fontClass}>{node.label}</span>
       </div>
       {open && node.children.map((child) => <TreeLine key={child.id} node={child} selected={selected} toggle={toggle} />)}
     </div>
