@@ -441,15 +441,13 @@ function useDreAnalyticsImpl(input: {
         // Reconstrói árvore hierárquica a partir das linhas detalhadas
         // mantendo a ordem original da planilha.
         const rootNodes: DreLineNode[] = [];
-        let lastL1: DreLineNode | null = null;
-        let lastL2: DreLineNode | null = null;
-        const seenIds = new Set<string>();
 
         // Agrupa linhas por label combinando meses do período (mantém ordem
         // de primeira aparição via Map).
         const linesByLabel = new Map<string, {
           level: number;
           category: string;
+          segment: string | null;
           values: Map<number, number | null>;
         }>();
         for (const line of allLines) {
@@ -458,41 +456,75 @@ function useDreAnalyticsImpl(input: {
           if (!lbl || lbl.startsWith("[")) continue;
           const level = (line.line_level ?? 3) as number;
           const category = (line.line_category ?? "Despesas Específicas") as string;
+          const segment = ((line as { line_segment?: string | null }).line_segment) ?? null;
           const month = line._month ?? input.month;
           if (!linesByLabel.has(lbl)) {
-            linesByLabel.set(lbl, { level, category, values: new Map() });
+            linesByLabel.set(lbl, { level, category, segment, values: new Map() });
           }
           linesByLabel.get(lbl)!.values.set(month, line.line_value ?? null);
         }
 
-        for (const [lbl, { level, category, values }] of linesByLabel) {
+        const MACRO_ORDER = [
+          "Deduções da Receita",
+          "Despesas Fixas",
+          "Despesas Variáveis",
+          "Deduções pós GOP",
+          "Outros",
+        ];
+        const macroMap = new Map<string, Map<string, DreLineNode[]>>();
+
+        for (const [lbl, { values, category, segment }] of linesByLabel) {
           const current: (number | null)[] = Array(12).fill(null);
-          for (const [m, v] of values) {
-            current[m - 1] = v;
-          }
-          const node: DreLineNode = {
-            id: `${category}:${lbl.toLowerCase().trim()}`,
+          for (const [m, v] of values) current[m - 1] = v;
+
+          const leafNode: DreLineNode = {
+            id: `leaf:${lbl.toLowerCase().trim()}`,
             label: lbl,
-            level,
-            series: {
-              current,
-              budget: Array(12).fill(null),
-              previous: Array(12).fill(null),
-            },
+            level: 3,
+            series: { current, budget: Array(12).fill(null), previous: Array(12).fill(null) },
             children: [],
           };
-          if (seenIds.has(node.id)) continue;
-          seenIds.add(node.id);
-          if (level === 1) {
-            rootNodes.push(node);
-            lastL1 = node;
-            lastL2 = null;
-          } else if (level === 2) {
-            (lastL1?.children ?? rootNodes).push(node);
-            lastL2 = node;
-          } else {
-            (lastL2?.children ?? lastL1?.children ?? rootNodes).push(node);
+
+          const macro = category || "Outros";
+          const seg = segment || "__noseg__";
+
+          if (!macroMap.has(macro)) macroMap.set(macro, new Map());
+          const segMap = macroMap.get(macro)!;
+          if (!segMap.has(seg)) segMap.set(seg, []);
+          segMap.get(seg)!.push(leafNode);
+        }
+
+        const orderedMacros = [
+          ...MACRO_ORDER.filter((m) => macroMap.has(m)),
+          ...[...macroMap.keys()].filter((m) => !MACRO_ORDER.includes(m)),
+        ];
+
+        for (const macro of orderedMacros) {
+          const segMap = macroMap.get(macro)!;
+          const macroNode: DreLineNode = {
+            id: `macro:${macro}`,
+            label: macro,
+            level: 1,
+            series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null) },
+            children: [],
+          };
+
+          for (const [seg, leaves] of segMap) {
+            if (seg === "__noseg__") {
+              macroNode.children.push(...leaves.map((l) => ({ ...l, level: 2 })));
+            } else {
+              const segNode: DreLineNode = {
+                id: `seg:${seg.toLowerCase()}`,
+                label: seg,
+                level: 2,
+                series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null) },
+                children: leaves,
+              };
+              macroNode.children.push(segNode);
+            }
           }
+
+          if (macroNode.children.length > 0) rootNodes.push(macroNode);
         }
 
         const flattenNodes = (ns: DreLineNode[]): DreLineNode[] =>
