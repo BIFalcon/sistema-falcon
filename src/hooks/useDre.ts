@@ -410,16 +410,10 @@ function useDreAnalyticsImpl(input: {
         // Linhas do período atual → alimentam série "current"
         const currentLines: LineRow[] = [];
         for (const closing of currentClosings ?? []) {
-          const { data: closingLines } = await supabase
-            .from("dre_parsed_lines")
-            .select("*")
-            .eq("closing_id", closing.id)
-            .order("version_number", { ascending: false });
+          const closingLines = await fetchLatestDreParsedLines(closing.id);
           if (!closingLines?.length) continue;
-          const topVer = closingLines[0].version_number;
           currentLines.push(
             ...closingLines
-              .filter((l) => l.version_number === topVer)
               .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
           );
         }
@@ -432,16 +426,10 @@ function useDreAnalyticsImpl(input: {
             allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
             continue;
           }
-          const { data: closingLines } = await supabase
-            .from("dre_parsed_lines")
-            .select("*")
-            .eq("closing_id", closing.id)
-            .order("version_number", { ascending: false });
+          const closingLines = await fetchLatestDreParsedLines(closing.id);
           if (!closingLines?.length) continue;
-          const topVer = closingLines[0].version_number;
           allYearLines.push(
             ...closingLines
-              .filter((l) => l.version_number === topVer)
               .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
           );
         }
