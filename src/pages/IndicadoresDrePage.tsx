@@ -360,31 +360,11 @@ export default function IndicadoresDrePage() {
     periodMonths: periodCfg.months,
   });
 
-  // Expande nós selecionados: se um pai for selecionado e tiver
-  // série vazia, substitui pelos descendentes com dados reais.
   const selectedLines = useMemo(() => {
     if (!dataset) return [];
-    function getLeaves(node: DreLineNode): DreLineNode[] {
-      if (node.children.length === 0) return [node];
-      const childLeaves = node.children.flatMap(getLeaves);
-      // Se o nó pai tem dados próprios (série não toda nula), inclui ele
-      const hasSeries = node.series.current.some((v) => v != null);
-      return hasSeries ? [node] : childLeaves;
-    }
-    const result: DreLineNode[] = [];
-    const seen = new Set<string>();
-    for (const id of selectedIds) {
-      const node = dataset.flat.find((n) => n.id === id);
-      if (!node) continue;
-      for (const leaf of getLeaves(node)) {
-        if (!seen.has(leaf.id)) {
-          seen.add(leaf.id);
-          result.push(leaf);
-        }
-      }
-    }
-    return result;
-  }, [dataset, selectedIds]);
+    const node = selectedId ? dataset.flat.find((n) => n.id === selectedId) : undefined;
+    return node ? [node] : [];
+  }, [dataset, selectedId]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
@@ -474,11 +454,7 @@ export default function IndicadoresDrePage() {
     l.series.current.filter((v) => v != null && v < 0).length >
     l.series.current.filter((v) => v != null && v > 0).length
   );
-  const toggleLine = (id: string) => setSelectedIds((prev) => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const selectLine = (id: string) => setSelectedId((prev) => (prev === id ? null : id));
 
   const monthsWindow = useMemo(
     () => periodMonths(month, periodCfg.months),
