@@ -325,12 +325,13 @@ function useDreAnalyticsImpl(input: {
           line_level?: number | null;
           line_type?: string | null;
           line_category?: string | null;
+          line_segment?: string | null;
         };
         const allLines: LineRow[] = [];
         for (const closing of closings) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number, line_type, line_level, line_category")
+            .select("line_label, line_value, version_number, line_type, line_level, line_category, line_segment" as "*")
             .eq("closing_id", closing.id)
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
