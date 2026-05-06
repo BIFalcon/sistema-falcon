@@ -861,11 +861,26 @@ function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
   return result;
 }
 
+function findAllMonthColumnsForYear(
+  rows: unknown[][],
+  targetYear?: number,
+  displayRows?: unknown[][],
+): Map<number, number> {
+  const result = new Map<number, number>();
+  for (let m = 1; m <= 12; m++) {
+    const info = findMonthColumn(rows, m, targetYear, displayRows);
+    if (info) result.set(m, info.colIndex);
+  }
+  return result.size > 0 ? result : findAllMonthColumns(rows);
+}
+
 /** Lê todas as linhas de uma aba com série anual completa (Jan-Dez). */
 function readSheetLines(
   rows: unknown[][],
+  targetYear?: number,
+  displayRows?: unknown[][],
 ): Array<{ label: string; level: number; values: Record<number, number | null> }> {
-  const monthCols = findAllMonthColumns(rows);
+  const monthCols = findAllMonthColumnsForYear(rows, targetYear, displayRows);
   if (monthCols.size === 0) return [];
 
   const firstMonthCol = Math.min(...monthCols.values());
