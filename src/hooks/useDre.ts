@@ -346,7 +346,7 @@ function useDreAnalyticsImpl(input: {
         for (const closing of currentClosings ?? []) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+            .select("*")
             .eq("closing_id", closing.id)
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
@@ -368,7 +368,7 @@ function useDreAnalyticsImpl(input: {
           }
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
-            .select("line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+            .select("*")
             .eq("closing_id", closing.id)
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
