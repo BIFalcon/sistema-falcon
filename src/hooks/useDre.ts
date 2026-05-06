@@ -309,21 +309,37 @@ type DreParsedLineRecord = DreIndicatorRow & {
 };
 
 async function fetchLatestDreParsedLines(closingId: string): Promise<DreParsedLineRecord[]> {
-  const { data, error } = await supabase.rpc("get_latest_dre_lines", { _closing_id: closingId });
-  if (error) throw error;
-  return (data ?? []) as DreParsedLineRecord[];
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .rpc("get_latest_dre_lines", { _closing_id: closingId })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as DreParsedLineRecord[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
 }
 
 async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Promise<Map<string, DreParsedLineRecord[]>> {
   const result = new Map<string, DreParsedLineRecord[]>();
   if (closingIds.length === 0) return result;
-  const { data, error } = await supabase.rpc("get_latest_dre_lines_by_closings", { _closing_ids: closingIds });
-  if (error) throw error;
-  for (const row of ((data ?? []) as DreParsedLineRecord[])) {
-    if (!row.closing_id) continue;
-    const list = result.get(row.closing_id) ?? [];
-    list.push(row);
-    result.set(row.closing_id, list);
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .rpc("get_latest_dre_lines_by_closings", { _closing_ids: closingIds })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as DreParsedLineRecord[];
+    for (const row of batch) {
+      if (!row.closing_id) continue;
+      const list = result.get(row.closing_id) ?? [];
+      list.push(row);
+      result.set(row.closing_id, list);
+    }
+    if (batch.length < pageSize) break;
   }
   return result;
 }
