@@ -728,6 +728,24 @@ function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: 
   return count;
 }
 
+function bestMonthValueColumn(rows: unknown[][], displayRows: unknown[][] | undefined, headerRow: number, monthCol: number): { colIndex: number; dataCount: number } {
+  let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
+  for (let c = monthCol; c <= monthCol + 5; c++) {
+    const dataCount = countNumericColumnData(rows, headerRow, c);
+    const subHeader = [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
+      .filter((v): v is string => typeof v === "string")
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    let score = dataCount;
+    if (/realizado|actual|valor/.test(subHeader)) score += 1000;
+    if (/orcado|budget|ano\s*anterior|desvio|varia|%/.test(subHeader)) score -= 1000;
+    if (score > best.score) best = { colIndex: c, dataCount, score };
+  }
+  return { colIndex: best.colIndex, dataCount: best.dataCount };
+}
+
 /**
  * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
  * coluna correspondente ao mês alvo (1=Jan ... 12=Dez), além do label.
@@ -749,14 +767,16 @@ function findMonthColumn(
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = parseHeaderDate(cell);
         if (date?.month === targetMonth) {
-          candidates.push({ headerRow: r, colIndex: c, label, year: date.year, dataCount: countNumericColumnData(rows, r, c) });
+          const best = bestMonthValueColumn(rows, displayRows, r, c);
+          candidates.push({ headerRow: r, colIndex: best.colIndex, label, year: date.year, dataCount: best.dataCount });
           continue;
         }
         if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
         if (!matchMonth(norm, targetMonth)) continue;
         const year = extractHeaderYear(cell) ?? inferHeaderYear(rows, displayRows, r, c);
-        candidates.push({ headerRow: r, colIndex: c, label, year, dataCount: countNumericColumnData(rows, r, c) });
+        const best = bestMonthValueColumn(rows, displayRows, r, c);
+        candidates.push({ headerRow: r, colIndex: best.colIndex, label, year, dataCount: best.dataCount });
       }
     }
   }
