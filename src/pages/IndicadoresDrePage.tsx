@@ -454,6 +454,19 @@ export default function IndicadoresDrePage() {
     l.series.current.filter((v) => v != null && v < 0).length >
     l.series.current.filter((v) => v != null && v > 0).length
   );
+  const chartValueIsPct = selectedLines.some((l) =>
+    /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
+  );
+  const formatChartValue = (value: unknown) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    if (chartValueIsPct) {
+      const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+      return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    }
+    return numeric.toLocaleString("pt-BR");
+  };
   const selectLine = (id: string) => setSelectedId((prev) => (prev === id ? null : id));
 
   const monthsWindow = useMemo(
