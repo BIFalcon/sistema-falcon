@@ -615,11 +615,22 @@ function useDreAnalyticsImpl(input: {
           s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             .toLowerCase().replace(/\s+/g, " ").trim();
 
+        // Comparação ainda mais tolerante: ignora sufixos entre parênteses
+        const looseLabelMatch = (a: string, b: string): boolean => {
+          const clean = (s: string) => s
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/\s*\(.*?\)/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          return clean(a) === clean(b);
+        };
+
         // Busca série de um label nos dados do banco
         const findSeriesForLabel = (label: string): (number | null)[] => {
           const norm = normLabel(label);
           for (const [lbl, data] of linesByLabel) {
-            if (normLabel(lbl) === norm) {
+            if (looseLabelMatch(lbl, label)) {
               const series: (number | null)[] = Array(12).fill(null);
               for (const [m, v] of data.values) series[m - 1] = v;
               return series;
@@ -643,7 +654,7 @@ function useDreAnalyticsImpl(input: {
           }
           // 2. Linha detalhada do orçamento (série anual completa)
           for (const [lbl, series] of budgetDetailSeries) {
-            if (normLabel(lbl) === norm) return series;
+            if (looseLabelMatch(lbl, label)) return series;
           }
           return Array(12).fill(null);
         };
@@ -658,7 +669,7 @@ function useDreAnalyticsImpl(input: {
           }
           // 2. Linha detalhada do ano anterior (série anual completa)
           for (const [lbl, series] of prevDetailSeries) {
-            if (normLabel(lbl) === norm) return series;
+            if (looseLabelMatch(lbl, label)) return series;
           }
           return Array(12).fill(null);
         };
