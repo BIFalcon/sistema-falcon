@@ -172,9 +172,45 @@ export function useUploadDre() {
             line_value: v,
           });
         }
-        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length) {
+        // Linhas detalhadas do Orçamento — série anual (Jan-Dez por linha)
+        const budgetLineRows: typeof otherRows = [];
+        for (const bl of parsed.budgetLines ?? []) {
+          const cat = getDreLineCategorization(bl.label);
+          for (const [monthStr, val] of Object.entries(bl.values)) {
+            if (val == null) continue;
+            budgetLineRows.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[bline_${monthStr}] ${bl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: bl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
+        // Linhas detalhadas do ANO ANTERIOR — série anual
+        const prevLineRows2: typeof otherRows = [];
+        for (const pl of parsed.prevLines ?? []) {
+          const cat = getDreLineCategorization(pl.label);
+          for (const [monthStr, val] of Object.entries(pl.values)) {
+            if (val == null) continue;
+            prevLineRows2.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[pline_${monthStr}] ${pl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: pl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
+        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length || budgetLineRows.length || prevLineRows2.length) {
           await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows,
+            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2,
           ]);
         }
 
@@ -479,6 +515,34 @@ function useDreAnalyticsImpl(input: {
           }
         }
 
+        // Mapas de séries anuais para linhas detalhadas de orçamento e ano anterior
+        // Formato no banco: "[bline_3] Salários" = valor de março do orçamento
+        const budgetDetailSeries = new Map<string, (number | null)[]>();
+        const prevDetailSeries = new Map<string, (number | null)[]>();
+
+        for (const line of allLines) {
+          const lbl = line.line_label;
+          const val = line.line_value;
+
+          const bMatch = lbl.match(/^\[bline_(\d+)\]\s(.+)$/);
+          if (bMatch) {
+            const m = parseInt(bMatch[1], 10) - 1;
+            const label = bMatch[2];
+            if (!budgetDetailSeries.has(label)) budgetDetailSeries.set(label, Array(12).fill(null));
+            budgetDetailSeries.get(label)![m] = val ?? null;
+            continue;
+          }
+
+          const pMatch = lbl.match(/^\[pline_(\d+)\]\s(.+)$/);
+          if (pMatch) {
+            const m = parseInt(pMatch[1], 10) - 1;
+            const label = pMatch[2];
+            if (!prevDetailSeries.has(label)) prevDetailSeries.set(label, Array(12).fill(null));
+            prevDetailSeries.get(label)![m] = val ?? null;
+            continue;
+          }
+        }
+
         const nodes: DreLineNode[] = [];
         const allKeys = new Set([
           ...Object.keys(seriesCur),
@@ -566,6 +630,7 @@ function useDreAnalyticsImpl(input: {
 
         // Busca série de budget para um label da árvore fixa
         const findBudgetForLabel = (label: string): (number | null)[] => {
+          const norm = normLabel(label);
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesBudget[ind.key]) return seriesBudget[ind.key]!;
@@ -576,15 +641,24 @@ function useDreAnalyticsImpl(input: {
               }
             }
           }
+          // 2. Linha detalhada do orçamento (série anual completa)
+          for (const [lbl, series] of budgetDetailSeries) {
+            if (normLabel(lbl) === norm) return series;
+          }
           return Array(12).fill(null);
         };
 
         // Busca série de ano anterior para um label da árvore fixa
         const findPreviousForLabel = (label: string): (number | null)[] => {
+          const norm = normLabel(label);
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesPrev[ind.key]) return seriesPrev[ind.key]!;
             }
+          }
+          // 2. Linha detalhada do ano anterior (série anual completa)
+          for (const [lbl, series] of prevDetailSeries) {
+            if (normLabel(lbl) === norm) return series;
           }
           return Array(12).fill(null);
         };

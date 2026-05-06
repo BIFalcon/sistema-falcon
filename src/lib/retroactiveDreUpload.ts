@@ -199,12 +199,52 @@ export async function uploadRetroactiveDre(input: {
         });
       }
 
+      // Linhas detalhadas do Orçamento — série anual (Jan-Dez por linha)
+      const budgetLineRows: typeof otherRows = [];
+      for (const bl of parsed.budgetLines ?? []) {
+        const cat = getDreLineCategorization(bl.label);
+        for (const [monthStr, val] of Object.entries(bl.values)) {
+          if (val == null) continue;
+          budgetLineRows.push({
+            closing_id: closingId!,
+            version_number: nextVersion,
+            line_label: `[bline_${monthStr}] ${bl.label}`,
+            line_type: "indicator",
+            line_value: val,
+            line_level: bl.level ?? 3,
+            line_category: cat?.catMacro ?? "Outros",
+            line_segment: cat?.segment ?? null,
+          });
+        }
+      }
+
+      // Linhas detalhadas do ANO ANTERIOR — série anual
+      const prevLineRows2: typeof otherRows = [];
+      for (const pl of parsed.prevLines ?? []) {
+        const cat = getDreLineCategorization(pl.label);
+        for (const [monthStr, val] of Object.entries(pl.values)) {
+          if (val == null) continue;
+          prevLineRows2.push({
+            closing_id: closingId!,
+            version_number: nextVersion,
+            line_label: `[pline_${monthStr}] ${pl.label}`,
+            line_type: "indicator",
+            line_value: val,
+            line_level: pl.level ?? 3,
+            line_category: cat?.catMacro ?? "Outros",
+            line_segment: cat?.segment ?? null,
+          });
+        }
+      }
+
       if (
         indicatorRows.length ||
         otherRows.length ||
         seriesRows.length ||
         prevIndicatorRows.length ||
-        budgetIndicatorRows.length
+        budgetIndicatorRows.length ||
+        budgetLineRows.length ||
+        prevLineRows2.length
       ) {
         const { error: insertErr } = await supabase
           .from("dre_parsed_lines")
@@ -214,6 +254,8 @@ export async function uploadRetroactiveDre(input: {
             ...seriesRows,
             ...prevIndicatorRows,
             ...budgetIndicatorRows,
+            ...budgetLineRows,
+            ...prevLineRows2,
           ]);
         if (insertErr) throw insertErr;
       }

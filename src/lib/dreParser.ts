@@ -531,6 +531,16 @@ export interface ParsedDre {
   previousIndicators: Partial<Record<IndicatorKey, number | null>>;
   budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
   budgetIndicators: Partial<Record<IndicatorKey, number | null>>;
+  budgetLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>; // mes 1-12 → valor
+  }>;
+  prevLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>;
+  }>;
 }
 
 /**
@@ -730,6 +740,64 @@ function rowValueAt(
   return null;
 }
 
+/** Detecta todas as colunas de mês (1-12) numa aba. */
+function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
+  const result = new Map<number, number>();
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell !== "string") continue;
+      const norm = cell.trim().toLowerCase();
+      for (let m = 1; m <= 12; m++) {
+        if (!result.has(m) && matchMonth(norm, m)) {
+          result.set(m, c);
+        }
+      }
+    }
+    if (result.size === 12) break;
+  }
+  return result;
+}
+
+/** Lê todas as linhas de uma aba com série anual completa (Jan-Dez). */
+function readSheetLines(
+  rows: unknown[][],
+): Array<{ label: string; level: number; values: Record<number, number | null> }> {
+  const monthCols = findAllMonthColumns(rows);
+  if (monthCols.size === 0) return [];
+
+  const firstMonthCol = Math.min(...monthCols.values());
+  const result: Array<{ label: string; level: number; values: Record<number, number | null> }> = [];
+
+  const STRUCTURAL = [
+    /^dre(\s|$)/i, /^topline$/i, /^receitas?$/i, /^despesas?$/i,
+    /^resultado$/i, /^acumulado$/i, /^nivel$/i, /^nível$/i,
+    /^>>>/, /^\d{5,}/, /^\d{4,}\.\d/,
+  ];
+
+  for (const row of rows) {
+    if (!row || row.every((c) => c == null || c === "")) continue;
+    const ll = rowLabelAndLevel(row, firstMonthCol);
+    if (!ll) continue;
+    const cleanLabel = ll.label.replace(/^\d[\d\.]*\s+/, "").trim();
+    const finalLabel = cleanLabel.length >= 3 ? cleanLabel : ll.label;
+    if (STRUCTURAL.some((rx) => rx.test(finalLabel))) continue;
+
+    const values: Record<number, number | null> = {};
+    for (const [month, col] of monthCols) {
+      const v = row[col];
+      values[month] = typeof v === "number" && Number.isFinite(v) ? v : null;
+    }
+
+    if (Object.values(values).some((v) => v != null)) {
+      result.push({ label: finalLabel, level: ll.level, values });
+    }
+  }
+
+  return result;
+}
+
 export async function parseDreExcel(
   file: File,
   opts: { targetMonth?: number } = {},
@@ -865,6 +933,7 @@ export async function parseDreExcel(
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
   let previousSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   let previousIndicators: Partial<Record<IndicatorKey, number | null>> = {};
+  let prevLines: ParsedDre["prevLines"] = [];
   if (prevSheetName) {
     const prevWs = wb.Sheets[prevSheetName];
     if (prevWs) {
@@ -872,6 +941,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+      prevLines = readSheetLines(prevRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
@@ -900,6 +970,7 @@ export async function parseDreExcel(
   const budgetSheetName = wb.SheetNames.find((n) => /or[çc]amento/i.test(n));
   let budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   let budgetIndicators: Partial<Record<IndicatorKey, number | null>> = {};
+  let budgetLines: ParsedDre["budgetLines"] = [];
   if (budgetSheetName) {
     const budgetWs = wb.Sheets[budgetSheetName];
     if (budgetWs) {
@@ -907,6 +978,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS);
+      budgetLines = readSheetLines(budgetRows);
       if (targetMonth) {
         const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
@@ -940,6 +1012,8 @@ export async function parseDreExcel(
     previousIndicators,
     budgetSeries,
     budgetIndicators,
+    budgetLines,
+    prevLines,
   };
 }
 
