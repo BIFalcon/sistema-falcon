@@ -319,13 +319,6 @@ export default function IndicadoresDrePage() {
     () => (gopHotelIds ? allowedHotels.filter((h) => gopHotelIds.has(h.id)) : allowedHotels),
     [allowedHotels, gopHotelIds],
   );
-  // Se o hotel selecionado não pertence à carteira do GOP escolhido, limpar
-  // para que a soma represente todos os hotéis da carteira.
-  useMemo(() => {
-    if (gopHotelIds && hotelId && !gopHotelIds.has(hotelId)) {
-      setHotelId(null);
-    }
-  }, [gopHotelIds, hotelId, setHotelId]);
   const [retroOpen, setRetroOpen] = useState(false);
   const [retroHotelId, setRetroHotelId] = useState<string>("");
   const [retroYear, setRetroYear] = useState<number>(new Date().getFullYear());
