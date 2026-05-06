@@ -615,15 +615,32 @@ function useDreAnalyticsImpl(input: {
           s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             .toLowerCase().replace(/\s+/g, " ").trim();
 
-        // Comparação ainda mais tolerante: ignora sufixos entre parênteses
-        const looseLabelMatch = (a: string, b: string): boolean => {
-          const clean = (s: string) => s
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        // Comparação ainda mais tolerante: ignora acentos, caixa, conteúdo
+        // entre parênteses, marcadores contábeis "(=)", "(+)", "(-)",
+        // pontuação e dobras de espaço. Também aceita match por
+        // "contém" quando o termo mais curto tem >= 6 chars (ex.:
+        // "Despesas Fixas Totais" vs "DESPESAS FIXAS TOTAIS (R$)").
+        const cleanForMatch = (s: string) =>
+          s
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
-            .replace(/\s*\(.*?\)/g, "")
+            // remove marcadores tipo (=) (+) (-) no início
+            .replace(/^\s*\(\s*[=+\-]\s*\)\s*/, "")
+            // remove qualquer grupo entre parênteses
+            .replace(/\s*\([^)]*\)/g, "")
+            // troca pontuação por espaço
+            .replace(/[^a-z0-9]+/g, " ")
             .replace(/\s+/g, " ")
             .trim();
-          return clean(a) === clean(b);
+        const looseLabelMatch = (a: string, b: string): boolean => {
+          const ca = cleanForMatch(a);
+          const cb = cleanForMatch(b);
+          if (!ca || !cb) return false;
+          if (ca === cb) return true;
+          const [shorter, longer] = ca.length <= cb.length ? [ca, cb] : [cb, ca];
+          if (shorter.length >= 6 && longer.includes(shorter)) return true;
+          return false;
         };
 
         // Busca série de um label nos dados do banco
