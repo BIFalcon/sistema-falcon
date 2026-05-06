@@ -816,6 +816,7 @@ export type Database = {
           line_category: string | null
           line_label: string
           line_level: number | null
+          line_segment: string | null
           line_type: string
           line_value: number | null
           version_number: number
@@ -827,6 +828,7 @@ export type Database = {
           line_category?: string | null
           line_label: string
           line_level?: number | null
+          line_segment?: string | null
           line_type?: string
           line_value?: number | null
           version_number: number
@@ -838,6 +840,7 @@ export type Database = {
           line_category?: string | null
           line_label?: string
           line_level?: number | null
+          line_segment?: string | null
           line_type?: string
           line_value?: number | null
           version_number?: number
