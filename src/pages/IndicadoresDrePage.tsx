@@ -316,6 +316,7 @@ export default function IndicadoresDrePage() {
   
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
+  const showAsPct = divider === "revenue";
   const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
   const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
@@ -677,6 +678,7 @@ export default function IndicadoresDrePage() {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => {
+                      if (showAsPct) return `${(Number(v) * 100).toFixed(1)}%`;
                       const isPct = selectedLines.some((l) =>
                         /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
                       );
@@ -684,7 +686,17 @@ export default function IndicadoresDrePage() {
                       return Number(v).toLocaleString("pt-BR", { notation: "compact" });
                     }}
                   />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) =>
+                          showAsPct
+                            ? `${(Number(value) * 100).toFixed(2)}%`
+                            : Number(value).toLocaleString("pt-BR")
+                        }
+                      />
+                    }
+                  />
                   {visible.current  && <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={false} connectNulls={false} />}
                   {visible.budget   && <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="5 3" />}
                   {visible.previous && <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="3 3" />}
