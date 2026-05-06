@@ -531,6 +531,16 @@ export interface ParsedDre {
   previousIndicators: Partial<Record<IndicatorKey, number | null>>;
   budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>>;
   budgetIndicators: Partial<Record<IndicatorKey, number | null>>;
+  budgetLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>; // mes 1-12 → valor
+  }>;
+  prevLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>;
+  }>;
 }
 
 /**
