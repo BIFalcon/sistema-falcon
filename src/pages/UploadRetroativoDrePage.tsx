@@ -17,6 +17,8 @@ import { Upload, ShieldAlert, FileSpreadsheet } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { uploadRetroactiveDre, type RetroUploadResult } from "@/lib/retroactiveDreUpload";
 
+const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
+
 export default function UploadRetroativoDrePage() {
   const { user, isMaster, allowedHotels } = useAuth();
   const [hotelId, setHotelId] = useState<string>("");
@@ -39,6 +41,14 @@ export default function UploadRetroativoDrePage() {
       toast({
         title: "Campos obrigatórios",
         description: "Selecione hotel, ano e arquivo.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!DRE_FILE_EXTENSIONS.test(file.name)) {
+      toast({
+        title: "Formato inválido",
+        description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
         variant: "destructive",
       });
       return;
@@ -167,8 +177,24 @@ export default function UploadRetroativoDrePage() {
             <Input
               id="dre-file"
               type="file"
-              accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const selected = e.target.files?.[0] ?? null;
+                if (!selected) {
+                  setFile(null);
+                  return;
+                }
+                if (!DRE_FILE_EXTENSIONS.test(selected.name)) {
+                  setFile(null);
+                  e.currentTarget.value = "";
+                  toast({
+                    title: "Formato inválido",
+                    description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setFile(selected);
+              }}
             />
             {file && (
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
