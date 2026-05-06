@@ -985,7 +985,7 @@ export async function parseDreExcel(
   // ─── Séries mensais Jan-Dez para gráficos da Carta ───
   // Chaves de interesse para os gráficos:
   const SERIES_KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
-  const currentSeries = extractMonthlySeries(rows, SERIES_KEYS);
+  const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows);
 
   // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
@@ -998,12 +998,15 @@ export async function parseDreExcel(
       const prevRows: unknown[][] = XLSX.utils.sheet_to_json(prevWs, {
         header: 1, blankrows: false, defval: null, raw: true,
       });
-      previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+      const prevDisplayRows: unknown[][] = XLSX.utils.sheet_to_json(prevWs, {
+        header: 1, blankrows: false, defval: null, raw: false,
+      });
+      previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
       prevLines = readSheetLines(prevRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
-        const prevMonthInfo = findMonthColumn(prevRows, targetMonth, targetYear ? targetYear - 1 : undefined);
+        const prevMonthInfo = findMonthColumn(prevRows, targetMonth, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
         const prevMonthCol = prevMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
@@ -1035,10 +1038,13 @@ export async function parseDreExcel(
       const budgetRows: unknown[][] = XLSX.utils.sheet_to_json(budgetWs, {
         header: 1, blankrows: false, defval: null, raw: true,
       });
-      budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS);
+      const budgetDisplayRows: unknown[][] = XLSX.utils.sheet_to_json(budgetWs, {
+        header: 1, blankrows: false, defval: null, raw: false,
+      });
+      budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS, targetYear, budgetDisplayRows);
       budgetLines = readSheetLines(budgetRows);
       if (targetMonth) {
-        const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear);
+        const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear, budgetDisplayRows);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
