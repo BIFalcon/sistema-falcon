@@ -740,6 +740,64 @@ function rowValueAt(
   return null;
 }
 
+/** Detecta todas as colunas de mês (1-12) numa aba. */
+function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
+  const result = new Map<number, number>();
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell !== "string") continue;
+      const norm = cell.trim().toLowerCase();
+      for (let m = 1; m <= 12; m++) {
+        if (!result.has(m) && matchMonth(norm, m)) {
+          result.set(m, c);
+        }
+      }
+    }
+    if (result.size === 12) break;
+  }
+  return result;
+}
+
+/** Lê todas as linhas de uma aba com série anual completa (Jan-Dez). */
+function readSheetLines(
+  rows: unknown[][],
+): Array<{ label: string; level: number; values: Record<number, number | null> }> {
+  const monthCols = findAllMonthColumns(rows);
+  if (monthCols.size === 0) return [];
+
+  const firstMonthCol = Math.min(...monthCols.values());
+  const result: Array<{ label: string; level: number; values: Record<number, number | null> }> = [];
+
+  const STRUCTURAL = [
+    /^dre(\s|$)/i, /^topline$/i, /^receitas?$/i, /^despesas?$/i,
+    /^resultado$/i, /^acumulado$/i, /^nivel$/i, /^nível$/i,
+    /^>>>/, /^\d{5,}/, /^\d{4,}\.\d/,
+  ];
+
+  for (const row of rows) {
+    if (!row || row.every((c) => c == null || c === "")) continue;
+    const ll = rowLabelAndLevel(row, firstMonthCol);
+    if (!ll) continue;
+    const cleanLabel = ll.label.replace(/^\d[\d\.]*\s+/, "").trim();
+    const finalLabel = cleanLabel.length >= 3 ? cleanLabel : ll.label;
+    if (STRUCTURAL.some((rx) => rx.test(finalLabel))) continue;
+
+    const values: Record<number, number | null> = {};
+    for (const [month, col] of monthCols) {
+      const v = row[col];
+      values[month] = typeof v === "number" && Number.isFinite(v) ? v : null;
+    }
+
+    if (Object.values(values).some((v) => v != null)) {
+      result.push({ label: finalLabel, level: ll.level, values });
+    }
+  }
+
+  return result;
+}
+
 export async function parseDreExcel(
   file: File,
   opts: { targetMonth?: number } = {},
