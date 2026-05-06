@@ -796,6 +796,11 @@ function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
+      const date = parseHeaderDate(cell);
+      if (date?.month && date.month >= 1 && date.month <= 12 && !result.has(date.month)) {
+        result.set(date.month, c);
+        continue;
+      }
       if (typeof cell !== "string") continue;
       const norm = cell.trim().toLowerCase();
       for (let m = 1; m <= 12; m++) {
@@ -1078,11 +1083,13 @@ export async function parseDreExcel(
 function extractMonthlySeries(
   rows: unknown[][],
   keys: IndicatorKey[],
+  targetYear?: number,
+  displayRows?: unknown[][],
 ): Partial<Record<IndicatorKey, (number | null)[]>> {
   // Mapeia mês (1..12) → colIndex
   const monthCols = new Map<number, number>();
   for (let m = 1; m <= 12; m++) {
-    const info = findMonthColumn(rows, m);
+    const info = findMonthColumn(rows, m, targetYear, displayRows);
     if (info) monthCols.set(m, info.colIndex);
   }
   if (monthCols.size === 0) return {};
