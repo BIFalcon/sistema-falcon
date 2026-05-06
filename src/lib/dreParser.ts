@@ -933,6 +933,7 @@ export async function parseDreExcel(
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
   let previousSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   let previousIndicators: Partial<Record<IndicatorKey, number | null>> = {};
+  let prevLines: ParsedDre["prevLines"] = [];
   if (prevSheetName) {
     const prevWs = wb.Sheets[prevSheetName];
     if (prevWs) {
@@ -940,6 +941,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS);
+      prevLines = readSheetLines(prevRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
@@ -968,6 +970,7 @@ export async function parseDreExcel(
   const budgetSheetName = wb.SheetNames.find((n) => /or[çc]amento/i.test(n));
   let budgetSeries: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   let budgetIndicators: Partial<Record<IndicatorKey, number | null>> = {};
+  let budgetLines: ParsedDre["budgetLines"] = [];
   if (budgetSheetName) {
     const budgetWs = wb.Sheets[budgetSheetName];
     if (budgetWs) {
@@ -975,6 +978,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: true,
       });
       budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS);
+      budgetLines = readSheetLines(budgetRows);
       if (targetMonth) {
         const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
@@ -1008,6 +1012,8 @@ export async function parseDreExcel(
     previousIndicators,
     budgetSeries,
     budgetIndicators,
+    budgetLines,
+    prevLines,
   };
 }
 
