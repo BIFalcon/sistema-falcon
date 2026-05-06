@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
 
 const CATEGORY_ORDER = ["Topline", "Receitas", "Despesas", "Despesas Específicas"];
 
@@ -543,12 +544,28 @@ export default function IndicadoresDrePage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="retro-file">Arquivo da DRE (.xlsx)</Label>
+                  <Label htmlFor="retro-file">Arquivo da DRE (.xlsx, .xlsm, .xls)</Label>
                   <Input
                     id="retro-file"
                     type="file"
-                    accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    onChange={(e) => setRetroFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      const selected = e.target.files?.[0] ?? null;
+                      if (!selected) {
+                        setRetroFile(null);
+                        return;
+                      }
+                      if (!DRE_FILE_EXTENSIONS.test(selected.name)) {
+                        setRetroFile(null);
+                        e.currentTarget.value = "";
+                        toast({
+                          title: "Formato inválido",
+                          description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      setRetroFile(selected);
+                    }}
                   />
                 </div>
               </div>
@@ -557,6 +574,14 @@ export default function IndicadoresDrePage() {
                   disabled={retroSubmitting || !retroHotelId || !retroFile || !user}
                   onClick={async () => {
                     if (!user || !retroHotelId || !retroFile) return;
+                    if (!DRE_FILE_EXTENSIONS.test(retroFile.name)) {
+                      toast({
+                        title: "Formato inválido",
+                        description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
                     setRetroSubmitting(true);
                     try {
                       const res = await uploadRetroactiveDre({
