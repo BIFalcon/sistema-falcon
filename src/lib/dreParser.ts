@@ -201,7 +201,19 @@ const DRE_LINE_MAP: Array<{ pattern: RegExp; catMacro: string; segment: string }
   { pattern: /^csll$/i,                          catMacro: "Deduções pós GOP",     segment: "Total dos Impostos sobre o Lucro" },
   { pattern: /taxa.*sucesso/i,                   catMacro: "Deduções pós GOP",     segment: "Total de Taxas sobre o Lucro Líquido" },
   { pattern: /compensa.*prejuiz/i,               catMacro: "Deduções pós GOP",     segment: "Total de Prejuízo a compensar" },
-  { pattern: /irrf.*aplica/i,                    catMacro: "Deduções pós GOP",     segment: "Despesas Financeiras" },
+  { pattern: /irrf.*aplica/i,                    catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+
+  // ── Entradas adicionais ──
+  { pattern: /^benef[íi]cio/i,                   catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /outras.*despesa.*funcion/i,        catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /outros.*custo.*servi/i,            catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+  { pattern: /outras.*despesa.*operac/i,         catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /condu.*transport/i,                catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /publicidade.*propaganda/i,         catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /assessoria.*vend.*rm/i,            catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /^taxas\s+accor$/i,                 catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+  { pattern: /juros\s*passivo/i,                 catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+  { pattern: /desconto.*concedido/i,             catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
 ];
 
 export function getDreLineCategorization(label: string): DreLineMapping | null {
