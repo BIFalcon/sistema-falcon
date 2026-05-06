@@ -306,17 +306,30 @@ function useDreAnalyticsImpl(input: {
       for (const hotelId of input.hotelIds) {
         const nMonths = input.periodMonths ?? 1;
         const startMonth = Math.max(1, input.month - nMonths + 1);
-        const monthRange = Array.from(
+        const currentMonthRange = Array.from(
           { length: input.month - startMonth + 1 },
           (_, i) => startMonth + i,
         );
-        const { data: closings } = await supabase
+        // Orçado e Ano Anterior buscam o ano todo para série completa
+        const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
+
+        // Closings do período atual (para série realizada)
+        const { data: currentClosings } = await supabase
           .from("closings")
           .select("id, month")
           .eq("hotel_id", hotelId)
           .eq("year", input.year)
-          .in("month", monthRange);
-        if (!closings?.length) continue;
+          .in("month", currentMonthRange);
+
+        // Closings do ano todo (para orçado e ano anterior)
+        const { data: allYearClosings } = await supabase
+          .from("closings")
+          .select("id, month")
+          .eq("hotel_id", hotelId)
+          .eq("year", input.year)
+          .in("month", fullYearRange);
+
+        if (!currentClosings?.length && !allYearClosings?.length) continue;
 
         type LineRow = {
           line_label: string;
@@ -328,8 +341,9 @@ function useDreAnalyticsImpl(input: {
           line_category?: string | null;
           line_segment?: string | null;
         };
-        const allLines: LineRow[] = [];
-        for (const closing of closings) {
+        // Linhas do período atual → alimentam série "current"
+        const currentLines: LineRow[] = [];
+        for (const closing of currentClosings ?? []) {
           const { data: closingLines } = await supabase
             .from("dre_parsed_lines")
             .select("*")
@@ -337,11 +351,39 @@ function useDreAnalyticsImpl(input: {
             .order("version_number", { ascending: false });
           if (!closingLines?.length) continue;
           const topVer = closingLines[0].version_number;
-          const topLines = closingLines
-            .filter((l) => l.version_number === topVer)
-            .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[];
-          allLines.push(...topLines);
+          currentLines.push(
+            ...closingLines
+              .filter((l) => l.version_number === topVer)
+              .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
+          );
         }
+
+        // Linhas de todos os meses → alimentam séries "budget" e "previous"
+        const allYearLines: LineRow[] = [];
+        for (const closing of allYearClosings ?? []) {
+          const alreadyRead = currentClosings?.some((c) => c.id === closing.id);
+          if (alreadyRead) {
+            allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
+            continue;
+          }
+          const { data: closingLines } = await supabase
+            .from("dre_parsed_lines")
+            .select("*")
+            .eq("closing_id", closing.id)
+            .order("version_number", { ascending: false });
+          if (!closingLines?.length) continue;
+          const topVer = closingLines[0].version_number;
+          allYearLines.push(
+            ...closingLines
+              .filter((l) => l.version_number === topVer)
+              .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
+          );
+        }
+
+        // Combina: current usa currentLines, budget/previous usam allYearLines
+        const allLines: LineRow[] = [...new Map(
+          [...currentLines, ...allYearLines].map((l) => [`${l._month}:${l.line_label}`, l])
+        ).values()];
         if (!allLines.length) continue;
 
         const seriesCur: Record<string, (number | null)[]> = {};
@@ -350,7 +392,7 @@ function useDreAnalyticsImpl(input: {
         const budgetIndicators: Record<string, number | null> = {};
         const indicators: Record<string, { label: string; value: number | null }> = {};
 
-        for (const line of allLines) {
+        for (const line of currentLines) {
           const lbl = line.line_label;
           const val = line.line_value;
 
@@ -393,6 +435,47 @@ function useDreAnalyticsImpl(input: {
               label: INDICATOR_LABELS[key as IndicatorKey] ?? key,
               value: val ?? null,
             };
+          }
+        }
+
+        // Processa allYearLines para budget e previous (série anual completa)
+        for (const line of allYearLines) {
+          const lbl = line.line_label;
+          const val = line.line_value;
+          const mIdx = (line._month ?? input.month) - 1;
+
+          const budgetSeriesMatch = lbl.match(/^\[series_budget_(.+)_(\d+)\]$/);
+          if (budgetSeriesMatch) {
+            const [, key, mStr] = budgetSeriesMatch;
+            const m = parseInt(mStr, 10) - 1;
+            if (!seriesBudget[key]) seriesBudget[key] = Array(12).fill(null);
+            seriesBudget[key][m] = val ?? null;
+            continue;
+          }
+          const budgetIndMatch = lbl.match(/^\[budget_([^\]\s]+)\]/);
+          if (budgetIndMatch) {
+            if (budgetIndicators[budgetIndMatch[1]] == null) {
+              budgetIndicators[budgetIndMatch[1]] = val ?? null;
+            }
+            const key = budgetIndMatch[1];
+            if (!seriesBudget[key]) seriesBudget[key] = Array(12).fill(null);
+            seriesBudget[key][mIdx] = val ?? null;
+            continue;
+          }
+          const prevSeriesMatch = lbl.match(/^\[series_prev_(.+)_(\d+)\]$/);
+          if (prevSeriesMatch) {
+            const [, key, mStr] = prevSeriesMatch;
+            const m = parseInt(mStr, 10) - 1;
+            if (!seriesPrev[key]) seriesPrev[key] = Array(12).fill(null);
+            seriesPrev[key][m] = val ?? null;
+            continue;
+          }
+          const prevIndMatch = lbl.match(/^\[prev_([^\]\s]+)\]/);
+          if (prevIndMatch) {
+            const key = prevIndMatch[1];
+            if (!seriesPrev[key]) seriesPrev[key] = Array(12).fill(null);
+            seriesPrev[key][mIdx] = val ?? null;
+            continue;
           }
         }
 
