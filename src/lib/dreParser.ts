@@ -861,6 +861,9 @@ export async function parseDreExcel(
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
     header: 1, blankrows: false, defval: null, raw: true,
   });
+  const displayRows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+    header: 1, blankrows: false, defval: null, raw: false,
+  });
 
   const indicators: Record<IndicatorKey, IndicatorHit | null> = {
     ocupacao: null, adr: null, revpar: null, roomnights: null,
@@ -876,7 +879,7 @@ export async function parseDreExcel(
   // Localiza a coluna do mês alvo. Se não informado, último mês com dado é usado (fallback).
   const targetMonth = opts.targetMonth;
   const targetYear = opts.targetYear;
-  const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth, targetYear) : null;
+  const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth, targetYear, displayRows) : null;
   const monthCol = monthInfo?.colIndex ?? null;
   if (targetMonth && !monthInfo) {
     warnings.push(`Coluna do mês ${targetMonth} não localizada no cabeçalho — usando fallback.`);
