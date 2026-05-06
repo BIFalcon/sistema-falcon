@@ -21,14 +21,29 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
 import { useEffect } from "react";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
+import { useGopManagers } from "@/hooks/useGopManagers";
 
 export function AppHeader() {
-  const { hotelId, month, year, dateFrom, dateTo, setHotelId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
+  const { hotelId, gopId, month, year, dateFrom, dateTo, setHotelId, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
   const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
+  const isIndicadores = pathname.startsWith("/indicadores");
   const { data: pendingCount = 0 } = usePendingNotificationCount();
+  const { data: gopManagers = [] } = useGopManagers();
+  const selectedGop = gopManagers.find((g) => g.user_id === gopId);
+  const gopHotelIds = selectedGop ? new Set(selectedGop.hotel_ids) : null;
+  const visibleHotels = gopHotelIds
+    ? allowedHotels.filter((h) => gopHotelIds.has(h.id))
+    : allowedHotels;
+
+  // Se hotel atual não pertence à carteira do GOP, limpar
+  useEffect(() => {
+    if (gopHotelIds && hotelId && !gopHotelIds.has(hotelId)) {
+      setHotelId(null);
+    }
+  }, [gopId, gopHotelIds, hotelId, setHotelId]);
 
   // Garante que o hotel selecionado é permitido (ou null = todos quando master)
   useEffect(() => {
@@ -71,10 +86,33 @@ export function AppHeader() {
               <SelectValue placeholder="Hotel" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              {isMaster && <SelectItem value="__all__">Todos os hotéis</SelectItem>}
-              {allowedHotels.map((h) => (
+              {isMaster && (
+                <SelectItem value="__all__">
+                  {selectedGop ? `Todos da carteira (${visibleHotels.length})` : "Todos os hotéis"}
+                </SelectItem>
+              )}
+              {visibleHotels.map((h) => (
                 <SelectItem key={h.id} value={h.id}>
                   {h.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {isIndicadores && !isGg && gopManagers.length > 0 && (
+          <Select
+            value={gopId ?? "__all__"}
+            onValueChange={(v) => setGopId(v === "__all__" ? null : v)}
+          >
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue placeholder="Gerente de Operações" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="__all__">Todos os GOPs</SelectItem>
+              {gopManagers.map((g) => (
+                <SelectItem key={g.user_id} value={g.user_id}>
+                  {g.display_name}
                 </SelectItem>
               ))}
             </SelectContent>
