@@ -85,9 +85,9 @@ const PERIOD_OPTIONS: { value: PeriodKey; label: string; months: number }[] = [
 ];
 
 const chartConfig = {
-  current: { label: "Realizado", color: "hsl(var(--primary))" },
-  budget: { label: "Orçado", color: "hsl(var(--ring))" },
-  previous: { label: "Ano Anterior", color: "hsl(var(--muted-foreground))" },
+  current:  { label: "Realizado",    color: "#1D4ED8" },
+  budget:   { label: "Orçado",       color: "#16A34A" },
+  previous: { label: "Ano Anterior", color: "#9CA3AF" },
 } satisfies ChartConfig;
 
 function pct(value: number | null | undefined) {
@@ -313,7 +313,7 @@ export default function IndicadoresDrePage() {
   const [retroSubmitting, setRetroSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
-  const [metric, setMetric] = useState("value");
+  
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
   const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
@@ -428,14 +428,12 @@ export default function IndicadoresDrePage() {
       const prev = aggPoint(basePrevious, months, lineAgg, rnNode?.series.previous);
       return {
         month: label,
-        current: metric === "budget" && cur != null && bud != null && bud !== 0
-          ? ((cur - bud) / Math.abs(bud)) * 100
-          : cur,
-        budget: metric === "budget" ? null : bud,
-        previous: metric === "budget" ? null : prev,
+        current: cur,
+        budget: bud,
+        previous: prev,
       };
     });
-  }, [selectedLines, divisorLine, metric, periodCfg, dataset, year]);
+  }, [selectedLines, divisorLine, periodCfg, dataset, year]);
   const toggleLine = (id: string) => setSelectedIds((prev) => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -646,17 +644,30 @@ export default function IndicadoresDrePage() {
                 {(["current", "budget", "previous"] as DreSeriesKey[]).map((key) => (
                   <Button key={key} size="sm" variant={visible[key] ? "default" : "outline"} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}>{chartConfig[key].label}</Button>
                 ))}
-                <Select value={metric} onValueChange={setMetric}>
-                  <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="value">Valores absolutos</SelectItem>
-                    <SelectItem value="budget">Variação vs Orçado (%)</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={divider} onValueChange={setDivider}>
                   <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="none">Sem divisor</SelectItem><SelectItem value="roomnights">÷ Room Nights</SelectItem><SelectItem value="uhs">÷ UHs Disponíveis</SelectItem><SelectItem value="revenue">÷ Receita Bruta Total</SelectItem></SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center gap-6 text-xs text-muted-foreground">
+                {visible.current && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-6 rounded-full inline-block" style={{ background: "#1D4ED8" }} />
+                    Realizado
+                  </div>
+                )}
+                {visible.budget && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-6 rounded-full inline-block" style={{ background: "#16A34A" }} />
+                    Orçado
+                  </div>
+                )}
+                {visible.previous && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-6 rounded-full inline-block" style={{ background: "#9CA3AF" }} />
+                    Ano Anterior
+                  </div>
+                )}
               </div>
               <ChartContainer config={chartConfig} className="h-[440px] w-full aspect-auto">
                 <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
@@ -666,7 +677,6 @@ export default function IndicadoresDrePage() {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => {
-                      if (metric === "budget") return `${Number(v).toFixed(1)}%`;
                       const isPct = selectedLines.some((l) =>
                         /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
                       );
@@ -675,9 +685,9 @@ export default function IndicadoresDrePage() {
                     }}
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  {visible.current && <Line type="monotone" dataKey="current" stroke="var(--color-current)" strokeWidth={3} dot={false} connectNulls={false} />}
-                  {visible.budget && <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} dot={false} connectNulls={false} />}
-                  {visible.previous && <Line type="monotone" dataKey="previous" stroke="var(--color-previous)" strokeWidth={2} dot={false} connectNulls={false} />}
+                  {visible.current  && <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={false} connectNulls={false} />}
+                  {visible.budget   && <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="5 3" />}
+                  {visible.previous && <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="3 3" />}
                 </LineChart>
               </ChartContainer>
             </Card>
