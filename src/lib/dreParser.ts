@@ -662,12 +662,35 @@ function parseHeaderDate(cell: unknown): { month: number; year: number } | null 
   const text = cell.trim().toLowerCase();
   const iso = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
   if (iso) return { year: Number(iso[1]), month: Number(iso[2]) };
+  const ym = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})\b/);
+  if (ym) return { year: Number(ym[1]), month: Number(ym[2]) };
   const br = text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|(?:19|20)\d{2})\b/);
   if (br) {
     const yy = Number(br[3]);
     return { month: Number(br[2]), year: yy < 100 ? 2000 + yy : yy };
   }
+  const my = text.match(/\b(\d{1,2})[\/-](\d{2}|(?:19|20)\d{2})\b/);
+  if (my) {
+    const yy = Number(my[2]);
+    return { month: Number(my[1]), year: yy < 100 ? 2000 + yy : yy };
+  }
   return null;
+}
+
+function parseNumericCell(cell: unknown): number | null {
+  if (typeof cell === "number" && Number.isFinite(cell)) return cell;
+  if (typeof cell !== "string") return null;
+  let text = cell.trim();
+  if (!text || text === "-" || text.startsWith("=")) return null;
+  const negative = /^\(.*\)$/.test(text) || /^-/.test(text);
+  text = text.replace(/[R$%\s()]/g, "").replace(/^-/, "");
+  if (!/[0-9]/.test(text)) return null;
+  const lastComma = text.lastIndexOf(",");
+  const lastDot = text.lastIndexOf(".");
+  if (lastComma > lastDot) text = text.replace(/\./g, "").replace(",", ".");
+  else if (lastDot > lastComma) text = text.replace(/,/g, "");
+  const value = Number(text);
+  return Number.isFinite(value) ? (negative ? -value : value) : null;
 }
 
 function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined, rowIndex: number, colIndex: number): number | null {
@@ -686,6 +709,15 @@ function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined
   return null;
 }
 
+function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: number): number {
+  let count = 0;
+  for (let r = headerRow + 1; r < Math.min(rows.length, headerRow + 260); r++) {
+    const value = parseNumericCell(rows[r]?.[colIndex]);
+    if (value != null && value !== 0) count++;
+  }
+  return count;
+}
+
 /**
  * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
  * coluna correspondente ao mês alvo (1=Jan ... 12=Dez), além do label.
@@ -696,7 +728,7 @@ function findMonthColumn(
   targetYear?: number,
   displayRows?: unknown[][],
 ): { headerRow: number; colIndex: number; label: string } | null {
-  let fallbackMatch: { headerRow: number; colIndex: number; label: string } | null = null;
+  const candidates: Array<{ headerRow: number; colIndex: number; label: string; year: number | null; dataCount: number }> = [];
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
     const displayRow = displayRows?.[r] ?? [];
@@ -707,20 +739,25 @@ function findMonthColumn(
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = parseHeaderDate(cell);
         if (date?.month === targetMonth) {
-          if (!targetYear || date.year === targetYear) return { headerRow: r, colIndex: c, label };
+          candidates.push({ headerRow: r, colIndex: c, label, year: date.year, dataCount: countNumericColumnData(rows, r, c) });
           continue;
         }
         if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
         if (!matchMonth(norm, targetMonth)) continue;
         const year = extractHeaderYear(cell) ?? inferHeaderYear(rows, displayRows, r, c);
-        if (targetYear && year && year !== targetYear) continue;
-        if (!targetYear || year === targetYear) return { headerRow: r, colIndex: c, label };
-        fallbackMatch ??= { headerRow: r, colIndex: c, label };
+        candidates.push({ headerRow: r, colIndex: c, label, year, dataCount: countNumericColumnData(rows, r, c) });
       }
     }
   }
-  return fallbackMatch;
+  const eligible = targetYear
+    ? candidates.filter((candidate) => candidate.year === targetYear || candidate.year == null)
+    : candidates;
+  const preferred = targetYear && eligible.some((candidate) => candidate.year === targetYear)
+    ? eligible.filter((candidate) => candidate.year === targetYear)
+    : eligible;
+  const best = preferred.sort((a, b) => b.dataCount - a.dataCount || a.headerRow - b.headerRow || a.colIndex - b.colIndex)[0];
+  return best ? { headerRow: best.headerRow, colIndex: best.colIndex, label: best.label } : null;
 }
 
 /** Extrai label da linha (primeira string não-vazia). */
@@ -775,16 +812,16 @@ function rowValueAt(
   excludeCols?: Set<number>,
 ): number | null {
   if (colIndex != null) {
-    const c = row[colIndex];
-    if (typeof c === "number" && Number.isFinite(c)) return c;
+    const c = parseNumericCell(row[colIndex]);
+    if (c != null) return c;
     // Coluna localizada mas célula vazia/string → não cai em fallback,
     // pois isso traria valores de outros meses (ex.: coluna "Média").
     return null;
   }
   for (let i = row.length - 1; i >= 0; i--) {
     if (excludeCols?.has(i)) continue;
-    const c = row[i];
-    if (typeof c === "number" && Number.isFinite(c) && c !== 0) return c;
+    const c = parseNumericCell(row[i]);
+    if (c != null && c !== 0) return c;
   }
   return null;
 }
@@ -840,8 +877,7 @@ function readSheetLines(
 
     const values: Record<number, number | null> = {};
     for (const [month, col] of monthCols) {
-      const v = row[col];
-      values[month] = typeof v === "number" && Number.isFinite(v) ? v : null;
+      values[month] = parseNumericCell(row[col]);
     }
 
     if (Object.values(values).some((v) => v != null)) {
@@ -1113,8 +1149,7 @@ function extractMonthlySeries(
     if (!hitRow) continue;
     const series: (number | null)[] = new Array(12).fill(null);
     for (const [m, c] of monthCols) {
-      const cell = hitRow[c];
-      if (typeof cell === "number" && Number.isFinite(cell)) series[m - 1] = cell;
+      series[m - 1] = parseNumericCell(hitRow[c]);
     }
     out[key] = series;
   }
