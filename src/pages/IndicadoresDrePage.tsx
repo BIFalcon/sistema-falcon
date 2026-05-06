@@ -358,9 +358,9 @@ export default function IndicadoresDrePage() {
   }, [dataset, divider]);
   const chartData = useMemo(() => {
     const base = {
-      current: divideSeries(sumSeries(selectedLines, "current"), divisorLine, "current"),
-      budget: divideSeries(sumSeries(selectedLines, "budget"), divisorLine, "budget"),
-      previous: divideSeries(sumSeries(selectedLines, "previous"), divisorLine, "previous"),
+      current: divideSeries(aggregateSelectedSeries(selectedLines, "current", dataset), divisorLine, "current"),
+      budget: divideSeries(aggregateSelectedSeries(selectedLines, "budget", dataset), divisorLine, "budget"),
+      previous: divideSeries(aggregateSelectedSeries(selectedLines, "previous", dataset), divisorLine, "previous"),
     };
     return MONTHS_SHORT.map((m, i) => ({
       month: m,
