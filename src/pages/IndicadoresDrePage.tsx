@@ -43,14 +43,14 @@ const CARD_LINES: CardDef[] = [
     format: "pct",
     agg: "ratio",
     numLabels: ["GOP", "Resultado Operacional Bruto"],
-    denLabels: ["RECEITA LÍQUIDA TOTAL", "Receita Líquida Total", "RECEITA BRUTA TOTAL"],
+    denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
   {
     title: "Margem Líquida",
     format: "pct",
     agg: "ratio",
     numLabels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
-    denLabels: ["RECEITA LÍQUIDA TOTAL", "Receita Líquida Total", "RECEITA BRUTA TOTAL"],
+    denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
 ];
 
