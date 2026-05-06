@@ -289,7 +289,7 @@ export const DRE_FIXED_TREE: DreTreeNode[] = [
         ],
       },
       {
-        label: "Deduções da Receita Total",
+        label: "DEDUÇÕES DA RECEITA TOTAL",
         children: [
           { label: "ISS" },
           { label: "ICMS" },
@@ -297,7 +297,7 @@ export const DRE_FIXED_TREE: DreTreeNode[] = [
           { label: "COFINS" },
         ],
       },
-      { label: "Receita Líquida Total" },
+      { label: "RECEITA LÍQUIDA TOTAL (RECEITA - DEDUÇÕES)" },
       { label: "Resultado Operacional Bruto (GOP)" },
       { label: "Resultado Operacional Líquido" },
       { label: "Lucro Líquido / Prejuízo do Exercício" },
@@ -310,9 +310,9 @@ export const DRE_FIXED_TREE: DreTreeNode[] = [
   {
     label: "Despesas",
     children: [
-      { label: "Despesas Totais" },
+      { label: "DESPESAS TOTAIS (FIXAS + VARIÁVEIS)" },
       {
-        label: "Despesas Fixas Totais",
+        label: "DESPESAS FIXAS TOTAIS",
         children: [
           {
             label: "(-) Custo das Mercadorias Vendidas",
@@ -376,7 +376,7 @@ export const DRE_FIXED_TREE: DreTreeNode[] = [
         ],
       },
       {
-        label: "Despesas Variáveis Totais",
+        label: "DESPESAS VARIÁVEIS TOTAL",
         children: [
           {
             label: "Custos de Hospedagem",

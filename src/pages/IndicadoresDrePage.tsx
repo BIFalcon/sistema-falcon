@@ -435,6 +435,11 @@ export default function IndicadoresDrePage() {
       };
     });
   }, [selectedLines, divisorLine, periodCfg, dataset, year]);
+  const isExpenseLine = selectedLines.some((l) =>
+    /despesa|dedu[çc]|custo|encargo|imposto|taxa.*adm|aluguel/i.test(l.label) ||
+    l.series.current.filter((v) => v != null && v < 0).length >
+    l.series.current.filter((v) => v != null && v > 0).length
+  );
   const toggleLine = (id: string) => setSelectedIds((prev) => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -677,13 +682,15 @@ export default function IndicadoresDrePage() {
                   <YAxis
                     tickLine={false}
                     axisLine={false}
+                    reversed={isExpenseLine}
                     tickFormatter={(v) => {
-                      if (showAsPct) return `${(Number(v) * 100).toFixed(1)}%`;
+                      const abs = Math.abs(Number(v));
+                      if (showAsPct) return `${(abs * 100).toFixed(1)}%`;
                       const isPct = selectedLines.some((l) =>
                         /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
                       );
-                      if (isPct) return `${(Number(v) * (Number(v) <= 1 ? 100 : 1)).toFixed(1)}%`;
-                      return Number(v).toLocaleString("pt-BR", { notation: "compact" });
+                      if (isPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
+                      return abs.toLocaleString("pt-BR", { notation: "compact" });
                     }}
                   />
                   <ChartTooltip
