@@ -483,6 +483,8 @@ function useDreAnalyticsImpl(input: {
         const allKeys = new Set([
           ...Object.keys(seriesCur),
           ...Object.keys(indicators),
+          ...Object.keys(seriesBudget),
+          ...Object.keys(seriesPrev),
         ]);
 
         for (const key of allKeys) {
