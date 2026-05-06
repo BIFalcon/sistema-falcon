@@ -402,32 +402,25 @@ function useDreAnalyticsImpl(input: {
     queryKey: ["dre-analytics", input.hotelIds, input.year, input.month, input.periodMonths ?? 1],
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
+      const nMonths = input.periodMonths ?? 1;
+      const startMonth = Math.max(1, input.month - nMonths + 1);
+      const currentMonthRange = Array.from(
+        { length: input.month - startMonth + 1 },
+        (_, i) => startMonth + i,
+      );
+      const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
+      const { data: allClosings, error: closingsError } = await supabase
+        .from("closings")
+        .select("id, month, hotel_id")
+        .in("hotel_id", input.hotelIds)
+        .eq("year", input.year)
+        .in("month", fullYearRange);
+      if (closingsError) throw closingsError;
+      const linesByClosingId = await fetchLatestDreParsedLinesByClosingIds((allClosings ?? []).map((c) => c.id));
 
       for (const hotelId of input.hotelIds) {
-        const nMonths = input.periodMonths ?? 1;
-        const startMonth = Math.max(1, input.month - nMonths + 1);
-        const currentMonthRange = Array.from(
-          { length: input.month - startMonth + 1 },
-          (_, i) => startMonth + i,
-        );
-        // Orçado e Ano Anterior buscam o ano todo para série completa
-        const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
-
-        // Closings do período atual (para série realizada)
-        const { data: currentClosings } = await supabase
-          .from("closings")
-          .select("id, month")
-          .eq("hotel_id", hotelId)
-          .eq("year", input.year)
-          .in("month", currentMonthRange);
-
-        // Closings do ano todo (para orçado e ano anterior)
-        const { data: allYearClosings } = await supabase
-          .from("closings")
-          .select("id, month")
-          .eq("hotel_id", hotelId)
-          .eq("year", input.year)
-          .in("month", fullYearRange);
+        const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
+        const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
 
         if (!currentClosings?.length && !allYearClosings?.length) continue;
 
