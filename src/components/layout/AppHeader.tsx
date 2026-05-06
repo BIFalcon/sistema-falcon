@@ -15,7 +15,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, User as UserIcon, Bell, Settings, X, Hotel } from "lucide-react";
+import { LogOut, User as UserIcon, Bell, Settings, X, Hotel, Check, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
@@ -24,7 +26,7 @@ import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
 
 export function AppHeader() {
-  const { hotelId, gopId, month, year, dateFrom, dateTo, setHotelId, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
+  const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
   const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -44,6 +46,14 @@ export function AppHeader() {
       setHotelId(null);
     }
   }, [gopId, gopHotelIds, hotelId, setHotelId]);
+
+  // Filtra hotelIds (multi) que não estão na carteira do GOP
+  useEffect(() => {
+    if (gopHotelIds && hotelIds.length > 0) {
+      const filtered = hotelIds.filter((id) => gopHotelIds.has(id));
+      if (filtered.length !== hotelIds.length) setHotelIds(filtered);
+    }
+  }, [gopId, gopHotelIds, hotelIds, setHotelIds]);
 
   // Garante que o hotel selecionado é permitido (ou null = todos quando master)
   useEffect(() => {
@@ -77,6 +87,64 @@ export function AppHeader() {
             <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
           </div>
+        ) : isIndicadores ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-[260px] h-9 justify-between font-normal"
+              >
+                <span className="truncate text-left">
+                  {hotelIds.length === 0
+                    ? selectedGop
+                      ? `Todos da carteira (${visibleHotels.length})`
+                      : "Todos os hotéis"
+                    : hotelIds.length === 1
+                    ? visibleHotels.find((h) => h.id === hotelIds[0])?.name ?? "1 hotel"
+                    : `${hotelIds.length} hotéis selecionados`}
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[280px] p-0 bg-popover">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => setHotelIds(visibleHotels.map((h) => h.id))}
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-muted-foreground hover:underline"
+                  onClick={() => setHotelIds([])}
+                >
+                  Limpar
+                </button>
+              </div>
+              <div className="max-h-[320px] overflow-y-auto py-1">
+                {visibleHotels.map((h) => {
+                  const checked = hotelIds.includes(h.id);
+                  return (
+                    <label
+                      key={h.id}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          if (v) setHotelIds([...hotelIds, h.id]);
+                          else setHotelIds(hotelIds.filter((id) => id !== h.id));
+                        }}
+                      />
+                      <span className="truncate">{h.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
         ) : (
           <Select
             value={hotelId ?? "__all__"}

@@ -315,7 +315,7 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, gopId, month, year, setHotelId } = useFilters();
+  const { hotelId, hotelIds: selectedHotelIds, gopId, month, year, setHotelId } = useFilters();
   const queryClient = useQueryClient();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = useMemo(
@@ -343,9 +343,10 @@ export default function IndicadoresDrePage() {
   const [period, setPeriod] = useState<PeriodKey>("1");
   const showAsPct = divider === "revenue";
   const hotelIds = useMemo(() => {
+    if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
     if (hotelId) return [hotelId];
     return hotelOptions.map((h) => h.id);
-  }, [hotelOptions, hotelId]);
+  }, [hotelOptions, hotelId, selectedHotelIds]);
   const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
