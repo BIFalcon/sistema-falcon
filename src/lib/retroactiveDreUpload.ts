@@ -205,7 +205,7 @@ export async function uploadRetroactiveDre(input: {
         prevIndicatorRows.length ||
         budgetIndicatorRows.length
       ) {
-        await supabase
+        const { error: insertErr } = await supabase
           .from("dre_parsed_lines")
           .insert([
             ...indicatorRows,
@@ -214,6 +214,7 @@ export async function uploadRetroactiveDre(input: {
             ...prevIndicatorRows,
             ...budgetIndicatorRows,
           ]);
+        if (insertErr) throw insertErr;
       }
 
       // 7. garante status aprovado (caso closing já existisse em outro estado)
