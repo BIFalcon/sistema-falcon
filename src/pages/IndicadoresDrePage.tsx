@@ -293,7 +293,7 @@ function VariationPill({ value }: { value: number | null }) {
 function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId: string | null; select: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
-  const isSelectable = !hasChildren;
+  const isSelectable = !(node.level === 1 && /^(topline|receitas|despesas)$/i.test(node.label));
   const fontClass =
     node.level === 1
       ? "text-sm font-semibold"
@@ -363,7 +363,12 @@ export default function IndicadoresDrePage() {
   const selectedLines = useMemo(() => {
     if (!dataset) return [];
     const node = selectedId ? dataset.flat.find((n) => n.id === selectedId) : undefined;
-    return node ? [node] : [];
+    if (!node) return [];
+    const hasSeries = node.series.current.some((v) => v != null);
+    if (hasSeries || node.children.length === 0) return [node];
+    const leaves = (n: DreLineNode): DreLineNode[] =>
+      n.children.length === 0 ? [n] : n.children.flatMap(leaves);
+    return leaves(node);
   }, [dataset, selectedId]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
