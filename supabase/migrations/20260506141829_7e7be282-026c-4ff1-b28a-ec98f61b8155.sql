@@ -1,0 +1,1 @@
+UPDATE public.hotels SET name = 'Ibis budget Patos de Minas' WHERE id = 'ibis-budget-patos';
