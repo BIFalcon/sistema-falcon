@@ -299,26 +299,55 @@ export interface DreIndicatorRow {
   line_value: number | null;
   version_number: number;
 }
+
+type DreParsedLineRecord = DreIndicatorRow & {
+  line_type?: string | null;
+  line_level?: number | null;
+  line_category?: string | null;
+  line_segment?: string | null;
+};
+
+async function fetchLatestDreParsedLines(closingId: string): Promise<DreParsedLineRecord[]> {
+  const { data: latest, error: latestError } = await supabase
+    .from("dre_parsed_lines")
+    .select("version_number")
+    .eq("closing_id", closingId)
+    .order("version_number", { ascending: false })
+    .limit(1);
+  if (latestError) throw latestError;
+
+  const topVersion = latest?.[0]?.version_number;
+  if (topVersion == null) return [];
+
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("dre_parsed_lines")
+      .select("line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+      .eq("closing_id", closingId)
+      .eq("version_number", topVersion)
+      .order("line_label", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as DreParsedLineRecord[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
 export function useDreIndicators(closingId: string | null | undefined) {
   return useQuery({
     enabled: !!closingId,
     queryKey: ["dre-indicators", closingId],
     queryFn: async (): Promise<DreIndicatorRow[]> => {
       if (!closingId) return [];
-      const { data, error } = await supabase
-        .from("dre_parsed_lines")
-        .select("line_label, line_value, version_number, line_type")
-        .eq("closing_id", closingId)
-        .eq("line_type", "indicator")
-        .order("version_number", { ascending: false });
-      if (error) throw error;
-      // mantém só a versão mais recente
-      const top = data?.[0]?.version_number;
       // Filtra também as linhas de séries mensais (que poluiriam o painel),
       // mantendo apenas indicadores do mês corrente ([key]) e do ano
       // anterior ([prev_key]). Cada linha de série tem prefixo [series_…].
-      return ((data ?? [])
-        .filter((r) => r.version_number === top)
+      const data = await fetchLatestDreParsedLines(closingId);
+      return (data
+        .filter((r) => r.line_type === "indicator")
         .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
     },
   });
