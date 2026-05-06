@@ -658,6 +658,10 @@ function extractHeaderYear(cell: unknown): number | null {
 
 function parseHeaderDate(cell: unknown): { month: number; year: number } | null {
   if (cell instanceof Date) return { month: cell.getMonth() + 1, year: cell.getFullYear() };
+  if (typeof cell === "number" && Number.isFinite(cell) && cell > 20000 && cell < 80000) {
+    const parsed = XLSX.SSF.parse_date_code(cell);
+    if (parsed?.m && parsed?.y) return { month: parsed.m, year: parsed.y };
+  }
   if (typeof cell !== "string") return null;
   const text = cell.trim().toLowerCase();
   const iso = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
@@ -694,14 +698,20 @@ function parseNumericCell(cell: unknown): number | null {
 }
 
 function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined, rowIndex: number, colIndex: number): number | null {
-  const candidates: unknown[] = [];
-  for (let r = Math.max(0, rowIndex - 1); r <= Math.min(rows.length - 1, rowIndex + 1); r++) {
+  const collect = (r: number): unknown[] => {
     const rawRow = rows[r] ?? [];
     const displayRow = displayRows?.[r] ?? [];
+    const candidates: unknown[] = [];
     for (let c = Math.max(0, colIndex - 8); c <= Math.min(Math.max(rawRow.length, displayRow.length) - 1, colIndex + 1); c++) {
       candidates.push(rawRow[c], displayRow[c]);
     }
-  }
+    return candidates;
+  };
+  const candidates = [
+    ...collect(rowIndex),
+    ...(rowIndex > 0 ? collect(rowIndex - 1) : []),
+    ...(rowIndex < rows.length - 1 ? collect(rowIndex + 1) : []),
+  ];
   for (const candidate of candidates) {
     const year = extractHeaderYear(candidate);
     if (year) return year;
@@ -778,7 +788,7 @@ function rowLabelAndLevel(
   firstMonthCol: number,
 ): { label: string; level: number } | null {
   const textCols: { col: number; text: string }[] = [];
-  for (let c = 2; c < firstMonthCol; c++) {
+  for (let c = 0; c < firstMonthCol; c++) {
     const cell = row[c];
     if (typeof cell === "string" && cell.trim().length > 1) {
       textCols.push({ col: c, text: cell.trim() });
