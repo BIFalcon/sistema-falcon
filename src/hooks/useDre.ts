@@ -633,6 +633,7 @@ function useDreAnalyticsImpl(input: {
             .replace(/[^a-z0-9]+/g, " ")
             .replace(/\s+/g, " ")
             .trim();
+        const aliasIndex = buildAliasIndex(cleanForMatch);
         const looseLabelMatch = (a: string, b: string): boolean => {
           const ca = cleanForMatch(a);
           const cb = cleanForMatch(b);
@@ -640,6 +641,14 @@ function useDreAnalyticsImpl(input: {
           if (ca === cb) return true;
           const [shorter, longer] = ca.length <= cb.length ? [ca, cb] : [cb, ca];
           if (shorter.length >= 6 && longer.includes(shorter)) return true;
+          // Aliases manuais (sinônimos / typos / reordenações)
+          const aliasesA = aliasIndex.get(ca);
+          if (aliasesA && aliasesA.includes(cb)) return true;
+          const aliasesB = aliasIndex.get(cb);
+          if (aliasesB && aliasesB.includes(ca)) return true;
+          // Match também por containment via alias
+          if (aliasesA && aliasesA.some((al) => al && (al === cb || (al.length >= 6 && (al.includes(cb) || cb.includes(al)))))) return true;
+          if (aliasesB && aliasesB.some((al) => al && (al === ca || (al.length >= 6 && (al.includes(ca) || ca.includes(al)))))) return true;
           return false;
         };
 
