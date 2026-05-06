@@ -515,6 +515,34 @@ function useDreAnalyticsImpl(input: {
           }
         }
 
+        // Mapas de séries anuais para linhas detalhadas de orçamento e ano anterior
+        // Formato no banco: "[bline_3] Salários" = valor de março do orçamento
+        const budgetDetailSeries = new Map<string, (number | null)[]>();
+        const prevDetailSeries = new Map<string, (number | null)[]>();
+
+        for (const line of allLines) {
+          const lbl = line.line_label;
+          const val = line.line_value;
+
+          const bMatch = lbl.match(/^\[bline_(\d+)\]\s(.+)$/);
+          if (bMatch) {
+            const m = parseInt(bMatch[1], 10) - 1;
+            const label = bMatch[2];
+            if (!budgetDetailSeries.has(label)) budgetDetailSeries.set(label, Array(12).fill(null));
+            budgetDetailSeries.get(label)![m] = val ?? null;
+            continue;
+          }
+
+          const pMatch = lbl.match(/^\[pline_(\d+)\]\s(.+)$/);
+          if (pMatch) {
+            const m = parseInt(pMatch[1], 10) - 1;
+            const label = pMatch[2];
+            if (!prevDetailSeries.has(label)) prevDetailSeries.set(label, Array(12).fill(null));
+            prevDetailSeries.get(label)![m] = val ?? null;
+            continue;
+          }
+        }
+
         const nodes: DreLineNode[] = [];
         const allKeys = new Set([
           ...Object.keys(seriesCur),
@@ -602,6 +630,7 @@ function useDreAnalyticsImpl(input: {
 
         // Busca série de budget para um label da árvore fixa
         const findBudgetForLabel = (label: string): (number | null)[] => {
+          const norm = normLabel(label);
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesBudget[ind.key]) return seriesBudget[ind.key]!;
@@ -612,15 +641,24 @@ function useDreAnalyticsImpl(input: {
               }
             }
           }
+          // 2. Linha detalhada do orçamento (série anual completa)
+          for (const [lbl, series] of budgetDetailSeries) {
+            if (normLabel(lbl) === norm) return series;
+          }
           return Array(12).fill(null);
         };
 
         // Busca série de ano anterior para um label da árvore fixa
         const findPreviousForLabel = (label: string): (number | null)[] => {
+          const norm = normLabel(label);
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
               if (seriesPrev[ind.key]) return seriesPrev[ind.key]!;
             }
+          }
+          // 2. Linha detalhada do ano anterior (série anual completa)
+          for (const [lbl, series] of prevDetailSeries) {
+            if (normLabel(lbl) === norm) return series;
           }
           return Array(12).fill(null);
         };
