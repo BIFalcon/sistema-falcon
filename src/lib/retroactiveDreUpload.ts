@@ -43,7 +43,7 @@ export async function uploadRetroactiveDre(input: {
   const parsedByMonth = new Map<number, ParsedDre>();
   for (let m = 1; m <= upToMonth; m++) {
     try {
-      const parsed = await parseDreExcel(file, { targetMonth: m });
+      const parsed = await parseDreExcel(file, { targetMonth: m, targetYear: year });
       const hasData = hasAnyData(parsed);
       console.log(`[retroDRE] mês ${m}: monthColumnIndex=${parsed.monthColumnIndex}, hasData=${hasData}, indicators=${JSON.stringify(Object.fromEntries(Object.entries(parsed.indicators).filter(([,v]) => v).map(([k,v]) => [k, v?.value])))}`);
       if (hasData) {
