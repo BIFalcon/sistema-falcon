@@ -12,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
+import { useGopManagers } from "@/hooks/useGopManagers";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
 import { MONTHS_PT } from "@/lib/constants";
 import { fmtBRL } from "@/lib/formatters";
@@ -303,8 +304,21 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, gopId, month, year, setHotelId } = useFilters();
   const queryClient = useQueryClient();
+  const { data: gopManagers = [] } = useGopManagers();
+  const selectedGop = useMemo(
+    () => gopManagers.find((g) => g.user_id === gopId),
+    [gopManagers, gopId],
+  );
+  const gopHotelIds = useMemo(
+    () => (selectedGop ? new Set(selectedGop.hotel_ids) : null),
+    [selectedGop],
+  );
+  const hotelOptions = useMemo(
+    () => (gopHotelIds ? allowedHotels.filter((h) => gopHotelIds.has(h.id)) : allowedHotels),
+    [allowedHotels, gopHotelIds],
+  );
   const [retroOpen, setRetroOpen] = useState(false);
   const [retroHotelId, setRetroHotelId] = useState<string>("");
   const [retroYear, setRetroYear] = useState<number>(new Date().getFullYear());
@@ -317,7 +331,10 @@ export default function IndicadoresDrePage() {
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
   const showAsPct = divider === "revenue";
-  const hotelIds = useMemo(() => (hotelId ? [hotelId] : allowedHotels.map((h) => h.id)), [allowedHotels, hotelId]);
+  const hotelIds = useMemo(() => {
+    if (hotelId) return [hotelId];
+    return hotelOptions.map((h) => h.id);
+  }, [hotelOptions, hotelId]);
   const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
