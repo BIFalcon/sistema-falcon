@@ -651,6 +651,7 @@ function matchMonth(norm: string, targetMonth: number): boolean {
 function findMonthColumn(
   rows: unknown[][],
   targetMonth: number,
+  targetYear?: number,
 ): { headerRow: number; colIndex: number; label: string } | null {
   let dateMatch: { headerRow: number; colIndex: number; label: string } | null = null;
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
@@ -663,10 +664,20 @@ function findMonthColumn(
           return { headerRow: r, colIndex: c, label: cell.trim() };
         }
       }
-      // CONFINS: cabeçalho com Date object (ex.: 2026-01-01)
-      if (cell instanceof Date && dateMatch === null) {
-        if (cell.getMonth() + 1 === targetMonth) {
-          dateMatch = { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
+      // CONFINS: cabeçalho com Date object (ex.: 2026-01-01).
+      // Se targetYear for informado, exige match exato de ano para evitar
+      // pegar uma coluna de outro ano (planilhas com 2025 e 2026 no header).
+      if (cell instanceof Date) {
+        const sameMonth = cell.getMonth() + 1 === targetMonth;
+        const sameYear = targetYear ? cell.getFullYear() === targetYear : true;
+        if (sameMonth && sameYear) {
+          // Match exato de ano tem prioridade — retorna imediatamente.
+          if (targetYear) {
+            return { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
+          }
+          if (dateMatch === null) {
+            dateMatch = { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
+          }
         }
       }
     }
@@ -800,7 +811,7 @@ function readSheetLines(
 
 export async function parseDreExcel(
   file: File,
-  opts: { targetMonth?: number } = {},
+  opts: { targetMonth?: number; targetYear?: number } = {},
 ): Promise<ParsedDre> {
   const buf = await file.arrayBuffer();
   // cellDates: true para que CONFINS (datas no header) gere objetos Date
@@ -826,7 +837,8 @@ export async function parseDreExcel(
 
   // Localiza a coluna do mês alvo. Se não informado, último mês com dado é usado (fallback).
   const targetMonth = opts.targetMonth;
-  const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth) : null;
+  const targetYear = opts.targetYear;
+  const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth, targetYear) : null;
   const monthCol = monthInfo?.colIndex ?? null;
   if (targetMonth && !monthInfo) {
     warnings.push(`Coluna do mês ${targetMonth} não localizada no cabeçalho — usando fallback.`);
@@ -945,7 +957,7 @@ export async function parseDreExcel(
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
-        const prevMonthInfo = findMonthColumn(prevRows, targetMonth);
+        const prevMonthInfo = findMonthColumn(prevRows, targetMonth, targetYear ? targetYear - 1 : undefined);
         const prevMonthCol = prevMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
@@ -980,7 +992,7 @@ export async function parseDreExcel(
       budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS);
       budgetLines = readSheetLines(budgetRows);
       if (targetMonth) {
-        const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth);
+        const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
