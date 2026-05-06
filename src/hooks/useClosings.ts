@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
@@ -29,30 +30,32 @@ export interface ClosingRow {
  */
 export function useClosings(params: { month: number; year: number; hotelId?: string | null }) {
   const { month, year, hotelId } = params;
-  // Fetch the full year once and filter month/hotel on the client. The closings
-  // table is small (dezenas de linhas), so isso elimina o roundtrip ao trocar
-  // qualquer filtro — UI instantânea.
-  return useQuery({
+  // Busca todos os closings do ano uma única vez e filtra month/hotel no client.
+  const query = useQuery({
     queryKey: ["closings", year],
     queryFn: async (): Promise<ClosingRow[]> => {
       const { data, error } = await supabase
         .from("closings")
         .select("*")
         .eq("year", year)
-        .order("hotel_id");
+        .order("month");
       if (error) throw error;
       return (data ?? []) as ClosingRow[];
-    },
-    select: (rows) => {
-      let filtered = rows.filter((c) => c.month === month);
-      if (hotelId) filtered = filtered.filter((c) => c.hotel_id === hotelId);
-      return filtered;
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
+
+  const data = useMemo(() => {
+    const rows = query.data ?? [];
+    let filtered = rows.filter((c) => c.month === month);
+    if (hotelId) filtered = filtered.filter((c) => c.hotel_id === hotelId);
+    return filtered;
+  }, [query.data, month, hotelId]);
+
+  return { ...query, data };
 }
 
 /**
