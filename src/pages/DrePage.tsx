@@ -54,8 +54,8 @@ export default function DrePage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !resolvedId || !user) return;
-    if (!/\.(xlsx?|csv)$/i.test(file.name)) {
-      toast.error("Envie um arquivo Excel (.xlsx, .xls) ou .csv");
+    if (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) {
+      toast.error("Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv");
       return;
     }
     try {
@@ -148,7 +148,7 @@ export default function DrePage() {
                   <input
                     ref={fileRef}
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xlsm,.xls,.csv"
                     className="hidden"
                     onChange={handleFile}
                   />

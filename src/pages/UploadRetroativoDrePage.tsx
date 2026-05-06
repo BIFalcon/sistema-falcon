@@ -163,11 +163,11 @@ export default function UploadRetroativoDrePage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dre-file">Arquivo da DRE (.xlsx)</Label>
+            <Label htmlFor="dre-file">Arquivo da DRE (.xlsx, .xlsm, .xls)</Label>
             <Input
               id="dre-file"
               type="file"
-              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
             {file && (
