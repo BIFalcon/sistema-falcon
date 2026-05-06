@@ -13,7 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { sanitizeFileName } from "@/lib/constants";
-import { parseDreExcel, getDreLineCategory, type ParsedDre } from "@/lib/dreParser";
+import { parseDreExcel, getDreLineCategory, getDreLineCategorization, type ParsedDre } from "@/lib/dreParser";
 
 export interface RetroUploadResult {
   monthsDetected: number[];
@@ -137,15 +137,19 @@ export async function uploadRetroactiveDre(input: {
       const extraKeyRows = parsed.lines.filter(
         (l) => !baseSet.has(l.row) && KEY_LINE_RX.some((rx) => rx.test(l.label)),
       );
-      const otherRows = [...baseRows, ...extraKeyRows].map((l) => ({
-        closing_id: closingId!,
-        version_number: nextVersion,
-        line_label: l.label,
-        line_type: "line",
-        line_value: l.value,
-        line_level: l.level ?? 3,
-        line_category: getDreLineCategory(l.label),
-      }));
+      const otherRows = [...baseRows, ...extraKeyRows].map((l) => {
+        const cat = getDreLineCategorization(l.label);
+        return {
+          closing_id: closingId!,
+          version_number: nextVersion,
+          line_label: l.label,
+          line_type: "line",
+          line_value: l.value,
+          line_level: l.level ?? 3,
+          line_category: cat?.catMacro ?? getDreLineCategory(l.label),
+          line_segment: cat?.segment ?? null,
+        };
+      });
 
       const seriesRows: typeof indicatorRows = [];
       const pushSeries = (

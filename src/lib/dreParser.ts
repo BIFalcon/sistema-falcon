@@ -90,6 +90,129 @@ export function getDreLineCategory(label: string): string {
   return "Despesas Específicas";
 }
 
+export interface DreLineMapping {
+  catMacro: string;
+  segment: string;
+}
+
+const DRE_LINE_MAP: Array<{ pattern: RegExp; catMacro: string; segment: string }> = [
+  // ── DEDUÇÕES DA RECEITA ──
+  { pattern: /^iss$/i,                           catMacro: "Deduções da Receita",  segment: "(-) Impostos s/ vendas e serviços" },
+  { pattern: /^icms$/i,                          catMacro: "Deduções da Receita",  segment: "(-) Impostos s/ vendas e serviços" },
+  { pattern: /^pis$/i,                           catMacro: "Deduções da Receita",  segment: "(-) Impostos s/ vendas e serviços" },
+  { pattern: /^cofins$/i,                        catMacro: "Deduções da Receita",  segment: "(-) Impostos s/ vendas e serviços" },
+  { pattern: /imposto.*vend/i,                   catMacro: "Deduções da Receita",  segment: "(-) Impostos s/ vendas e serviços" },
+
+  // ── DESPESAS FIXAS — Pessoal ──
+  { pattern: /^sal[aá]rio/i,                     catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /^f[eé]rias$/i,                     catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /^encargos$/i,                      catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /vale\s*refei/i,                    catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /vale\s*transport/i,                catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /rescis/i,                          catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /uniforme/i,                        catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /lavanderia\s*func/i,               catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /treinamento/i,                     catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /confraterniza/i,                   catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /plano\s*de\s*sa[úu]de/i,           catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /m[ãa]o\s*de\s*obra/i,              catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+  { pattern: /repasse\s*de\s*sal/i,              catMacro: "Despesas Fixas",       segment: "Despesas com Pessoal" },
+
+  // ── DESPESAS FIXAS — Custo das Mercadorias ──
+  { pattern: /custo.*mercadoria/i,               catMacro: "Despesas Fixas",       segment: "(-) Custo das Mercadorias Vendidas" },
+  { pattern: /custo.*caf[eé]\s*da\s*manh/i,      catMacro: "Despesas Fixas",       segment: "(-) Custo das Mercadorias Vendidas" },
+
+  // ── DESPESAS FIXAS — Operacionais ──
+  { pattern: /taxa\s*de\s*condom/i,              catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /aluguel.*m[áa]quina/i,             catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /material.*escrit/i,                catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /material.*inform[áa]t/i,           catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /telefon/i,                         catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /correio/i,                         catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /impresso/i,                        catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /associa.*classe/i,                 catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /viagen.*estadi/i,                  catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /despesa.*alimenta/i,               catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /condu.*transport/i,                catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /decora.*anima/i,                   catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /^seguro/i,                         catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /ecad/i,                            catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /taxas.*emolumento/i,               catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /aquisi.*bens.*pequeno/i,           catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+  { pattern: /despesa.*n[ãa]o\s*previst/i,       catMacro: "Despesas Fixas",       segment: "Despesas Operacionais" },
+
+  // ── DESPESAS FIXAS — Prestadores ──
+  { pattern: /assessoria\s*cont[áa]b/i,          catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+  { pattern: /auditoria/i,                       catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+  { pattern: /advocaci/i,                        catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+  { pattern: /assist.*software/i,                catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+  { pattern: /servi.*terceiro/i,                 catMacro: "Despesas Fixas",       segment: "Despesas com Prestadores de Serviços" },
+
+  // ── DESPESAS VARIÁVEIS — Hospedagem ──
+  { pattern: /amenitie/i,                        catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+  { pattern: /material.*apartamento/i,           catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+  { pattern: /lavanderia\s*enxoval/i,            catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+  { pattern: /lavanderia\s*h[oó]spede/i,         catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+  { pattern: /material.*limpeza/i,               catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+  { pattern: /utens[íi]lio.*cozinha/i,           catMacro: "Despesas Variáveis",   segment: "Custos de Hospedagem" },
+
+  // ── DESPESAS VARIÁVEIS — Utilidades ──
+  { pattern: /energia\s*el[eé]tric/i,            catMacro: "Despesas Variáveis",   segment: "Despesas de Utilidades" },
+  { pattern: /[áa]gua\s*e\s*esgoto/i,            catMacro: "Despesas Variáveis",   segment: "Despesas de Utilidades" },
+  { pattern: /^g[áa]s$/i,                        catMacro: "Despesas Variáveis",   segment: "Despesas de Utilidades" },
+
+  // ── DESPESAS VARIÁVEIS — Manutenção ──
+  { pattern: /contrato.*manuten/i,               catMacro: "Despesas Variáveis",   segment: "Despesas com Manutenção" },
+  { pattern: /^laudos?$/i,                       catMacro: "Despesas Variáveis",   segment: "Despesas com Manutenção" },
+  { pattern: /material.*manuten/i,               catMacro: "Despesas Variáveis",   segment: "Despesas com Manutenção" },
+  { pattern: /servi.*eventual.*manuten/i,        catMacro: "Despesas Variáveis",   segment: "Despesas com Manutenção" },
+
+  // ── DESPESAS VARIÁVEIS — Vendas ──
+  { pattern: /comiss.*ag[eê]ncia/i,              catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /comiss.*cart[ãa]o/i,               catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /publicidade|propaganda|marketing/i,catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /assessoria.*vend/i,                catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /viagem.*comercial/i,               catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+  { pattern: /^brinde/i,                         catMacro: "Despesas Variáveis",   segment: "Despesas com Vendas" },
+
+  // ── DESPESAS VARIÁVEIS — Taxas Accor ──
+  { pattern: /auditoria.*servi.*software/i,      catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+  { pattern: /tars.*fideliza/i,                  catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+  { pattern: /royalt.*accor/i,                   catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+  { pattern: /taxa.*reserva.*accor/i,            catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+  { pattern: /fee.*marketing.*accor/i,           catMacro: "Despesas Variáveis",   segment: "Taxas Accor" },
+
+  // ── DESPESAS VARIÁVEIS — Taxas de Administração ──
+  { pattern: /taxa.*adm.*falcon/i,               catMacro: "Despesas Variáveis",   segment: "Taxas de Administração" },
+
+  // ── DESPESAS VARIÁVEIS — Financeiras ──
+  { pattern: /tarifa.*banc/i,                    catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+  { pattern: /taxa.*antecipa/i,                  catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+  { pattern: /^pcld$/i,                          catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+  { pattern: /juros\s*passivo/i,                 catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+  { pattern: /desconto.*concedido/i,             catMacro: "Despesas Variáveis",   segment: "Despesas Financeiras" },
+
+  // ── DEDUÇÕES PÓS GOP ──
+  { pattern: /tcl|iptu/i,                        catMacro: "Deduções pós GOP",     segment: "Total dos Gastos de Propriedade" },
+  { pattern: /fundo.*reserva/i,                  catMacro: "Deduções pós GOP",     segment: "Total dos Gastos de Propriedade" },
+  { pattern: /taxa.*adm.*gop/i,                  catMacro: "Deduções pós GOP",     segment: "Total dos Gastos de Propriedade" },
+  { pattern: /gasto.*propriedade/i,              catMacro: "Deduções pós GOP",     segment: "Total dos Gastos de Propriedade" },
+  { pattern: /^irpj$/i,                          catMacro: "Deduções pós GOP",     segment: "Total dos Impostos sobre o Lucro" },
+  { pattern: /^csll$/i,                          catMacro: "Deduções pós GOP",     segment: "Total dos Impostos sobre o Lucro" },
+  { pattern: /taxa.*sucesso/i,                   catMacro: "Deduções pós GOP",     segment: "Total de Taxas sobre o Lucro Líquido" },
+  { pattern: /compensa.*prejuiz/i,               catMacro: "Deduções pós GOP",     segment: "Total de Prejuízo a compensar" },
+  { pattern: /irrf.*aplica/i,                    catMacro: "Deduções pós GOP",     segment: "Despesas Financeiras" },
+];
+
+export function getDreLineCategorization(label: string): DreLineMapping | null {
+  for (const entry of DRE_LINE_MAP) {
+    if (entry.pattern.test(label)) {
+      return { catMacro: entry.catMacro, segment: entry.segment };
+    }
+  }
+  return null;
+}
+
 export type IndicatorKey =
   | "ocupacao"
   | "adr"
