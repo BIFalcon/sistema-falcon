@@ -301,6 +301,7 @@ export interface DreIndicatorRow {
 }
 
 type DreParsedLineRecord = DreIndicatorRow & {
+  closing_id?: string;
   line_type?: string | null;
   line_level?: number | null;
   line_category?: string | null;
@@ -334,6 +335,39 @@ async function fetchLatestDreParsedLines(closingId: string): Promise<DreParsedLi
     if (!data || data.length < pageSize) break;
   }
   return rows;
+}
+
+async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Promise<Map<string, DreParsedLineRecord[]>> {
+  const result = new Map<string, DreParsedLineRecord[]>();
+  if (closingIds.length === 0) return result;
+
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("dre_parsed_lines")
+      .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+      .in("closing_id", closingIds)
+      .order("closing_id", { ascending: true })
+      .order("version_number", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as DreParsedLineRecord[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  const latestByClosing = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.closing_id) continue;
+    latestByClosing.set(row.closing_id, Math.max(latestByClosing.get(row.closing_id) ?? -Infinity, row.version_number));
+  }
+  for (const row of rows) {
+    if (!row.closing_id || latestByClosing.get(row.closing_id) !== row.version_number) continue;
+    const list = result.get(row.closing_id) ?? [];
+    list.push(row);
+    result.set(row.closing_id, list);
+  }
+  return result;
 }
 
 export function useDreIndicators(closingId: string | null | undefined) {
