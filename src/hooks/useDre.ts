@@ -414,7 +414,7 @@ function useDreAnalyticsImpl(input: {
           if (!closingLines?.length) continue;
           currentLines.push(
             ...closingLines
-              .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
+              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
           );
         }
 
@@ -430,7 +430,7 @@ function useDreAnalyticsImpl(input: {
           if (!closingLines?.length) continue;
           allYearLines.push(
             ...closingLines
-              .map((l) => ({ ...(l as Record<string, unknown>), _month: closing.month })) as LineRow[]
+              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
           );
         }
 
