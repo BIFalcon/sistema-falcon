@@ -662,12 +662,35 @@ function parseHeaderDate(cell: unknown): { month: number; year: number } | null 
   const text = cell.trim().toLowerCase();
   const iso = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
   if (iso) return { year: Number(iso[1]), month: Number(iso[2]) };
+  const ym = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})\b/);
+  if (ym) return { year: Number(ym[1]), month: Number(ym[2]) };
   const br = text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|(?:19|20)\d{2})\b/);
   if (br) {
     const yy = Number(br[3]);
     return { month: Number(br[2]), year: yy < 100 ? 2000 + yy : yy };
   }
+  const my = text.match(/\b(\d{1,2})[\/-](\d{2}|(?:19|20)\d{2})\b/);
+  if (my) {
+    const yy = Number(my[2]);
+    return { month: Number(my[1]), year: yy < 100 ? 2000 + yy : yy };
+  }
   return null;
+}
+
+function parseNumericCell(cell: unknown): number | null {
+  if (typeof cell === "number" && Number.isFinite(cell)) return cell;
+  if (typeof cell !== "string") return null;
+  let text = cell.trim();
+  if (!text || text === "-" || text.startsWith("=")) return null;
+  const negative = /^\(.*\)$/.test(text) || /^-/.test(text);
+  text = text.replace(/[R$%\s()]/g, "").replace(/^-/, "");
+  if (!/[0-9]/.test(text)) return null;
+  const lastComma = text.lastIndexOf(",");
+  const lastDot = text.lastIndexOf(".");
+  if (lastComma > lastDot) text = text.replace(/\./g, "").replace(",", ".");
+  else if (lastDot > lastComma) text = text.replace(/,/g, "");
+  const value = Number(text);
+  return Number.isFinite(value) ? (negative ? -value : value) : null;
 }
 
 function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined, rowIndex: number, colIndex: number): number | null {
@@ -689,8 +712,8 @@ function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined
 function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: number): number {
   let count = 0;
   for (let r = headerRow + 1; r < Math.min(rows.length, headerRow + 260); r++) {
-    const value = rows[r]?.[colIndex];
-    if (typeof value === "number" && Number.isFinite(value) && value !== 0) count++;
+    const value = parseNumericCell(rows[r]?.[colIndex]);
+    if (value != null && value !== 0) count++;
   }
   return count;
 }
