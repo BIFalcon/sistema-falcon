@@ -304,10 +304,9 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, month, year, setHotelId } = useFilters();
+  const { hotelId, gopId, month, year, setHotelId } = useFilters();
   const queryClient = useQueryClient();
   const { data: gopManagers = [] } = useGopManagers();
-  const [gopId, setGopId] = useState<string>("__all__");
   const selectedGop = useMemo(
     () => gopManagers.find((g) => g.user_id === gopId),
     [gopManagers, gopId],
