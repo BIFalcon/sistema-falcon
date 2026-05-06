@@ -7,6 +7,7 @@ import { INDICATOR_LABELS, getDreLineCategory, getDreLineCategorization } from "
 import type { IndicatorKey } from "@/lib/dreParser";
 import { DRE_FIXED_TREE, INDICATORS, type DreTreeNode } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
+import { buildAliasIndex } from "@/lib/dreLabelAliases";
 import {
   estimateDistribution,
   buildHistoryEntry,
