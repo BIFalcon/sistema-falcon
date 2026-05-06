@@ -28,6 +28,7 @@ function hasAnyData(parsed: ParsedDre): boolean {
     (i) => i && typeof i.value === "number" && Number.isFinite(i.value),
   );
   if (hasIndicator) return true;
+  if (parsed.monthColumnIndex == null) return false;
   return parsed.lines.some(
     (line) => typeof line.value === "number" && Number.isFinite(line.value),
   );
