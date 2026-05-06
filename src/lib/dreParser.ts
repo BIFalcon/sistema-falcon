@@ -686,6 +686,15 @@ function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined
   return null;
 }
 
+function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: number): number {
+  let count = 0;
+  for (let r = headerRow + 1; r < Math.min(rows.length, headerRow + 260); r++) {
+    const value = rows[r]?.[colIndex];
+    if (typeof value === "number" && Number.isFinite(value) && value !== 0) count++;
+  }
+  return count;
+}
+
 /**
  * Localiza a linha de cabeçalho com nomes de meses e devolve o índice da
  * coluna correspondente ao mês alvo (1=Jan ... 12=Dez), além do label.
@@ -696,7 +705,7 @@ function findMonthColumn(
   targetYear?: number,
   displayRows?: unknown[][],
 ): { headerRow: number; colIndex: number; label: string } | null {
-  let fallbackMatch: { headerRow: number; colIndex: number; label: string } | null = null;
+  const candidates: Array<{ headerRow: number; colIndex: number; label: string; year: number | null; dataCount: number }> = [];
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
     const displayRow = displayRows?.[r] ?? [];
@@ -707,20 +716,25 @@ function findMonthColumn(
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = parseHeaderDate(cell);
         if (date?.month === targetMonth) {
-          if (!targetYear || date.year === targetYear) return { headerRow: r, colIndex: c, label };
+          candidates.push({ headerRow: r, colIndex: c, label, year: date.year, dataCount: countNumericColumnData(rows, r, c) });
           continue;
         }
         if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
         if (!matchMonth(norm, targetMonth)) continue;
         const year = extractHeaderYear(cell) ?? inferHeaderYear(rows, displayRows, r, c);
-        if (targetYear && year && year !== targetYear) continue;
-        if (!targetYear || year === targetYear) return { headerRow: r, colIndex: c, label };
-        fallbackMatch ??= { headerRow: r, colIndex: c, label };
+        candidates.push({ headerRow: r, colIndex: c, label, year, dataCount: countNumericColumnData(rows, r, c) });
       }
     }
   }
-  return fallbackMatch;
+  const eligible = targetYear
+    ? candidates.filter((candidate) => candidate.year === targetYear || candidate.year == null)
+    : candidates;
+  const preferred = targetYear && eligible.some((candidate) => candidate.year === targetYear)
+    ? eligible.filter((candidate) => candidate.year === targetYear)
+    : eligible;
+  const best = preferred.sort((a, b) => b.dataCount - a.dataCount || a.headerRow - b.headerRow || a.colIndex - b.colIndex)[0];
+  return best ? { headerRow: best.headerRow, colIndex: best.colIndex, label: best.label } : null;
 }
 
 /** Extrai label da linha (primeira string não-vazia). */
