@@ -812,16 +812,16 @@ function rowValueAt(
   excludeCols?: Set<number>,
 ): number | null {
   if (colIndex != null) {
-    const c = row[colIndex];
-    if (typeof c === "number" && Number.isFinite(c)) return c;
+    const c = parseNumericCell(row[colIndex]);
+    if (c != null) return c;
     // Coluna localizada mas célula vazia/string → não cai em fallback,
     // pois isso traria valores de outros meses (ex.: coluna "Média").
     return null;
   }
   for (let i = row.length - 1; i >= 0; i--) {
     if (excludeCols?.has(i)) continue;
-    const c = row[i];
-    if (typeof c === "number" && Number.isFinite(c) && c !== 0) return c;
+    const c = parseNumericCell(row[i]);
+    if (c != null && c !== 0) return c;
   }
   return null;
 }
@@ -877,8 +877,7 @@ function readSheetLines(
 
     const values: Record<number, number | null> = {};
     for (const [month, col] of monthCols) {
-      const v = row[col];
-      values[month] = typeof v === "number" && Number.isFinite(v) ? v : null;
+      values[month] = parseNumericCell(row[col]);
     }
 
     if (Object.values(values).some((v) => v != null)) {
@@ -1150,8 +1149,7 @@ function extractMonthlySeries(
     if (!hitRow) continue;
     const series: (number | null)[] = new Array(12).fill(null);
     for (const [m, c] of monthCols) {
-      const cell = hitRow[c];
-      if (typeof cell === "number" && Number.isFinite(cell)) series[m - 1] = cell;
+      series[m - 1] = parseNumericCell(hitRow[c]);
     }
     out[key] = series;
   }
