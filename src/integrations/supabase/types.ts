@@ -1514,6 +1514,31 @@ export type Database = {
         Returns: number
       }
       get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
+      get_latest_dre_lines: {
+        Args: { _closing_id: string }
+        Returns: {
+          line_category: string
+          line_label: string
+          line_level: number
+          line_segment: string
+          line_type: string
+          line_value: number
+          version_number: number
+        }[]
+      }
+      get_latest_dre_lines_by_closings: {
+        Args: { _closing_ids: string[] }
+        Returns: {
+          closing_id: string
+          line_category: string
+          line_label: string
+          line_level: number
+          line_segment: string
+          line_type: string
+          line_value: number
+          version_number: number
+        }[]
+      }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_global_data_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
