@@ -728,9 +728,34 @@ function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: 
   return count;
 }
 
-function bestMonthValueColumn(rows: unknown[][], displayRows: unknown[][] | undefined, headerRow: number, monthCol: number): { colIndex: number; dataCount: number } {
+function isAggregateOrMonthHeaderCell(cell: unknown): "aggregate" | "month" | null {
+  const date = parseHeaderDate(cell);
+  if (date?.month) return "month";
+  if (typeof cell !== "string") return null;
+  const norm = cell.trim().toLowerCase();
+  if (!norm) return null;
+  if (/^(m[ée]dia|total|acumulado|ano\s*anterior|ytd|year)/.test(norm)) return "aggregate";
+  for (let m = 1; m <= 12; m++) if (matchMonth(norm, m)) return "month";
+  return null;
+}
+
+function bestMonthValueColumn(
+  rows: unknown[][],
+  displayRows: unknown[][] | undefined,
+  headerRow: number,
+  monthCol: number,
+): { colIndex: number; dataCount: number } {
+  // Limita a busca ao bloco do próprio mês: nunca atravessa para outra
+  // coluna de mês ou para colunas agregadas (ACUMULADO/MÉDIA/TOTAL).
+  let maxCol = monthCol;
+  for (let c = monthCol + 1; c <= monthCol + 6; c++) {
+    const headerCell = rows[headerRow]?.[c] ?? displayRows?.[headerRow]?.[c];
+    const kind = isAggregateOrMonthHeaderCell(headerCell);
+    if (kind === "month" || kind === "aggregate") break;
+    maxCol = c;
+  }
   let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
-  for (let c = monthCol; c <= monthCol + 5; c++) {
+  for (let c = monthCol; c <= maxCol; c++) {
     const dataCount = countNumericColumnData(rows, headerRow, c);
     const subHeader = [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
       .filter((v): v is string => typeof v === "string")
