@@ -24,8 +24,12 @@ export interface RetroUploadResult {
 function hasAnyData(parsed: ParsedDre): boolean {
   // Aceita se tem pelo menos um indicador com valor numérico válido
   // independente de monthColumnIndex (que pode ser null em alguns templates)
-  return Object.values(parsed.indicators).some(
+  const hasIndicator = Object.values(parsed.indicators).some(
     (i) => i && typeof i.value === "number" && Number.isFinite(i.value),
+  );
+  if (hasIndicator) return true;
+  return parsed.lines.some(
+    (line) => typeof line.value === "number" && Number.isFinite(line.value),
   );
 }
 
