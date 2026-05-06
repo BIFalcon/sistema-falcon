@@ -39,10 +39,16 @@ export function useGopManagers() {
         byUser.set(row.user_id, arr);
       }
 
+      function shortName(full: string): string {
+        const f = full.trim();
+        if (/geraldo\s+magela/i.test(f)) return "Magela";
+        // primeiro nome
+        return f.split(/\s+/)[0] || f;
+      }
       return (profiles ?? [])
         .map((p) => ({
           user_id: p.user_id,
-          display_name: (p.display_name ?? p.email ?? "").split(" ")[0] || (p.display_name ?? p.email ?? ""),
+          display_name: shortName(p.display_name ?? p.email ?? ""),
           email: p.email,
           hotel_ids: byUser.get(p.user_id) ?? [],
         }))
