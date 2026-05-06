@@ -290,9 +290,10 @@ function VariationPill({ value }: { value: number | null }) {
   return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
 }
 
-function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set<string>; toggle: (id: string) => void }) {
+function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId: string | null; select: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
+  const isSelectable = !hasChildren;
   const fontClass =
     node.level === 1
       ? "text-sm font-semibold"
@@ -305,10 +306,14 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen((v) => !v)} disabled={!hasChildren}>
           {hasChildren ? open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" /> : <span />}
         </Button>
-        <Checkbox checked={selected.has(node.id)} onCheckedChange={() => toggle(node.id)} />
+        {isSelectable ? (
+          <Checkbox checked={selectedId === node.id} onCheckedChange={() => select(node.id)} />
+        ) : (
+          <span className="h-4 w-4 shrink-0" />
+        )}
         <span className={fontClass}>{node.label}</span>
       </div>
-      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selected={selected} toggle={toggle} />)}
+      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedId={selectedId} select={select} />)}
     </div>
   );
 }
@@ -336,7 +341,7 @@ export default function IndicadoresDrePage() {
   const [retroUpToMonth, setRetroUpToMonth] = useState<number>(12);
   const [retroFile, setRetroFile] = useState<File | null>(null);
   const [retroSubmitting, setRetroSubmitting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   
   const [divider, setDivider] = useState("none");
