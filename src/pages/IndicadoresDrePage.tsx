@@ -290,9 +290,10 @@ function VariationPill({ value }: { value: number | null }) {
   return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
 }
 
-function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set<string>; toggle: (id: string) => void }) {
+function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId: string | null; select: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
+  const isSelectable = !(node.level === 1 && /^(topline|receitas|despesas)$/i.test(node.label));
   const fontClass =
     node.level === 1
       ? "text-sm font-semibold"
@@ -305,10 +306,14 @@ function TreeLine({ node, selected, toggle }: { node: DreLineNode; selected: Set
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen((v) => !v)} disabled={!hasChildren}>
           {hasChildren ? open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" /> : <span />}
         </Button>
-        <Checkbox checked={selected.has(node.id)} onCheckedChange={() => toggle(node.id)} />
+        {isSelectable ? (
+          <Checkbox checked={selectedId === node.id} onCheckedChange={() => select(node.id)} />
+        ) : (
+          <span className="h-4 w-4 shrink-0" />
+        )}
         <span className={fontClass}>{node.label}</span>
       </div>
-      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selected={selected} toggle={toggle} />)}
+      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedId={selectedId} select={select} />)}
     </div>
   );
 }
@@ -336,7 +341,7 @@ export default function IndicadoresDrePage() {
   const [retroUpToMonth, setRetroUpToMonth] = useState<number>(12);
   const [retroFile, setRetroFile] = useState<File | null>(null);
   const [retroSubmitting, setRetroSubmitting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   
   const [divider, setDivider] = useState("none");
@@ -355,31 +360,16 @@ export default function IndicadoresDrePage() {
     periodMonths: periodCfg.months,
   });
 
-  // Expande nós selecionados: se um pai for selecionado e tiver
-  // série vazia, substitui pelos descendentes com dados reais.
   const selectedLines = useMemo(() => {
     if (!dataset) return [];
-    function getLeaves(node: DreLineNode): DreLineNode[] {
-      if (node.children.length === 0) return [node];
-      const childLeaves = node.children.flatMap(getLeaves);
-      // Se o nó pai tem dados próprios (série não toda nula), inclui ele
-      const hasSeries = node.series.current.some((v) => v != null);
-      return hasSeries ? [node] : childLeaves;
-    }
-    const result: DreLineNode[] = [];
-    const seen = new Set<string>();
-    for (const id of selectedIds) {
-      const node = dataset.flat.find((n) => n.id === id);
-      if (!node) continue;
-      for (const leaf of getLeaves(node)) {
-        if (!seen.has(leaf.id)) {
-          seen.add(leaf.id);
-          result.push(leaf);
-        }
-      }
-    }
-    return result;
-  }, [dataset, selectedIds]);
+    const node = selectedId ? dataset.flat.find((n) => n.id === selectedId) : undefined;
+    if (!node) return [];
+    const hasSeries = node.series.current.some((v) => v != null);
+    if (hasSeries || node.children.length === 0) return [node];
+    const leaves = (n: DreLineNode): DreLineNode[] =>
+      n.children.length === 0 ? [n] : n.children.flatMap(leaves);
+    return leaves(node);
+  }, [dataset, selectedId]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
@@ -469,11 +459,20 @@ export default function IndicadoresDrePage() {
     l.series.current.filter((v) => v != null && v < 0).length >
     l.series.current.filter((v) => v != null && v > 0).length
   );
-  const toggleLine = (id: string) => setSelectedIds((prev) => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const chartValueIsPct = selectedLines.some((l) =>
+    /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
+  );
+  const formatChartValue = (value: unknown) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    if (chartValueIsPct) {
+      const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+      return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    }
+    return numeric.toLocaleString("pt-BR");
+  };
+  const selectLine = (id: string) => setSelectedId((prev) => (prev === id ? null : id));
 
   const monthsWindow = useMemo(
     () => periodMonths(month, periodCfg.months),
@@ -664,12 +663,12 @@ export default function IndicadoresDrePage() {
 
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <Card className="p-4 shadow-soft">
-              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedIds.size} selecionadas</span></div>
+              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedId ? "1 selecionada" : "0 selecionadas"}</span></div>
               <div className="max-h-[620px] overflow-auto pr-1">
                 {dataset?.tree
                   .filter((n) => n.id.startsWith("fixed:"))
                   .map((node) => (
-                    <TreeLine key={node.id} node={node} selected={selectedIds} toggle={toggleLine} />
+                    <TreeLine key={node.id} node={node} selectedId={selectedId} select={selectLine} />
                   ))}
               </div>
             </Card>
@@ -715,21 +714,19 @@ export default function IndicadoresDrePage() {
                     tickFormatter={(v) => {
                       const abs = Math.abs(Number(v));
                       if (showAsPct) return `${(abs * 100).toFixed(1)}%`;
-                      const isPct = selectedLines.some((l) =>
-                        /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
-                      );
-                      if (isPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
+                      if (chartValueIsPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
                       return abs.toLocaleString("pt-BR", { notation: "compact" });
                     }}
                   />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
-                        formatter={(value) =>
-                          showAsPct
-                            ? `${(Number(value) * 100).toFixed(2)}%`
-                            : Number(value).toLocaleString("pt-BR")
-                        }
+                        formatter={(value, name) => (
+                          <>
+                            <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
+                            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
+                          </>
+                        )}
                       />
                     }
                   />

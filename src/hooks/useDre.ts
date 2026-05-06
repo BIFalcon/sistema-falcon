@@ -301,6 +301,7 @@ export interface DreIndicatorRow {
 }
 
 type DreParsedLineRecord = DreIndicatorRow & {
+  closing_id?: string;
   line_type?: string | null;
   line_level?: number | null;
   line_category?: string | null;
@@ -336,6 +337,39 @@ async function fetchLatestDreParsedLines(closingId: string): Promise<DreParsedLi
   return rows;
 }
 
+async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Promise<Map<string, DreParsedLineRecord[]>> {
+  const result = new Map<string, DreParsedLineRecord[]>();
+  if (closingIds.length === 0) return result;
+
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("dre_parsed_lines")
+      .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+      .in("closing_id", closingIds)
+      .order("closing_id", { ascending: true })
+      .order("version_number", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as DreParsedLineRecord[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  const latestByClosing = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.closing_id) continue;
+    latestByClosing.set(row.closing_id, Math.max(latestByClosing.get(row.closing_id) ?? -Infinity, row.version_number));
+  }
+  for (const row of rows) {
+    if (!row.closing_id || latestByClosing.get(row.closing_id) !== row.version_number) continue;
+    const list = result.get(row.closing_id) ?? [];
+    list.push(row);
+    result.set(row.closing_id, list);
+  }
+  return result;
+}
+
 export function useDreIndicators(closingId: string | null | undefined) {
   return useQuery({
     enabled: !!closingId,
@@ -366,34 +400,29 @@ function useDreAnalyticsImpl(input: {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["dre-analytics", input.hotelIds, input.year, input.month, input.periodMonths ?? 1],
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
       const datasets: DreAnalyticsDataset[] = [];
+      const nMonths = input.periodMonths ?? 1;
+      const startMonth = Math.max(1, input.month - nMonths + 1);
+      const currentMonthRange = Array.from(
+        { length: input.month - startMonth + 1 },
+        (_, i) => startMonth + i,
+      );
+      const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
+      const { data: allClosings, error: closingsError } = await supabase
+        .from("closings")
+        .select("id, month, hotel_id")
+        .in("hotel_id", input.hotelIds)
+        .eq("year", input.year)
+        .in("month", fullYearRange);
+      if (closingsError) throw closingsError;
+      const linesByClosingId = await fetchLatestDreParsedLinesByClosingIds((allClosings ?? []).map((c) => c.id));
 
       for (const hotelId of input.hotelIds) {
-        const nMonths = input.periodMonths ?? 1;
-        const startMonth = Math.max(1, input.month - nMonths + 1);
-        const currentMonthRange = Array.from(
-          { length: input.month - startMonth + 1 },
-          (_, i) => startMonth + i,
-        );
-        // Orçado e Ano Anterior buscam o ano todo para série completa
-        const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
-
-        // Closings do período atual (para série realizada)
-        const { data: currentClosings } = await supabase
-          .from("closings")
-          .select("id, month")
-          .eq("hotel_id", hotelId)
-          .eq("year", input.year)
-          .in("month", currentMonthRange);
-
-        // Closings do ano todo (para orçado e ano anterior)
-        const { data: allYearClosings } = await supabase
-          .from("closings")
-          .select("id, month")
-          .eq("hotel_id", hotelId)
-          .eq("year", input.year)
-          .in("month", fullYearRange);
+        const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
+        const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
 
         if (!currentClosings?.length && !allYearClosings?.length) continue;
 
@@ -410,7 +439,7 @@ function useDreAnalyticsImpl(input: {
         // Linhas do período atual → alimentam série "current"
         const currentLines: LineRow[] = [];
         for (const closing of currentClosings ?? []) {
-          const closingLines = await fetchLatestDreParsedLines(closing.id);
+          const closingLines = linesByClosingId.get(closing.id) ?? [];
           if (!closingLines?.length) continue;
           currentLines.push(
             ...closingLines
@@ -426,7 +455,7 @@ function useDreAnalyticsImpl(input: {
             allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
             continue;
           }
-          const closingLines = await fetchLatestDreParsedLines(closing.id);
+          const closingLines = linesByClosingId.get(closing.id) ?? [];
           if (!closingLines?.length) continue;
           allYearLines.push(
             ...closingLines

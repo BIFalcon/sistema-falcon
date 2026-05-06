@@ -658,6 +658,10 @@ function extractHeaderYear(cell: unknown): number | null {
 
 function parseHeaderDate(cell: unknown): { month: number; year: number } | null {
   if (cell instanceof Date) return { month: cell.getMonth() + 1, year: cell.getFullYear() };
+  if (typeof cell === "number" && Number.isFinite(cell) && cell > 20000 && cell < 80000) {
+    const parsed = XLSX.SSF.parse_date_code(cell);
+    if (parsed?.m && parsed?.y) return { month: parsed.m, year: parsed.y };
+  }
   if (typeof cell !== "string") return null;
   const text = cell.trim().toLowerCase();
   const iso = text.match(/\b((?:19|20)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
@@ -694,14 +698,20 @@ function parseNumericCell(cell: unknown): number | null {
 }
 
 function inferHeaderYear(rows: unknown[][], displayRows: unknown[][] | undefined, rowIndex: number, colIndex: number): number | null {
-  const candidates: unknown[] = [];
-  for (let r = Math.max(0, rowIndex - 1); r <= Math.min(rows.length - 1, rowIndex + 1); r++) {
+  const collect = (r: number): unknown[] => {
     const rawRow = rows[r] ?? [];
     const displayRow = displayRows?.[r] ?? [];
+    const candidates: unknown[] = [];
     for (let c = Math.max(0, colIndex - 8); c <= Math.min(Math.max(rawRow.length, displayRow.length) - 1, colIndex + 1); c++) {
       candidates.push(rawRow[c], displayRow[c]);
     }
-  }
+    return candidates;
+  };
+  const candidates = [
+    ...collect(rowIndex),
+    ...(rowIndex > 0 ? collect(rowIndex - 1) : []),
+    ...(rowIndex < rows.length - 1 ? collect(rowIndex + 1) : []),
+  ];
   for (const candidate of candidates) {
     const year = extractHeaderYear(candidate);
     if (year) return year;
@@ -716,6 +726,24 @@ function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: 
     if (value != null && value !== 0) count++;
   }
   return count;
+}
+
+function bestMonthValueColumn(rows: unknown[][], displayRows: unknown[][] | undefined, headerRow: number, monthCol: number): { colIndex: number; dataCount: number } {
+  let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
+  for (let c = monthCol; c <= monthCol + 5; c++) {
+    const dataCount = countNumericColumnData(rows, headerRow, c);
+    const subHeader = [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
+      .filter((v): v is string => typeof v === "string")
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    let score = dataCount;
+    if (/realizado|actual|valor/.test(subHeader)) score += 1000;
+    if (/orcado|budget|ano\s*anterior|desvio|varia|%/.test(subHeader)) score -= 1000;
+    if (score > best.score) best = { colIndex: c, dataCount, score };
+  }
+  return { colIndex: best.colIndex, dataCount: best.dataCount };
 }
 
 /**
@@ -739,14 +767,16 @@ function findMonthColumn(
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = parseHeaderDate(cell);
         if (date?.month === targetMonth) {
-          candidates.push({ headerRow: r, colIndex: c, label, year: date.year, dataCount: countNumericColumnData(rows, r, c) });
+          const best = bestMonthValueColumn(rows, displayRows, r, c);
+          candidates.push({ headerRow: r, colIndex: best.colIndex, label, year: date.year, dataCount: best.dataCount });
           continue;
         }
         if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
         if (!matchMonth(norm, targetMonth)) continue;
         const year = extractHeaderYear(cell) ?? inferHeaderYear(rows, displayRows, r, c);
-        candidates.push({ headerRow: r, colIndex: c, label, year, dataCount: countNumericColumnData(rows, r, c) });
+        const best = bestMonthValueColumn(rows, displayRows, r, c);
+        candidates.push({ headerRow: r, colIndex: best.colIndex, label, year, dataCount: best.dataCount });
       }
     }
   }
@@ -778,7 +808,7 @@ function rowLabelAndLevel(
   firstMonthCol: number,
 ): { label: string; level: number } | null {
   const textCols: { col: number; text: string }[] = [];
-  for (let c = 2; c < firstMonthCol; c++) {
+  for (let c = 0; c < firstMonthCol; c++) {
     const cell = row[c];
     if (typeof cell === "string" && cell.trim().length > 1) {
       textCols.push({ col: c, text: cell.trim() });
@@ -851,11 +881,26 @@ function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
   return result;
 }
 
+function findAllMonthColumnsForYear(
+  rows: unknown[][],
+  targetYear?: number,
+  displayRows?: unknown[][],
+): Map<number, number> {
+  const result = new Map<number, number>();
+  for (let m = 1; m <= 12; m++) {
+    const info = findMonthColumn(rows, m, targetYear, displayRows);
+    if (info) result.set(m, info.colIndex);
+  }
+  return result.size > 0 ? result : findAllMonthColumns(rows);
+}
+
 /** Lê todas as linhas de uma aba com série anual completa (Jan-Dez). */
 function readSheetLines(
   rows: unknown[][],
+  targetYear?: number,
+  displayRows?: unknown[][],
 ): Array<{ label: string; level: number; values: Record<number, number | null> }> {
-  const monthCols = findAllMonthColumns(rows);
+  const monthCols = findAllMonthColumnsForYear(rows, targetYear, displayRows);
   if (monthCols.size === 0) return [];
 
   const firstMonthCol = Math.min(...monthCols.values());
@@ -1038,7 +1083,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: false,
       });
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
-      prevLines = readSheetLines(prevRows);
+      prevLines = readSheetLines(prevRows, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
       if (targetMonth) {
@@ -1078,7 +1123,7 @@ export async function parseDreExcel(
         header: 1, blankrows: false, defval: null, raw: false,
       });
       budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS, targetYear, budgetDisplayRows);
-      budgetLines = readSheetLines(budgetRows);
+      budgetLines = readSheetLines(budgetRows, targetYear, budgetDisplayRows);
       if (targetMonth) {
         const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear, budgetDisplayRows);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
