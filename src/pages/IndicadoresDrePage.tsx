@@ -54,6 +54,27 @@ const CARD_LINES: CardDef[] = [
   },
 ];
 
+type AggType = "sum" | "avg" | "weighted_avg";
+
+const AGG_RULES: Array<{ pattern: RegExp; agg: AggType }> = [
+  // Médias ponderadas por Room Nights / UHs disponíveis
+  { pattern: /taxa\s*de\s*ocupa/i,     agg: "weighted_avg" },
+  { pattern: /diária\s*média|adr/i,    agg: "weighted_avg" },
+  { pattern: /revpar/i,                agg: "weighted_avg" },
+  { pattern: /fator\s*de\s*ocupa/i,    agg: "avg" },
+  // Porcentagens — média simples
+  { pattern: /%\s*gop/i,               agg: "avg" },
+  { pattern: /margem\s*l[íi]quida/i,   agg: "avg" },
+  // Tudo mais → soma
+];
+
+function getAggType(label: string): AggType {
+  for (const rule of AGG_RULES) {
+    if (rule.pattern.test(label)) return rule.agg;
+  }
+  return "sum"; // default: receitas, despesas, GOP, etc.
+}
+
 type PeriodKey = "1" | "2" | "3" | "6" | "12";
 const PERIOD_OPTIONS: { value: PeriodKey; label: string; months: number }[] = [
   { value: "1", label: "Mensal", months: 1 },
@@ -139,6 +160,58 @@ function pickLine(
   return undefined;
 }
 
+function aggregateSelectedSeries(
+  lines: DreLineNode[],
+  key: DreSeriesKey,
+  dataset: ReturnType<typeof useDreAnalytics>["data"],
+): DreMonthValue[] {
+  if (lines.length === 0) return Array(12).fill(null);
+  const aggTypes = lines.map((l) => getAggType(l.label));
+  const allSame = aggTypes.every((a) => a === aggTypes[0]);
+  const agg = allSame ? aggTypes[0] : "sum";
+
+  if (agg === "sum") {
+    return sumSeries(lines, key);
+  }
+  if (agg === "avg") {
+    return Array.from({ length: 12 }, (_, i) => {
+      const vals = lines
+        .map((l) => l.series[key][i])
+        .filter((v): v is number => v != null && Number.isFinite(v));
+      if (vals.length === 0) return null;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    });
+  }
+  if (agg === "weighted_avg") {
+    const roomNightsLine =
+      findDreLine(dataset ?? undefined, "Apartamentos Ocupados") ??
+      findDreLine(dataset ?? undefined, "Apartamentos ocupados") ??
+      findDreLine(dataset ?? undefined, "Room Nights");
+    if (!roomNightsLine) {
+      return Array.from({ length: 12 }, (_, i) => {
+        const vals = lines
+          .map((l) => l.series[key][i])
+          .filter((v): v is number => v != null && Number.isFinite(v));
+        if (vals.length === 0) return null;
+        return vals.reduce((a, b) => a + b, 0) / vals.length;
+      });
+    }
+    return Array.from({ length: 12 }, (_, i) => {
+      let sumWeighted = 0;
+      let sumWeights = 0;
+      for (const line of lines) {
+        const val = line.series[key][i];
+        const rn = roomNightsLine.series[key][i];
+        if (val == null || rn == null || !Number.isFinite(val) || !Number.isFinite(rn) || rn === 0) continue;
+        sumWeighted += val * rn;
+        sumWeights += rn;
+      }
+      return sumWeights > 0 ? sumWeighted / sumWeights : null;
+    });
+  }
+  return Array(12).fill(null);
+}
+
 function computeCardValue(
   card: CardDef,
   dataset: ReturnType<typeof useDreAnalytics>["data"],
@@ -155,6 +228,27 @@ function computeCardValue(
   if (!line) return null;
   const v = aggregateSeries(line.series[series], months, card.agg);
   if (v == null) return null;
+  // Para períodos com múltiplos meses, usa média ponderada por RN
+  if (months.length > 1 && (card.title === "Taxa de Ocupação" || card.title === "ADR" || card.title === "RevPAR")) {
+    const rnLine = pickLine(dataset, ["Apartamentos Ocupados", "Apartamentos ocupados", "Room Nights"]);
+    if (rnLine) {
+      let sumWeighted = 0;
+      let sumWeights = 0;
+      for (const m of months) {
+        const val = line.series[series][m - 1];
+        const rn = rnLine.series[series][m - 1];
+        if (val != null && rn != null && Number.isFinite(val) && Number.isFinite(rn) && rn > 0) {
+          sumWeighted += val * rn;
+          sumWeights += rn;
+        }
+      }
+      if (sumWeights > 0) {
+        const weighted = sumWeighted / sumWeights;
+        if (card.title === "Taxa de Ocupação") return weighted <= 1 ? weighted * 100 : weighted;
+        return weighted;
+      }
+    }
+  }
   // Taxa de Ocupação vem em fração ou %; normaliza para %
   if (card.title === "Taxa de Ocupação") return v <= 1 ? v * 100 : v;
   return v;
