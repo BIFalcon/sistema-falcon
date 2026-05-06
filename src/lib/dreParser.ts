@@ -850,6 +850,7 @@ export async function parseDreExcel(
   if (!indicators.receita_bruta_total) warnings.push("Receita Bruta Total não localizada.");
   if (!indicators.ocupacao) warnings.push("Taxa de Ocupação não localizada.");
   if (!indicators.lucro_liquido) warnings.push("Lucro Líquido não localizado.");
+  warnings.push(`[DEBUG] firstMonthCol=${firstMonthCol}, monthCol=${monthCol}, template=${template}, sheet=${sheetName}, totalRows=${rows.length}`);
 
   // ─── Séries mensais Jan-Dez para gráficos da Carta ───
   // Chaves de interesse para os gráficos:

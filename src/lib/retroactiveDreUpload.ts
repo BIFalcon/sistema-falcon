@@ -22,9 +22,8 @@ export interface RetroUploadResult {
 }
 
 function hasAnyData(parsed: ParsedDre): boolean {
-  // Considera "tem dados" se a coluna do mês foi localizada E pelo menos
-  // um indicador-chave foi capturado com valor numérico finito.
-  if (parsed.monthColumnIndex == null) return false;
+  // Aceita se tem pelo menos um indicador com valor numérico válido
+  // independente de monthColumnIndex (que pode ser null em alguns templates)
   return Object.values(parsed.indicators).some(
     (i) => i && typeof i.value === "number" && Number.isFinite(i.value),
   );
