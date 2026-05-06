@@ -109,7 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isMaster = roles.some((r) => (MASTER_ROLES as readonly string[]).includes(r));
-  const allowedHotels = isMaster ? allHotels : userHotels;
+  const GLOBAL_ACCESS_ROLES = ["controladoria", "financeiro", "ri", "rh", "operacoes", "viewer"];
+  const hasGlobalAccess = isMaster || roles.some((r) => GLOBAL_ACCESS_ROLES.includes(r as string));
+  const allowedHotels = hasGlobalAccess ? allHotels : userHotels;
 
   const hasFinanceiroRole = roles.includes("financeiro" as AppRole);
   // Default histórico: financeiro sem sub-flag = coordenadora.
