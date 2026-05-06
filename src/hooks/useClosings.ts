@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ClosingStatus } from "@/lib/constants";
@@ -29,20 +29,25 @@ export interface ClosingRow {
  */
 export function useClosings(params: { month: number; year: number; hotelId?: string | null }) {
   const { month, year, hotelId } = params;
+  // Fetch all closings for the period once; filter by hotel on the client so
+  // switching the hotel filter is instant and doesn't trigger a network roundtrip.
   return useQuery({
-    queryKey: ["closings", year, month, hotelId ?? "all"],
+    queryKey: ["closings", year, month],
     queryFn: async (): Promise<ClosingRow[]> => {
-      let q = supabase
+      const { data, error } = await supabase
         .from("closings")
         .select("*")
         .eq("month", month)
         .eq("year", year)
         .order("hotel_id");
-      if (hotelId) q = q.eq("hotel_id", hotelId);
-      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as ClosingRow[];
     },
+    select: (rows) => (hotelId ? rows.filter((c) => c.hotel_id === hotelId) : rows),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -94,6 +99,9 @@ export function useClosing(closingId: string | null | undefined) {
       if (error) throw error;
       return (data ?? null) as ClosingRow | null;
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
