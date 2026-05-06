@@ -642,6 +642,7 @@ function findMonthColumn(
   rows: unknown[][],
   targetMonth: number,
 ): { headerRow: number; colIndex: number; label: string } | null {
+  let dateMatch: { headerRow: number; colIndex: number; label: string } | null = null;
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
@@ -653,14 +654,14 @@ function findMonthColumn(
         }
       }
       // CONFINS: cabeçalho com Date object (ex.: 2026-01-01)
-      if (cell instanceof Date) {
+      if (cell instanceof Date && dateMatch === null) {
         if (cell.getMonth() + 1 === targetMonth) {
-          return { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
+          dateMatch = { headerRow: r, colIndex: c, label: cell.toISOString().slice(0, 10) };
         }
       }
     }
   }
-  return null;
+  return dateMatch;
 }
 
 /** Extrai label da linha (primeira string não-vazia). */
@@ -791,6 +792,11 @@ export async function parseDreExcel(
           break;
         }
       }
+      // CONFINS: mês como Date object
+      if (cell instanceof Date && cell.getMonth() === 0) {
+        if (firstMonthCol === 6) firstMonthCol = c; // só se não achou string
+        break;
+      }
     }
     if (firstMonthCol !== 6) break;
   }
@@ -800,6 +806,10 @@ export async function parseDreExcel(
     const ll = rowLabelAndLevel(row, firstMonthCol);
     if (!ll) return;
     const { label, level } = ll;
+    // Remove código contábil do início do label (ex: "3010101001 Diárias" → "Diárias")
+    // MAS só se o restante tiver pelo menos 3 chars (evita apagar labels numéricos válidos)
+    const cleanLabel = label.replace(/^\d[\d\.]*\s+/, "").trim();
+    const finalLabel = cleanLabel.length >= 3 ? cleanLabel : label;
     // Filtra labels estruturais que não devem aparecer no seletor de
     // Indicadores DRE (cabeçalhos de seção, títulos de planilha etc.).
     const STRUCTURAL_LABELS = [
@@ -816,20 +826,22 @@ export async function parseDreExcel(
       /^resultado\s+acumulado/i,
       /^lucro\s*\/\s*prejuízo\s+acumulado/i,
       /^lucro\s+antes/i,
+      /^\d{5,}/,                           // linha começa com código contábil (5+ dígitos)
+      /^\d{4,}\.\d/,                       // código no formato 3.1.2.03.001
     ];
     if (STRUCTURAL_LABELS.some((rx) => rx.test(label))) return;
     if (/dre\s+\d{4}/i.test(label)) return;
     let value = rowValueAt(row, monthCol, aggregateCols);
     // CONFINS: "UHs Pool: 280" — extrai o número embutido no rótulo
     if (value == null) {
-      const m = label.match(/(\d{2,5})\s*$/);
+      const m = finalLabel.match(/(\d{2,5})\s*$/);
       if (m) value = Number(m[1]);
     }
-    lines.push({ row: idx + 1, label, value, level });
+    lines.push({ row: idx + 1, label: finalLabel, value, level });
     for (const ind of INDICATORS) {
       if (indicators[ind.key]) continue;
-      if (ind.rx.some((rx) => rx.test(label))) {
-        indicators[ind.key] = { key: ind.key, label, value, row: idx + 1, sheet: sheetName };
+      if (ind.rx.some((rx) => rx.test(finalLabel))) {
+        indicators[ind.key] = { key: ind.key, label: finalLabel, value, row: idx + 1, sheet: sheetName };
       }
     }
   });
