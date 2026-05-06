@@ -2,11 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 
 interface FilterContextValue {
   hotelId: string | null;
+  gopId: string | null;
   month: number;
   year: number;
   dateFrom: string;
   dateTo: string;
   setHotelId: (id: string | null) => void;
+  setGopId: (id: string | null) => void;
   setMonth: (m: number) => void;
   setYear: (y: number) => void;
   setDateFrom: (d: string) => void;
@@ -20,6 +22,7 @@ const STORAGE_KEY = "falcon:filters";
 export function FilterProvider({ children }: { children: ReactNode }) {
   const now = new Date();
   const [hotelId, setHotelIdState] = useState<string | null>(null);
+  const [gopId, setGopIdState] = useState<string | null>(null);
   const [month, setMonthState] = useState<number>(now.getMonth() + 1);
   const [year, setYearState] = useState<number>(now.getFullYear());
   const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -35,6 +38,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const v = JSON.parse(raw);
         if (v.hotelId !== undefined) setHotelIdState(v.hotelId);
+        if (v.gopId !== undefined) setGopIdState(v.gopId);
         if (typeof v.month === "number") setMonthState(v.month);
         if (typeof v.year === "number") setYearState(v.year);
         if (typeof v.dateFrom === "string") setDateFromState(v.dateFrom);
@@ -48,19 +52,21 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ hotelId, month, year, dateFrom, dateTo }),
+      JSON.stringify({ hotelId, gopId, month, year, dateFrom, dateTo }),
     );
-  }, [hotelId, month, year, dateFrom, dateTo]);
+  }, [hotelId, gopId, month, year, dateFrom, dateTo]);
 
   return (
     <FilterContext.Provider
       value={{
         hotelId,
+        gopId,
         month,
         year,
         dateFrom,
         dateTo,
         setHotelId: setHotelIdState,
+        setGopId: setGopIdState,
         setMonth: setMonthState,
         setYear: setYearState,
         setDateFrom: setDateFromState,
