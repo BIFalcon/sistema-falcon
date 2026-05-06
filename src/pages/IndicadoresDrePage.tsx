@@ -231,7 +231,31 @@ export default function IndicadoresDrePage() {
     periodMonths: periodCfg.months,
   });
 
-  const selectedLines = useMemo(() => dataset?.flat.filter((line) => selectedIds.has(line.id)) ?? [], [dataset, selectedIds]);
+  // Expande nós selecionados: se um pai for selecionado e tiver
+  // série vazia, substitui pelos descendentes com dados reais.
+  const selectedLines = useMemo(() => {
+    if (!dataset) return [];
+    function getLeaves(node: DreLineNode): DreLineNode[] {
+      if (node.children.length === 0) return [node];
+      const childLeaves = node.children.flatMap(getLeaves);
+      // Se o nó pai tem dados próprios (série não toda nula), inclui ele
+      const hasSeries = node.series.current.some((v) => v != null);
+      return hasSeries ? [node] : childLeaves;
+    }
+    const result: DreLineNode[] = [];
+    const seen = new Set<string>();
+    for (const id of selectedIds) {
+      const node = dataset.flat.find((n) => n.id === id);
+      if (!node) continue;
+      for (const leaf of getLeaves(node)) {
+        if (!seen.has(leaf.id)) {
+          seen.add(leaf.id);
+          result.push(leaf);
+        }
+      }
+    }
+    return result;
+  }, [dataset, selectedIds]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
