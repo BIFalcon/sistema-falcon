@@ -220,10 +220,21 @@ function computeCardValue(
   series: DreSeriesKey,
 ): number | null {
   if (card.agg === "ratio") {
-    const num = pickLine(dataset, card.numLabels);
-    const den = pickLine(dataset, card.denLabels);
-    if (!num || !den) return null;
-    return aggregateRatio(num.series[series], den.series[series], months);
+    // Tenta cada combinação numerador × denominador até obter um valor
+    // não-nulo na série pedida (importante para Margem Líquida em
+    // Orçado/Ano Anterior, onde "Lucro a Distribuir" não tem dados,
+    // mas "Lucro Líquido / Prejuízo do Exercício" tem).
+    for (const nLbl of card.numLabels) {
+      const num = findDreLine(dataset ?? undefined, nLbl);
+      if (!num) continue;
+      for (const dLbl of card.denLabels) {
+        const den = findDreLine(dataset ?? undefined, dLbl);
+        if (!den) continue;
+        const v = aggregateRatio(num.series[series], den.series[series], months);
+        if (v != null) return v;
+      }
+    }
+    return null;
   }
   const line = pickLine(dataset, card.labels);
   if (!line) return null;
