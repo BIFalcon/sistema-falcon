@@ -5,6 +5,7 @@ import { sanitizeFileName } from "@/lib/constants";
 import { parseDreExcel } from "@/lib/dreParser";
 import { INDICATOR_LABELS, getDreLineCategory, getDreLineCategorization } from "@/lib/dreParser";
 import type { IndicatorKey } from "@/lib/dreParser";
+import { DRE_FIXED_TREE, type DreTreeNode } from "@/lib/dreParser";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import {
   estimateDistribution,
@@ -438,10 +439,6 @@ function useDreAnalyticsImpl(input: {
           });
         }
 
-        // Reconstrói árvore hierárquica a partir das linhas detalhadas
-        // mantendo a ordem original da planilha.
-        const rootNodes: DreLineNode[] = [];
-
         // Agrupa linhas por label combinando meses do período (mantém ordem
         // de primeira aparição via Map).
         const linesByLabel = new Map<string, {
@@ -464,76 +461,54 @@ function useDreAnalyticsImpl(input: {
           linesByLabel.get(lbl)!.values.set(month, line.line_value ?? null);
         }
 
-        const MACRO_ORDER = [
-          "Deduções da Receita",
-          "Despesas Fixas",
-          "Despesas Variáveis",
-          "Deduções pós GOP",
-          "Outros",
-        ];
-        const macroMap = new Map<string, Map<string, DreLineNode[]>>();
+        // Normaliza string para comparação tolerante a variações
+        const normLabel = (s: string): string =>
+          s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase().replace(/\s+/g, " ").trim();
 
-        for (const [lbl, { values, category, segment }] of linesByLabel) {
-          const current: (number | null)[] = Array(12).fill(null);
-          for (const [m, v] of values) current[m - 1] = v;
-
-          const leafNode: DreLineNode = {
-            id: `leaf:${lbl.toLowerCase().trim()}`,
-            label: lbl,
-            level: 3,
-            series: { current, budget: Array(12).fill(null), previous: Array(12).fill(null) },
-            children: [],
-          };
-
-          const macro = category || "Outros";
-          const seg = segment || "__noseg__";
-
-          if (!macroMap.has(macro)) macroMap.set(macro, new Map());
-          const segMap = macroMap.get(macro)!;
-          if (!segMap.has(seg)) segMap.set(seg, []);
-          segMap.get(seg)!.push(leafNode);
-        }
-
-        const orderedMacros = [
-          ...MACRO_ORDER.filter((m) => macroMap.has(m)),
-          ...[...macroMap.keys()].filter((m) => !MACRO_ORDER.includes(m)),
-        ];
-
-        for (const macro of orderedMacros) {
-          const segMap = macroMap.get(macro)!;
-          const macroNode: DreLineNode = {
-            id: `macro:${macro}`,
-            label: macro,
-            level: 1,
-            series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null) },
-            children: [],
-          };
-
-          for (const [seg, leaves] of segMap) {
-            if (seg === "__noseg__") {
-              macroNode.children.push(...leaves.map((l) => ({ ...l, level: 2 })));
-            } else {
-              const segNode: DreLineNode = {
-                id: `seg:${seg.toLowerCase()}`,
-                label: seg,
-                level: 2,
-                series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null) },
-                children: leaves,
-              };
-              macroNode.children.push(segNode);
+        // Busca série de um label nos dados do banco
+        const findSeriesForLabel = (label: string): (number | null)[] => {
+          const norm = normLabel(label);
+          for (const [lbl, data] of linesByLabel) {
+            if (normLabel(lbl) === norm) {
+              const series: (number | null)[] = Array(12).fill(null);
+              for (const [m, v] of data.values) series[m - 1] = v;
+              return series;
             }
           }
+          return Array(12).fill(null);
+        };
 
-          if (macroNode.children.length > 0) rootNodes.push(macroNode);
-        }
+        // Converte DreTreeNode em DreLineNode recursivamente
+        const buildFixedNode = (treeNode: DreTreeNode, depth: number): DreLineNode => {
+          const current = findSeriesForLabel(treeNode.label);
+          const children = (treeNode.children ?? []).map((child) =>
+            buildFixedNode(child, depth + 1)
+          );
+          return {
+            id: `fixed:${depth}:${treeNode.label.toLowerCase().trim()}`,
+            label: treeNode.label,
+            level: Math.min(depth + 1, 3) as 1 | 2 | 3,
+            series: {
+              current,
+              budget: Array(12).fill(null),
+              previous: Array(12).fill(null),
+            },
+            children,
+          };
+        };
+
+        const fixedRootNodes: DreLineNode[] = DRE_FIXED_TREE.map((node) =>
+          buildFixedNode(node, 0)
+        );
 
         const flattenNodes = (ns: DreLineNode[]): DreLineNode[] =>
           ns.flatMap((n) => [n, ...flattenNodes(n.children)]);
-        const allFlat = [...nodes, ...flattenNodes(rootNodes)];
+        const allFlat = [...nodes, ...flattenNodes(fixedRootNodes)];
 
-        if (nodes.length || rootNodes.length) {
+        if (nodes.length || fixedRootNodes.length) {
           datasets.push({
-            tree: [...nodes, ...rootNodes],
+            tree: [...nodes, ...fixedRootNodes],
             flat: allFlat,
             hotelCount: 1,
             sourceNames: [hotelId],

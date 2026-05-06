@@ -225,6 +225,265 @@ export function getDreLineCategorization(label: string): DreLineMapping | null {
   return null;
 }
 
+/**
+ * Árvore fixa de exibição das Linhas da DRE.
+ * Estrutura: Grupo (nível 1) → Subcategoria (nível 2) → Linha específica (nível 3)
+ * Os labels são usados para buscar os valores salvos no banco.
+ */
+export interface DreTreeNode {
+  label: string;
+  children?: DreTreeNode[];
+}
+
+export const DRE_FIXED_TREE: DreTreeNode[] = [
+  {
+    label: "Topline",
+    children: [
+      { label: "Apartamentos Ocupados" },
+      { label: "Taxa de Ocupação" },
+      { label: "Número de Hóspedes" },
+      { label: "Fator de Ocupação" },
+      { label: "Diária Média (ADR)" },
+      { label: "RevPAR" },
+    ],
+  },
+  {
+    label: "Receitas",
+    children: [
+      {
+        label: "Receita Bruta Total",
+        children: [
+          {
+            label: "Receita Bruta de Serviços",
+            children: [
+              { label: "Receita de Hospedagem" },
+              { label: "No Show" },
+              { label: "(-) Café da Manhã" },
+            ],
+          },
+          {
+            label: "Receita Bruta A&B",
+            children: [
+              { label: "Receita das Mercadorias Vendidas" },
+              { label: "(+) Café da Manhã" },
+            ],
+          },
+          {
+            label: "Receita Financeira Líquida",
+            children: [
+              { label: "Receitas de Aplicações Financeiras" },
+              { label: "(-) Rendimentos de Fundo de Reserva" },
+              { label: "Juros Ativos" },
+              { label: "Descontos Financeiros Obtidos" },
+            ],
+          },
+          {
+            label: "Outras Receitas",
+            children: [
+              { label: "Aluguéis de Salas de Eventos" },
+              { label: "Lavanderia de Hóspedes" },
+              { label: "Receita de Estacionamento" },
+              { label: "Outras Receitas" },
+            ],
+          },
+        ],
+      },
+      {
+        label: "Deduções da Receita Total",
+        children: [
+          { label: "ISS" },
+          { label: "ICMS" },
+          { label: "PIS" },
+          { label: "COFINS" },
+        ],
+      },
+      { label: "Receita Líquida Total" },
+      { label: "Resultado Operacional Bruto (GOP)" },
+      { label: "Resultado Operacional Líquido" },
+      { label: "Lucro Líquido / Prejuízo do Exercício" },
+      { label: "Total de Taxas sobre o Lucro Líquido" },
+      { label: "Lucro / Prejuízo a Distribuir do período" },
+      { label: "Distribuição por UH" },
+      { label: "Por UH" },
+    ],
+  },
+  {
+    label: "Despesas",
+    children: [
+      { label: "Despesas Totais" },
+      {
+        label: "Despesas Fixas Totais",
+        children: [
+          {
+            label: "(-) Custo das Mercadorias Vendidas",
+            children: [
+              { label: "(-) Custo com Mercadorias Vendidas" },
+              { label: "(-) Custo com Café da manhã" },
+            ],
+          },
+          {
+            label: "Despesas com Pessoal",
+            children: [
+              { label: "Salários" },
+              { label: "Férias" },
+              { label: "Encargos" },
+              { label: "Vale Refeição e Alimentação" },
+              { label: "Vale transporte" },
+              { label: "Rescisões" },
+              { label: "Uniformes / EPI" },
+              { label: "Lavanderia Funcionários" },
+              { label: "Treinamentos" },
+              { label: "Confraternizações" },
+              { label: "Plano de Saúde e Medicina do Trabalho" },
+              { label: "Mão de Obra Direta - PF" },
+              { label: "Mão de Obra Direta - PJ" },
+              { label: "(-) Repasse de Salários" },
+              { label: "Benefícios" },
+            ],
+          },
+          {
+            label: "Despesas Operacionais",
+            children: [
+              { label: "Taxa de Condomínio" },
+              { label: "Aluguéis de máquinas e equipamentos" },
+              { label: "Material de Escritório" },
+              { label: "Materiais de Informática" },
+              { label: "Telefonia, Internet e TV a Cabo." },
+              { label: "Correios" },
+              { label: "Impressos e Formulários" },
+              { label: "Associação de Classe" },
+              { label: "Viagens e Estadias" },
+              { label: "Despesas com Alimentação" },
+              { label: "Condução, Transporte e Fretes" },
+              { label: "Decoração / Animação" },
+              { label: "Seguros" },
+              { label: "ECAD - direitos autorais" },
+              { label: "Taxas e Emolumentos" },
+              { label: "Aquisição de bens de pequeno valor" },
+              { label: "Despesas não previstas" },
+            ],
+          },
+          {
+            label: "Despesas com Prestadores de Serviços",
+            children: [
+              { label: "Assessoria Contábil" },
+              { label: "Auditoria e Consultoria" },
+              { label: "Advocacia" },
+              { label: "Assistência em Software" },
+              { label: "Serviços Prestados Por Terceiros" },
+            ],
+          },
+        ],
+      },
+      {
+        label: "Despesas Variáveis Totais",
+        children: [
+          {
+            label: "Custos de Hospedagem",
+            children: [
+              { label: "Amenities" },
+              { label: "Materiais de Apartamento" },
+              { label: "Lavanderia Enxoval" },
+              { label: "Lavanderia Hóspedes" },
+              { label: "Material de Limpeza" },
+              { label: "Utensílios e Materiais de Cozinha" },
+            ],
+          },
+          {
+            label: "Despesas com Vendas",
+            children: [
+              { label: "Comissões de Agências / Reservas" },
+              { label: "Comissões de Cartão de Crédito" },
+              { label: "Publicidade, Propaganda e Marketing" },
+              { label: "Assessoria de Vendas e RM" },
+              { label: "Despesa com viagens comerciais" },
+              { label: "Brindes" },
+            ],
+          },
+          {
+            label: "Despesas com Manutenção",
+            children: [
+              { label: "Contratos de Manutenção" },
+              { label: "Laudos" },
+              { label: "Materiais de Manutenção" },
+              { label: "Serviços eventuais de Manutenção" },
+            ],
+          },
+          {
+            label: "Despesas de Utilidades",
+            children: [
+              { label: "Energia Elétrica" },
+              { label: "Água e Esgoto" },
+              { label: "Gás" },
+            ],
+          },
+          {
+            label: "Taxas Accor",
+            children: [
+              { label: "Auditorias, Serviços e Softwares" },
+              { label: "Tars e Fidelização" },
+              { label: "Royalties Accor" },
+              { label: "Taxas de reserva Accor" },
+              { label: "Fees de Marketing Accor" },
+            ],
+          },
+          {
+            label: "Taxas de Administração",
+            children: [
+              { label: "Taxas de Administração Falcon s/ Receita" },
+            ],
+          },
+          {
+            label: "Despesas Financeiras",
+            children: [
+              { label: "Tarifas Bancárias" },
+              { label: "Taxa de antecipação" },
+              { label: "IRRF - Aplicação Financeira" },
+              { label: "PCLD" },
+              { label: "Juros Passivos" },
+              { label: "Descontos Concedidos" },
+            ],
+          },
+        ],
+      },
+      {
+        label: "Deduções pós GOP",
+        children: [
+          {
+            label: "Total dos Gastos de Propriedade",
+            children: [
+              { label: "(-) TCL / IPTU" },
+              { label: "(-) Fundo de Reservas e Reposição Patrimonial" },
+              { label: "(-) Taxa de Condomínio" },
+              { label: "(-) Taxa de Administração s/ GOP" },
+              { label: "(-) Gastos da propriedade" },
+            ],
+          },
+          {
+            label: "Total dos Impostos sobre o Lucro",
+            children: [
+              { label: "IRPJ" },
+              { label: "CSLL" },
+            ],
+          },
+          {
+            label: "Total de Taxas sobre o Lucro Líquido",
+            children: [
+              { label: "Taxa de Sucesso" },
+            ],
+          },
+          {
+            label: "Total de Prejuízo a compensar",
+            children: [
+              { label: "Compensação de prejuizo acumulado" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
 export type IndicatorKey =
   | "ocupacao"
   | "adr"
