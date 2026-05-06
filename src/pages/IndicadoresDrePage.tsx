@@ -357,18 +357,85 @@ export default function IndicadoresDrePage() {
     return findDreLine(dataset, "RECEITA BRUTA TOTAL");
   }, [dataset, divider]);
   const chartData = useMemo(() => {
-    const base = {
-      current: divideSeries(aggregateSelectedSeries(selectedLines, "current", dataset), divisorLine, "current"),
-      budget: divideSeries(aggregateSelectedSeries(selectedLines, "budget", dataset), divisorLine, "budget"),
-      previous: divideSeries(aggregateSelectedSeries(selectedLines, "previous", dataset), divisorLine, "previous"),
-    };
-    return MONTHS_SHORT.map((m, i) => ({
-      month: m,
-      current: metric === "mom" ? variation(base.current[i], base.current[i - 1]) : metric === "yoy" ? variation(base.current[i], base.previous[i]) : metric === "budget" ? variation(base.current[i], base.budget[i]) : base.current[i],
-      budget: base.budget[i],
-      previous: base.previous[i],
-    }));
-  }, [selectedLines, divisorLine, metric]);
+    const pMonths = periodCfg.months;
+    type ChartPoint = { label: string; months: number[] };
+    let points: ChartPoint[];
+    if (pMonths === 1) {
+      points = MONTHS_SHORT.map((m, i) => ({ label: m, months: [i + 1] }));
+    } else if (pMonths === 2) {
+      points = [
+        { label: "B1", months: [1, 2] },
+        { label: "B2", months: [3, 4] },
+        { label: "B3", months: [5, 6] },
+        { label: "B4", months: [7, 8] },
+        { label: "B5", months: [9, 10] },
+        { label: "B6", months: [11, 12] },
+      ];
+    } else if (pMonths === 3) {
+      points = [
+        { label: "T1", months: [1, 2, 3] },
+        { label: "T2", months: [4, 5, 6] },
+        { label: "T3", months: [7, 8, 9] },
+        { label: "T4", months: [10, 11, 12] },
+      ];
+    } else if (pMonths === 6) {
+      points = [
+        { label: "S1", months: [1, 2, 3, 4, 5, 6] },
+        { label: "S2", months: [7, 8, 9, 10, 11, 12] },
+      ];
+    } else {
+      points = [{ label: String(year), months: Array.from({ length: 12 }, (_, i) => i + 1) }];
+    }
+
+    function aggPoint(
+      series: DreMonthValue[],
+      months: number[],
+      aggType: AggType,
+      rnSeries?: DreMonthValue[],
+    ): number | null {
+      const vals = months.map((m) => series[m - 1]).filter((v): v is number => v != null && Number.isFinite(v));
+      if (vals.length === 0) return null;
+      if (aggType === "sum") return vals.reduce((a, b) => a + b, 0);
+      if (aggType === "avg") return vals.reduce((a, b) => a + b, 0) / vals.length;
+      if (aggType === "weighted_avg" && rnSeries) {
+        let sumW = 0, sumRn = 0;
+        for (const m of months) {
+          const v = series[m - 1];
+          const rn = rnSeries[m - 1];
+          if (v != null && rn != null && Number.isFinite(v) && Number.isFinite(rn) && rn > 0) {
+            sumW += v * rn;
+            sumRn += rn;
+          }
+        }
+        return sumRn > 0 ? sumW / sumRn : null;
+      }
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+
+    const lineAgg = selectedLines.length > 0 ? getAggType(selectedLines[0].label) : "sum";
+
+    const rnNode = findDreLine(dataset ?? undefined, "Apartamentos ocupados")
+      ?? findDreLine(dataset ?? undefined, "Apartamentos Ocupados")
+      ?? findDreLine(dataset ?? undefined, "Room Nights");
+
+    const baseCurrent = divideSeries(aggregateSelectedSeries(selectedLines, "current", dataset), divisorLine, "current");
+    const baseBudget = divideSeries(aggregateSelectedSeries(selectedLines, "budget", dataset), divisorLine, "budget");
+    const basePrevious = divideSeries(aggregateSelectedSeries(selectedLines, "previous", dataset), divisorLine, "previous");
+
+    return points.map(({ label, months }) => {
+      const cur = aggPoint(baseCurrent, months, lineAgg, rnNode?.series.current);
+      const bud = aggPoint(baseBudget, months, lineAgg, rnNode?.series.budget);
+      const prev = aggPoint(basePrevious, months, lineAgg, rnNode?.series.previous);
+      return {
+        month: label,
+        current: metric === "budget" && cur != null && bud != null && bud !== 0
+          ? ((cur - bud) / Math.abs(bud)) * 100
+          : cur,
+        budget: metric === "budget" ? null : bud,
+        previous: metric === "budget" ? null : prev,
+      };
+    });
+  }, [selectedLines, divisorLine, metric, periodCfg, dataset, year]);
   const toggleLine = (id: string) => setSelectedIds((prev) => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -580,8 +647,11 @@ export default function IndicadoresDrePage() {
                   <Button key={key} size="sm" variant={visible[key] ? "default" : "outline"} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}>{chartConfig[key].label}</Button>
                 ))}
                 <Select value={metric} onValueChange={setMetric}>
-                  <SelectTrigger className="w-[230px]"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="value">Valores mensais</SelectItem><SelectItem value="mom">Variação mês a mês</SelectItem><SelectItem value="yoy">Variação ano a ano</SelectItem><SelectItem value="budget">Variação vs Orçado</SelectItem></SelectContent>
+                  <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="value">Valores absolutos</SelectItem>
+                    <SelectItem value="budget">Variação vs Orçado (%)</SelectItem>
+                  </SelectContent>
                 </Select>
                 <Select value={divider} onValueChange={setDivider}>
                   <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
@@ -592,7 +662,18 @@ export default function IndicadoresDrePage() {
                 <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => metric === "value" ? Number(v).toLocaleString("pt-BR") : `${Number(v).toFixed(0)}%`} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => {
+                      if (metric === "budget") return `${Number(v).toFixed(1)}%`;
+                      const isPct = selectedLines.some((l) =>
+                        /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
+                      );
+                      if (isPct) return `${(Number(v) * (Number(v) <= 1 ? 100 : 1)).toFixed(1)}%`;
+                      return Number(v).toLocaleString("pt-BR", { notation: "compact" });
+                    }}
+                  />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   {visible.current && <Line type="monotone" dataKey="current" stroke="var(--color-current)" strokeWidth={3} dot={false} connectNulls={false} />}
                   {visible.budget && <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} dot={false} connectNulls={false} />}
