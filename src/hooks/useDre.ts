@@ -437,7 +437,7 @@ function useDreAnalyticsImpl(input: {
         // Linhas do período atual → alimentam série "current"
         const currentLines: LineRow[] = [];
         for (const closing of currentClosings ?? []) {
-          const closingLines = await fetchLatestDreParsedLines(closing.id);
+          const closingLines = linesByClosingId.get(closing.id) ?? [];
           if (!closingLines?.length) continue;
           currentLines.push(
             ...closingLines
@@ -453,7 +453,7 @@ function useDreAnalyticsImpl(input: {
             allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
             continue;
           }
-          const closingLines = await fetchLatestDreParsedLines(closing.id);
+          const closingLines = linesByClosingId.get(closing.id) ?? [];
           if (!closingLines?.length) continue;
           allYearLines.push(
             ...closingLines
