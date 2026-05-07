@@ -808,6 +808,150 @@ export type Database = {
           },
         ]
       }
+      conciliation_journal_lines: {
+        Row: {
+          categoria: string | null
+          company_name: string | null
+          credit: number | null
+          debit: number | null
+          guest_first_name: string | null
+          guest_last_name: string | null
+          id: string
+          line_date: string
+          receipt_number: string | null
+          transaction_code: string
+          transaction_description: string | null
+          transaction_number: string
+          upload_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          company_name?: string | null
+          credit?: number | null
+          debit?: number | null
+          guest_first_name?: string | null
+          guest_last_name?: string | null
+          id?: string
+          line_date: string
+          receipt_number?: string | null
+          transaction_code: string
+          transaction_description?: string | null
+          transaction_number: string
+          upload_id: string
+        }
+        Update: {
+          categoria?: string | null
+          company_name?: string | null
+          credit?: number | null
+          debit?: number | null
+          guest_first_name?: string | null
+          guest_last_name?: string | null
+          id?: string
+          line_date?: string
+          receipt_number?: string | null
+          transaction_code?: string
+          transaction_description?: string | null
+          transaction_number?: string
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliation_journal_lines_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conciliation_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conciliation_razao_lines: {
+        Row: {
+          descricao: string
+          documento: string | null
+          historico: string | null
+          id: string
+          is_totalizador: boolean | null
+          lancamento: string | null
+          line_date: string
+          upload_id: string
+          valor_credito: number | null
+          valor_debito: number | null
+        }
+        Insert: {
+          descricao: string
+          documento?: string | null
+          historico?: string | null
+          id?: string
+          is_totalizador?: boolean | null
+          lancamento?: string | null
+          line_date: string
+          upload_id: string
+          valor_credito?: number | null
+          valor_debito?: number | null
+        }
+        Update: {
+          descricao?: string
+          documento?: string | null
+          historico?: string | null
+          id?: string
+          is_totalizador?: boolean | null
+          lancamento?: string | null
+          line_date?: string
+          upload_id?: string
+          valor_credito?: number | null
+          valor_debito?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliation_razao_lines_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conciliation_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conciliation_uploads: {
+        Row: {
+          created_at: string | null
+          hotel_id: string
+          id: string
+          journal_file_name: string | null
+          period: string
+          razao_file_name: string | null
+          status: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hotel_id: string
+          id?: string
+          journal_file_name?: string | null
+          period: string
+          razao_file_name?: string | null
+          status?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hotel_id?: string
+          id?: string
+          journal_file_name?: string | null
+          period?: string
+          razao_file_name?: string | null
+          status?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliation_uploads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_parsed_lines: {
         Row: {
           closing_id: string
