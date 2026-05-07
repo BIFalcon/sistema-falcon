@@ -23,6 +23,7 @@ import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
+import ConciliacaoPage from "./pages/ConciliacaoPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -96,6 +97,7 @@ const App = () => (
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/rh" element={<EmBreve />} />
               <Route path="/controladoria" element={<EmBreve />} />
+              <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria"]}><ConciliacaoPage /></RoleGuard>} />
 
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />

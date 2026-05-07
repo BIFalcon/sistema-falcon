@@ -18,6 +18,7 @@ import {
   LayoutGrid,
   Gauge,
   Home,
+  GitCompare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -112,7 +113,15 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         ],
       },
       { title: "RH & People", url: "/rh", icon: Users, soon: true, allowedRoles: ["rh"] as AppRole[] },
-      { title: "Controladoria", url: "/controladoria", icon: ShieldCheck, soon: true, allowedRoles: ["controladoria"] as AppRole[] },
+      {
+        title: "Controladoria",
+        url: "/controladoria",
+        icon: ShieldCheck,
+        allowedRoles: ["controladoria"] as AppRole[],
+        children: [
+          { title: "Conciliação TOTVS × Opera", url: "/controladoria/conciliacao", icon: GitCompare },
+        ],
+      },
     ],
   },
   {
