@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           amount: number
           balance_date: string
+          bank_name: string
           created_at: string
           hotel_id: string
           id: string
@@ -27,6 +28,7 @@ export type Database = {
         Insert: {
           amount: number
           balance_date: string
+          bank_name?: string
           created_at?: string
           hotel_id: string
           id?: string
@@ -36,6 +38,7 @@ export type Database = {
         Update: {
           amount?: number
           balance_date?: string
+          bank_name?: string
           created_at?: string
           hotel_id?: string
           id?: string
@@ -45,6 +48,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ap_bank_balance_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_card_receivable: {
+        Row: {
+          amount: number
+          created_at: string
+          date_from: string
+          date_to: string
+          hotel_id: string
+          id: string
+          informed_by: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date_from: string
+          date_to: string
+          hotel_id: string
+          id?: string
+          informed_by: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date_from?: string
+          date_to?: string
+          hotel_id?: string
+          id?: string
+          informed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_card_receivable_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
@@ -135,6 +176,8 @@ export type Database = {
         Row: {
           amount: number
           archived_at: string | null
+          archived_reason: string | null
+          bank_account: string | null
           category: string | null
           cnpj: string | null
           created_at: string
@@ -146,6 +189,7 @@ export type Database = {
           gg_approval_at: string | null
           gg_approval_by: string | null
           gg_approval_notes: string | null
+          hotel_cnpj: string | null
           hotel_id: string
           id: string
           interest_fees: number | null
@@ -153,6 +197,8 @@ export type Database = {
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
+          paid_amount: number | null
+          paid_interest: number | null
           payment_marked_at: string | null
           payment_marked_by: string | null
           payment_method: string | null
@@ -160,6 +206,7 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id: string | null
           raw: Json
+          scheduled_date: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           updated_at: string
@@ -168,6 +215,8 @@ export type Database = {
         Insert: {
           amount: number
           archived_at?: string | null
+          archived_reason?: string | null
+          bank_account?: string | null
           category?: string | null
           cnpj?: string | null
           created_at?: string
@@ -179,6 +228,7 @@ export type Database = {
           gg_approval_at?: string | null
           gg_approval_by?: string | null
           gg_approval_notes?: string | null
+          hotel_cnpj?: string | null
           hotel_id: string
           id?: string
           interest_fees?: number | null
@@ -186,6 +236,8 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          paid_amount?: number | null
+          paid_interest?: number | null
           payment_marked_at?: string | null
           payment_marked_by?: string | null
           payment_method?: string | null
@@ -193,6 +245,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id?: string | null
           raw?: Json
+          scheduled_date?: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           updated_at?: string
@@ -201,6 +254,8 @@ export type Database = {
         Update: {
           amount?: number
           archived_at?: string | null
+          archived_reason?: string | null
+          bank_account?: string | null
           category?: string | null
           cnpj?: string | null
           created_at?: string
@@ -212,6 +267,7 @@ export type Database = {
           gg_approval_at?: string | null
           gg_approval_by?: string | null
           gg_approval_notes?: string | null
+          hotel_cnpj?: string | null
           hotel_id?: string
           id?: string
           interest_fees?: number | null
@@ -219,6 +275,8 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          paid_amount?: number | null
+          paid_interest?: number | null
           payment_marked_at?: string | null
           payment_marked_by?: string | null
           payment_method?: string | null
@@ -226,6 +284,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
           primary_document_id?: string | null
           raw?: Json
+          scheduled_date?: string | null
           source_system?: Database["public"]["Enums"]["financial_system"]
           supplier?: string
           updated_at?: string
@@ -244,6 +303,47 @@ export type Database = {
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "ap_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_notification_log: {
+        Row: {
+          entries_snapshot: Json
+          entry_ids: string[]
+          hotel_id: string
+          id: string
+          message_text: string | null
+          recipient_emails: string[]
+          sent_at: string
+          sent_by: string
+        }
+        Insert: {
+          entries_snapshot?: Json
+          entry_ids?: string[]
+          hotel_id: string
+          id?: string
+          message_text?: string | null
+          recipient_emails?: string[]
+          sent_at?: string
+          sent_by: string
+        }
+        Update: {
+          entries_snapshot?: Json
+          entry_ids?: string[]
+          hotel_id?: string
+          id?: string
+          message_text?: string | null
+          recipient_emails?: string[]
+          sent_at?: string
+          sent_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_notification_log_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,7 +1853,13 @@ export type Database = {
     }
     Enums: {
       ap_entry_approval: "pending" | "approved" | "rejected"
-      ap_payment_status: "pendente" | "inserido" | "agendado" | "pago"
+      ap_payment_status:
+        | "pendente"
+        | "inserido"
+        | "agendado"
+        | "pago"
+        | "em_aprovacao"
+        | "autorizado"
       app_role:
         | "processos"
         | "fernando"
@@ -1926,7 +2032,14 @@ export const Constants = {
   public: {
     Enums: {
       ap_entry_approval: ["pending", "approved", "rejected"],
-      ap_payment_status: ["pendente", "inserido", "agendado", "pago"],
+      ap_payment_status: [
+        "pendente",
+        "inserido",
+        "agendado",
+        "pago",
+        "em_aprovacao",
+        "autorizado",
+      ],
       app_role: [
         "processos",
         "fernando",
