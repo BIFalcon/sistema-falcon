@@ -26,6 +26,7 @@ interface ParsedLine {
   line_label: string;
   line_value: number | null;
   line_type?: string | null;
+  version_number?: number | null;
 }
 
 function findIndicator(lines: ParsedLine[], key: string): number | null {
@@ -36,8 +37,10 @@ function findIndicator(lines: ParsedLine[], key: string): number | null {
 
 function findLineByPattern(lines: ParsedLine[], patterns: RegExp[]): number | null {
   for (const p of patterns) {
-    const hit = lines.find((l) => l.line_type !== "indicator" && p.test(l.line_label));
-    if (hit && hit.line_value != null) return hit.line_value;
+    const hits = lines.filter((l) => l.line_type !== "indicator" && p.test(l.line_label));
+    for (const hit of hits) {
+      if (hit.line_value != null && hit.line_value !== 0) return hit.line_value;
+    }
   }
   return null;
 }
@@ -46,10 +49,27 @@ const TAXA_FEE_PATTERNS = [
   /taxas?\s+(de\s+)?administra[çc][ãa]o\s+falcon/i,
   /taxa\s+falcon/i,
   /^fees?\s+falcon/i,
+  /fees?\s+falcon\s+hotels?/i,
+  /taxas?\s+(de\s+)?administra[çc][ãa]o\s+s\/\s*receita/i,
 ];
 const TAXA_SUCESSO_PATTERNS = [
   /taxa\s+(de\s+)?sucesso/i,
   /incentive\s+fee/i,
+  /taxa\s+(de\s+)?administra[çc][ãa]o\s+s\/\s*gop/i,
+];
+
+// Hotéis sem distribuição por UH
+const NO_DISTRIB_UH_HOTELS = new Set([
+  "ibis-styles-confins",
+  "mercure-macae",
+  "ibis-budget-recife",
+]);
+
+const DISTRIBUICAO_POR_UH_PATTERNS = [
+  /distribui[çc][ãa]o\s+por\s+(tipo\s+(de\s+)?)?uh/i,
+  /^por\s+uh$/i,
+  /distribui[çc][ãa]o\s+por\s+uh/i,
+  /dividendo\s+efetivamente\s+distribu[íi]do\s+\(por\s+apartamento\)/i,
 ];
 
 export function useConsolidadoData(input: {
@@ -90,6 +110,43 @@ export function useConsolidadoData(input: {
         }
       }
 
+      // Busca adicional para linhas de Taxa Fee, Incentive Fee e Distribuição
+      // que são salvas como line_type = "line" (não "indicator")
+      if (closingIds.length > 0) {
+        const { data: extraLines } = await supabase
+          .from("dre_parsed_lines")
+          .select("closing_id, line_label, line_value, line_type, version_number")
+          .in("closing_id", closingIds)
+          .eq("line_type", "line")
+          .or([
+            "line_label.ilike.%taxa%falcon%",
+            "line_label.ilike.%fee%falcon%",
+            "line_label.ilike.%taxa%sucesso%",
+            "line_label.ilike.%incentive%fee%",
+            "line_label.ilike.%distribui%",
+            "line_label.ilike.%por uh%",
+            "line_label.ilike.%por_uh%",
+            "line_label.ilike.%dividendo%",
+            "line_label.ilike.%rendimento%",
+            "line_label.ilike.%lucro%distribu%",
+            "line_label.ilike.%resultado%exerc%",
+            "line_label.ilike.%taxa%administ%gop%",
+          ].join(","));
+
+        for (const row of (extraLines ?? []) as ParsedLine[]) {
+          if (!row.closing_id) continue;
+          const list = linesByClosing.get(row.closing_id) ?? [];
+          const existingVersions = list.filter((l) => l.line_type === "line");
+          const maxVersion = existingVersions.length > 0
+            ? Math.max(...existingVersions.map((l) => (l.version_number ?? 0) as number))
+            : (row.version_number ?? 0);
+          if ((row.version_number ?? 0) >= maxVersion) {
+            list.push(row);
+            linesByClosing.set(row.closing_id, list);
+          }
+        }
+      }
+
       return input.hotelIds.map((hotelId) => {
         const closing = (closings ?? []).find((c) => c.hotel_id === hotelId) ?? null;
         const lines: ParsedLine[] = closing ? linesByClosing.get(closing.id) ?? [] : [];
@@ -105,10 +162,15 @@ export function useConsolidadoData(input: {
           null;
         const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
         const incentiveFee = findLineByPattern(lines, TAXA_SUCESSO_PATTERNS);
-        const distribuicaoPorUh =
-          distribuicaoTotal != null && uhsDisponiveis && uhsDisponiveis > 0
-            ? distribuicaoTotal / uhsDisponiveis
-            : null;
+        const distribuicaoPorUh = NO_DISTRIB_UH_HOTELS.has(hotelId)
+          ? null
+          : (() => {
+              const fromDre = findLineByPattern(lines, DISTRIBUICAO_POR_UH_PATTERNS);
+              if (fromDre != null) return Math.abs(fromDre);
+              return distribuicaoTotal != null && uhsDisponiveis && uhsDisponiveis > 0
+                ? distribuicaoTotal / uhsDisponiveis
+                : null;
+            })();
         return {
           hotelId,
           closingId: closing?.id ?? null,
