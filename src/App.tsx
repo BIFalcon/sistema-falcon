@@ -14,6 +14,7 @@ import CartaPage from "./pages/CartaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import EnvioPage from "./pages/EnvioPage";
 import PerformanceSlaPage from "./pages/PerformanceSlaPage";
+import ConsolidadoPage from "./pages/ConsolidadoPage";
 import HoteisPage from "./pages/HoteisPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
@@ -82,6 +83,14 @@ const App = () => (
               <Route path="/fechamento/financeiro" element={<RoleGuard roles={["financeiro"]}><FinanceiroPage /></RoleGuard>} />
               <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />
               <Route path="/fechamento/performance" element={<RoleGuard masterOnly><PerformanceSlaPage /></RoleGuard>} />
+              <Route
+                path="/fechamento/consolidado"
+                element={
+                  <RoleGuard roles={["controladoria", "gop", "ri", "financeiro", "processos"]}>
+                    <ConsolidadoPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Compat: rotas antigas */}
               <Route path="/dre" element={<Navigate to="/fechamento/dre" replace />} />
