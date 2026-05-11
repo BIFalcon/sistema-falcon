@@ -27,7 +27,7 @@ export interface JournalLine {
   categoria: string | null;
 }
 
-function toIsoDate(raw: string): string {
+function toIsoDate(raw: unknown): string {
   // Handle Date objects coming from XLSX cellDates
   if (raw instanceof Date) {
     const y = raw.getUTCFullYear();
