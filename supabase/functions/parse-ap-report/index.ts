@@ -174,6 +174,26 @@ function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
   return "pending";
 }
 
+// Mapeia situação OMIE para o status de pagamento Falcon
+type ApPaymentStatus = "em_aprovacao" | "autorizado" | "inserido" | "agendado" | "pago";
+function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
+  if (!situacao) return "em_aprovacao";
+  const s = toAscii(situacao);
+  if (s.includes("agendado")) return "agendado";
+  if (s.includes("pago") || s.includes("liquidado")) return "pago";
+  if (s.includes("previsto") || s.includes("aprovado") || s.includes("em aprovacao")) return "em_aprovacao";
+  return "em_aprovacao";
+}
+
+// Normaliza a conta corrente para "itau" | "santander" | null
+function normalizeBank(account: string | null | undefined): string | null {
+  const a = toAscii(account ?? "");
+  if (!a) return null;
+  if (a.includes("itau")) return "itau";
+  if (a.includes("santander")) return "santander";
+  return null;
+}
+
 function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   entries: ParsedEntry[];
   skipped: { other_bank: number; no_amount: number; no_supplier: number };
