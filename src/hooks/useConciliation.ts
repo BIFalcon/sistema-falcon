@@ -128,15 +128,17 @@ export function useConciliation(
 
       const apenasNoJournal = journalDestaCateg.filter((_, idx) => !matchedJournal.has(idx));
       const apenasNoRazao = creditosRazao.filter((_, idx) => !matchedRazao.has(idx));
-      const totalComparacao = journalDestaCateg.length > 0 ? totalJournal : totalCreditoRazao;
+      // Divergência = (Débito TOTVS - Crédito TOTVS) - Journal Opera
+      // O Journal deve corresponder ao líquido (débito menos crédito) do Razão.
+      const divergencia = (totalDebito - totalCreditoRazao) - totalJournal;
 
       return {
         categoria: cat,
         totalDebito,
         totalCreditoRazao,
         totalJournal,
-        conciliado: Math.abs(totalDebito - totalComparacao) <= TOLERANCE,
-        divergencia: totalDebito - totalComparacao,
+        conciliado: Math.abs(divergencia) <= TOLERANCE,
+        divergencia,
         apenasNoJournal,
         apenasNoRazao,
         emAmbos,
