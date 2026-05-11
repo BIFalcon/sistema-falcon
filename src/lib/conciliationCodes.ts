@@ -62,9 +62,11 @@ export function getCategoriaFromCode(code: string): ConciliationCategory | null 
 
 export function normalizaDescricaoRazao(desc: string): ConciliationCategory | null {
   const d = desc.toLowerCase().trim();
-  if (d.includes("cart") || d.includes("cartões") || d.includes("cartoes")) return "Cartoes a Processar";
-  if (d.includes("pix")) return "Regularizar PIX";
-  if (d.includes("dinheiro") || d.includes("cash")) return "Regularizar Dinheiro";
-  if (d.includes("faturar") || d.includes("nota")) return "Notas a Faturar";
+  // Match estritamente apenas as 4 descrições alvo do Razão.
+  // Evita confundir com "Cartao Amex", "Cartao Elo", etc.
+  if (/(^|\s)cart(o|õ)es?\s+a\s+processar/.test(d)) return "Cartoes a Processar";
+  if (/regulariza(r|ç(ã|a)o)?\s+pix/.test(d)) return "Regularizar PIX";
+  if (/regulariza(r|ç(ã|a)o)?\s+dinheiro/.test(d)) return "Regularizar Dinheiro";
+  if (/notas?\s+a\s+faturar/.test(d)) return "Notas a Faturar";
   return null;
 }
