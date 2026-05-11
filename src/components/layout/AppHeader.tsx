@@ -18,17 +18,34 @@ import { Button } from "@/components/ui/button";
 import { LogOut, User as UserIcon, Bell, Settings, X, Hotel, Check, ChevronDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters, type FilterModule } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
 import { useEffect } from "react";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
 
+function getModuleFromPath(pathname: string): FilterModule {
+  if (pathname.startsWith("/fechamento/consolidado")) return "consolidado";
+  if (
+    pathname.startsWith("/fechamento") ||
+    pathname.startsWith("/dre") ||
+    pathname.startsWith("/carta") ||
+    pathname.startsWith("/envio") ||
+    pathname.startsWith("/financeiro-fechamento") ||
+    pathname.startsWith("/performance")
+  ) return "fechamento";
+  if (pathname.startsWith("/conciliacao")) return "conciliacao";
+  if (pathname.startsWith("/financeiro") || pathname.startsWith("/contas-")) return "financeiro";
+  if (pathname.startsWith("/indicadores")) return "indicadores";
+  return "global";
+}
+
 export function AppHeader() {
-  const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useFilters();
-  const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
   const { pathname } = useLocation();
+  const activeModule = getModuleFromPath(pathname);
+  const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useModuleFilters(activeModule);
+  const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
