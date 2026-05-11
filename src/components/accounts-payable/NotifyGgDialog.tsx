@@ -1,7 +1,7 @@
 /**
  * Modal simplificado de notificação ao GG.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { notifyGgPendencies, type ApEntry } from "@/hooks/useAccountsPayable";
-import { fmtBRL } from "@/lib/formatters";
+import { notifyGgPendencies, useSaveNotificationLog, type ApEntry } from "@/hooks/useAccountsPayable";
+import { fmtBRL, fmtDate } from "@/lib/formatters";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NotifyGgDialogProps {
   open: boolean;
@@ -31,24 +32,57 @@ export function NotifyGgDialog({
   hotelId,
   selectedEntries,
 }: NotifyGgDialogProps) {
+  const { user } = useAuth();
   const [extraEmails, setExtraEmails] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const saveLog = useSaveNotificationLog();
 
   const total = selectedEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0);
+
+  // Pré-popula a mensagem com a lista detalhada (incluindo observação).
+  useEffect(() => {
+    if (!open) return;
+    const lines = selectedEntries.map((e) => {
+      const obs = e.observation ? `\n  Obs: ${e.observation}` : "";
+      return `• ${e.supplier} — ${fmtBRL(Number(e.amount))} (vence ${fmtDate(e.due_date)})${obs}`;
+    });
+    setMessage(lines.join("\n"));
+  }, [open, selectedEntries]);
 
   async function handleSend() {
     setSending(true);
     try {
+      const emails = extraEmails
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const entryIds = selectedEntries.map((e) => e.id);
       await notifyGgPendencies({
         hotelId,
-        entryIds: selectedEntries.map((e) => e.id),
-        extraEmails: extraEmails
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        entryIds,
+        extraEmails: emails,
         message: message.trim() || null,
       });
+      if (user) {
+        try {
+          await saveLog.mutateAsync({
+            hotelId,
+            sentBy: user.id,
+            entryIds,
+            recipientEmails: emails,
+            messageText: message.trim(),
+            entriesSnapshot: selectedEntries.map((e) => ({
+              supplier: e.supplier,
+              amount: e.amount,
+              due_date: e.due_date,
+              observation: e.observation,
+            })),
+          });
+        } catch {
+          // log é melhor-esforço — não falha o envio
+        }
+      }
       toast.success("Notificação enviada ao GG.");
       onClose();
     } catch (err) {

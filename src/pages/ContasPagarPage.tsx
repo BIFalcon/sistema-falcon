@@ -15,10 +15,11 @@
  *  - NotifyGgDialog                  → components/accounts-payable/NotifyGgDialog.tsx
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
-import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, ShieldCheck, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,9 @@ import {
   useSetEntryPaymentStatus,
   useTodayBankBalance,
   useUpsertBankBalance,
+  useApNotificationLog,
+  useCardReceivable,
+  useUpsertCardReceivable,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -55,7 +59,7 @@ import {
 import { useApPageDerived } from "@/hooks/useApPageDerived";
 import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
-import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
+import { fmtBRL, fmtDate, fmtDateTime, handlePasteBRL } from "@/lib/formatters";
 
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
@@ -73,11 +77,13 @@ export default function ContasPagarPage() {
     isFinanceiroEquipe,
     isFinanceiroCoordenadora,
   } = useAuth();
+  const qc = useQueryClient();
   const canManage = isMaster || hasRole("financeiro");
   // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
     isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
   const canMarkPaid = isMaster || isFinanceiroCoordenadora;
+  const canMarkAutorizado = isMaster || isFinanceiroCoordenadora;
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
 
@@ -96,14 +102,22 @@ export default function ContasPagarPage() {
   // ── Dados remotos ──────────────────────────────────────────────────────
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
-  const { data: balance } = useTodayBankBalance(hotelId);
+  const { data: balanceItau } = useTodayBankBalance(hotelId, "itau");
+  const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
+  const { data: cardReceivables = [] } = useCardReceivable(hotelId);
+  const { data: notifLog = [] } = useApNotificationLog(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
+  const upsertCard = useUpsertCardReceivable();
 
   // ── Estado local ───────────────────────────────────────────────────────
-  const [balanceInput, setBalanceInput] = useState("");
+  const [balanceItauInput, setBalanceItauInput] = useState("");
+  const [balanceSantanderInput, setBalanceSantanderInput] = useState("");
+  const [cardAmount, setCardAmount] = useState("");
+  const [cardFrom, setCardFrom] = useState("");
+  const [cardTo, setCardTo] = useState("");
   const [period, setPeriod] = useState<Period>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [category, setCategory] = useState("all");
@@ -115,6 +129,11 @@ export default function ContasPagarPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
+  const [paidInterest, setPaidInterest] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +141,7 @@ export default function ContasPagarPage() {
   const derived = useApPageDerived({
     allEntriesRaw,
     documents: [],
-    balance,
+    balance: balanceItau,
     sourceSystem,
     period,
     status,
@@ -150,8 +169,32 @@ export default function ContasPagarPage() {
     balanceDiff,
   } = derived;
 
-  const balanceAmount = balance ? Number(balance.amount) : null;
+  const balanceItauAmount = balanceItau ? Number(balanceItau.amount) : null;
+  const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
+  const balanceTotal =
+    (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
+
+  // Soma da seleção em lote
+  const selectedTotal = useMemo(() => {
+    let sum = 0;
+    for (const e of entries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
+    for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
+    return sum;
+  }, [selectedIds, entries, distributionEntries]);
+
+  // Auto: agendados cuja data já passou viram "inserido".
+  useEffect(() => {
+    if (!hotelId || entries.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const toInsert = entries
+      .filter((e) => e.payment_status === "agendado" && e.scheduled_date && e.scheduled_date <= today)
+      .map((e) => e.id);
+    if (toInsert.length > 0) {
+      setPaymentStatus.mutate({ hotelId, entryIds: toInsert, status: "inserido" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotelId, entries.length]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -175,6 +218,9 @@ export default function ContasPagarPage() {
         `Importado: ${r.entries} lançamentos${r.documents_extracted ? `, ${r.documents_extracted} documentos` : ""}`,
       );
       window.dispatchEvent(new CustomEvent("ap:refresh"));
+      qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-latest-upload", hotelId] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao importar");
     } finally {
@@ -191,18 +237,61 @@ export default function ContasPagarPage() {
       toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
       return;
     }
+    if (newStatus === "autorizado" && !canMarkAutorizado) {
+      toast.error("Apenas a coordenadoria do financeiro pode autorizar pagamentos");
+      return;
+    }
     if ((newStatus === "inserido" || newStatus === "agendado") && !canMarkInsertedAgendado) {
       toast.error("Sem permissão para alterar status");
       return;
     }
+    // Agendado → pede data
+    if (newStatus === "agendado") {
+      setScheduledDate("");
+      setSchedulingOpen(true);
+      return;
+    }
+    // Inserido em lançamento vencido → pede juros/valor pago
+    if (newStatus === "inserido") {
+      const today = new Date().toISOString().slice(0, 10);
+      const allEntries = [...entries, ...distributionEntries];
+      const hasOverdue = ids.some((id) => {
+        const entry = allEntries.find((e) => e.id === id);
+        return entry?.due_date && entry.due_date < today;
+      });
+      if (hasOverdue) {
+        setPaidInterest("");
+        setPaidAmount("");
+        setInterestDialogOpen(true);
+        return;
+      }
+    }
+    await executeStatusChange(newStatus);
+  }
+
+  async function executeStatusChange(
+    newStatus: ApPaymentStatus,
+    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number },
+  ) {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
     // Captura status anterior para permitir desfazer
     const previousByEntry = new Map<string, ApPaymentStatus>();
-    for (const e of entries) {
+    const allEntries = [...entries, ...distributionEntries];
+    for (const e of allEntries) {
       if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
     }
     const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
-      await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
+      await setPaymentStatus.mutateAsync({
+        hotelId,
+        entryIds: ids,
+        status: newStatus,
+        scheduledDate: extra?.scheduledDate ?? null,
+        paidInterest: extra?.paidInterest ?? null,
+        paidAmount: extra?.paidAmount ?? null,
+      });
       setSelectedIds(new Set());
       toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
         duration: 8000,
@@ -247,7 +336,15 @@ export default function ContasPagarPage() {
   }
 
   function labelForStatus(s: ApPaymentStatus) {
-    return s === "pago" ? "Pago" : s === "inserido" ? "Inserido" : s === "agendado" ? "Agendado" : "Pendente";
+    return s === "pago"
+      ? "Pago"
+      : s === "inserido"
+      ? "Inserido"
+      : s === "agendado"
+      ? "Agendado"
+      : s === "autorizado"
+      ? "Autorizado"
+      : "Em Aprovação";
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -304,50 +401,60 @@ export default function ContasPagarPage() {
 
       {hotelId && (
         <>
-          {/* Saldo bancário */}
-          <Card className="p-5 shadow-soft">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="md:col-span-1">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Saldo bancário do dia
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder={balance ? String(balance.amount) : "0,00"}
-                    value={balanceInput}
-                    onChange={(e) => setBalanceInput(e.target.value)}
-                    disabled={!canManage}
-                  />
-                  <Button
-                    size="sm"
-                    disabled={!canManage || !balanceInput || upsertBalance.isPending}
-                    onClick={async () => {
-                      if (!user) return;
-                      try {
-                        await upsertBalance.mutateAsync({
-                          hotelId,
-                          amount: parseFloat(balanceInput),
-                          userId: user.id,
-                        });
-                        toast.success("Saldo informado");
-                        setBalanceInput("");
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
-                      }
-                    }}
-                  >
-                    Salvar
-                  </Button>
-                </div>
-                {balance && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Atualizado: {fmtDateTime(balance.updated_at)}
-                  </p>
-                )}
-              </div>
-              <Stat label="Saldo informado" value={balanceAmount !== null ? fmtBRL(balanceAmount) : "—"} />
+          {/* Saldo bancário (Itaú + Santander) */}
+          <Card className="p-5 shadow-soft space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <BankBalanceField
+                bankName="itau"
+                label="Saldo Itaú"
+                value={balanceItauInput}
+                setValue={setBalanceItauInput}
+                current={balanceItau}
+                disabled={!canManage}
+                pending={upsertBalance.isPending}
+                onSave={async () => {
+                  if (!user || !balanceItauInput) return;
+                  try {
+                    await upsertBalance.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(balanceItauInput),
+                      userId: user.id,
+                      bankName: "itau",
+                    });
+                    toast.success("Saldo Itaú informado");
+                    setBalanceItauInput("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
+                  }
+                }}
+              />
+              <BankBalanceField
+                bankName="santander"
+                label="Saldo Santander"
+                value={balanceSantanderInput}
+                setValue={setBalanceSantanderInput}
+                current={balanceSantander}
+                disabled={!canManage}
+                pending={upsertBalance.isPending}
+                onSave={async () => {
+                  if (!user || !balanceSantanderInput) return;
+                  try {
+                    await upsertBalance.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(balanceSantanderInput),
+                      userId: user.id,
+                      bankName: "santander",
+                    });
+                    toast.success("Saldo Santander informado");
+                    setBalanceSantanderInput("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
+                  }
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
               <Stat
                 label={
                   dateFrom === dateTo
@@ -362,6 +469,75 @@ export default function ContasPagarPage() {
                 tone={balanceDiff !== null && balanceDiff < 0 ? "danger" : "neutral"}
               />
             </div>
+          </Card>
+
+          {/* Cartão a receber */}
+          <Card className="p-5 shadow-soft space-y-4">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-accent" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Cartão a receber</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Valor</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={cardAmount}
+                  onChange={(e) => setCardAmount(e.target.value)}
+                  onPaste={(e) => handlePasteBRL(e, setCardAmount)}
+                  disabled={!canManage}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">De</label>
+                <Input type="date" value={cardFrom} onChange={(e) => setCardFrom(e.target.value)} disabled={!canManage} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Até</label>
+                <Input type="date" value={cardTo} onChange={(e) => setCardTo(e.target.value)} disabled={!canManage} />
+              </div>
+              <Button
+                size="sm"
+                disabled={!canManage || !cardAmount || !cardFrom || !cardTo || upsertCard.isPending}
+                onClick={async () => {
+                  if (!user) return;
+                  try {
+                    await upsertCard.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(cardAmount),
+                      dateFrom: cardFrom,
+                      dateTo: cardTo,
+                      userId: user.id,
+                    });
+                    toast.success("Saldo de cartão registrado");
+                    setCardAmount("");
+                    setCardFrom("");
+                    setCardTo("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+                  }
+                }}
+              >
+                Salvar
+              </Button>
+            </div>
+            {cardReceivables.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Últimos registros</p>
+                <div className="space-y-1">
+                  {cardReceivables.slice(0, 5).map((c) => (
+                    <div key={c.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-1.5">
+                      <span className="text-muted-foreground">
+                        {fmtDate(c.date_from)} → {fmtDate(c.date_to)}
+                      </span>
+                      <span className="font-mono font-semibold">{fmtBRL(Number(c.amount))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Urgência */}
@@ -444,6 +620,9 @@ export default function ContasPagarPage() {
                         "Forma de Pagamento": e.payment_method ?? "",
                         "Aprovação GG": e.gg_approval,
                         "Status Pagamento": e.payment_status,
+                        "Data do Pagamento": e.payment_paid_at
+                          ? new Date(e.payment_paid_at).toLocaleDateString("pt-BR")
+                          : "",
                         Observação: e.observation ?? "",
                       }];
                     });
@@ -507,7 +686,7 @@ export default function ContasPagarPage() {
                   <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
                   <SelectItem value="payment_agendado">Agendado</SelectItem>
                   <SelectItem value="payment_pago">Pago</SelectItem>
-                  <SelectItem value="payment_pendente">Pendente</SelectItem>
+                  <SelectItem value="payment_pendente">Em Aprovação</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -586,7 +765,7 @@ export default function ContasPagarPage() {
                 <div className="flex items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30 flex-wrap">
                   <div className="text-xs text-muted-foreground">
                     {selectedIds.size > 0
-                      ? `${selectedIds.size} selecionado(s)`
+                      ? `${selectedIds.size} selecionado(s) · soma ${fmtBRL(selectedTotal)}`
                       : "Selecione lançamentos para marcar status em lote"}
                   </div>
                   <div className="flex items-center gap-2">
@@ -598,6 +777,17 @@ export default function ContasPagarPage() {
                         onClick={() => setNotifyOpen(true)}
                       >
                         <Mail className="h-3.5 w-3.5" /> Notificar GG ({selectedIds.size})
+                      </Button>
+                    )}
+                    {canMarkAutorizado && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-400"
+                        disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                        onClick={() => handleBulkPaymentStatus("autorizado")}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" /> Autorizado
                       </Button>
                     )}
                     {canMarkInsertedAgendado && (
@@ -668,6 +858,7 @@ export default function ContasPagarPage() {
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
+                    {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -676,12 +867,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -692,7 +883,7 @@ export default function ContasPagarPage() {
                       if (row.kind === "group") {
                         const colSpan =
                           (showApproval ? 7 : 6) +
-                          (sourceSystem === "omie" ? 1 : 0) +
+                          (sourceSystem === "omie" ? 2 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
@@ -742,6 +933,8 @@ export default function ContasPagarPage() {
                           selectable={canMarkInsertedAgendado || canMarkPaid}
                           selected={selectedIds.has(e.id)}
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
+                          showBank={sourceSystem === "omie"}
+                          canEditObservation={canManage}
                         />
                       );
                     })
@@ -749,6 +942,31 @@ export default function ContasPagarPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Histórico de notificações */}
+            {notifLog.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-xs font-semibold uppercase tracking-wider cursor-pointer text-muted-foreground hover:text-foreground">
+                  Histórico de notificações ({notifLog.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {notifLog.map((log) => (
+                    <div key={log.id} className="text-sm border rounded-md p-3">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>{fmtDateTime(log.sent_at)}</span>
+                        <span>{log.recipient_emails.join(", ") || "—"}</span>
+                      </div>
+                      {log.message_text && (
+                        <p className="text-xs whitespace-pre-wrap">{log.message_text}</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {(log.entries_snapshot as unknown[]).length} lançamento(s) notificado(s)
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </Card>
         </>
       )}
@@ -835,6 +1053,134 @@ export default function ContasPagarPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de agendamento */}
+      <AlertDialog open={schedulingOpen} onOpenChange={setSchedulingOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Data de agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione a data prevista para inserção no banco. O sistema mudará automaticamente
+              para "Inserido" nessa data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            type="date"
+            value={scheduledDate}
+            onChange={(e) => setScheduledDate(e.target.value)}
+            min={new Date().toISOString().slice(0, 10)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!scheduledDate}
+              onClick={() => {
+                setSchedulingOpen(false);
+                executeStatusChange("agendado", { scheduledDate });
+              }}
+            >
+              Confirmar agendamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de juros (lançamentos vencidos marcados como Inserido) */}
+      <AlertDialog open={interestDialogOpen} onOpenChange={setInterestDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Há lançamentos vencidos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o juros pago e o novo valor (com juros) para registrar o pagamento em atraso.
+              Deixe em branco caso não se aplique.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Juros pago
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={paidInterest}
+                onChange={(e) => setPaidInterest(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setPaidInterest)}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Novo valor pago
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setPaidAmount)}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setInterestDialogOpen(false);
+                executeStatusChange("inserido", {
+                  paidInterest: paidInterest ? parseFloat(paidInterest) : undefined,
+                  paidAmount: paidAmount ? parseFloat(paidAmount) : undefined,
+                });
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Sub-componentes ─────────────────────────────────────────────────────
+interface BankBalanceFieldProps {
+  bankName: "itau" | "santander";
+  label: string;
+  value: string;
+  setValue: (v: string) => void;
+  current: { amount: number | string; updated_at: string } | null | undefined;
+  disabled: boolean;
+  pending: boolean;
+  onSave: () => void;
+}
+function BankBalanceField({ label, value, setValue, current, disabled, pending, onSave }: BankBalanceFieldProps) {
+  return (
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          step="0.01"
+          placeholder={current ? String(current.amount) : "0,00"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onPaste={(e) => handlePasteBRL(e, setValue)}
+          disabled={disabled}
+        />
+        <Button size="sm" disabled={disabled || !value || pending} onClick={onSave}>
+          Salvar
+        </Button>
+      </div>
+      {current ? (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Atual: {fmtBRL(Number(current.amount))} · {fmtDateTime(current.updated_at)}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground mt-1">Nenhum saldo informado hoje</p>
+      )}
     </div>
   );
 }

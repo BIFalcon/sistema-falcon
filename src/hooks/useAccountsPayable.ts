@@ -692,3 +692,21 @@ export function useSaveNotificationLog() {
     },
   });
 }
+
+/** Atualiza apenas a observação de um lançamento. */
+export function useUpdateEntryObservation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entryId: string; hotelId: string; observation: string }) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ observation: input.observation } as never)
+        .eq("id", input.entryId);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
