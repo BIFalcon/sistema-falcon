@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { getCategoriaFromCode } from "./conciliationCodes";
 
 export interface RazaoLine {
-  date: string;
+  date: string; // ISO YYYY-MM-DD
   descricao: string;
   lancamento: string;
   historico: string;
@@ -13,7 +13,7 @@ export interface RazaoLine {
 }
 
 export interface JournalLine {
-  date: string;
+  date: string; // ISO YYYY-MM-DD
   transactionNumber: string;
   receiptNumber: string;
   transactionCode: string;
@@ -27,6 +27,22 @@ export interface JournalLine {
   categoria: string | null;
 }
 
+function toIsoDate(raw: string): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) {
+    const dd = m[1].padStart(2, "0");
+    const mm = m[2].padStart(2, "0");
+    let yyyy = m[3];
+    if (yyyy.length === 2) yyyy = (parseInt(yyyy, 10) > 50 ? "19" : "20") + yyyy;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
+  return s;
+}
+
 export function parseRazao(file: File): Promise<RazaoLine[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -38,21 +54,27 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
           header: 1, blankrows: false, defval: null, raw: false,
         });
 
-        const headerIdx = rows.findIndex((r) =>
-          r.some((c) => typeof c === "string" && c.toLowerCase().includes("descrição"))
-        );
-        if (headerIdx === -1) throw new Error("Cabeçalho não encontrado no Razão");
+        const headerIdx = 0;
+        const header = (rows[headerIdx] ?? []).map((c) => String(c ?? "").toLowerCase().trim());
+        const findCol = (...names: string[]) => {
+          for (const n of names) {
+            const idx = header.findIndex((h) => h === n);
+            if (idx !== -1) return idx;
+          }
+          for (const n of names) {
+            const idx = header.findIndex((h) => h.includes(n));
+            if (idx !== -1) return idx;
+          }
+          return -1;
+        };
 
-        const header = rows[headerIdx].map((c) => String(c ?? "").toLowerCase().trim());
-        const col = (name: string) => header.findIndex((h) => h.includes(name));
-
-        const iData      = col("data");
-        const iDesc      = col("descrição") !== -1 ? col("descrição") : col("descricao");
-        const iLanc      = col("lançamento") !== -1 ? col("lançamento") : col("lancamento");
-        const iHist      = col("histórico") !== -1 ? col("histórico") : col("historico");
-        const iDoc       = col("documento");
-        const iDeb       = col("débito") !== -1 ? col("débito") : col("debito");
-        const iCred      = col("crédito") !== -1 ? col("crédito") : col("credito");
+        const iData = findCol("data");
+        const iDesc = findCol("descrição", "descricao");
+        const iLanc = findCol("lançamento", "lancamento");
+        const iHist = findCol("histórico", "historico");
+        const iDoc  = findCol("documento");
+        const iDeb  = findCol("valor débito", "valor debito", "débito", "debito");
+        const iCred = findCol("valor crédito", "valor credito", "crédito", "credito");
 
         const lines: RazaoLine[] = [];
         for (const row of rows.slice(headerIdx + 1)) {
@@ -63,7 +85,7 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
           const cred = parseFloat(String(row[iCred] ?? "0").replace(",", ".")) || 0;
 
           lines.push({
-            date:          String(row[iData] ?? "").trim(),
+            date:          toIsoDate(String(row[iData] ?? "")),
             descricao:     desc,
             lancamento:    String(row[iLanc] ?? "").trim(),
             historico:     String(row[iHist] ?? "").trim(),
@@ -125,7 +147,7 @@ export function parseJournal(file: File): Promise<JournalLine[]> {
           const last   = String(row[iLast]    ?? "").trim();
 
           lines.push({
-            date:                  String(row[iDate] ?? "").trim(),
+            date:                  toIsoDate(String(row[iDate] ?? "")),
             transactionNumber:     trnNum,
             receiptNumber:         String(row[iReceipt] ?? "").trim(),
             transactionCode:       code,
