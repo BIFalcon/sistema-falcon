@@ -401,50 +401,60 @@ export default function ContasPagarPage() {
 
       {hotelId && (
         <>
-          {/* Saldo bancário */}
-          <Card className="p-5 shadow-soft">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="md:col-span-1">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Saldo bancário do dia
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder={balance ? String(balance.amount) : "0,00"}
-                    value={balanceInput}
-                    onChange={(e) => setBalanceInput(e.target.value)}
-                    disabled={!canManage}
-                  />
-                  <Button
-                    size="sm"
-                    disabled={!canManage || !balanceInput || upsertBalance.isPending}
-                    onClick={async () => {
-                      if (!user) return;
-                      try {
-                        await upsertBalance.mutateAsync({
-                          hotelId,
-                          amount: parseFloat(balanceInput),
-                          userId: user.id,
-                        });
-                        toast.success("Saldo informado");
-                        setBalanceInput("");
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
-                      }
-                    }}
-                  >
-                    Salvar
-                  </Button>
-                </div>
-                {balance && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Atualizado: {fmtDateTime(balance.updated_at)}
-                  </p>
-                )}
-              </div>
-              <Stat label="Saldo informado" value={balanceAmount !== null ? fmtBRL(balanceAmount) : "—"} />
+          {/* Saldo bancário (Itaú + Santander) */}
+          <Card className="p-5 shadow-soft space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <BankBalanceField
+                bankName="itau"
+                label="Saldo Itaú"
+                value={balanceItauInput}
+                setValue={setBalanceItauInput}
+                current={balanceItau}
+                disabled={!canManage}
+                pending={upsertBalance.isPending}
+                onSave={async () => {
+                  if (!user || !balanceItauInput) return;
+                  try {
+                    await upsertBalance.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(balanceItauInput),
+                      userId: user.id,
+                      bankName: "itau",
+                    });
+                    toast.success("Saldo Itaú informado");
+                    setBalanceItauInput("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
+                  }
+                }}
+              />
+              <BankBalanceField
+                bankName="santander"
+                label="Saldo Santander"
+                value={balanceSantanderInput}
+                setValue={setBalanceSantanderInput}
+                current={balanceSantander}
+                disabled={!canManage}
+                pending={upsertBalance.isPending}
+                onSave={async () => {
+                  if (!user || !balanceSantanderInput) return;
+                  try {
+                    await upsertBalance.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(balanceSantanderInput),
+                      userId: user.id,
+                      bankName: "santander",
+                    });
+                    toast.success("Saldo Santander informado");
+                    setBalanceSantanderInput("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar saldo");
+                  }
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
               <Stat
                 label={
                   dateFrom === dateTo
@@ -459,6 +469,75 @@ export default function ContasPagarPage() {
                 tone={balanceDiff !== null && balanceDiff < 0 ? "danger" : "neutral"}
               />
             </div>
+          </Card>
+
+          {/* Cartão a receber */}
+          <Card className="p-5 shadow-soft space-y-4">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-accent" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Cartão a receber</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Valor</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={cardAmount}
+                  onChange={(e) => setCardAmount(e.target.value)}
+                  onPaste={(e) => handlePasteBRL(e, setCardAmount)}
+                  disabled={!canManage}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">De</label>
+                <Input type="date" value={cardFrom} onChange={(e) => setCardFrom(e.target.value)} disabled={!canManage} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Até</label>
+                <Input type="date" value={cardTo} onChange={(e) => setCardTo(e.target.value)} disabled={!canManage} />
+              </div>
+              <Button
+                size="sm"
+                disabled={!canManage || !cardAmount || !cardFrom || !cardTo || upsertCard.isPending}
+                onClick={async () => {
+                  if (!user) return;
+                  try {
+                    await upsertCard.mutateAsync({
+                      hotelId,
+                      amount: parseFloat(cardAmount),
+                      dateFrom: cardFrom,
+                      dateTo: cardTo,
+                      userId: user.id,
+                    });
+                    toast.success("Saldo de cartão registrado");
+                    setCardAmount("");
+                    setCardFrom("");
+                    setCardTo("");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+                  }
+                }}
+              >
+                Salvar
+              </Button>
+            </div>
+            {cardReceivables.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Últimos registros</p>
+                <div className="space-y-1">
+                  {cardReceivables.slice(0, 5).map((c) => (
+                    <div key={c.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-1.5">
+                      <span className="text-muted-foreground">
+                        {fmtDate(c.date_from)} → {fmtDate(c.date_to)}
+                      </span>
+                      <span className="font-mono font-semibold">{fmtBRL(Number(c.amount))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Urgência */}
