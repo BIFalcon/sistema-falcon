@@ -152,6 +152,18 @@ function addSeries(a: DreMonthValue[], b: DreMonthValue[]) {
   return a.map((v, i) => (v == null && b[i] == null ? null : Number(v ?? 0) + Number(b[i] ?? 0)));
 }
 
+const WEIGHTED_AVG_LABELS = [
+  /taxa\s*de\s*ocupa/i,
+  /fator\s*de\s*ocupa/i,
+  /di[áa]ria\s*m[ée]dia|adr/i,
+  /revpar/i,
+  /margem|%\s*gop/i,
+];
+
+function isWeightedAvgIndicator(label: string): boolean {
+  return WEIGHTED_AVG_LABELS.some((rx) => rx.test(label));
+}
+
 export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: string): DreAnalyticsDataset {
   const wb = XLSX.read(buffer, { type: "array", cellDates: true });
   const byKey = new Map<string, DreLineNode>();
@@ -171,19 +183,57 @@ export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: strin
 }
 
 export function mergeDreDatasets(datasets: DreAnalyticsDataset[]): DreAnalyticsDataset {
-  const byKey = new Map<string, DreLineNode>();
+  if (datasets.length === 0) {
+    return { tree: [], flat: [], hotelCount: 0, sourceNames: [] };
+  }
+  if (datasets.length === 1) return datasets[0];
+
+  // Agrupa nós por id em todos os datasets
+  const grouped = new Map<string, DreLineNode[]>();
   for (const dataset of datasets) {
     for (const node of dataset.flat) {
-      const existing = byKey.get(node.id);
-      if (!existing) byKey.set(node.id, { ...node, children: [] });
-      else {
-        existing.series.current = addSeries(existing.series.current, node.series.current);
-        existing.series.budget = addSeries(existing.series.budget, node.series.budget);
-        existing.series.previous = addSeries(existing.series.previous, node.series.previous);
-      }
+      const arr = grouped.get(node.id) ?? [];
+      arr.push(node);
+      grouped.set(node.id, arr);
     }
   }
-  return buildDataset(Array.from(byKey.values()), datasets.length, datasets.flatMap((d) => d.sourceNames));
+
+  const merged: DreLineNode[] = [];
+  for (const [id, nodes] of grouped) {
+    const label = nodes[0].label;
+    const useAvg = isWeightedAvgIndicator(label);
+    const series: Record<DreSeriesKey, DreMonthValue[]> = {
+      current: Array(12).fill(null),
+      budget: Array(12).fill(null),
+      previous: Array(12).fill(null),
+    };
+    for (const key of ["current", "budget", "previous"] as DreSeriesKey[]) {
+      for (let m = 0; m < 12; m++) {
+        const vals = nodes
+          .map((n) => n.series[key][m])
+          .filter((v): v is number => v != null && Number.isFinite(v));
+        if (vals.length === 0) {
+          series[key][m] = null;
+          continue;
+        }
+        const sum = vals.reduce((a, b) => a + b, 0);
+        series[key][m] = useAvg ? sum / vals.length : sum;
+      }
+    }
+    merged.push({
+      id,
+      label,
+      level: nodes[0].level,
+      series,
+      children: [],
+    });
+  }
+
+  return buildDataset(
+    merged,
+    datasets.reduce((s, d) => s + d.hotelCount, 0),
+    datasets.flatMap((d) => d.sourceNames),
+  );
 }
 
 function buildDataset(nodes: DreLineNode[], hotelCount: number, sourceNames: string[]): DreAnalyticsDataset {
