@@ -1,0 +1,22 @@
+
+UPDATE public.hotels SET cnpj = '32.288.742/0008-27' WHERE id = 'ibis-budget-recife';
+UPDATE public.hotels SET cnpj = '32.288.742/0007-46' WHERE id = 'mercure-macae';
+UPDATE public.hotels SET cnpj = '60.498.259/0001-36' WHERE id = 'ibis-arcoverde';
+UPDATE public.hotels SET cnpj = '15.225.143/0004-11' WHERE id = 'ibis-budget-barbacena';
+UPDATE public.hotels SET cnpj = '63.371.596/0001-56' WHERE id = 'ibis-caruaru';
+UPDATE public.hotels SET cnpj = '32.288.742/0002-31' WHERE id = 'ibis-styles-confins';
+UPDATE public.hotels SET cnpj = '15.225.143/0010-60' WHERE id = 'ibis-cuiaba';
+UPDATE public.hotels SET cnpj = '15.225.143/0007-64' WHERE id = 'ibis-budget-divinopolis';
+UPDATE public.hotels SET cnpj = '36.967.218/0001-67' WHERE id = 'ibis-styles-garanhuns';
+UPDATE public.hotels SET cnpj = '15.225.143/0008-45' WHERE id = 'ibis-budget-itaperuna';
+UPDATE public.hotels SET cnpj = '15.225.143/0002-50' WHERE id = 'ibis-juiz-de-fora';
+UPDATE public.hotels SET cnpj = '32.288.742/0003-12' WHERE id = 'ibis-macae';
+UPDATE public.hotels SET cnpj = '32.288.742/0004-01' WHERE id = 'ibis-budget-manhuacu';
+UPDATE public.hotels SET cnpj = '15.225.143/0003-30' WHERE id = 'ibis-budget-muriae';
+UPDATE public.hotels SET cnpj = '32.288.742/0005-84' WHERE id = 'ibis-budget-patos';
+UPDATE public.hotels SET cnpj = '15.225.143/0009-26' WHERE id = 'ibis-budget-petropolis';
+UPDATE public.hotels SET cnpj = '44.387.114/0001-01' WHERE id = 'manhattan-poa';
+UPDATE public.hotels SET cnpj = '55.707.252/0001-47' WHERE id = 'ibis-serra-talhada';
+UPDATE public.hotels SET cnpj = '15.225.143/0006-83' WHERE id = 'ibis-styles-tres-rios';
+UPDATE public.hotels SET cnpj = '16.385.170/0001-71' WHERE id = 'ibis-budget-uberlandia';
+UPDATE public.hotels SET cnpj = '17.408.336/0001-90' WHERE id = 'pousada-carneiros';
