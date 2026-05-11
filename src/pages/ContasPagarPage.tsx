@@ -15,10 +15,11 @@
  *  - NotifyGgDialog                  → components/accounts-payable/NotifyGgDialog.tsx
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
-import { useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, Upload, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, ShieldCheck, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,9 @@ import {
   useSetEntryPaymentStatus,
   useTodayBankBalance,
   useUpsertBankBalance,
+  useApNotificationLog,
+  useCardReceivable,
+  useUpsertCardReceivable,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -55,7 +59,7 @@ import {
 import { useApPageDerived } from "@/hooks/useApPageDerived";
 import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
-import { fmtBRL, fmtDate, fmtDateTime } from "@/lib/formatters";
+import { fmtBRL, fmtDate, fmtDateTime, handlePasteBRL } from "@/lib/formatters";
 
 import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
@@ -73,11 +77,13 @@ export default function ContasPagarPage() {
     isFinanceiroEquipe,
     isFinanceiroCoordenadora,
   } = useAuth();
+  const qc = useQueryClient();
   const canManage = isMaster || hasRole("financeiro");
   // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
     isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
   const canMarkPaid = isMaster || isFinanceiroCoordenadora;
+  const canMarkAutorizado = isMaster || isFinanceiroCoordenadora;
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
 
@@ -96,14 +102,22 @@ export default function ContasPagarPage() {
   // ── Dados remotos ──────────────────────────────────────────────────────
   const { data: lastUpload } = useLatestApUpload(hotelId);
   const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
-  const { data: balance } = useTodayBankBalance(hotelId);
+  const { data: balanceItau } = useTodayBankBalance(hotelId, "itau");
+  const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
+  const { data: cardReceivables = [] } = useCardReceivable(hotelId);
+  const { data: notifLog = [] } = useApNotificationLog(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
+  const upsertCard = useUpsertCardReceivable();
 
   // ── Estado local ───────────────────────────────────────────────────────
-  const [balanceInput, setBalanceInput] = useState("");
+  const [balanceItauInput, setBalanceItauInput] = useState("");
+  const [balanceSantanderInput, setBalanceSantanderInput] = useState("");
+  const [cardAmount, setCardAmount] = useState("");
+  const [cardFrom, setCardFrom] = useState("");
+  const [cardTo, setCardTo] = useState("");
   const [period, setPeriod] = useState<Period>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [category, setCategory] = useState("all");
@@ -115,6 +129,11 @@ export default function ContasPagarPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
+  const [paidInterest, setPaidInterest] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +141,7 @@ export default function ContasPagarPage() {
   const derived = useApPageDerived({
     allEntriesRaw,
     documents: [],
-    balance,
+    balance: balanceItau,
     sourceSystem,
     period,
     status,
@@ -150,8 +169,32 @@ export default function ContasPagarPage() {
     balanceDiff,
   } = derived;
 
-  const balanceAmount = balance ? Number(balance.amount) : null;
+  const balanceItauAmount = balanceItau ? Number(balanceItau.amount) : null;
+  const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
+  const balanceTotal =
+    (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
+
+  // Soma da seleção em lote
+  const selectedTotal = useMemo(() => {
+    let sum = 0;
+    for (const e of entries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
+    for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
+    return sum;
+  }, [selectedIds, entries, distributionEntries]);
+
+  // Auto: agendados cuja data já passou viram "inserido".
+  useEffect(() => {
+    if (!hotelId || entries.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const toInsert = entries
+      .filter((e) => e.payment_status === "agendado" && e.scheduled_date && e.scheduled_date <= today)
+      .map((e) => e.id);
+    if (toInsert.length > 0) {
+      setPaymentStatus.mutate({ hotelId, entryIds: toInsert, status: "inserido" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotelId, entries.length]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -175,6 +218,9 @@ export default function ContasPagarPage() {
         `Importado: ${r.entries} lançamentos${r.documents_extracted ? `, ${r.documents_extracted} documentos` : ""}`,
       );
       window.dispatchEvent(new CustomEvent("ap:refresh"));
+      qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-latest-upload", hotelId] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao importar");
     } finally {
@@ -191,18 +237,61 @@ export default function ContasPagarPage() {
       toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
       return;
     }
+    if (newStatus === "autorizado" && !canMarkAutorizado) {
+      toast.error("Apenas a coordenadoria do financeiro pode autorizar pagamentos");
+      return;
+    }
     if ((newStatus === "inserido" || newStatus === "agendado") && !canMarkInsertedAgendado) {
       toast.error("Sem permissão para alterar status");
       return;
     }
+    // Agendado → pede data
+    if (newStatus === "agendado") {
+      setScheduledDate("");
+      setSchedulingOpen(true);
+      return;
+    }
+    // Inserido em lançamento vencido → pede juros/valor pago
+    if (newStatus === "inserido") {
+      const today = new Date().toISOString().slice(0, 10);
+      const allEntries = [...entries, ...distributionEntries];
+      const hasOverdue = ids.some((id) => {
+        const entry = allEntries.find((e) => e.id === id);
+        return entry?.due_date && entry.due_date < today;
+      });
+      if (hasOverdue) {
+        setPaidInterest("");
+        setPaidAmount("");
+        setInterestDialogOpen(true);
+        return;
+      }
+    }
+    await executeStatusChange(newStatus);
+  }
+
+  async function executeStatusChange(
+    newStatus: ApPaymentStatus,
+    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number },
+  ) {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
     // Captura status anterior para permitir desfazer
     const previousByEntry = new Map<string, ApPaymentStatus>();
-    for (const e of entries) {
+    const allEntries = [...entries, ...distributionEntries];
+    for (const e of allEntries) {
       if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
     }
     const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
-      await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
+      await setPaymentStatus.mutateAsync({
+        hotelId,
+        entryIds: ids,
+        status: newStatus,
+        scheduledDate: extra?.scheduledDate ?? null,
+        paidInterest: extra?.paidInterest ?? null,
+        paidAmount: extra?.paidAmount ?? null,
+      });
       setSelectedIds(new Set());
       toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
         duration: 8000,
@@ -247,7 +336,15 @@ export default function ContasPagarPage() {
   }
 
   function labelForStatus(s: ApPaymentStatus) {
-    return s === "pago" ? "Pago" : s === "inserido" ? "Inserido" : s === "agendado" ? "Agendado" : "Pendente";
+    return s === "pago"
+      ? "Pago"
+      : s === "inserido"
+      ? "Inserido"
+      : s === "agendado"
+      ? "Agendado"
+      : s === "autorizado"
+      ? "Autorizado"
+      : "Em Aprovação";
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
