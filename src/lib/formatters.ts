@@ -3,6 +3,7 @@
  * Centraliza as funções fmtBRL / fmtDate / fmtDateTime que antes
  * eram redefinidas em cada página.
  */
+import type React from "react";
 
 export function fmtBRL(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "—";
