@@ -28,3 +28,22 @@ export function fmtDateTime(s: string | null | undefined): string {
     timeStyle: "short",
   });
 }
+
+/** Handler para colar valores no formato BR ("R$ 1.234,56" → "1234.56"). */
+export function handlePasteBRL(
+  e: React.ClipboardEvent<HTMLInputElement>,
+  setter: (v: string) => void,
+): void {
+  const text = e.clipboardData.getData("text");
+  if (!text) return;
+  const cleaned = text
+    .trim()
+    .replace(/R\$\s?/gi, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const num = parseFloat(cleaned);
+  if (!isNaN(num)) {
+    e.preventDefault();
+    setter(num.toFixed(2));
+  }
+}
