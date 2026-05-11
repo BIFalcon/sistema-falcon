@@ -683,7 +683,7 @@ export default function ContasPagarPage() {
                   <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
                   <SelectItem value="payment_agendado">Agendado</SelectItem>
                   <SelectItem value="payment_pago">Pago</SelectItem>
-                  <SelectItem value="payment_pendente">Pendente</SelectItem>
+                  <SelectItem value="payment_pendente">Em Aprovação</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -762,7 +762,7 @@ export default function ContasPagarPage() {
                 <div className="flex items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30 flex-wrap">
                   <div className="text-xs text-muted-foreground">
                     {selectedIds.size > 0
-                      ? `${selectedIds.size} selecionado(s)`
+                      ? `${selectedIds.size} selecionado(s) · soma ${fmtBRL(selectedTotal)}`
                       : "Selecione lançamentos para marcar status em lote"}
                   </div>
                   <div className="flex items-center gap-2">
@@ -774,6 +774,17 @@ export default function ContasPagarPage() {
                         onClick={() => setNotifyOpen(true)}
                       >
                         <Mail className="h-3.5 w-3.5" /> Notificar GG ({selectedIds.size})
+                      </Button>
+                    )}
+                    {canMarkAutorizado && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-400"
+                        disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                        onClick={() => handleBulkPaymentStatus("autorizado")}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" /> Autorizado
                       </Button>
                     )}
                     {canMarkInsertedAgendado && (
@@ -844,6 +855,7 @@ export default function ContasPagarPage() {
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
+                    {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -852,12 +864,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 1 : 0)}
+                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -868,7 +880,7 @@ export default function ContasPagarPage() {
                       if (row.kind === "group") {
                         const colSpan =
                           (showApproval ? 7 : 6) +
-                          (sourceSystem === "omie" ? 1 : 0) +
+                          (sourceSystem === "omie" ? 2 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
@@ -918,6 +930,8 @@ export default function ContasPagarPage() {
                           selectable={canMarkInsertedAgendado || canMarkPaid}
                           selected={selectedIds.has(e.id)}
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
+                          showBank={sourceSystem === "omie"}
+                          canEditObservation={canManage}
                         />
                       );
                     })
@@ -925,6 +939,31 @@ export default function ContasPagarPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Histórico de notificações */}
+            {notifLog.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-xs font-semibold uppercase tracking-wider cursor-pointer text-muted-foreground hover:text-foreground">
+                  Histórico de notificações ({notifLog.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {notifLog.map((log) => (
+                    <div key={log.id} className="text-sm border rounded-md p-3">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>{fmtDateTime(log.sent_at)}</span>
+                        <span>{log.recipient_emails.join(", ") || "—"}</span>
+                      </div>
+                      {log.message_text && (
+                        <p className="text-xs whitespace-pre-wrap">{log.message_text}</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {(log.entries_snapshot as unknown[]).length} lançamento(s) notificado(s)
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </Card>
         </>
       )}
