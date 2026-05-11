@@ -4,7 +4,12 @@ import JSZip from "jszip";
 
 export type FinancialSystem = "totvs" | "omie";
 export type ApApproval = "pending" | "approved" | "rejected";
-export type ApPaymentStatus = "pendente" | "inserido" | "agendado" | "pago";
+export type ApPaymentStatus =
+  | "em_aprovacao" // GG aprovou no OMIE — aguardando autorização do financeiro
+  | "autorizado"   // coordenadora autorizou para pagamento
+  | "inserido"     // inserido no banco
+  | "agendado"     // agendado para data futura
+  | "pago";        // pago
 
 export interface ApUpload {
   id: string;
@@ -48,6 +53,11 @@ export interface ApEntry {
   payment_marked_by: string | null;
   payment_marked_at: string | null;
   payment_paid_at: string | null;
+  scheduled_date: string | null;
+  bank_account: string | null;
+  hotel_cnpj: string | null;
+  paid_interest: number | null;
+  paid_amount: number | null;
 }
 
 export interface ApBankBalance {
@@ -57,6 +67,7 @@ export interface ApBankBalance {
   amount: number;
   informed_by: string;
   updated_at: string;
+  bank_name: string;
 }
 
 export interface ApDocument {
