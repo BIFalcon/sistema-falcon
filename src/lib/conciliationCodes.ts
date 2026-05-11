@@ -20,6 +20,7 @@ export const TRANSACTION_CODE_MAP: Record<string, ConciliationCategory> = {
   "9095": "Regularizar PIX",
   "9096": "Regularizar PIX",
   "9097": "Regularizar PIX",
+  "9099": "Regularizar PIX",
   "9100": "Cartoes a Processar",
   "9101": "Cartoes a Processar",
   "9102": "Cartoes a Processar",

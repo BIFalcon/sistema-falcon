@@ -50,6 +50,26 @@ function toIsoDate(raw: unknown): string {
   return s;
 }
 
+function parseMoney(raw: unknown): number {
+  if (typeof raw === "number") return raw;
+  const s = String(raw ?? "").trim().replace(/\s/g, "");
+  if (!s) return 0;
+  const normalized = s.includes(",")
+    ? s.replace(/\./g, "").replace(",", ".")
+    : s;
+  return Number.parseFloat(normalized) || 0;
+}
+
+function extractRazaoDate(data: unknown, historico: string): string {
+  const issueDate = historico.match(/data\s+emiss[ãa]o\s*:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+  if (issueDate) return toIsoDate(issueDate[1]);
+
+  const movementDate = historico.match(/movimento\s+\d+\s+-.*?(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*$/i);
+  if (movementDate) return toIsoDate(movementDate[1]);
+
+  return toIsoDate(data);
+}
+
 export function parseRazao(file: File): Promise<RazaoLine[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -88,11 +108,11 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
           const desc = String(row[iDesc] ?? "").trim();
           if (!desc) continue;
 
-          const deb  = parseFloat(String(row[iDeb]  ?? "0").replace(",", ".")) || 0;
-          const cred = parseFloat(String(row[iCred] ?? "0").replace(",", ".")) || 0;
+          const deb  = parseMoney(row[iDeb]);
+          const cred = parseMoney(row[iCred]);
           const hist = String(row[iHist] ?? "").trim();
           const doc  = String(row[iDoc]  ?? "").trim();
-          const lineDate = toIsoDate(row[iData] as never);
+          const lineDate = extractRazaoDate(row[iData], hist);
 
           // Tenta categoria pela descrição primeiro
           let categoriaFinal = desc;
@@ -164,8 +184,8 @@ export function parseJournal(file: File): Promise<JournalLine[]> {
           if (!trnNum) continue;
 
           const code   = String(row[iTrnCode] ?? "").trim();
-          const debit  = parseFloat(String(row[iDebit]  ?? "0").replace(",", ".")) || 0;
-          const credit = parseFloat(String(row[iCredit] ?? "0").replace(",", ".")) || 0;
+          const debit  = parseMoney(row[iDebit]);
+          const credit = parseMoney(row[iCredit]);
           const first  = String(row[iFirst]   ?? "").trim();
           const last   = String(row[iLast]    ?? "").trim();
 
