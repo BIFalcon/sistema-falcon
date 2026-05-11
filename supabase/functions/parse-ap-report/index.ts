@@ -366,6 +366,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Busca CNPJ do hotel para validação posterior
+    const { data: hotelData } = await admin
+      .from("hotels")
+      .select("cnpj")
+      .eq("id", hotelId)
+      .maybeSingle();
+    const hotelCnpjDigits = (hotelData?.cnpj ?? "").replace(/\D/g, "");
+
     const arrayBuf = await file.arrayBuffer();
     const lowerName = file.name.toLowerCase();
 
@@ -392,6 +400,23 @@ Deno.serve(async (req) => {
       parsed = r.entries; skipped = r.skipped;
     } else {
       parsed = parseTotvsXls(arrayBuf);
+    }
+
+    // Validação de CNPJ do hotel: se o hotel tem CNPJ cadastrado e a planilha
+    // apresenta CNPJ diferente, bloqueia para evitar importar arquivo errado.
+    if (hotelCnpjDigits && parsed.length > 0) {
+      const firstWithCnpj = parsed.find((p) => p.cnpj && p.cnpj.replace(/\D/g, "").length >= 11);
+      if (firstWithCnpj) {
+        const fileCnpj = (firstWithCnpj.cnpj ?? "").replace(/\D/g, "");
+        if (fileCnpj && fileCnpj !== hotelCnpjDigits) {
+          return new Response(
+            JSON.stringify({
+              error: `CNPJ da planilha (${firstWithCnpj.cnpj}) não corresponde ao hotel selecionado. Verifique se importou o arquivo correto.`,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
     }
 
     const ts = Date.now();
