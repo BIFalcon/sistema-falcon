@@ -174,6 +174,26 @@ function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
   return "pending";
 }
 
+// Mapeia situação OMIE para o status de pagamento Falcon
+type ApPaymentStatus = "em_aprovacao" | "autorizado" | "inserido" | "agendado" | "pago";
+function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
+  if (!situacao) return "em_aprovacao";
+  const s = toAscii(situacao);
+  if (s.includes("agendado")) return "agendado";
+  if (s.includes("pago") || s.includes("liquidado")) return "pago";
+  if (s.includes("previsto") || s.includes("aprovado") || s.includes("em aprovacao")) return "em_aprovacao";
+  return "em_aprovacao";
+}
+
+// Normaliza a conta corrente para "itau" | "santander" | null
+function normalizeBank(account: string | null | undefined): string | null {
+  const a = toAscii(account ?? "");
+  if (!a) return null;
+  if (a.includes("itau")) return "itau";
+  if (a.includes("santander")) return "santander";
+  return null;
+}
+
 function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   entries: ParsedEntry[];
   skipped: { other_bank: number; no_amount: number; no_supplier: number };
@@ -346,6 +366,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Busca CNPJ do hotel para validação posterior
+    const { data: hotelData } = await admin
+      .from("hotels")
+      .select("cnpj")
+      .eq("id", hotelId)
+      .maybeSingle();
+    const hotelCnpjDigits = (hotelData?.cnpj ?? "").replace(/\D/g, "");
+
     const arrayBuf = await file.arrayBuffer();
     const lowerName = file.name.toLowerCase();
 
@@ -372,6 +400,23 @@ Deno.serve(async (req) => {
       parsed = r.entries; skipped = r.skipped;
     } else {
       parsed = parseTotvsXls(arrayBuf);
+    }
+
+    // Validação de CNPJ do hotel: se o hotel tem CNPJ cadastrado e a planilha
+    // apresenta CNPJ diferente, bloqueia para evitar importar arquivo errado.
+    if (hotelCnpjDigits && parsed.length > 0) {
+      const firstWithCnpj = parsed.find((p) => p.cnpj && p.cnpj.replace(/\D/g, "").length >= 11);
+      if (firstWithCnpj) {
+        const fileCnpj = (firstWithCnpj.cnpj ?? "").replace(/\D/g, "");
+        if (fileCnpj && fileCnpj !== hotelCnpjDigits) {
+          return new Response(
+            JSON.stringify({
+              error: `CNPJ da planilha (${firstWithCnpj.cnpj}) não corresponde ao hotel selecionado. Verifique se importou o arquivo correto.`,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
     }
 
     const ts = Date.now();
@@ -455,16 +500,26 @@ Deno.serve(async (req) => {
         is_distribution: p.is_distribution,
         raw: p.raw,
         archived_at: null,
+        bank_account: normalizeBank((p.raw as any)?.conta_corrente ?? null),
+        hotel_cnpj: hotelCnpjDigits || null,
       };
+      const omieFalconStatus = sourceSystem === "omie" ? omieStatusToFalcon(p.omie_situation) : "em_aprovacao";
       if (prev) {
         updatedIds.add(prev.id);
         // Preserva: gg_approval*, primary_document_id, observation
+        // Status: 'pago' nunca retroage. Se OMIE traz status específico
+        // (agendado/pago) usa ele; caso contrário mantém o atual.
+        const preservedStatus =
+          prev.payment_status === "pago"
+            ? "pago"
+            : omieFalconStatus !== "em_aprovacao"
+              ? omieFalconStatus
+              : (prev.payment_status ?? "em_aprovacao");
         updates.push({
           id: prev.id,
           ...baseFields,
-          // não sobrescreve aprovação/observação/documento
           observation: prev.observation ?? p.observation,
-          payment_status: prev.payment_status ?? "pendente",
+          payment_status: preservedStatus,
         });
       } else {
         inserts.push({
@@ -475,7 +530,7 @@ Deno.serve(async (req) => {
           gg_approval_at: null,
           gg_approval_notes: null,
           primary_document_id: null,
-          payment_status: "pendente",
+          payment_status: omieFalconStatus,
         });
       }
     }
@@ -498,19 +553,28 @@ Deno.serve(async (req) => {
     }
 
     // 6. arquiva os que sumiram do novo relatório
-    const toArchive: string[] = [];
+    //    Pagos vão para histórico (archived_reason = "paid_history") e os
+    //    demais são arquivados normalmente.
+    const toArchivePaid: string[] = [];
+    const toArchiveOther: string[] = [];
     for (const e of existing ?? []) {
-      // Não arquiva se já foi atualizada via lookup_key (mesmo sem entry_key match)
       if (updatedIds.has(e.id)) continue;
-      if (!seenKeys.has(e.entry_key) && !e.archived_at) toArchive.push(e.id);
+      if (seenKeys.has(e.entry_key) || e.archived_at) continue;
+      if (e.payment_status === "pago") toArchivePaid.push(e.id);
+      else toArchiveOther.push(e.id);
     }
-    if (toArchive.length) {
-      const nowIso = new Date().toISOString();
-      const archiveChunk = 500;
-      for (let i = 0; i < toArchive.length; i += archiveChunk) {
-        const chunk = toArchive.slice(i, i + archiveChunk);
-        await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
-      }
+    const nowIso = new Date().toISOString();
+    const archiveChunk = 500;
+    for (let i = 0; i < toArchivePaid.length; i += archiveChunk) {
+      const chunk = toArchivePaid.slice(i, i + archiveChunk);
+      await admin
+        .from("ap_entries")
+        .update({ archived_at: nowIso, archived_reason: "paid_history" })
+        .in("id", chunk);
+    }
+    for (let i = 0; i < toArchiveOther.length; i += archiveChunk) {
+      const chunk = toArchiveOther.slice(i, i + archiveChunk);
+      await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
     }
 
     // 5. ZIP OMIE: salva docs extraídos
