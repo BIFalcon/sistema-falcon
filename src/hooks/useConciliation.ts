@@ -23,6 +23,34 @@ export interface ConciliationResult {
 
 const TOLERANCE = 0.05;
 
+const toCents = (value: number) => Math.round(value * 100);
+
+const normalizeText = (value: string) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+const hasNameMatch = (razao: RazaoLine, journal: JournalLine) => {
+  const historico = normalizeText(razao.historico);
+  const nameParts = [journal.guestFirstName, journal.guestLastName]
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .match(/[a-z0-9]+/g)
+    ?.filter((part) => part.length > 2) ?? [];
+
+  if (!historico || nameParts.length === 0) return false;
+  return nameParts.every((part) => historico.includes(part));
+};
+
+const normKey = (s: string) => {
+  const onlyDigits = String(s ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  return onlyDigits || String(s ?? "").trim();
+};
+
 export function useConciliation(
   razaoLines: RazaoLine[],
   journalLines: JournalLine[],
@@ -54,32 +82,53 @@ export function useConciliation(
       );
       const totalJournal = journalDestaCateg.reduce((s, l) => s + l.credit, 0);
 
-      // Normaliza chave de matching: só dígitos, sem zeros à esquerda.
-      // Evita falsos "não subiram" por diferenças de formatação entre
-      // Razão (documento) e Journal (transactionNumber).
-      const normKey = (s: string) => {
-        const onlyDigits = String(s ?? "").replace(/\D/g, "").replace(/^0+/, "");
-        return onlyDigits || String(s ?? "").trim();
+      const matchedRazao = new Set<number>();
+      const matchedJournal = new Set<number>();
+      const emAmbos: Array<{ razao: RazaoLine; journal: JournalLine }> = [];
+
+      const matchPair = (razaoIdx: number, journalIdx: number) => {
+        matchedRazao.add(razaoIdx);
+        matchedJournal.add(journalIdx);
+        emAmbos.push({ razao: creditosRazao[razaoIdx], journal: journalDestaCateg[journalIdx] });
       };
 
-      const razaoDocSet   = new Set(creditosRazao.map((l) => normKey(l.documento)));
-      const journalDocSet = new Set(journalDestaCateg.map((l) => normKey(l.transactionNumber)));
+      creditosRazao.forEach((razao, razaoIdx) => {
+        const docKey = normKey(razao.documento);
+        if (!docKey) return;
+        const journalIdx = journalDestaCateg.findIndex(
+          (journal, idx) => !matchedJournal.has(idx) && normKey(journal.transactionNumber) === docKey
+        );
+        if (journalIdx !== -1) matchPair(razaoIdx, journalIdx);
+      });
 
-      const apenasNoJournal = journalDestaCateg.filter(
-        (l) => !razaoDocSet.has(normKey(l.transactionNumber))
-      );
-      const apenasNoRazao = creditosRazao.filter(
-        (l) => !journalDocSet.has(normKey(l.documento))
-      );
+      creditosRazao.forEach((razao, razaoIdx) => {
+        if (matchedRazao.has(razaoIdx)) return;
+        const candidates = journalDestaCateg
+          .map((journal, journalIdx) => ({ journal, journalIdx }))
+          .filter(({ journal, journalIdx }) =>
+            !matchedJournal.has(journalIdx) &&
+            journal.date === razao.date &&
+            toCents(journal.credit) === toCents(razao.valorCredito) &&
+            hasNameMatch(razao, journal)
+          );
+        if (candidates.length === 1) matchPair(razaoIdx, candidates[0].journalIdx);
+      });
+
+      creditosRazao.forEach((razao, razaoIdx) => {
+        if (matchedRazao.has(razaoIdx)) return;
+        const candidates = journalDestaCateg
+          .map((journal, journalIdx) => ({ journal, journalIdx }))
+          .filter(({ journal, journalIdx }) =>
+            !matchedJournal.has(journalIdx) &&
+            journal.date === razao.date &&
+            toCents(journal.credit) === toCents(razao.valorCredito)
+          );
+        if (candidates.length === 1) matchPair(razaoIdx, candidates[0].journalIdx);
+      });
+
+      const apenasNoJournal = journalDestaCateg.filter((_, idx) => !matchedJournal.has(idx));
+      const apenasNoRazao = creditosRazao.filter((_, idx) => !matchedRazao.has(idx));
       const totalComparacao = journalDestaCateg.length > 0 ? totalJournal : totalCreditoRazao;
-      const emAmbos = creditosRazao
-        .filter((l) => journalDocSet.has(normKey(l.documento)))
-        .map((r) => ({
-          razao: r,
-          journal: journalDestaCateg.find(
-            (j) => normKey(j.transactionNumber) === normKey(r.documento)
-          )!,
-        }));
 
       return {
         categoria: cat,
