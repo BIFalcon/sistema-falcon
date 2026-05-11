@@ -61,7 +61,7 @@ import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
 import { fmtBRL, fmtDate, fmtDateTime, handlePasteBRL } from "@/lib/formatters";
 
-import { ApEntryRow } from "@/components/accounts-payable/ApEntryRow";
+import { ApEntryRow, PaymentStatusBadge } from "@/components/accounts-payable/ApEntryRow";
 import { Stat, UrgencyCell } from "@/components/accounts-payable/ApStatCards";
 import { NotifyGgDialog } from "@/components/accounts-payable/NotifyGgDialog";
 import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
