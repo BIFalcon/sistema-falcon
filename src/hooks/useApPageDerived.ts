@@ -191,7 +191,7 @@ export function useApPageDerived(opts: {
         if (status === "issues") {
           if (e.gg_approval === "approved") return false;
         }
-        if (status === "payment_pendente" && e.payment_status !== "pendente") return false;
+        if (status === "payment_pendente" && e.payment_status !== "em_aprovacao") return false;
         if (status === "payment_inserido" && e.payment_status !== "inserido") return false;
         if (status === "payment_agendado" && e.payment_status !== "agendado") return false;
         if (status === "payment_pago" && e.payment_status !== "pago") return false;

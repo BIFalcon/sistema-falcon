@@ -1,7 +1,7 @@
 /**
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -151,32 +151,47 @@ function ApprovalBadge({ status }: { status: string }) {
   );
 }
 
-const STATUS_TOOLTIPS: Record<ApPaymentStatus, string> = {
-  pendente: "Aguardando inserção no banco",
-  inserido: "Inserido no banco — aguardando compensação",
-  agendado: "Agendado para pagamento futuro",
-  pago: "Pagamento confirmado",
+const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string; tooltip: string; Icon: typeof Banknote }> = {
+  em_aprovacao: {
+    label: "Em Aprovação",
+    className: "border-amber-500/40 text-amber-700 dark:text-amber-400",
+    tooltip: "Aprovado pelo GG — aguardando autorização do financeiro",
+    Icon: CircleDashed,
+  },
+  autorizado: {
+    label: "Autorizado",
+    className: "border-violet-500/40 text-violet-700 dark:text-violet-400",
+    tooltip: "Autorizado para pagamento pela coordenadora",
+    Icon: ShieldCheck,
+  },
+  inserido: {
+    label: "Inserido",
+    className: "border-sky-500/40 text-sky-700 dark:text-sky-400",
+    tooltip: "Inserido no banco — aguardando compensação",
+    Icon: CheckCircle2,
+  },
+  agendado: {
+    label: "Agendado",
+    className: "border-indigo-500/40 text-indigo-700 dark:text-indigo-400",
+    tooltip: "Agendado para pagamento futuro",
+    Icon: CalendarClock,
+  },
+  pago: {
+    label: "Pago",
+    className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400",
+    tooltip: "Pagamento confirmado",
+    Icon: Banknote,
+  },
 };
 
 export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
-  const badge =
-    status === "pago" ? (
-      <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
-        <Banknote className="h-3 w-3" /> Pago
-      </Badge>
-    ) : status === "inserido" ? (
-      <Badge variant="outline" className="gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400">
-        <CheckCircle2 className="h-3 w-3" /> Inserido
-      </Badge>
-    ) : status === "agendado" ? (
-      <Badge variant="outline" className="gap-1 border-violet-500/40 text-violet-700 dark:text-violet-400">
-        <CalendarClock className="h-3 w-3" /> Agendado
-      </Badge>
-    ) : (
-      <Badge variant="outline" className="gap-1 border-muted-foreground/30 text-muted-foreground">
-        <CircleDashed className="h-3 w-3" /> Pendente
-      </Badge>
-    );
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.em_aprovacao;
+  const Icon = cfg.Icon;
+  const badge = (
+    <Badge variant="outline" className={`gap-1 ${cfg.className}`}>
+      <Icon className="h-3 w-3" /> {cfg.label}
+    </Badge>
+  );
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
@@ -184,7 +199,7 @@ export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
           <span className="inline-block">{badge}</span>
         </TooltipTrigger>
         <TooltipContent side="top">
-          <p className="text-xs">{STATUS_TOOLTIPS[status] ?? status}</p>
+          <p className="text-xs">{cfg.tooltip}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

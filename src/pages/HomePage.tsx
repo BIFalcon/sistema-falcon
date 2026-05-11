@@ -160,7 +160,7 @@ export default function HomePage() {
       (e) => e.due_date && e.due_date < today && e.gg_approval !== "rejected"
     ).length;
     const noApproval = scoped.filter(
-      (e) => e.gg_approval === "pending" && e.payment_status === "pendente"
+      (e) => e.gg_approval === "pending" && e.payment_status === "em_aprovacao"
     ).length;
     return { overdue, noApproval };
   }, [apEntries, today, isGg, allowedHotels]);

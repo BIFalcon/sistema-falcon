@@ -4,7 +4,12 @@ import JSZip from "jszip";
 
 export type FinancialSystem = "totvs" | "omie";
 export type ApApproval = "pending" | "approved" | "rejected";
-export type ApPaymentStatus = "pendente" | "inserido" | "agendado" | "pago";
+export type ApPaymentStatus =
+  | "em_aprovacao" // GG aprovou no OMIE — aguardando autorização do financeiro
+  | "autorizado"   // coordenadora autorizou para pagamento
+  | "inserido"     // inserido no banco
+  | "agendado"     // agendado para data futura
+  | "pago";        // pago
 
 export interface ApUpload {
   id: string;
@@ -48,6 +53,11 @@ export interface ApEntry {
   payment_marked_by: string | null;
   payment_marked_at: string | null;
   payment_paid_at: string | null;
+  scheduled_date: string | null;
+  bank_account: string | null;
+  hotel_cnpj: string | null;
+  paid_interest: number | null;
+  paid_amount: number | null;
 }
 
 export interface ApBankBalance {
@@ -57,6 +67,7 @@ export interface ApBankBalance {
   amount: number;
   informed_by: string;
   updated_at: string;
+  bank_name: string;
 }
 
 export interface ApDocument {
@@ -438,11 +449,11 @@ export function useAllTodayBankBalances(enabled = true) {
   });
 }
 
-export function useTodayBankBalance(hotelId: string | null) {
+export function useTodayBankBalance(hotelId: string | null, bankName: "itau" | "santander" = "itau") {
   const today = new Date().toISOString().slice(0, 10);
   return useQuery({
     enabled: !!hotelId,
-    queryKey: ["ap-balance", hotelId, today],
+    queryKey: ["ap-balance", hotelId, today, bankName],
     queryFn: async (): Promise<ApBankBalance | null> => {
       if (!hotelId) return null;
       const { data, error } = await supabase
@@ -450,6 +461,7 @@ export function useTodayBankBalance(hotelId: string | null) {
         .select("*")
         .eq("hotel_id", hotelId)
         .eq("balance_date", today)
+        .eq("bank_name", bankName)
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as ApBankBalance | null;
@@ -460,18 +472,25 @@ export function useTodayBankBalance(hotelId: string | null) {
 export function useUpsertBankBalance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { hotelId: string; amount: number; userId: string }) => {
+    mutationFn: async (input: {
+      hotelId: string;
+      amount: number;
+      userId: string;
+      bankName?: "itau" | "santander";
+    }) => {
       const today = new Date().toISOString().slice(0, 10);
+      const bankName = input.bankName ?? "itau";
       const { error } = await supabase
         .from("ap_bank_balance")
         .upsert(
           {
             hotel_id: input.hotelId,
             balance_date: today,
+            bank_name: bankName,
             amount: input.amount,
             informed_by: input.userId,
           },
-          { onConflict: "hotel_id,balance_date" },
+          { onConflict: "hotel_id,balance_date,bank_name" },
         );
       if (error) throw error;
     },
@@ -534,11 +553,18 @@ export function useSetEntryPaymentStatus() {
       hotelId: string;
       entryIds: string[];
       status: ApPaymentStatus;
+      scheduledDate?: string | null;
+      paidInterest?: number | null;
+      paidAmount?: number | null;
     }) => {
       if (input.entryIds.length === 0) return 0;
+      const update: Record<string, unknown> = { payment_status: input.status };
+      if (input.scheduledDate !== undefined) update.scheduled_date = input.scheduledDate;
+      if (input.paidInterest !== undefined) update.paid_interest = input.paidInterest;
+      if (input.paidAmount !== undefined) update.paid_amount = input.paidAmount;
       const { error } = await supabase
         .from("ap_entries")
-        .update({ payment_status: input.status })
+        .update(update as never)
         .in("id", input.entryIds);
       if (error) throw error;
       return input.entryIds.length;
@@ -546,6 +572,123 @@ export function useSetEntryPaymentStatus() {
     onSuccess: (_n, v) => {
       qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
       qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+// ── Cartão a receber ──────────────────────────────────────────────────────
+export interface ApCardReceivable {
+  id: string;
+  hotel_id: string;
+  amount: number;
+  date_from: string;
+  date_to: string;
+  informed_by: string;
+  created_at: string;
+}
+
+export function useCardReceivable(hotelId: string | null) {
+  return useQuery({
+    enabled: !!hotelId,
+    queryKey: ["ap-card-receivable", hotelId],
+    queryFn: async (): Promise<ApCardReceivable[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_card_receivable")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .order("date_from", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ApCardReceivable[];
+    },
+  });
+}
+
+export function useUpsertCardReceivable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      amount: number;
+      dateFrom: string;
+      dateTo: string;
+      userId: string;
+    }) => {
+      const { error } = await supabase
+        .from("ap_card_receivable")
+        .upsert(
+          {
+            hotel_id: input.hotelId,
+            amount: input.amount,
+            date_from: input.dateFrom,
+            date_to: input.dateTo,
+            informed_by: input.userId,
+          },
+          { onConflict: "hotel_id,date_from,date_to" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-card-receivable", v.hotelId] });
+    },
+  });
+}
+
+// ── Histórico de notificações ─────────────────────────────────────────────
+export interface ApNotificationLog {
+  id: string;
+  hotel_id: string;
+  sent_by: string;
+  sent_at: string;
+  entry_ids: string[];
+  recipient_emails: string[];
+  message_text: string | null;
+  entries_snapshot: unknown[];
+}
+
+export function useApNotificationLog(hotelId: string | null) {
+  return useQuery({
+    enabled: !!hotelId,
+    queryKey: ["ap-notification-log", hotelId],
+    queryFn: async (): Promise<ApNotificationLog[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_notification_log")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .order("sent_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as ApNotificationLog[];
+    },
+  });
+}
+
+export function useSaveNotificationLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      sentBy: string;
+      entryIds: string[];
+      recipientEmails: string[];
+      messageText: string;
+      entriesSnapshot: unknown[];
+    }) => {
+      const { error } = await supabase
+        .from("ap_notification_log")
+        .insert([{
+          hotel_id: input.hotelId,
+          sent_by: input.sentBy,
+          entry_ids: input.entryIds,
+          recipient_emails: input.recipientEmails,
+          message_text: input.messageText,
+          entries_snapshot: input.entriesSnapshot,
+        } as never]);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-notification-log", v.hotelId] });
     },
   });
 }

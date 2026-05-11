@@ -200,7 +200,7 @@ export default function ContasPagarPage() {
     for (const e of entries) {
       if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
     }
-    const prevStatus = previousByEntry.get(ids[0]) ?? "pendente";
+    const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
       await setPaymentStatus.mutateAsync({ hotelId, entryIds: ids, status: newStatus });
       setSelectedIds(new Set());
