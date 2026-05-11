@@ -28,6 +28,13 @@ export interface JournalLine {
 }
 
 function toIsoDate(raw: string): string {
+  // Handle Date objects coming from XLSX cellDates
+  if (raw instanceof Date) {
+    const y = raw.getUTCFullYear();
+    const m = String(raw.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(raw.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
   const s = String(raw ?? "").trim();
   if (!s) return "";
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
@@ -48,10 +55,10 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target?.result, { type: "binary" });
+        const wb = XLSX.read(e.target?.result, { type: "binary", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
-          header: 1, blankrows: false, defval: null, raw: false,
+          header: 1, blankrows: false, defval: null, raw: true,
         });
 
         const headerIdx = 0;
@@ -85,7 +92,7 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
           const cred = parseFloat(String(row[iCred] ?? "0").replace(",", ".")) || 0;
           const hist = String(row[iHist] ?? "").trim();
           const doc  = String(row[iDoc]  ?? "").trim();
-          const lineDate = toIsoDate(String(row[iData] ?? ""));
+          const lineDate = toIsoDate(row[iData] as never);
 
           // Tenta categoria pela descrição primeiro
           let categoriaFinal = desc;
@@ -126,10 +133,10 @@ export function parseJournal(file: File): Promise<JournalLine[]> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target?.result, { type: "binary" });
+        const wb = XLSX.read(e.target?.result, { type: "binary", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
-          header: 1, blankrows: false, defval: null, raw: false,
+          header: 1, blankrows: false, defval: null, raw: true,
         });
 
         const headerIdx = rows.findIndex((r) =>
@@ -163,7 +170,7 @@ export function parseJournal(file: File): Promise<JournalLine[]> {
           const last   = String(row[iLast]    ?? "").trim();
 
           lines.push({
-            date:                  toIsoDate(String(row[iDate] ?? "")),
+            date:                  toIsoDate(row[iDate] as never),
             transactionNumber:     trnNum,
             receiptNumber:         String(row[iReceipt] ?? "").trim(),
             transactionCode:       code,
