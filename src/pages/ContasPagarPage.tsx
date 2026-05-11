@@ -620,6 +620,9 @@ export default function ContasPagarPage() {
                         "Forma de Pagamento": e.payment_method ?? "",
                         "Aprovação GG": e.gg_approval,
                         "Status Pagamento": e.payment_status,
+                        "Data do Pagamento": e.payment_paid_at
+                          ? new Date(e.payment_paid_at).toLocaleDateString("pt-BR")
+                          : "",
                         Observação: e.observation ?? "",
                       }];
                     });
