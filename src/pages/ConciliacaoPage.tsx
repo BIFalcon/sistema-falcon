@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { parseRazao, parseJournal, type RazaoLine, type JournalLine } from "@/lib/conciliationParser";
@@ -198,8 +200,29 @@ export default function ConciliacaoPage() {
   const [journalLines, setJournalLines] = useState<JournalLine[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
-  const result = useConciliation(razaoLines, journalLines);
+  const uniqueDates = useMemo(
+    () => [...new Set(razaoLines.map((l) => l.date).filter(Boolean))].sort(),
+    [razaoLines]
+  );
+
+  useEffect(() => {
+    if (uniqueDates.length > 0 && !selectedDate) {
+      setSelectedDate(uniqueDates[0]);
+    }
+  }, [uniqueDates, selectedDate]);
+
+  const filteredRazao = useMemo(
+    () => (selectedDate ? razaoLines.filter((l) => l.date === selectedDate) : razaoLines),
+    [razaoLines, selectedDate]
+  );
+  const filteredJournal = useMemo(
+    () => (selectedDate ? journalLines.filter((l) => l.date === selectedDate) : journalLines),
+    [journalLines, selectedDate]
+  );
+
+  const result = useConciliation(filteredRazao, filteredJournal);
 
   const handleProcess = async () => {
     if (!razaoFile) { toast.error("Selecione o arquivo do Razão (TOTVS)"); return; }
@@ -226,6 +249,7 @@ export default function ConciliacaoPage() {
     setRazaoLines([]);
     setJournalLines([]);
     setProcessed(false);
+    setSelectedDate("");
   };
 
   const xlsxAccept = {
@@ -298,10 +322,45 @@ export default function ConciliacaoPage() {
                 Período: {result?.period}
               </span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              Nova análise
-            </Button>
+            <div className="flex items-center gap-2">
+              {result?.hasErrors && selectedDate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportDivergencias(result.categories, selectedDate)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar divergências
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleReset}>
+                Nova análise
+              </Button>
+            </div>
           </div>
+
+          {uniqueDates.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Data
+              </span>
+              <Select value={selectedDate} onValueChange={setSelectedDate}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Selecione a data" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueDates.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {new Date(d + "T12:00:00").toLocaleDateString("pt-BR")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {uniqueDates.length} dia(s) no arquivo
+              </span>
+            </div>
+          )}
 
           <div className="space-y-3">
             {result?.categories.map((cat) => (
@@ -312,4 +371,44 @@ export default function ConciliacaoPage() {
       )}
     </div>
   );
+}
+
+function exportDivergencias(categories: CategoryResult[], date: string) {
+  const rows: unknown[][] = [
+    ["Categoria", "Nº Transação", "Hóspede / Empresa", "Tipo Cartão", "Valor", "Status"],
+  ];
+
+  for (const cat of categories) {
+    if (cat.conciliado) continue;
+    for (const j of cat.apenasNoJournal) {
+      rows.push([
+        cat.categoria,
+        j.transactionNumber,
+        j.guestFullName || j.companyName || "—",
+        `${j.transactionCode} · ${j.transactionDescription}`,
+        j.credit,
+        "No Opera, não subiu pro TOTVS",
+      ]);
+    }
+    for (const r of cat.apenasNoRazao) {
+      rows.push([
+        cat.categoria,
+        r.documento,
+        r.historico,
+        "—",
+        r.valorCredito,
+        "No TOTVS, sem origem no Opera",
+      ]);
+    }
+  }
+
+  if (rows.length === 1) return;
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Divergências");
+  const dateFormatted = new Date(date + "T12:00:00")
+    .toLocaleDateString("pt-BR")
+    .replace(/\//g, "-");
+  XLSX.writeFile(wb, `divergencias-${dateFormatted}.xlsx`);
 }
