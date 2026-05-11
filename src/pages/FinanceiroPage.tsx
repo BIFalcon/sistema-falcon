@@ -10,7 +10,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useFinanceiroQueue,
@@ -31,7 +31,7 @@ function lucroFromLines(lines: unknown): { value: number | null; source: string 
 }
 
 export default function FinanceiroPage() {
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster, isFinanceiroCoordenadora } = useAuth();
   const { data: rows = [], isLoading } = useFinanceiroQueue({ month, year, hotelId });
   const record = useRecordDistribution();

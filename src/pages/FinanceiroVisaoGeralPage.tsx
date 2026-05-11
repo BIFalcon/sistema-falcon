@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
@@ -34,7 +34,7 @@ export default function FinanceiroVisaoGeralPage() {
   void allHotels;
 
   // Filtros globais (header)
-  const { hotelId, dateFrom, dateTo } = useFilters();
+  const { hotelId, dateFrom, dateTo } = useModuleFilters("fechamento");
   const hotelFilter = hotelId ?? "all";
 
   // Dados

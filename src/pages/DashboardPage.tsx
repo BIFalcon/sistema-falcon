@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useClosings } from "@/hooks/useClosings";
 import { MONTHS_PT, hotelSkipsCarta } from "@/lib/constants";
 import {
@@ -18,7 +18,7 @@ import { Link } from "react-router-dom";
 
 export default function DashboardPage() {
   const { profile, isMaster, allowedHotels } = useAuth();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("global");
   const { data: closings = [] } = useClosings({ hotelId, month, year });
 
   const stats = useMemo(() => {

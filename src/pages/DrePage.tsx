@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
 import { useDreVersions, useUploadDre, getDreSignedUrl } from "@/hooks/useDre";
@@ -21,7 +21,7 @@ import { toast } from "sonner";
 export default function DrePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
   const ensure = useEnsureClosing();
   const upload = useUploadDre();

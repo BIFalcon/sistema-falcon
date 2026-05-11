@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useClosings } from "@/hooks/useClosings";
 import { ClosingTable } from "@/components/closings/ClosingTable";
 import { MONTHS_PT, hotelSkipsCarta } from "@/lib/constants";
@@ -9,7 +9,7 @@ import { useMemo } from "react";
 
 export default function Index() {
   const { isMaster, allowedHotels } = useAuth();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("fechamento");
   const { data: closings = [] } = useClosings({ hotelId, month, year });
 
   const stats = useMemo(() => {

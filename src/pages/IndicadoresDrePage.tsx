@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
 import { useGopManagers } from "@/hooks/useGopManagers";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
@@ -331,7 +331,7 @@ function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId:
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, hotelIds: selectedHotelIds, gopId, month, year, setHotelId } = useFilters();
+  const { hotelId, hotelIds: selectedHotelIds, gopId, month, year, setHotelId } = useModuleFilters("indicadores");
   const queryClient = useQueryClient();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = useMemo(

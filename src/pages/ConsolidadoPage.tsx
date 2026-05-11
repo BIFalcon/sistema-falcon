@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useConsolidadoData, type ConsolidadoRow } from "@/hooks/useConsolidado";
 import { MONTHS_PT, formatBRL } from "@/lib/constants";
 
@@ -31,7 +31,7 @@ function fmtBRLOrDash(v: number | null): string {
 }
 
 export default function ConsolidadoPage() {
-  const { month, year } = useFilters();
+  const { month, year } = useModuleFilters("consolidado");
   const { allowedHotels } = useAuth();
   const hotelIds = useMemo(() => allowedHotels.map((h) => h.id), [allowedHotels]);
   const hotelById = useMemo(
