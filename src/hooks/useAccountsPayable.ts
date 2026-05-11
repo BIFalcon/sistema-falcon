@@ -564,7 +564,7 @@ export function useSetEntryPaymentStatus() {
       if (input.paidAmount !== undefined) update.paid_amount = input.paidAmount;
       const { error } = await supabase
         .from("ap_entries")
-        .update(update)
+        .update(update as never)
         .in("id", input.entryIds);
       if (error) throw error;
       return input.entryIds.length;
@@ -677,14 +677,14 @@ export function useSaveNotificationLog() {
     }) => {
       const { error } = await supabase
         .from("ap_notification_log")
-        .insert({
+        .insert([{
           hotel_id: input.hotelId,
           sent_by: input.sentBy,
           entry_ids: input.entryIds,
           recipient_emails: input.recipientEmails,
           message_text: input.messageText,
           entries_snapshot: input.entriesSnapshot,
-        });
+        } as never]);
       if (error) throw error;
     },
     onSuccess: (_n, v) => {
