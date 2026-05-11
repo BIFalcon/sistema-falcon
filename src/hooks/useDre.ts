@@ -396,11 +396,12 @@ function useDreAnalyticsImpl(input: {
       if (closingsError) throw closingsError;
       const linesByClosingId = await fetchLatestDreParsedLinesByClosingIds((allClosings ?? []).map((c) => c.id));
 
-      for (const hotelId of input.hotelIds) {
-        const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
-        const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
+      const results = await Promise.all(
+        input.hotelIds.map(async (hotelId): Promise<DreAnalyticsDataset | null> => {
+          const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
+          const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
 
-        if (!currentClosings?.length && !allYearClosings?.length) continue;
+          if (!currentClosings?.length && !allYearClosings?.length) return null;
 
         type LineRow = {
           line_label: string;
@@ -443,7 +444,7 @@ function useDreAnalyticsImpl(input: {
         const allLines: LineRow[] = [...new Map(
           [...currentLines, ...allYearLines].map((l) => [`${l._month}:${l.line_label}`, l])
         ).values()];
-        if (!allLines.length) continue;
+        if (!allLines.length) return null;
 
         const seriesCur: Record<string, (number | null)[]> = {};
         const seriesPrev: Record<string, (number | null)[]> = {};
@@ -750,14 +751,20 @@ function useDreAnalyticsImpl(input: {
           ns.flatMap((n) => [n, ...flattenNodes(n.children)]);
         const allFlat = [...nodes, ...flattenNodes(fixedRootNodes)];
 
-        if (nodes.length || fixedRootNodes.length) {
-          datasets.push({
-            tree: [...nodes, ...fixedRootNodes],
-            flat: allFlat,
-            hotelCount: 1,
-            sourceNames: [hotelId],
-          });
-        }
+          if (nodes.length || fixedRootNodes.length) {
+            return {
+              tree: [...nodes, ...fixedRootNodes],
+              flat: allFlat,
+              hotelCount: 1,
+              sourceNames: [hotelId],
+            };
+          }
+          return null;
+        })
+      );
+
+      for (const ds of results) {
+        if (ds) datasets.push(ds);
       }
 
       if (!datasets.length) return null;
