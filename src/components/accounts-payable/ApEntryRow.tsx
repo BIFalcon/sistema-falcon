@@ -1,11 +1,16 @@
 /**
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, ShieldCheck, XCircle } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
-import type { ApEntry, ApPaymentStatus, FinancialSystem } from "@/hooks/useAccountsPayable";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
+import { useUpdateEntryObservation, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -24,6 +29,8 @@ interface EntryRowProps {
   selected?: boolean;
   onToggleSelected?: (v: boolean) => void;
   issues?: Set<IssueCategory>;
+  showBank?: boolean;
+  canEditObservation?: boolean;
 }
 
 export function ApEntryRow({
@@ -35,6 +42,8 @@ export function ApEntryRow({
   selected = false,
   onToggleSelected,
   issues,
+  showBank = false,
+  canEditObservation = false,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -114,6 +123,13 @@ export function ApEntryRow({
         </TableCell>
       )}
 
+      {/* Conta corrente (Itaú/Santander) */}
+      {!compact && showBank && (
+        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell capitalize">
+          {entry.bank_account ?? "—"}
+        </TableCell>
+      )}
+
       {/* Aprovação GG */}
       {showApproval && (
         <TableCell>
@@ -124,10 +140,58 @@ export function ApEntryRow({
       {/* Status de pagamento */}
       {!compact && (
         <TableCell>
-          <PaymentStatusBadge status={entry.payment_status} />
+          <div className="flex items-center gap-1">
+            <PaymentStatusBadge status={entry.payment_status} />
+            {canEditObservation && (
+              <ObservationButton entryId={entry.id} hotelId={entry.hotel_id} initial={entry.observation ?? ""} />
+            )}
+          </div>
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+function ObservationButton({ entryId, hotelId, initial }: { entryId: string; hotelId: string; initial: string }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(initial);
+  const update = useUpdateEntryObservation();
+  const hasObs = !!initial.trim();
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) setText(initial); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-6 w-6 ${hasObs ? "text-accent" : "text-muted-foreground"}`}
+          aria-label="Editar observação"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 space-y-2" align="end">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Observação</p>
+        <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Anotações internas…" />
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            size="sm"
+            disabled={update.isPending || text === initial}
+            onClick={async () => {
+              try {
+                await update.mutateAsync({ entryId, hotelId, observation: text });
+                toast.success("Observação salva");
+                setOpen(false);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+              }
+            }}
+          >
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
