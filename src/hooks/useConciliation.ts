@@ -54,22 +54,30 @@ export function useConciliation(
       );
       const totalJournal = journalDestaCateg.reduce((s, l) => s + l.credit, 0);
 
-      const razaoDocSet   = new Set(creditosRazao.map((l) => l.documento.trim()));
-      const journalDocSet = new Set(journalDestaCateg.map((l) => l.transactionNumber.trim()));
+      // Normaliza chave de matching: só dígitos, sem zeros à esquerda.
+      // Evita falsos "não subiram" por diferenças de formatação entre
+      // Razão (documento) e Journal (transactionNumber).
+      const normKey = (s: string) => {
+        const onlyDigits = String(s ?? "").replace(/\D/g, "").replace(/^0+/, "");
+        return onlyDigits || String(s ?? "").trim();
+      };
+
+      const razaoDocSet   = new Set(creditosRazao.map((l) => normKey(l.documento)));
+      const journalDocSet = new Set(journalDestaCateg.map((l) => normKey(l.transactionNumber)));
 
       const apenasNoJournal = journalDestaCateg.filter(
-        (l) => !razaoDocSet.has(l.transactionNumber.trim())
+        (l) => !razaoDocSet.has(normKey(l.transactionNumber))
       );
       const apenasNoRazao = creditosRazao.filter(
-        (l) => !journalDocSet.has(l.documento.trim())
+        (l) => !journalDocSet.has(normKey(l.documento))
       );
       const totalComparacao = journalDestaCateg.length > 0 ? totalJournal : totalCreditoRazao;
       const emAmbos = creditosRazao
-        .filter((l) => journalDocSet.has(l.documento.trim()))
+        .filter((l) => journalDocSet.has(normKey(l.documento)))
         .map((r) => ({
           razao: r,
           journal: journalDestaCateg.find(
-            (j) => j.transactionNumber.trim() === r.documento.trim()
+            (j) => normKey(j.transactionNumber) === normKey(r.documento)
           )!,
         }));
 
