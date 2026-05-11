@@ -63,6 +63,7 @@ export function useConciliation(
       const apenasNoRazao = creditosRazao.filter(
         (l) => !journalDocSet.has(l.documento.trim())
       );
+      const totalComparacao = journalDestaCateg.length > 0 ? totalJournal : totalCreditoRazao;
       const emAmbos = creditosRazao
         .filter((l) => journalDocSet.has(l.documento.trim()))
         .map((r) => ({
@@ -77,8 +78,8 @@ export function useConciliation(
         totalDebito,
         totalCreditoRazao,
         totalJournal,
-        conciliado: Math.abs(totalDebito - totalCreditoRazao) <= TOLERANCE,
-        divergencia: totalDebito - totalCreditoRazao,
+        conciliado: Math.abs(totalDebito - totalComparacao) <= TOLERANCE,
+        divergencia: totalDebito - totalComparacao,
         apenasNoJournal,
         apenasNoRazao,
         emAmbos,
