@@ -1053,6 +1053,134 @@ export default function ContasPagarPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de agendamento */}
+      <AlertDialog open={schedulingOpen} onOpenChange={setSchedulingOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Data de agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione a data prevista para inserção no banco. O sistema mudará automaticamente
+              para "Inserido" nessa data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            type="date"
+            value={scheduledDate}
+            onChange={(e) => setScheduledDate(e.target.value)}
+            min={new Date().toISOString().slice(0, 10)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!scheduledDate}
+              onClick={() => {
+                setSchedulingOpen(false);
+                executeStatusChange("agendado", { scheduledDate });
+              }}
+            >
+              Confirmar agendamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de juros (lançamentos vencidos marcados como Inserido) */}
+      <AlertDialog open={interestDialogOpen} onOpenChange={setInterestDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Há lançamentos vencidos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o juros pago e o novo valor (com juros) para registrar o pagamento em atraso.
+              Deixe em branco caso não se aplique.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Juros pago
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={paidInterest}
+                onChange={(e) => setPaidInterest(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setPaidInterest)}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Novo valor pago
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setPaidAmount)}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setInterestDialogOpen(false);
+                executeStatusChange("inserido", {
+                  paidInterest: paidInterest ? parseFloat(paidInterest) : undefined,
+                  paidAmount: paidAmount ? parseFloat(paidAmount) : undefined,
+                });
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Sub-componentes ─────────────────────────────────────────────────────
+interface BankBalanceFieldProps {
+  bankName: "itau" | "santander";
+  label: string;
+  value: string;
+  setValue: (v: string) => void;
+  current: { amount: number | string; updated_at: string } | null | undefined;
+  disabled: boolean;
+  pending: boolean;
+  onSave: () => void;
+}
+function BankBalanceField({ label, value, setValue, current, disabled, pending, onSave }: BankBalanceFieldProps) {
+  return (
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          step="0.01"
+          placeholder={current ? String(current.amount) : "0,00"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onPaste={(e) => handlePasteBRL(e, setValue)}
+          disabled={disabled}
+        />
+        <Button size="sm" disabled={disabled || !value || pending} onClick={onSave}>
+          Salvar
+        </Button>
+      </div>
+      {current ? (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Atual: {fmtBRL(Number(current.amount))} · {fmtDateTime(current.updated_at)}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground mt-1">Nenhum saldo informado hoje</p>
+      )}
     </div>
   );
 }
