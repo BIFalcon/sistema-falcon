@@ -1,13 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Upload, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Download, CalendarIcon } from "lucide-react";
 import * as XLSX from "xlsx";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { parseRazao, parseJournal, type RazaoLine, type JournalLine } from "@/lib/conciliationParser";
 import { useConciliation, type CategoryResult } from "@/hooks/useConciliation";
 import { fmtBRL } from "@/lib/formatters";
@@ -56,6 +60,7 @@ function DropZone({
 function CategoryCard({ result }: { result: CategoryResult }) {
   const [expanded, setExpanded] = useState(false);
   const hasMissing = result.apenasNoJournal.length > 0 || result.apenasNoRazao.length > 0;
+  const hasDetails = hasMissing || result.emAmbos.length > 0;
   const hasData = result.totalDebito > 0 || result.totalJournal > 0;
 
   if (!hasData) return null;
@@ -64,7 +69,7 @@ function CategoryCard({ result }: { result: CategoryResult }) {
     <Card className="overflow-hidden shadow-soft">
       <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30"
-        onClick={() => hasMissing && setExpanded(!expanded)}
+        onClick={() => hasDetails && setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
           {result.conciliado ? (
@@ -110,7 +115,7 @@ function CategoryCard({ result }: { result: CategoryResult }) {
               </p>
             </div>
           )}
-          {hasMissing && (
+          {hasDetails && (
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
@@ -118,7 +123,7 @@ function CategoryCard({ result }: { result: CategoryResult }) {
         </div>
       </div>
 
-      {expanded && hasMissing && (
+      {expanded && hasDetails && (
         <div className="border-t">
           {result.apenasNoJournal.length > 0 && (
             <div className="p-4">
@@ -180,6 +185,43 @@ function CategoryCard({ result }: { result: CategoryResult }) {
                       <TableCell className="text-xs">{l.historico}</TableCell>
                       <TableCell className="text-right font-semibold">
                         {fmtBRL(l.valorCredito)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {result.emAmbos.length > 0 && (
+            <div className="p-4 border-t">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  {result.emAmbos.length} lançamento(s) conciliado(s) (TOTVS × Opera)
+                </p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Documento / Nº Transação</TableHead>
+                    <TableHead>Hóspede</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {result.emAmbos.map(({ razao, journal }) => (
+                    <TableRow key={`${razao.lancamento}-${journal.transactionNumber}`}>
+                      <TableCell className="font-mono text-xs">{journal.transactionNumber}</TableCell>
+                      <TableCell>{journal.guestFullName || journal.companyName || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {journal.transactionCode} · {journal.transactionDescription}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {fmtBRL(journal.credit)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -257,6 +299,9 @@ export default function ConciliacaoPage() {
     "application/vnd.ms-excel": [".xls"],
   };
 
+  const selectedDateObj = selectedDate ? new Date(selectedDate + "T12:00:00") : undefined;
+  const uniqueDateSet = useMemo(() => new Set(uniqueDates), [uniqueDates]);
+
   return (
     <div className="space-y-6 max-w-[1100px]">
       <div>
@@ -268,6 +313,56 @@ export default function ConciliacaoPage() {
           Importe o Razão do TOTVS e o Journal do Oracle R&A para verificar divergências.
         </p>
       </div>
+
+      {processed && uniqueDates.length > 0 && (
+        <Card className="p-4 shadow-soft">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Filtro de data
+            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDateObj
+                    ? format(selectedDateObj, "PPP", { locale: ptBR })
+                    : "Selecione uma data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDateObj}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, "0");
+                    const day = String(d.getDate()).padStart(2, "0");
+                    setSelectedDate(`${y}-${m}-${day}`);
+                  }}
+                  disabled={(d) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, "0");
+                    const day = String(d.getDate()).padStart(2, "0");
+                    return !uniqueDateSet.has(`${y}-${m}-${day}`);
+                  }}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">
+              {uniqueDates.length} dia(s) importado(s)
+            </span>
+          </div>
+        </Card>
+      )}
 
       {!processed ? (
         <Card className="p-6 shadow-soft space-y-5">
@@ -318,23 +413,6 @@ export default function ConciliacaoPage() {
                   <span className="font-semibold">Tudo conciliado</span>
                 </div>
               )}
-              {uniqueDates.length > 0 && (
-                <Select value={selectedDate} onValueChange={setSelectedDate}>
-                  <SelectTrigger className="w-[160px] h-9">
-                    <SelectValue placeholder="Selecione a data" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {uniqueDates.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {new Date(d + "T12:00:00").toLocaleDateString("pt-BR")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <span className="text-xs text-muted-foreground">
-                {uniqueDates.length} dia(s)
-              </span>
             </div>
             <div className="flex items-center gap-2">
               {result?.hasErrors && selectedDate && (
