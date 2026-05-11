@@ -22,6 +22,7 @@ import { MONTHS_PT, formatBRL } from "@/lib/constants";
 import { Wallet, CheckCircle2, XCircle, Clock, AlertTriangle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { EstimatedLine } from "@/lib/dreEstimator";
+import { useClosingFinanceMetrics } from "@/hooks/useConsolidado";
 
 function lucroFromLines(lines: unknown): { value: number | null; source: string } {
   if (!Array.isArray(lines)) return { value: null, source: "no_history" };
@@ -41,6 +42,7 @@ export default function FinanceiroPage() {
   const [decision, setDecision] = useState<DistributionDecision>("enviado");
   const [valueStr, setValueStr] = useState("");
   const [notes, setNotes] = useState("");
+  const { data: metrics } = useClosingFinanceMetrics(openRow?.id ?? null);
 
   const hotelById = useMemo(() => {
     const m = new Map(allowedHotels.map((h) => [h.id, h]));
@@ -219,6 +221,46 @@ export default function FinanceiroPage() {
                 />
               </div>
             )}
+
+            {/* Métricas adicionais do fechamento (Bloco 4) */}
+            {(() => {
+              const finalValue =
+                decision === "enviado"
+                  ? Number((valueStr || "0").replace(",", "."))
+                  : openRow?.final_distribution ?? openRow?.estimated_distribution ?? 0;
+              const distribPorUh =
+                metrics?.uhsDisponiveis && metrics.uhsDisponiveis > 0 && finalValue
+                  ? finalValue / metrics.uhsDisponiveis
+                  : null;
+              return (
+                <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/30 p-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Distribuição / UH
+                    </p>
+                    <p className="text-sm font-semibold">
+                      {distribPorUh != null ? formatBRL(distribPorUh) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Taxa Fee (Falcon s/ Receita)
+                    </p>
+                    <p className="text-sm font-semibold">
+                      {metrics?.taxaFee != null ? formatBRL(metrics.taxaFee) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Taxa de Sucesso
+                    </p>
+                    <p className="text-sm font-semibold">
+                      {metrics?.taxaSucesso != null ? formatBRL(metrics.taxaSucesso) : "—"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium uppercase tracking-wider">Observações</label>

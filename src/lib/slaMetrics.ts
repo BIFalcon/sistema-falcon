@@ -13,12 +13,35 @@ export interface StageSla {
   overdueHours: number | null; // positive when over SLA
 }
 
+/**
+ * Conta horas úteis (segunda a sexta) entre duas datas.
+ * Sábado e domingo não contam para o SLA.
+ */
+export function businessHoursBetween(startDate: Date, endDate: Date): number {
+  if (endDate <= startDate) return 0;
+  let elapsed = 0;
+  const current = new Date(startDate);
+  while (current < endDate) {
+    const day = current.getDay(); // 0=Dom, 6=Sáb
+    if (day !== 0 && day !== 6) elapsed++;
+    current.setHours(current.getHours() + 1);
+  }
+  return elapsed;
+}
+
+export function isBusinessHoursExceeded(startDate: Date, limitBusinessHours: number): boolean {
+  return businessHoursBetween(startDate, new Date()) > limitBusinessHours;
+}
+
+/**
+ * Diferença em horas úteis entre duas datas ISO. Retorna null se faltar entrada.
+ */
 export function diffHours(start: string | null, end: string | null): number | null {
   if (!start || !end) return null;
-  const s = new Date(start).getTime();
-  const e = new Date(end).getTime();
-  if (Number.isNaN(s) || Number.isNaN(e)) return null;
-  return Math.max(0, (e - s) / 36e5);
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+  return businessHoursBetween(s, e);
 }
 
 export function toneFromRatio(ratio: number | null): SlaTone {

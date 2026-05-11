@@ -76,6 +76,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet, allowedRoles: ["financeiro"] as AppRole[] },
           { title: "Envio", url: "/fechamento/envio", icon: Send, allowedRoles: ["ri"] as AppRole[] },
           { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge, requireMaster: true },
+          { title: "Consolidado de Resultados", url: "/fechamento/consolidado", icon: LayoutGrid, allowedRoles: ["controladoria", "gop", "ri", "financeiro", "processos"] as AppRole[] },
         ],
       },
     ],
