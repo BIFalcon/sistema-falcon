@@ -83,16 +83,32 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
 
           const deb  = parseFloat(String(row[iDeb]  ?? "0").replace(",", ".")) || 0;
           const cred = parseFloat(String(row[iCred] ?? "0").replace(",", ".")) || 0;
+          const hist = String(row[iHist] ?? "").trim();
+          const doc  = String(row[iDoc]  ?? "").trim();
+          const lineDate = toIsoDate(String(row[iData] ?? ""));
+
+          // Tenta categoria pela descrição primeiro
+          let categoriaFinal = desc;
+
+          // Se for linha totalizadora sem doc, extrai código do Histórico
+          const isTot = deb > 0 && cred === 0 && !doc;
+          if (isTot) {
+            const mHist = hist.match(/movimento\s+(\d+)/i);
+            if (mHist) {
+              const catFromCode = getCategoriaFromCode(mHist[1]);
+              if (catFromCode) categoriaFinal = catFromCode;
+            }
+          }
 
           lines.push({
-            date:          toIsoDate(String(row[iData] ?? "")),
-            descricao:     desc,
+            date:          lineDate,
+            descricao:     categoriaFinal,
             lancamento:    String(row[iLanc] ?? "").trim(),
-            historico:     String(row[iHist] ?? "").trim(),
-            documento:     String(row[iDoc]  ?? "").trim(),
+            historico:     hist,
+            documento:     doc,
             valorDebito:   deb,
             valorCredito:  cred,
-            isTotalizador: deb > 0 && cred === 0,
+            isTotalizador: isTot,
           });
         }
         resolve(lines);

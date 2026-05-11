@@ -318,8 +318,22 @@ export default function ConciliacaoPage() {
                   <span className="font-semibold">Tudo conciliado</span>
                 </div>
               )}
-              <span className="text-sm text-muted-foreground">
-                Período: {result?.period}
+              {uniqueDates.length > 0 && (
+                <Select value={selectedDate} onValueChange={setSelectedDate}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue placeholder="Selecione a data" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueDates.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {new Date(d + "T12:00:00").toLocaleDateString("pt-BR")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {uniqueDates.length} dia(s)
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -338,29 +352,6 @@ export default function ConciliacaoPage() {
               </Button>
             </div>
           </div>
-
-          {uniqueDates.length > 0 && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Data
-              </span>
-              <Select value={selectedDate} onValueChange={setSelectedDate}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="Selecione a data" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueDates.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {new Date(d + "T12:00:00").toLocaleDateString("pt-BR")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs text-muted-foreground">
-                {uniqueDates.length} dia(s) no arquivo
-              </span>
-            </div>
-          )}
 
           <div className="space-y-3">
             {result?.categories.map((cat) => (

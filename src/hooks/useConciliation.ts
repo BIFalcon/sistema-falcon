@@ -49,7 +49,9 @@ export function useConciliation(
       const totalDebito       = totalizadores.reduce((s, l) => s + l.valorDebito, 0);
       const totalCreditoRazao = creditosRazao.reduce((s, l) => s + l.valorCredito, 0);
 
-      const journalDestaCateg = journalLines.filter((l) => l.categoria === cat);
+      const journalDestaCateg = journalLines.filter(
+        (l) => l.categoria === cat && l.credit > 0
+      );
       const totalJournal = journalDestaCateg.reduce((s, l) => s + l.credit, 0);
 
       const razaoDocSet   = new Set(creditosRazao.map((l) => l.documento.trim()));
