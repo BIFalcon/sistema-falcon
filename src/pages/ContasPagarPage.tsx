@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   uploadApReport,
@@ -88,7 +88,7 @@ export default function ContasPagarPage() {
   const canApproveBase = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId, dateFrom, dateTo } = useFilters();
+  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],

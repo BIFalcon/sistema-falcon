@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
   useToInvoiceEntries,
@@ -190,7 +190,7 @@ function ToInvoiceSection({
 }) {
   const { data: allHotels = [] } = useAllHotels();
   // Filtro global do header (Hotel) é a única fonte de verdade.
-  const { hotelId: globalHotelId } = useFilters();
+  const { hotelId: globalHotelId } = useModuleFilters("financeiro");
   const hotelId = globalHotelId ?? "";
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
@@ -620,7 +620,7 @@ function OpenFolioSection({
   const { data: lastUpload } = useLatestArUpload("open_folio");
   const { data: allNotes = [] } = useAllOpenFolioNotes();
   // Filtro global do header (Hotel) é a única fonte de verdade.
-  const { hotelId: globalHotelId, setHotelId } = useFilters();
+  const { hotelId: globalHotelId, setHotelId } = useModuleFilters("financeiro");
   const selectedHotel = globalHotelId;
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);

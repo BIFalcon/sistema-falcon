@@ -8,7 +8,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useClosings } from "@/hooks/useClosings";
 import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
@@ -132,7 +132,7 @@ export default function HomePage() {
     hasRole,
     allowedHotels,
   } = useAuth();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("global");
   const today = todayIso();
 
   const { data: closings = [] } = useClosings({ hotelId, month, year });

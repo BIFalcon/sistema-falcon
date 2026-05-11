@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
 import {
@@ -35,7 +35,7 @@ import type { IndicatorKey } from "@/lib/dreParser";
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
 
   const ensure = useEnsureClosing();

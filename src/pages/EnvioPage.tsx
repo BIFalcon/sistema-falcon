@@ -8,7 +8,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useEnvioQueue,
@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 
 export default function EnvioPage() {
-  const { hotelId, month, year } = useFilters();
+  const { hotelId, month, year } = useModuleFilters("fechamento");
   const { allowedHotels, hasRole, isMaster } = useAuth();
   const { data: rows = [], isLoading } = useEnvioQueue({ month, year, hotelId });
   const markSent = useMarkEnvioSent();
