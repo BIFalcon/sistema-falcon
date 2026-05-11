@@ -500,16 +500,26 @@ Deno.serve(async (req) => {
         is_distribution: p.is_distribution,
         raw: p.raw,
         archived_at: null,
+        bank_account: normalizeBank((p.raw as any)?.conta_corrente ?? null),
+        hotel_cnpj: hotelCnpjDigits || null,
       };
+      const omieFalconStatus = sourceSystem === "omie" ? omieStatusToFalcon(p.omie_situation) : "em_aprovacao";
       if (prev) {
         updatedIds.add(prev.id);
         // Preserva: gg_approval*, primary_document_id, observation
+        // Status: 'pago' nunca retroage. Se OMIE traz status específico
+        // (agendado/pago) usa ele; caso contrário mantém o atual.
+        const preservedStatus =
+          prev.payment_status === "pago"
+            ? "pago"
+            : omieFalconStatus !== "em_aprovacao"
+              ? omieFalconStatus
+              : (prev.payment_status ?? "em_aprovacao");
         updates.push({
           id: prev.id,
           ...baseFields,
-          // não sobrescreve aprovação/observação/documento
           observation: prev.observation ?? p.observation,
-          payment_status: prev.payment_status ?? "pendente",
+          payment_status: preservedStatus,
         });
       } else {
         inserts.push({
@@ -520,7 +530,7 @@ Deno.serve(async (req) => {
           gg_approval_at: null,
           gg_approval_notes: null,
           primary_document_id: null,
-          payment_status: "pendente",
+          payment_status: omieFalconStatus,
         });
       }
     }
@@ -543,19 +553,28 @@ Deno.serve(async (req) => {
     }
 
     // 6. arquiva os que sumiram do novo relatório
-    const toArchive: string[] = [];
+    //    Pagos vão para histórico (archived_reason = "paid_history") e os
+    //    demais são arquivados normalmente.
+    const toArchivePaid: string[] = [];
+    const toArchiveOther: string[] = [];
     for (const e of existing ?? []) {
-      // Não arquiva se já foi atualizada via lookup_key (mesmo sem entry_key match)
       if (updatedIds.has(e.id)) continue;
-      if (!seenKeys.has(e.entry_key) && !e.archived_at) toArchive.push(e.id);
+      if (seenKeys.has(e.entry_key) || e.archived_at) continue;
+      if (e.payment_status === "pago") toArchivePaid.push(e.id);
+      else toArchiveOther.push(e.id);
     }
-    if (toArchive.length) {
-      const nowIso = new Date().toISOString();
-      const archiveChunk = 500;
-      for (let i = 0; i < toArchive.length; i += archiveChunk) {
-        const chunk = toArchive.slice(i, i + archiveChunk);
-        await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
-      }
+    const nowIso = new Date().toISOString();
+    const archiveChunk = 500;
+    for (let i = 0; i < toArchivePaid.length; i += archiveChunk) {
+      const chunk = toArchivePaid.slice(i, i + archiveChunk);
+      await admin
+        .from("ap_entries")
+        .update({ archived_at: nowIso, archived_reason: "paid_history" })
+        .in("id", chunk);
+    }
+    for (let i = 0; i < toArchiveOther.length; i += archiveChunk) {
+      const chunk = toArchiveOther.slice(i, i + archiveChunk);
+      await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
     }
 
     // 5. ZIP OMIE: salva docs extraídos
