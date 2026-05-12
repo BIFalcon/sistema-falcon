@@ -51,9 +51,16 @@ export const EVENT_LABELS: Record<NotificationEvent, string> = {
   carta_returned: "Carta — devolvida",
 };
 
-export function useNotificationQueue(params?: { status?: NotificationStatus }) {
+export function useNotificationQueue(params?: {
+  status?: NotificationStatus;
+  recipientUserId?: string;
+}) {
   return useQuery({
-    queryKey: ["notification-queue", params?.status ?? "all"],
+    queryKey: [
+      "notification-queue",
+      params?.status ?? "all",
+      params?.recipientUserId ?? "all",
+    ],
     queryFn: async (): Promise<NotificationRow[]> => {
       let q = supabase
         .from("notification_queue")
@@ -61,6 +68,7 @@ export function useNotificationQueue(params?: { status?: NotificationStatus }) {
         .order("created_at", { ascending: false })
         .limit(200);
       if (params?.status) q = q.eq("status", params.status);
+      if (params?.recipientUserId) q = q.eq("recipient_user_id", params.recipientUserId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as NotificationRow[];
