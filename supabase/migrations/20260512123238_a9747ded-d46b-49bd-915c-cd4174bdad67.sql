@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS ar_open_folio_entries_entry_key_uidx ON public.ar_open_folio_entries (entry_key) WHERE entry_key IS NOT NULL;
