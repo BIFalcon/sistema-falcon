@@ -93,28 +93,29 @@ Deno.serve(async (req) => {
         const redirectTo =
           (req.headers.get("origin") ?? "") + "/reset-password";
 
-        // 1) Tenta inviteUserByEmail; se já existe, gera link de recovery
-        let userId: string | null = null;
+        // 1) Verifica se o usuário já existe.
+        const { data: existingProfile } = await admin
+          .from("profiles")
+          .select("user_id")
+          .eq("email", payload.email)
+          .maybeSingle();
+
+        let userId: string | null = existingProfile?.user_id ?? null;
         let actionLink: string | null = null;
 
-        const invite = await admin.auth.admin.inviteUserByEmail(payload.email, {
-          redirectTo,
-          data: { display_name: payload.display_name ?? null },
-        });
-
-        if (invite.error) {
-          // Talvez já exista — buscar
-          const { data: existing } = await admin
-            .from("profiles")
-            .select("user_id")
-            .eq("email", payload.email)
-            .maybeSingle();
-          if (!existing) {
-            return json({ error: invite.error.message }, 400);
+        // 2) Se não existe, cria o usuário (sem enviar email — vamos enviar
+        //    UM único link via generateLink abaixo, evitando tokens duplicados
+        //    que invalidam uns aos outros).
+        if (!userId) {
+          const created = await admin.auth.admin.createUser({
+            email: payload.email,
+            email_confirm: false,
+            user_metadata: { display_name: payload.display_name ?? null },
+          });
+          if (created.error || !created.data.user) {
+            return json({ error: created.error?.message ?? "create_user_failed" }, 400);
           }
-          userId = existing.user_id;
-        } else {
-          userId = invite.data.user?.id ?? null;
+          userId = created.data.user.id;
         }
 
         if (!userId) return json({ error: "no_user_id" }, 500);
@@ -166,12 +167,20 @@ Deno.serve(async (req) => {
           );
         }
 
-        // 5) Gera link de convite (recovery) para que processos possa copiar
-        const { data: linkData } = await admin.auth.admin.generateLink({
-          type: "recovery",
-          email: payload.email,
-          options: { redirectTo },
-        });
+        // 5) Gera UM único link de convite. Esse link dispara o email via
+        //    auth-email-hook E retorna o action_link para o processos copiar
+        //    se quiser repassar manualmente. Como é o único token gerado,
+        //    nada o invalida.
+        const linkType = existingProfile ? "recovery" : "invite";
+        const { data: linkData, error: linkErr } =
+          await admin.auth.admin.generateLink({
+            type: linkType,
+            email: payload.email,
+            options: { redirectTo },
+          });
+        if (linkErr) {
+          return json({ error: linkErr.message }, 400);
+        }
         actionLink = linkData?.properties?.action_link ?? null;
 
         return json({ ok: true, user_id: userId, invite_link: actionLink });
@@ -263,31 +272,19 @@ Deno.serve(async (req) => {
         const redirectTo =
           (req.headers.get("origin") ?? "") + "/reset-password";
 
-        // Tenta reenviar via inviteUserByEmail (envia email automaticamente).
-        // Se o usuário já está confirmado, cai para generateLink('recovery').
-        const inviteRes = await admin.auth.admin.inviteUserByEmail(prof.email, {
-          redirectTo,
-          data: { display_name: prof.display_name ?? null },
-        });
+        // Verifica se o usuário já confirmou email para escolher o tipo
+        // correto (invite para novos, recovery para confirmados).
+        const { data: authUser } = await admin.auth.admin.getUserById(
+          payload.user_id,
+        );
+        const isConfirmed = !!authUser?.user?.email_confirmed_at;
+        const linkType = isConfirmed ? "recovery" : "invite";
 
-        if (!inviteRes.error) {
-          // Email de convite enviado pelo Supabase Auth.
-          const { data: linkData } = await admin.auth.admin.generateLink({
-            type: "recovery",
-            email: prof.email,
-            options: { redirectTo },
-          });
-          return json({
-            ok: true,
-            invite_link: linkData?.properties?.action_link ?? null,
-          });
-        }
-
-        // Fallback: usuário já existe/confirmado — gera link de recovery
-        // (também dispara email de recovery via Auth).
+        // Gera UM único link — invalida qualquer token anterior pendente,
+        // dispara o email novo e retorna a URL para copiar.
         const { data: linkData, error: linkErr } =
           await admin.auth.admin.generateLink({
-            type: "recovery",
+            type: linkType,
             email: prof.email,
             options: { redirectTo },
           });
