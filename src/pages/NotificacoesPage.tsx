@@ -21,6 +21,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Mail, RefreshCw, Send, AlertCircle, Clock, CheckCircle2, MinusCircle } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const STATUS_OPTIONS: { value: NotificationStatus | "all"; label: string }[] = [
   { value: "all", label: "Todos" },
@@ -47,13 +49,20 @@ function StatusBadge({ status }: { status: NotificationStatus }) {
 }
 
 export default function NotificacoesPage() {
-  const { isMaster, hasRole } = useAuth();
+  const { isMaster, hasRole, user } = useAuth();
   const canManage = isMaster || hasRole("processos");
   const [statusFilter, setStatusFilter] = useState<NotificationStatus | "all">("all");
   const [selected, setSelected] = useState<NotificationRow | null>(null);
 
   const { data: items = [], isLoading } = useNotificationQueue(
-    statusFilter === "all" ? undefined : { status: statusFilter },
+    canManage
+      ? statusFilter === "all"
+        ? undefined
+        : { status: statusFilter }
+      : {
+          recipientUserId: user?.id,
+          ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+        },
   );
   const process = useProcessNotifications();
 
@@ -81,36 +90,29 @@ export default function NotificacoesPage() {
     }
   }
 
-  if (!canManage) {
-    return (
-      <div className="max-w-2xl mx-auto pt-12">
-        <Card className="p-8 text-center shadow-soft">
-          <Mail className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <h2 className="text-lg font-semibold mb-1">Acesso restrito</h2>
-          <p className="text-sm text-muted-foreground">
-            Apenas perfis Master ou Processos podem visualizar a fila de notificações.
-          </p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Configurações</p>
-          <h1 className="text-2xl font-semibold text-foreground">Notificações do workflow</h1>
+          <h1 className="text-2xl font-semibold text-foreground">
+            {canManage ? "Notificações do workflow" : "Minhas notificações"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Fila de e-mails automáticos disparados pelo fluxo de fechamento.
+            {canManage
+              ? "Fila de e-mails automáticos disparados pelo fluxo de fechamento."
+              : "Notificações do fluxo de fechamento direcionadas a você."}
           </p>
         </div>
-        <Button onClick={handleProcess} disabled={process.isPending} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${process.isPending ? "animate-spin" : ""}`} />
-          Processar fila
-        </Button>
+        {canManage && (
+          <Button onClick={handleProcess} disabled={process.isPending} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${process.isPending ? "animate-spin" : ""}`} />
+            Processar fila
+          </Button>
+        )}
       </div>
 
+      {canManage && (
       <Card className="p-4 shadow-soft border-warning/30 bg-warning/5">
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
@@ -127,6 +129,7 @@ export default function NotificacoesPage() {
           </div>
         </div>
       </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
