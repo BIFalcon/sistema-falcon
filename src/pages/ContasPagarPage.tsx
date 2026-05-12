@@ -76,14 +76,15 @@ export default function ContasPagarPage() {
     isMaster,
     isFinanceiroEquipe,
     isFinanceiroCoordenadora,
+    isFernando,
   } = useAuth();
   const qc = useQueryClient();
-  const canManage = isMaster || hasRole("financeiro");
+  const canManage = !isFernando && (isMaster || hasRole("financeiro"));
   // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
     isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
-  const canMarkPaid = isMaster || isFinanceiroCoordenadora;
-  const canMarkAutorizado = isMaster || isFinanceiroCoordenadora;
+  const canMarkPaid = !isFernando && (isMaster || isFinanceiroCoordenadora);
+  const canMarkAutorizado = !isFernando && (isMaster || isFinanceiroCoordenadora);
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
 

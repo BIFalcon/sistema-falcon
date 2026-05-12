@@ -24,12 +24,12 @@ import { toast } from "sonner";
 
 export default function EnvioPage() {
   const { hotelId, month, year } = useModuleFilters("fechamento");
-  const { allowedHotels, hasRole, isMaster } = useAuth();
+  const { allowedHotels, hasRole, isMaster, isFernando } = useAuth();
   const { data: rows = [], isLoading } = useEnvioQueue({ month, year, hotelId });
   const markSent = useMarkEnvioSent();
   const reopen = useReopenEnvio();
 
-  const canSend = isMaster || hasRole("ri");
+  const canSend = !isFernando && (isMaster || hasRole("ri"));
   const [confirmRow, setConfirmRow] = useState<EnvioRow | null>(null);
   const [reopenRow, setReopenRow] = useState<EnvioRow | null>(null);
 
