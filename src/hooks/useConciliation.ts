@@ -51,6 +51,28 @@ const normKey = (s: string) => {
   return onlyDigits || String(s ?? "").trim();
 };
 
+function normName(s: string): string {
+  return String(s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join(" ");
+}
+
+function crossKey(value: number, name: string): string {
+  return `${Math.abs(value).toFixed(2)}|${normName(name)}`;
+}
+
+function nameFromHistorico(hist: string): string {
+  const m = hist.match(/\d{2}\/\d{2}\/\d{4}(.+)$/);
+  if (m) return m[1].replace(/,/g, " ").trim();
+  return hist;
+}
+
 export function useConciliation(
   razaoLines: RazaoLine[],
   journalLines: JournalLine[],
@@ -71,10 +93,12 @@ export function useConciliation(
       const razaoDestaCateg = razaoLines.filter(
         (l) => normalizaDescricaoRazao(l.descricao) === cat
       );
-      const totalizadores  = razaoDestaCateg.filter((l) => l.isTotalizador);
       const creditosRazao  = razaoDestaCateg.filter((l) => !l.isTotalizador && l.valorCredito > 0);
 
-      const totalDebito       = totalizadores.reduce((s, l) => s + l.valorDebito, 0);
+      // Soma TODOS os débitos da categoria (não só os com flag isTotalizador)
+      const totalDebito = razaoDestaCateg
+        .filter((l) => l.valorDebito > 0)
+        .reduce((s, l) => s + l.valorDebito, 0);
       const totalCreditoRazao = creditosRazao.reduce((s, l) => s + l.valorCredito, 0);
 
       const journalDestaCateg = journalLines.filter(
@@ -82,52 +106,33 @@ export function useConciliation(
       );
       const totalJournal = journalDestaCateg.reduce((s, l) => s + l.credit, 0);
 
-      const matchedRazao = new Set<number>();
-      const matchedJournal = new Set<number>();
-      const emAmbos: Array<{ razao: RazaoLine; journal: JournalLine }> = [];
+      // Cruzamento por VALOR + NOME do hóspede (Transaction Number != Documento)
+      const journalReal = journalDestaCateg.filter((l) => l.credit > 0);
 
-      const matchPair = (razaoIdx: number, journalIdx: number) => {
-        matchedRazao.add(razaoIdx);
-        matchedJournal.add(journalIdx);
-        emAmbos.push({ razao: creditosRazao[razaoIdx], journal: journalDestaCateg[journalIdx] });
-      };
+      const razaoCrossKeys = new Set(
+        creditosRazao.map((l) => crossKey(l.valorCredito, nameFromHistorico(l.historico)))
+      );
+      const journalCrossKeys = new Set(
+        journalReal.map((l) => crossKey(l.credit, l.guestFullName))
+      );
 
-      creditosRazao.forEach((razao, razaoIdx) => {
-        const docKey = normKey(razao.documento);
-        if (!docKey) return;
-        const journalIdx = journalDestaCateg.findIndex(
-          (journal, idx) => !matchedJournal.has(idx) && normKey(journal.transactionNumber) === docKey
-        );
-        if (journalIdx !== -1) matchPair(razaoIdx, journalIdx);
-      });
+      const apenasNoJournal = journalReal.filter(
+        (l) => !razaoCrossKeys.has(crossKey(l.credit, l.guestFullName))
+      );
+      const apenasNoRazao = creditosRazao.filter(
+        (l) => !journalCrossKeys.has(crossKey(l.valorCredito, nameFromHistorico(l.historico)))
+      );
+      const emAmbos = journalReal
+        .filter((l) => razaoCrossKeys.has(crossKey(l.credit, l.guestFullName)))
+        .map((j) => ({
+          journal: j,
+          razao: creditosRazao.find(
+            (r) =>
+              crossKey(r.valorCredito, nameFromHistorico(r.historico)) ===
+              crossKey(j.credit, j.guestFullName)
+          )!,
+        }));
 
-      creditosRazao.forEach((razao, razaoIdx) => {
-        if (matchedRazao.has(razaoIdx)) return;
-        const candidates = journalDestaCateg
-          .map((journal, journalIdx) => ({ journal, journalIdx }))
-          .filter(({ journal, journalIdx }) =>
-            !matchedJournal.has(journalIdx) &&
-            journal.date === razao.date &&
-            toCents(journal.credit) === toCents(razao.valorCredito) &&
-            hasNameMatch(razao, journal)
-          );
-        if (candidates.length === 1) matchPair(razaoIdx, candidates[0].journalIdx);
-      });
-
-      creditosRazao.forEach((razao, razaoIdx) => {
-        if (matchedRazao.has(razaoIdx)) return;
-        const candidates = journalDestaCateg
-          .map((journal, journalIdx) => ({ journal, journalIdx }))
-          .filter(({ journal, journalIdx }) =>
-            !matchedJournal.has(journalIdx) &&
-            journal.date === razao.date &&
-            toCents(journal.credit) === toCents(razao.valorCredito)
-          );
-        if (candidates.length === 1) matchPair(razaoIdx, candidates[0].journalIdx);
-      });
-
-      const apenasNoJournal = journalDestaCateg.filter((_, idx) => !matchedJournal.has(idx));
-      const apenasNoRazao = creditosRazao.filter((_, idx) => !matchedRazao.has(idx));
       // Divergência = (Débito TOTVS - Crédito TOTVS) - Journal Opera
       // O Journal deve corresponder ao líquido (débito menos crédito) do Razão.
       const divergencia = (totalDebito - totalCreditoRazao) - totalJournal;
