@@ -123,8 +123,8 @@ function exportOpenFolioToExcel(
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora } = useAuth();
-  const isManager = isMaster || hasRole("financeiro");
+  const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora, isFernando } = useAuth();
+  const isManager = !isFernando && (isMaster || hasRole("financeiro"));
   // Quem pode importar relatórios AR: master ou coordenadora (equipe e GG não importam)
   const canImportAr = isMaster || isFinanceiroCoordenadora;
   // Quem vê todos os hotéis: master, financeiro, controladoria, ri

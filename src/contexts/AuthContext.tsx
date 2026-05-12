@@ -22,6 +22,7 @@ interface AuthContextValue {
   loading: boolean;
   isMaster: boolean;
   isGg: boolean;
+  isFernando: boolean;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: () => boolean;
   /** Sub-papel do financeiro: equipe (ops) ou coordenadora (chefe). */
