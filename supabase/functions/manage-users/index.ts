@@ -26,7 +26,8 @@ type Action =
   | "invite"
   | "update"
   | "set_status"
-  | "resend_invite";
+  | "resend_invite"
+  | "delete_user";
 
 interface Payload {
   action: Action;
@@ -293,6 +294,29 @@ Deno.serve(async (req) => {
           ok: true,
           invite_link: linkData?.properties?.action_link ?? null,
         });
+      }
+
+      case "delete_user": {
+        if (!payload.user_id) return json({ error: "user_id_required" }, 400);
+        // Bloqueia deleção de processos/fernando
+        const { data: targetRoles } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", payload.user_id);
+        const targetSet = new Set((targetRoles ?? []).map((r) => r.role));
+        if (targetSet.has("processos") || targetSet.has("fernando")) {
+          return json({ error: "cannot_delete_protected_user" }, 403);
+        }
+        // Limpa vínculos (FKs sem cascade) e depois deleta o auth user.
+        // O profile/user_roles/user_hotels referenciam auth.users via cascade.
+        await admin.from("user_hotels").delete().eq("user_id", payload.user_id);
+        await admin.from("user_roles").delete().eq("user_id", payload.user_id);
+        await admin.from("profiles").delete().eq("user_id", payload.user_id);
+        const { error: delErr } = await admin.auth.admin.deleteUser(
+          payload.user_id,
+        );
+        if (delErr) return json({ error: delErr.message }, 400);
+        return json({ ok: true });
       }
 
       default:
