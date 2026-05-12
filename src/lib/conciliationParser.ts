@@ -114,6 +114,10 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
           const doc  = String(row[iDoc]  ?? "").trim();
           const lineDate = extractRazaoDate(row[iData], hist);
 
+          // Exclui comissões de cartão (Doc: "2180 1", "2180 2", etc.)
+          const isComissao = /^\d+\s+\d+$/.test(doc);
+          if (isComissao) continue;
+
           // Tenta categoria pela descrição primeiro
           let categoriaFinal = desc;
 
