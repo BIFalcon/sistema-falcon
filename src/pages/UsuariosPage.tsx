@@ -52,6 +52,7 @@ import {
   Loader2,
   ArrowRight,
   ArrowLeft,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -63,6 +64,7 @@ import {
   useSetUserStatus,
   useResendInvite,
   useSetFinanceiroSubrole,
+  useDeleteUser,
   type ManagedUser,
 } from "@/hooks/useUsers";
 import { useAllHotels } from "@/hooks/useHotelAssets";
@@ -227,7 +229,9 @@ function UserRow({
 }) {
   const setStatus = useSetUserStatus();
   const resend = useResendInvite();
+  const deleteUser = useDeleteUser();
   const [confirmBan, setConfirmBan] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [linkDialog, setLinkDialog] = useState<string | null>(null);
 
   const primaryRoleLabel = user.is_master
@@ -259,6 +263,16 @@ function UserRow({
       setConfirmBan(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteUser.mutateAsync(user.user_id);
+      toast.success("Usuário excluído. Você já pode criar novamente com o mesmo e-mail.");
+      setConfirmDelete(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir");
     }
   }
 
@@ -353,6 +367,19 @@ function UserRow({
                 <Ban className="h-3.5 w-3.5 text-rose-600" />
               )}
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmDelete(true)}
+              disabled={user.is_protected || deleteUser.isPending}
+              title={user.is_protected ? "Usuário protegido" : "Excluir usuário"}
+            >
+              {deleteUser.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+              )}
+            </Button>
           </div>
         </TableCell>
       </TableRow>
@@ -369,6 +396,29 @@ function UserRow({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleToggleStatus}>Desativar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {user.display_name ?? user.email} será removido por completo do sistema
+              (login, perfil, papéis e vínculos com hotéis). Após excluir, você pode criar
+              novamente com o mesmo e-mail e gerar um novo link de acesso. Essa ação não
+              pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
