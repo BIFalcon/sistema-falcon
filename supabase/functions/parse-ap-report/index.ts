@@ -197,6 +197,7 @@ function normalizeBank(account: string | null | undefined): string | null {
 function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   entries: ParsedEntry[];
   skipped: { other_bank: number; no_amount: number; no_supplier: number };
+  my_company_cnpj: string | null;
 } {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -207,7 +208,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   //           Categoria, Nota Fiscal, A Pagar ou Receber, Observação da Conta, Conta Corrente
   // linha 2 = totalizador geral (sem fornecedor — será ignorado pelo filtro de supplier vazio)
   // linhas 3+ = dados reais. Valores de "A Pagar ou Receber" são sempre negativos — usar Math.abs().
-  if (rows.length < 3) return { entries: [], skipped: { other_bank: 0, no_amount: 0, no_supplier: 0 } };
+  if (rows.length < 3) return { entries: [], skipped: { other_bank: 0, no_amount: 0, no_supplier: 0 }, my_company_cnpj: null };
   let headerIdx = 1;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const row = (rows[i] ?? []).map((c: any) => toAscii(normalize(c)));
@@ -221,6 +222,12 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
     }
   }
   const headerArr = (rows[headerIdx] ?? []).map((h: any) => normalize(h));
+  // CNPJ da empresa que exportou (próprio hotel) — usado para validar se o
+  // arquivo é do hotel selecionado.
+  const colMyCnpj = (() => {
+    const norm = headerArr.map((h: string) => toAscii(h));
+    return norm.findIndex((h) => h.includes("minha empresa") && h.includes("cnpj"));
+  })();
   // Colunas reais do OMIE (115 cols). Pulamos as variantes "Minha Empresa (...)".
   const colSit = findCol(headerArr, "situacao");
   const colSitVenc = findCol(headerArr, "situacao do vencimento");
@@ -250,6 +257,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
 
   const out: ParsedEntry[] = [];
   const skipped = { other_bank: 0, no_amount: 0, no_supplier: 0 };
+  let myCompanyCnpj: string | null = null;
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
@@ -257,6 +265,10 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
     if (!supplier) { skipped.no_supplier++; continue; }
     const lower = toAscii(supplier);
     if (lower.includes("total") || lower === "razao social") continue;
+    if (!myCompanyCnpj && colMyCnpj >= 0) {
+      const v = normalize(row[colMyCnpj] ?? "").replace(/\D/g, "");
+      if (v.length >= 11) myCompanyCnpj = v;
+    }
     // Filtro de banco
     const bank = colBank >= 0 ? normalize(row[colBank] ?? "") : "";
     if (bank && !isAllowedBank(bank, hotelId)) {
@@ -287,7 +299,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
       raw: { row, header: headerArr, situacao_vencimento: sitVenc, conta_corrente: bank },
     });
   }
-  return { entries: out, skipped };
+  return { entries: out, skipped, my_company_cnpj: myCompanyCnpj };
 }
 
 async function extractFromZip(buf: ArrayBuffer): Promise<{
@@ -379,6 +391,7 @@ Deno.serve(async (req) => {
 
     let parsed: ParsedEntry[] = [];
     let skipped: { other_bank: number; no_amount: number; no_supplier: number } | null = null;
+    let myCompanyCnpj: string | null = null;
     let reportBuf: ArrayBuffer = arrayBuf;
     let reportName = file.name;
     let extractedDocs: { name: string; data: Uint8Array; mime: string }[] = [];
@@ -394,29 +407,25 @@ Deno.serve(async (req) => {
       reportName = ext.reportName ?? file.name;
       extractedDocs = ext.documents;
       const r = parseOmieXlsx(reportBuf, hotelId);
-      parsed = r.entries; skipped = r.skipped;
+      parsed = r.entries; skipped = r.skipped; myCompanyCnpj = r.my_company_cnpj;
     } else if (sourceSystem === "omie") {
       const r = parseOmieXlsx(arrayBuf, hotelId);
-      parsed = r.entries; skipped = r.skipped;
+      parsed = r.entries; skipped = r.skipped; myCompanyCnpj = r.my_company_cnpj;
     } else {
       parsed = parseTotvsXls(arrayBuf);
     }
 
-    // Validação de CNPJ do hotel: se o hotel tem CNPJ cadastrado e a planilha
-    // apresenta CNPJ diferente, bloqueia para evitar importar arquivo errado.
-    if (hotelCnpjDigits && parsed.length > 0) {
-      const firstWithCnpj = parsed.find((p) => p.cnpj && p.cnpj.replace(/\D/g, "").length >= 11);
-      if (firstWithCnpj) {
-        const fileCnpj = (firstWithCnpj.cnpj ?? "").replace(/\D/g, "");
-        if (fileCnpj && fileCnpj !== hotelCnpjDigits) {
-          return new Response(
-            JSON.stringify({
-              error: `CNPJ da planilha (${firstWithCnpj.cnpj}) não corresponde ao hotel selecionado. Verifique se importou o arquivo correto.`,
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
+    // Validação de CNPJ do hotel: comparamos o CNPJ da coluna "Minha Empresa
+    // (CNPJ)" da planilha (= CNPJ de quem exportou) com o CNPJ cadastrado do
+    // hotel. NÃO comparamos contra o CNPJ do fornecedor — esse é sempre
+    // diferente do hotel.
+    if (hotelCnpjDigits && myCompanyCnpj && myCompanyCnpj !== hotelCnpjDigits) {
+      return new Response(
+        JSON.stringify({
+          error: `CNPJ da empresa exportadora na planilha (${myCompanyCnpj}) não corresponde ao CNPJ cadastrado para o hotel selecionado. Verifique se importou o arquivo correto.`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const ts = Date.now();
