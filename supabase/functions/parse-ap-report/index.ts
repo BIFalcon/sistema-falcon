@@ -264,7 +264,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
     }
     // Filtro de banco
     const bank = colBank >= 0 ? normalize(row[colBank] ?? "") : "";
-    if (bank && !isAllowedBank(bank, hotelId)) {
+    if (bank && !isAllowedBank(bank)) {
       skipped.other_bank++;
       continue;
     }
