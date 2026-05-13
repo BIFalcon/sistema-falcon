@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -361,8 +361,9 @@ export default function IndicadoresDrePage() {
   const hotelIds = useMemo(() => {
     if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
     if (hotelId) return [hotelId];
-    return hotelOptions.map((h) => h.id);
+    return [];
   }, [hotelOptions, hotelId, selectedHotelIds]);
+  const noHotelSelected = hotelIds.length === 0;
   const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
@@ -638,7 +639,12 @@ export default function IndicadoresDrePage() {
         )}
       </div>
 
-      {!dataset && !isLoading ? (
+      {noHotelSelected ? (
+        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+          <BarChart2 className="h-12 w-12 opacity-20" />
+          <p className="text-sm">Selecione um hotel no filtro acima para ver os indicadores.</p>
+        </div>
+      ) : !dataset && !isLoading ? (
         <Card className="p-8 text-center shadow-soft">
           <LineChartIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
           <h2 className="text-lg font-semibold">Nenhuma DRE encontrada</h2>
