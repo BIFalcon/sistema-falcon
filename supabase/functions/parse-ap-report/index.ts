@@ -432,14 +432,23 @@ Deno.serve(async (req) => {
     if (upErr) throw upErr;
 
     // ── Upload preservando vínculos por entry_key ──
-    // 1. lê entries existentes (todos os campos que serão preservados)
-    const { data: existing } = await admin
-      .from("ap_entries")
-      .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status")
-      .eq("hotel_id", hotelId);
+    // 1. lê entries existentes (paginado — Supabase limita 1000 por request)
+    const existing: any[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error: pErr } = await admin
+        .from("ap_entries")
+        .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status")
+        .eq("hotel_id", hotelId)
+        .range(from, from + pageSize - 1);
+      if (pErr) throw pErr;
+      if (!page || page.length === 0) break;
+      existing.push(...page);
+      if (page.length < pageSize) break;
+    }
     const existingByKey = new Map<string, any>();
     const existingByLookup = new Map<string, any>();
-    for (const e of existing ?? []) {
+    for (const e of existing) {
       existingByKey.set(e.entry_key, e);
       if (e.lookup_key) existingByLookup.set(e.lookup_key, e);
     }
