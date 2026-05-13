@@ -153,17 +153,10 @@ function findCol(header: string[], ...candidates: string[]): number {
   return -1;
 }
 
-// Hotéis que aceitam Santander além de Itaú Unibanco
-const SANTANDER_ALLOWED_HOTELS = new Set([
-  "ibis-budget-petropolis",
-  "ibis-juiz-de-fora",
-]);
-
-function isAllowedBank(account: string, hotelId: string): boolean {
+function isAllowedBank(account: string): boolean {
   const a = toAscii(account);
-  if (a.includes("itau")) return true;
-  if (a.includes("santander") && SANTANDER_ALLOWED_HOTELS.has(hotelId)) return true;
-  return false;
+  if (!a) return true;
+  return a.includes("itau") || a.includes("santander");
 }
 
 // 'Em Aprovação' no OMIE = GG já aprovou. 'Agendado' também já passou (foi pro
