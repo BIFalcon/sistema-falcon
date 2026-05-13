@@ -71,6 +71,7 @@ import { useAllHotels } from "@/hooks/useHotelAssets";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
+  { value: "fernando", label: "Fernando (CEO)", scope: "Aprovação final de DRE e Carta — visualização total" },
   { value: "controladoria", label: "Controladoria", scope: "Acesso a todos os hotéis" },
   { value: "financeiro", label: "Financeiro", scope: "Acesso a todos os hotéis" },
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
