@@ -101,7 +101,7 @@ function CategoryCard({ result }: { result: CategoryResult }) {
               {fmtBRL(result.totalCreditoRazao)}
             </p>
           </div>
-          {result.totalJournal > 0 && (
+          {result.totalJournal >= 0 && (
             <div>
               <p className="text-xs text-muted-foreground">Opera (Journal)</p>
               <p className="text-sm font-semibold">{fmtBRL(result.totalJournal)}</p>

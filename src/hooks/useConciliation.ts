@@ -51,26 +51,16 @@ const normKey = (s: string) => {
   return onlyDigits || String(s ?? "").trim();
 };
 
-function normName(s: string): string {
-  return String(s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .join(" ");
-}
-
-function crossKey(value: number, name: string): string {
-  return `${Math.abs(value).toFixed(2)}|${normName(name)}`;
-}
-
-function nameFromHistorico(hist: string): string {
-  const m = hist.match(/\d{2}\/\d{2}\/\d{4}(.+)$/);
-  if (m) return m[1].replace(/,/g, " ").trim();
-  return hist;
+function namesMatch(historico: string, guestFullName: string): boolean {
+  const hist = historico
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z]/g, " ");
+  const nameParts = guestFullName
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().split(/\s+/).filter((p) => p.length > 2);
+  if (nameParts.length === 0) return false;
+  const matches = nameParts.filter((p) => hist.includes(p));
+  return matches.length >= Math.min(2, nameParts.length);
 }
 
 export function useConciliation(
@@ -109,33 +99,47 @@ export function useConciliation(
       // Cruzamento por VALOR + NOME do hóspede (Transaction Number != Documento)
       const journalReal = journalDestaCateg.filter((l) => l.credit > 0);
 
-      const razaoCrossKeys = new Set(
-        creditosRazao.map((l) => crossKey(l.valorCredito, nameFromHistorico(l.historico)))
-      );
-      const journalCrossKeys = new Set(
-        journalReal.map((l) => crossKey(l.credit, l.guestFullName))
-      );
+      // Agrupa créditos do Razão por valor em centavos
+      const razaoByValue = new Map<number, RazaoLine[]>();
+      for (const r of creditosRazao) {
+        const cents = toCents(r.valorCredito);
+        if (!razaoByValue.has(cents)) razaoByValue.set(cents, []);
+        razaoByValue.get(cents)!.push(r);
+      }
 
-      const apenasNoJournal = journalReal.filter(
-        (l) => !razaoCrossKeys.has(crossKey(l.credit, l.guestFullName))
-      );
-      const apenasNoRazao = creditosRazao.filter(
-        (l) => !journalCrossKeys.has(crossKey(l.valorCredito, nameFromHistorico(l.historico)))
-      );
-      const emAmbos = journalReal
-        .filter((l) => razaoCrossKeys.has(crossKey(l.credit, l.guestFullName)))
-        .map((j) => ({
-          journal: j,
-          razao: creditosRazao.find(
-            (r) =>
-              crossKey(r.valorCredito, nameFromHistorico(r.historico)) ===
-              crossKey(j.credit, j.guestFullName)
-          )!,
-        }));
+      // Cruza Journal com Razão por valor + nome
+      const matchedRazaoIndices = new Map<number, Set<number>>();
+      const emAmbos: CategoryResult["emAmbos"] = [];
+      const apenasNoJournal: JournalLine[] = [];
 
-      // Divergência = (Débito TOTVS - Crédito TOTVS) - Journal Opera
-      // O Journal deve corresponder ao líquido (débito menos crédito) do Razão.
-      const divergencia = (totalDebito - totalCreditoRazao) - totalJournal;
+      for (const j of journalReal) {
+        const cents = toCents(j.credit);
+        const candidates = razaoByValue.get(cents) ?? [];
+        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
+        const matchIdx = candidates.findIndex(
+          (r, idx) =>
+            !usedIndices.has(idx) &&
+            namesMatch(r.historico, j.guestFullName || j.companyName || "")
+        );
+        if (matchIdx >= 0) {
+          usedIndices.add(matchIdx);
+          matchedRazaoIndices.set(cents, usedIndices);
+          emAmbos.push({ journal: j, razao: candidates[matchIdx] });
+        } else {
+          apenasNoJournal.push(j);
+        }
+      }
+
+      const apenasNoRazao = creditosRazao.filter((r) => {
+        const cents = toCents(r.valorCredito);
+        const candidates = razaoByValue.get(cents) ?? [];
+        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
+        return !usedIndices.has(candidates.indexOf(r));
+      });
+
+      // Divergência = apenas TOTVS interno: débito vs soma de créditos
+      // O Journal é INFORMATIVO — não entra no cálculo de divergência
+      const divergencia = totalDebito - totalCreditoRazao;
 
       return {
         categoria: cat,
