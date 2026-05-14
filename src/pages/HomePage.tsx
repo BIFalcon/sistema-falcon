@@ -143,13 +143,15 @@ export default function HomePage() {
   const { data: pendingNotifs = 0 } = usePendingNotificationCount();
 
   const closingStats = useMemo(() => {
-    let returned = 0, waitingGop = 0, waitingMe = 0;
+    let returned = 0, waitingGop = 0, waitingMe = 0, waitingFernando = 0, waitingFernandoCarta = 0;
     for (const c of closings) {
       if ([c.status_dre, c.status_carta].includes("devolvido")) returned++;
       if (c.status_dre === "aguardando_gop") waitingGop++;
       if (c.status_dre === "aguardando_gg" || c.status_carta === "aguardando_gg") waitingMe++;
+      if (c.status_dre === "aguardando_fernando") waitingFernando++;
+      if (c.status_carta === "aguardando_fernando") waitingFernandoCarta++;
     }
-    return { returned, waitingGop, waitingMe };
+    return { returned, waitingGop, waitingMe, waitingFernando, waitingFernandoCarta };
   }, [closings]);
 
   const apStats = useMemo(() => {
@@ -175,7 +177,9 @@ export default function HomePage() {
   const todoItems = useMemo((): TodoItem[] => {
     const items: TodoItem[] = [];
 
-    if (isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("fernando")) {
+    const isFernando = hasRole("fernando");
+
+    if (isMaster || hasRole("gop") || hasRole("controladoria")) {
       if (closingStats.returned > 0)
         items.push({ dot: "red", text: `${closingStats.returned} DRE(s) devolvida(s)`, meta: "Fechamento", url: "/fechamento" });
       if (closingStats.waitingGop > 0 && (isMaster || hasRole("gop")))
@@ -186,6 +190,13 @@ export default function HomePage() {
         items.push({ dot: "blue", text: `${ofStats} folios em aberto`, meta: "Open Folio", url: "/financeiro/contas-receber" });
       if (pendingNotifs > 0)
         items.push({ dot: "amber", text: `${pendingNotifs} notificação(ões) pendente(s)`, meta: "Notificações", url: "/configuracoes/notificacoes" });
+    }
+
+    if (isFernando) {
+      if (closingStats.waitingFernando > 0)
+        items.push({ dot: "amber", text: `${closingStats.waitingFernando} DRE(s) aguardando sua aprovação final`, meta: "Fechamento", url: "/fechamento" });
+      if (closingStats.waitingFernandoCarta > 0)
+        items.push({ dot: "amber", text: `${closingStats.waitingFernandoCarta} Carta(s) aguardando sua aprovação`, meta: "Carta", url: "/fechamento/carta" });
     }
 
     if (isGg) {
