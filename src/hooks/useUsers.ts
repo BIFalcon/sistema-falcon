@@ -50,7 +50,7 @@ export function useManagedUsers() {
 
       return (profiles ?? []).map((p): ManagedUser => {
         const rs = rolesByUser.get(p.user_id) ?? [];
-        const isMaster = rs.includes("processos") || rs.includes("fernando");
+        const isMaster = rs.includes("processos");
         const isProtected = rs.includes("processos") || rs.includes("fernando");
         return {
           user_id: p.user_id,
