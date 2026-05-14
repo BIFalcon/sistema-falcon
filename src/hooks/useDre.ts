@@ -373,7 +373,7 @@ function useDreAnalyticsImpl(input: {
 }) {
   return useQuery({
     enabled: input.hotelIds.length > 0,
-    queryKey: ["dre-analytics", input.hotelIds, input.year, input.month, input.periodMonths ?? 1],
+    queryKey: ["dre-analytics", [...input.hotelIds].sort().join(","), input.year, input.month, input.periodMonths ?? 1],
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
