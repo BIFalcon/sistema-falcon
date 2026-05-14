@@ -273,13 +273,9 @@ Deno.serve(async (req) => {
         const redirectTo =
           (req.headers.get("origin") ?? "") + "/reset-password";
 
-        // Verifica se o usuário já confirmou email para escolher o tipo
-        // correto (invite para novos, recovery para confirmados).
-        const { data: authUser } = await admin.auth.admin.getUserById(
-          payload.user_id,
-        );
-        const isConfirmed = !!authUser?.user?.email_confirmed_at;
-        const linkType = isConfirmed ? "recovery" : "invite";
+        // Sempre usa magiclink para garantir que o usuário
+        // recebe um e-mail funcional independente do estado
+        const linkType = "magiclink" as const;
 
         // Gera UM único link — invalida qualquer token anterior pendente,
         // dispara o email novo e retorna a URL para copiar.
