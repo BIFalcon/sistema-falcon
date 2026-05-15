@@ -185,6 +185,38 @@ Deno.serve(async (req) => {
         }
         actionLink = linkData?.properties?.action_link ?? null;
 
+        if (actionLink) {
+          const html = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
+              <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 16px;">Bem-vindo ao Sistema Falcon</h1>
+              <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px; color: #333;">
+                Você foi convidado para acessar o Sistema Falcon Hotels.
+                Clique no botão abaixo para criar sua senha e acessar o sistema.
+              </p>
+              <p style="margin: 0 0 32px;">
+                <a href="${actionLink}" style="display: inline-block; background: #0a0a0a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 15px; font-weight: 500;">
+                  Criar minha senha
+                </a>
+              </p>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
+                Este link é válido por 72 horas. Se você não esperava este
+                convite, ignore este e-mail.
+              </p>
+            </div>
+          `;
+          try {
+            await sendLovableEmail({
+              from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
+              to: payload.email,
+              subject: "Convite — Sistema Falcon Hotels",
+              html,
+            });
+          } catch (emailErr) {
+            console.error("[invite] falha ao enviar e-mail:", emailErr);
+            // Não bloqueia — o link ainda é retornado para copiar manualmente
+          }
+        }
+
         return json({ ok: true, user_id: userId, invite_link: actionLink });
       }
 
@@ -287,9 +319,42 @@ Deno.serve(async (req) => {
             options: { redirectTo },
           });
         if (linkErr) return json({ error: linkErr.message }, 400);
+        const actionLink = linkData?.properties?.action_link ?? null;
+
+        if (actionLink) {
+          const html = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
+              <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 16px;">Novo acesso ao Sistema Falcon</h1>
+              <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px; color: #333;">
+                Seu link de acesso ao Sistema Falcon foi renovado.
+                Clique no botão abaixo para acessar o sistema.
+              </p>
+              <p style="margin: 0 0 32px;">
+                <a href="${actionLink}" style="display: inline-block; background: #0a0a0a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 15px; font-weight: 500;">
+                  Acessar o sistema
+                </a>
+              </p>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
+                Este link é válido por 72 horas. Se você não solicitou este
+                acesso, ignore este e-mail.
+              </p>
+            </div>
+          `;
+          try {
+            await sendLovableEmail({
+              from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
+              to: prof.email,
+              subject: "Novo acesso — Sistema Falcon Hotels",
+              html,
+            });
+          } catch (emailErr) {
+            console.error("[resend_invite] falha ao enviar e-mail:", emailErr);
+          }
+        }
+
         return json({
           ok: true,
-          invite_link: linkData?.properties?.action_link ?? null,
+          invite_link: actionLink,
         });
       }
 
