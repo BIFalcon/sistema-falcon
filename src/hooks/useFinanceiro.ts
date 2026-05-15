@@ -49,6 +49,9 @@ export function useFinanceiroQueue(params: {
       if (error) throw error;
       return (data ?? []) as unknown as FinanceiroRow[];
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
