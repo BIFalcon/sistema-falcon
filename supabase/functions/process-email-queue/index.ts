@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const MAX_RETRIES = 5
 const DEFAULT_BATCH_SIZE = 10
 const DEFAULT_SEND_DELAY_MS = 200
-const DEFAULT_AUTH_TTL_MINUTES = 15
+const DEFAULT_AUTH_TTL_MINUTES = 60 * 24 * 3 // 72 horas (3 dias)
 const DEFAULT_TRANSACTIONAL_TTL_MINUTES = 60
 
 // Check if an error is a rate-limit (429) response.
