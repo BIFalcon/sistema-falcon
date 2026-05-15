@@ -1,4 +1,4 @@
-import { useEffect, useCallback, createContext, useContext, ReactNode, useSyncExternalStore } from "react";
+import { useCallback, createContext, useContext, ReactNode, useSyncExternalStore } from "react";
 
 export type FilterModule =
   | "fechamento"
