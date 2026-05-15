@@ -38,6 +38,9 @@ export function useDreVersions(closingId: string | null | undefined) {
       if (error) throw error;
       return (data ?? []) as DreVersion[];
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -358,6 +361,9 @@ export function useDreIndicators(closingId: string | null | undefined) {
         .filter((r) => r.line_type === "indicator")
         .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
