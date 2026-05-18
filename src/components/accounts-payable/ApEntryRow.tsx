@@ -51,8 +51,6 @@ export function ApEntryRow({
   const paymentRowClass =
     entry.payment_status === "pago"
       ? "bg-emerald-500/10 dark:bg-emerald-500/10"
-      : entry.payment_status === "inserido"
-      ? "bg-sky-500/10 dark:bg-sky-500/10"
       : entry.payment_status === "agendado"
       ? "bg-violet-500/10 dark:bg-violet-500/10"
       : "";
@@ -227,12 +225,6 @@ const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string;
     className: "border-violet-500/40 text-violet-700 dark:text-violet-400",
     tooltip: "Autorizado para pagamento pela coordenadora",
     Icon: ShieldCheck,
-  },
-  inserido: {
-    label: "Inserido",
-    className: "border-sky-500/40 text-sky-700 dark:text-sky-400",
-    tooltip: "Inserido no banco — aguardando compensação",
-    Icon: CheckCircle2,
   },
   agendado: {
     label: "Agendado",
