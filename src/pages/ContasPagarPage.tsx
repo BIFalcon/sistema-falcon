@@ -1028,6 +1028,7 @@ export default function ContasPagarPage() {
                           onToggleSelected={(v) => toggleSelected(e.id, v)}
                           showBank={sourceSystem === "omie"}
                           canEditObservation={canManage}
+                          canManageCategory={canManage}
                         />
                       );
                     })
