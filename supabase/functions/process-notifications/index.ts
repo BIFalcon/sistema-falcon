@@ -5,6 +5,7 @@
 // implementar o envio real (provider já preparado).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { sendLovableEmail } from "npm:@lovable.dev/email-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const EMAIL_DOMAIN_READY = false; // mudar para true quando notify.falconhoteis.com.br estiver ativo
+const EMAIL_DOMAIN_READY = true; // notify.falconhoteis.com.br ativo
 const APP_BASE_URL =
   Deno.env.get("APP_BASE_URL") ?? "https://app.falconhoteis.com.br";
 
@@ -63,14 +64,34 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // === Quando o domínio estiver pronto, envio real entra aqui ===
-    // Exemplo (Resend/Lovable Email): construir HTML a partir de body_md,
-    // adicionar link absoluto APP_BASE_URL + link_url e footer de unsubscribe.
     try {
       const fullLink = `${APP_BASE_URL}${item.link_url}`;
-      console.log(
-        `[notify] would send ${item.event} to ${item.recipient_email} → ${fullLink}`,
-      );
+
+      // Converte body_md para HTML simples
+      const bodyHtml = (item.body_md as string)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#1e40af;text-decoration:underline;">$1</a>')
+        .replace(/\n/g, "<br/>");
+
+      const html = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1f2937;">
+          <div style="font-size:14px;line-height:1.6;">
+            ${bodyHtml}
+          </div>
+          <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+            Sistema Falcon Hotels ·
+            <a href="${APP_BASE_URL}/notificacoes" style="color:#6b7280;">Gerenciar notificações</a>
+          </div>
+        </div>
+      `;
+
+      await sendLovableEmail({
+        from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
+        to: item.recipient_email as string,
+        subject: item.subject as string,
+        html,
+      });
+
       await supabase
         .from("notification_queue")
         .update({
