@@ -7,8 +7,7 @@ export type ApApproval = "pending" | "approved" | "rejected";
 export type ApPaymentStatus =
   | "em_aprovacao" // GG aprovou no OMIE — aguardando autorização do financeiro
   | "autorizado"   // coordenadora autorizou para pagamento
-  | "inserido"     // inserido no banco
-  | "agendado"     // agendado para data futura
+  | "agendado"     // agendado (unifica antigo "inserido")
   | "pago";        // pago
 
 export interface ApUpload {
