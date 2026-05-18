@@ -1,14 +1,19 @@
 // GG pode ver esta página (somente leitura — sem botões de ação).
 // Dados já são filtrados pelo hotel do GG via allowedHotels no AuthContext.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   ArrowDownCircle,
   AlertTriangle,
@@ -18,14 +23,16 @@ import {
   CreditCard,
   Sparkles,
   Clock,
+  Pencil,
 } from "lucide-react";
 import { fmtBRL } from "@/lib/formatters";
 
 export default function FinanceiroVisaoGeralPage() {
   const navigate = useNavigate();
-  const { hasRole, isMaster, userHotels } = useAuth();
+  const { user, hasRole, isMaster, userHotels } = useAuth();
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
+  const canEditAnticipation = isMaster || hasRole("financeiro");
   const restrictedHotelIds: string[] | null = seesAllHotels
     ? null
     : userHotels.map((h) => h.id);
@@ -118,6 +125,28 @@ export default function FinanceiroVisaoGeralPage() {
 
   const saldoLiquido = totalOpenFolio - totalDuePeriod;
 
+  // ===== Encargos financeiros =====
+  // Juros pagos no período (apenas lançamentos pagos com juros)
+  const jurosPagos = useMemo(
+    () =>
+      apScoped
+        .filter(
+          (e) =>
+            e.payment_status === "pago" &&
+            e.due_date &&
+            e.due_date >= dateFrom &&
+            e.due_date <= dateTo,
+        )
+        .reduce((s, e) => s + Number(e.paid_interest ?? 0), 0),
+    [apScoped, dateFrom, dateTo],
+  );
+
+  // Antecipação: deriva mês/ano de dateFrom
+  const period = useMemo(() => {
+    const d = dateFrom ? new Date(dateFrom + "T00:00:00") : new Date();
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  }, [dateFrom]);
+
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div>
@@ -195,27 +224,199 @@ export default function FinanceiroVisaoGeralPage() {
         <SectionHeader
           icon={<TrendingUp className="h-4 w-4" />}
           title="Encargos financeiros"
-          subtitle="Disponível em breve"
+          subtitle={
+            hotelFilter === "all"
+              ? "Antecipação: selecione um hotel para informar"
+              : undefined
+          }
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PlaceholderCard
+          <SummaryCard
             icon={<Clock className="h-4 w-4" />}
-            title="Juros pagos no período"
-            text="Total de juros pagos no período selecionado — disponível em breve."
+            label="Juros pagos no período"
+            value={fmtBRL(jurosPagos)}
+            tone={jurosPagos > 0 ? "warning" : "default"}
           />
-          <PlaceholderCard
-            icon={<Clock className="h-4 w-4" />}
-            title="Antecipação de recebíveis"
-            text="Valor antecipado no período — disponível em breve."
-          />
-          <PlaceholderCard
-            icon={<Clock className="h-4 w-4" />}
-            title="Taxa de antecipação"
-            text="Taxa paga por antecipação no período — disponível em breve."
+          <AnticipationCards
+            hotelId={hotelFilter === "all" ? null : hotelFilter}
+            year={period.year}
+            month={period.month}
+            canEdit={canEditAnticipation}
+            userId={user?.id ?? null}
           />
         </div>
       </section>
     </div>
+  );
+}
+
+// ── Antecipação de recebíveis ──────────────────────────────────────────────
+interface ApAnticipationRow {
+  id: string;
+  hotel_id: string;
+  month: number;
+  year: number;
+  anticipated_amount: number;
+  anticipation_rate: number;
+}
+
+function AnticipationCards({
+  hotelId,
+  year,
+  month,
+  canEdit,
+  userId,
+}: {
+  hotelId: string | null;
+  year: number;
+  month: number;
+  canEdit: boolean;
+  userId: string | null;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [amountInput, setAmountInput] = useState("");
+  const [rateInput, setRateInput] = useState("");
+
+  const { data: rows = [] } = useQuery({
+    queryKey: ["ap-anticipation", year, month, hotelId],
+    queryFn: async (): Promise<ApAnticipationRow[]> => {
+      let q = supabase
+        .from("ap_anticipation" as never)
+        .select("*")
+        .eq("year", year)
+        .eq("month", month);
+      if (hotelId) q = q.eq("hotel_id", hotelId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as ApAnticipationRow[];
+    },
+  });
+
+  const totalAmount = rows.reduce((s, r) => s + Number(r.anticipated_amount ?? 0), 0);
+  const avgRate =
+    rows.length > 0
+      ? rows.reduce((s, r) => s + Number(r.anticipation_rate ?? 0), 0) / rows.length
+      : 0;
+
+  const upsert = useMutation({
+    mutationFn: async () => {
+      if (!hotelId || !userId) throw new Error("Selecione um hotel.");
+      const payload = {
+        hotel_id: hotelId,
+        month,
+        year,
+        anticipated_amount: parseFloat(amountInput || "0"),
+        anticipation_rate: parseFloat(rateInput || "0"),
+        informed_by: userId,
+      };
+      const { error } = await supabase
+        .from("ap_anticipation" as never)
+        .upsert(payload as never, { onConflict: "hotel_id,month,year" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ap-anticipation"] });
+      toast.success("Antecipação atualizada");
+      setEditing(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar"),
+  });
+
+  const startEdit = () => {
+    const current = rows[0];
+    setAmountInput(current ? String(current.anticipated_amount ?? "") : "");
+    setRateInput(current ? String(current.anticipation_rate ?? "") : "");
+    setEditing(true);
+  };
+
+  const canEditThis = canEdit && !!hotelId;
+
+  return (
+    <>
+      <Card className="p-4 shadow-soft space-y-2">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+          <CreditCard className="h-4 w-4" /> Antecipação de recebíveis
+          {canEditThis && !editing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-6 px-2 text-xs gap-1"
+              onClick={startEdit}
+            >
+              <Pencil className="h-3 w-3" /> Editar
+            </Button>
+          )}
+        </div>
+        {editing ? (
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] uppercase text-muted-foreground">
+                Valor antecipado
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                placeholder="0,00"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase text-muted-foreground">
+                Taxa (ex: 0.0235 = 2,35%)
+              </label>
+              <Input
+                type="number"
+                step="0.0001"
+                value={rateInput}
+                onChange={(e) => setRateInput(e.target.value)}
+                placeholder="0.0000"
+                className="h-8"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => upsert.mutate()}
+                disabled={upsert.isPending}
+              >
+                Salvar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditing(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-2xl font-semibold">{fmtBRL(totalAmount)}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground">
+          Período: {String(month).padStart(2, "0")}/{year}
+          {!hotelId && " · todos os hotéis (soma)"}
+        </p>
+      </Card>
+
+      <Card className="p-4 shadow-soft space-y-2">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+          <TrendingUp className="h-4 w-4" /> Taxa de antecipação
+        </div>
+        <p className="mt-1 text-2xl font-semibold">
+          {(avgRate * 100).toFixed(2)}%
+        </p>
+        <p className="text-[10px] text-muted-foreground">
+          {hotelId
+            ? "Taxa cobrada no período"
+            : "Taxa média entre os hotéis no período"}
+        </p>
+      </Card>
+    </>
   );
 }
 
