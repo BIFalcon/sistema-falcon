@@ -45,7 +45,7 @@ export function AppHeader() {
   const { pathname } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useModuleFilters(activeModule);
-  const { allowedHotels, profile, signOut, isMaster, isGg } = useAuth();
+  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
@@ -171,7 +171,7 @@ export function AppHeader() {
               <SelectValue placeholder="Hotel" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              {isMaster && (
+              {(isMaster || hasRole("financeiro")) && (
                 <SelectItem value="__all__">
                   {selectedGop ? `Todos da carteira (${visibleHotels.length})` : "Todos os hotéis"}
                 </SelectItem>
