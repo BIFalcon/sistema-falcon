@@ -531,7 +531,7 @@ export async function uploadApReport(input: {
   hotelId: string;
   sourceSystem: FinancialSystem;
   file: File;
-}): Promise<{ entries: number; documents_extracted: number }> {
+}): Promise<{ entries: number; documents_extracted: number; skipped?: { duplicate_entry?: number } }> {
   const form = new FormData();
   form.append("hotel_id", input.hotelId);
   form.append("source_system", input.sourceSystem);
@@ -540,7 +540,7 @@ export async function uploadApReport(input: {
     body: form,
   });
   if (error) throw error;
-  const result = data as { entries: number; documents_extracted: number; error?: string };
+  const result = data as { entries: number; documents_extracted: number; skipped?: { duplicate_entry?: number }; error?: string };
   if (result?.error) throw new Error(result.error);
   return result;
 }
