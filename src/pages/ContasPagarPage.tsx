@@ -409,6 +409,7 @@ export default function ContasPagarPage() {
         <>
           {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
           {hotelId && (
+          <>
           <Card className="p-5 shadow-soft space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BankBalanceField
@@ -567,6 +568,7 @@ export default function ContasPagarPage() {
             </Card>
             </CollapsibleContent>
           </Collapsible>
+          </>
           )}
 
           {/* Urgência */}
