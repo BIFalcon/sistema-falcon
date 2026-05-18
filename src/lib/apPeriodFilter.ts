@@ -16,7 +16,6 @@ export type StatusFilter =
   | "all"
   | "issues"
   | "payment_pendente"
-  | "payment_inserido"
   | "payment_agendado"
   | "payment_pago";
 
