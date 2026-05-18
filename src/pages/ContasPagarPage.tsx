@@ -670,28 +670,109 @@ export default function ContasPagarPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="issues">Sem aprovação do GG</SelectItem>
-                  <SelectItem value="payment_agendado">Agendado</SelectItem>
-                  <SelectItem value="payment_pago">Pago</SelectItem>
-                  <SelectItem value="payment_pendente">Em Aprovação</SelectItem>
-                </SelectContent>
-              </Select>
+              {(() => {
+                const STATUS_OPTIONS: { value: string; label: string }[] = [
+                  { value: "em_aprovacao", label: "Não aprovado pelo GG" },
+                  { value: "autorizado", label: "Autorizado" },
+                  { value: "agendado", label: "Agendado" },
+                  { value: "pago", label: "Pago" },
+                  { value: "issues", label: "Sem aprovação do GG" },
+                ];
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="justify-between h-10">
+                        <span>
+                          Status{selectedStatuses.length > 0 ? ` (${selectedStatuses.length})` : ""}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-56 bg-popover">
+                      <DropdownMenuLabel className="text-xs">Status</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {STATUS_OPTIONS.map((opt) => (
+                        <DropdownMenuCheckboxItem
+                          key={opt.value}
+                          checked={selectedStatuses.includes(opt.value)}
+                          onCheckedChange={(c) =>
+                            setSelectedStatuses((prev) =>
+                              c ? [...prev, opt.value] : prev.filter((s) => s !== opt.value),
+                            )
+                          }
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          {opt.label}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                      {selectedStatuses.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start h-7 px-2 text-xs"
+                            onClick={() => setSelectedStatuses([])}
+                          >
+                            Limpar
+                          </Button>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })()}
 
-              {sourceSystem === "omie" && categories.length > 0 ? (
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as categorias</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
+              {sourceSystem === "omie" ? (() => {
+                const FIXED_CATEGORIES = ["Salários RH"];
+                const allCategories = [
+                  ...FIXED_CATEGORIES,
+                  ...categories.filter((c) => !FIXED_CATEGORIES.includes(c)),
+                ];
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="justify-between h-10">
+                        <span>
+                          Categoria{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ""}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-64 max-h-[320px] overflow-y-auto bg-popover">
+                      <DropdownMenuLabel className="text-xs">Categoria</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {allCategories.map((c) => (
+                        <DropdownMenuCheckboxItem
+                          key={c}
+                          checked={selectedCategories.includes(c)}
+                          onCheckedChange={(chk) =>
+                            setSelectedCategories((prev) =>
+                              chk ? [...prev, c] : prev.filter((x) => x !== c),
+                            )
+                          }
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          {c}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                      {selectedCategories.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start h-7 px-2 text-xs"
+                            onClick={() => setSelectedCategories([])}
+                          >
+                            Limpar
+                          </Button>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })() : (
                 <div />
               )}
             </div>
@@ -737,8 +818,8 @@ export default function ContasPagarPage() {
             {(() => {
               const activeFilterCount = [
                 period !== "all",
-                status !== "all",
-                category !== "all",
+                selectedStatuses.length > 0,
+                selectedCategories.length > 0,
                 searchText !== "",
                 !hideTrivial,
               ].filter(Boolean).length;
@@ -762,8 +843,8 @@ export default function ContasPagarPage() {
                     className="h-7 px-2 text-xs text-accent hover:text-accent"
                     onClick={() => {
                       setPeriod("all");
-                      setStatus("all");
-                      setCategory("all");
+                      setSelectedStatuses([]);
+                      setSelectedCategories([]);
                       setSearchText("");
                       setHideTrivial(true);
                       setGroupNd(true);
