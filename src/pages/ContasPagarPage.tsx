@@ -826,9 +826,13 @@ export default function ContasPagarPage() {
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
+                    <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
+                    <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
+                    <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -836,12 +840,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 7 : 6) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -851,7 +855,7 @@ export default function ContasPagarPage() {
                     displayRows.map((row, idx) => {
                       if (row.kind === "group") {
                         const colSpan =
-                          (showApproval ? 7 : 6) +
+                          (showApproval ? 11 : 10) +
                           (sourceSystem === "omie" ? 2 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
                         return (

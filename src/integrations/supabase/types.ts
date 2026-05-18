@@ -197,6 +197,7 @@ export type Database = {
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
+          original_amount: number | null
           paid_amount: number | null
           paid_interest: number | null
           payment_marked_at: string | null
@@ -236,6 +237,7 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          original_amount?: number | null
           paid_amount?: number | null
           paid_interest?: number | null
           payment_marked_at?: string | null
@@ -275,6 +277,7 @@ export type Database = {
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
+          original_amount?: number | null
           paid_amount?: number | null
           paid_interest?: number | null
           payment_marked_at?: string | null

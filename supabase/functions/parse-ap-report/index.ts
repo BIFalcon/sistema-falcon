@@ -440,7 +440,7 @@ Deno.serve(async (req) => {
     for (let from = 0; ; from += pageSize) {
       const { data: page, error: pErr } = await admin
         .from("ap_entries")
-        .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status")
+        .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status, original_amount")
         .eq("hotel_id", hotelId)
         .range(from, from + pageSize - 1);
       if (pErr) throw pErr;
@@ -533,6 +533,9 @@ Deno.serve(async (req) => {
           ...baseFields,
           observation: prev.observation ?? p.observation,
           payment_status: preservedStatus,
+          // Preserva original_amount: nunca sobrescreve se já existe;
+          // garante valor para registros antigos que ainda não têm.
+          original_amount: prev.original_amount ?? p.amount,
         });
       } else {
         inserts.push({
@@ -544,6 +547,7 @@ Deno.serve(async (req) => {
           gg_approval_notes: null,
           primary_document_id: null,
           payment_status: omieFalconStatus,
+          original_amount: p.amount,
         });
       }
     }
