@@ -32,6 +32,8 @@ interface EntryRowProps {
   showBank?: boolean;
   canEditObservation?: boolean;
   canManageCategory?: boolean;
+  /** Quando definido, renderiza uma célula extra com o nome do hotel (modo "todos os hotéis"). */
+  hotelLabel?: string;
 }
 
 export function ApEntryRow({
@@ -46,6 +48,7 @@ export function ApEntryRow({
   showBank = false,
   canEditObservation = false,
   canManageCategory = false,
+  hotelLabel,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -68,6 +71,11 @@ export function ApEntryRow({
             onCheckedChange={(c) => onToggleSelected?.(!!c)}
             aria-label="Selecionar lançamento"
           />
+        </TableCell>
+      )}
+      {hotelLabel !== undefined && (
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+          {hotelLabel}
         </TableCell>
       )}
       {/* Fornecedor */}

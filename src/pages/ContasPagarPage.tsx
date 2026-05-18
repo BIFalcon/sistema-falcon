@@ -54,6 +54,7 @@ import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   uploadApReport,
   useApEntries,
+  useAllApEntries,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useTodayBankBalance,
@@ -112,7 +113,17 @@ export default function ContasPagarPage() {
 
   // ── Dados remotos ──────────────────────────────────────────────────────
   const { data: lastUpload } = useLatestApUpload(hotelId);
-  const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
+  const { data: hotelEntries = [], isLoading: hotelEntriesLoading } = useApEntries(hotelId);
+  const showingAllHotels = !hotelId;
+  const { data: allHotelEntries = [], isLoading: allEntriesLoading } =
+    useAllApEntries(showingAllHotels);
+  const allEntriesRaw = showingAllHotels ? allHotelEntries : hotelEntries;
+  const entriesLoading = showingAllHotels ? allEntriesLoading : hotelEntriesLoading;
+  const hotelNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    hotels.forEach((h) => m.set(h.id, h.name));
+    return m;
+  }, [hotels]);
   const { data: balanceItau } = useTodayBankBalance(hotelId, "itau");
   const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
   const { data: cardReceivables = [] } = useCardReceivable(hotelId);
@@ -387,18 +398,18 @@ export default function ContasPagarPage() {
         </Card>
       )}
 
-      {/* Placeholder sem hotel */}
-      {!hotelId && (
-        <EmptyHotelState
-          icon={<Wallet className="h-12 w-12" />}
-          title="Contas a Pagar"
-          description="Selecione um hotel para visualizar e gerenciar os lançamentos financeiros."
-        />
+      {showingAllHotels && (
+        <div className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">
+          Vendo lançamentos de <strong className="text-foreground">todos os hotéis</strong>.
+          Selecione um hotel para informar saldos e importar relatórios.
+        </div>
       )}
 
-      {hotelId && (
+      {true && (
         <>
-          {/* Saldo bancário (Itaú + Santander) */}
+          {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
+          {hotelId && (
+          <>
           <Card className="p-5 shadow-soft space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BankBalanceField
@@ -557,6 +568,8 @@ export default function ContasPagarPage() {
             </Card>
             </CollapsibleContent>
           </Collapsible>
+          </>
+          )}
 
           {/* Urgência */}
           <Card className="p-5 shadow-soft">
@@ -979,6 +992,7 @@ export default function ContasPagarPage() {
                         />
                       </TableHead>
                     )}
+                    {showingAllHotels && <TableHead>Hotel</TableHead>}
                     <TableHead>Fornecedor</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
@@ -998,12 +1012,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -1015,12 +1029,14 @@ export default function ContasPagarPage() {
                         const colSpan =
                           (showApproval ? 11 : 10) +
                           (sourceSystem === "omie" ? 2 : 0) +
-                          ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
+                          ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) +
+                          (showingAllHotels ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
                             {(canMarkInsertedAgendado || canMarkPaid) && (
                               <TableCell />
                             )}
+                            {showingAllHotels && <TableCell />}
                             <TableCell className="font-medium">
                               {row.supplier}{" "}
                               <span className="text-muted-foreground font-normal">
@@ -1067,6 +1083,7 @@ export default function ContasPagarPage() {
                           showBank={sourceSystem === "omie"}
                           canEditObservation={canManage}
                           canManageCategory={canManage}
+                          hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
                         />
                       );
                     })
