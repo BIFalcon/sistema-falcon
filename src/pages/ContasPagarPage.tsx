@@ -1255,6 +1255,61 @@ export default function ContasPagarPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de agrupamento de lançamentos */}
+      <AlertDialog
+        open={groupDialogOpen}
+        onOpenChange={(o) => {
+          setGroupDialogOpen(o);
+          if (!o) setGroupCategoryName("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Agrupar lançamentos</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedIds.size} lançamentos serão agrupados em um único lançamento.
+              Valor total: <strong>{fmtBRL(selectedTotal)}</strong>.
+              Os originais serão arquivados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Input
+              autoFocus
+              placeholder="Nome da categoria (ex: Comissões Maio)"
+              value={groupCategoryName}
+              onChange={(e) => setGroupCategoryName(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!groupCategoryName.trim() || groupEntries.isPending || !hotelId}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!hotelId) return;
+                try {
+                  await groupEntries.mutateAsync({
+                    hotelId,
+                    entryIds: Array.from(selectedIds),
+                    categoryName: groupCategoryName.trim(),
+                  });
+                  toast.success("Lançamentos agrupados com sucesso");
+                  setSelectedIds(new Set());
+                  setGroupCategoryName("");
+                  setGroupDialogOpen(false);
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error ? err.message : "Erro ao agrupar lançamentos",
+                  );
+                }
+              }}
+            >
+              {groupEntries.isPending ? "Agrupando..." : "Agrupar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
