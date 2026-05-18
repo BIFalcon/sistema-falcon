@@ -60,6 +60,7 @@ import {
   useApNotificationLog,
   useCardReceivable,
   useUpsertCardReceivable,
+  useGroupEntries,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -143,6 +144,9 @@ export default function ContasPagarPage() {
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupCategoryName, setGroupCategoryName] = useState("");
+  const groupEntries = useGroupEntries();
 
   const fileRef = useRef<HTMLInputElement>(null);
 
