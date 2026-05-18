@@ -42,7 +42,6 @@ import {
   useAllOpenFolioNotes,
   useUpsertOpenFolioNote,
   useSetToInvoiceGgStatus,
-  useNotifyGgToInvoice,
   useDeleteArUpload,
   useArUploadsByKind,
   findContractTerm,
