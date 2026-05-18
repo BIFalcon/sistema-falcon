@@ -24,6 +24,11 @@ import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
+import TurnoverPage from "./pages/rh/TurnoverPage";
+import CalendarioPage from "./pages/rh/CalendarioPage";
+import OrganogramaPage from "./pages/rh/OrganogramaPage";
+import TreinamentosPage from "./pages/rh/TreinamentosPage";
+import PoliticasPage from "./pages/rh/PoliticasPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -102,7 +107,12 @@ const App = () => (
               <Route path="/financeiro" element={<RoleGuard roles={["financeiro", "gg"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["financeiro"]}><ContasPagarPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg"]}><ContasReceberPage /></RoleGuard>} />
-              <Route path="/rh" element={<EmBreve />} />
+              <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
+              <Route path="/rh/turnover" element={<TurnoverPage />} />
+              <Route path="/rh/calendario" element={<CalendarioPage />} />
+              <Route path="/rh/organograma" element={<OrganogramaPage />} />
+              <Route path="/rh/treinamentos" element={<TreinamentosPage />} />
+              <Route path="/rh/politicas" element={<PoliticasPage />} />
               <Route path="/controladoria" element={<EmBreve />} />
               <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria"]}><ConciliacaoPage /></RoleGuard>} />
 

@@ -13,6 +13,9 @@ import { useClosings } from "@/hooks/useClosings";
 import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
+import { useRhCalendarDates } from "@/hooks/useRh";
+import { CalendarDays } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 interface TodoItem {
   dot: "red" | "amber" | "blue" | "green";
@@ -141,6 +144,24 @@ export default function HomePage() {
   );
   const { data: ofEntries = [] } = useOpenFolioEntries();
   const { data: pendingNotifs = 0 } = usePendingNotificationCount();
+  const { data: calendarDates = [] } = useRhCalendarDates();
+
+  const upcomingDates = useMemo(() => {
+    const now = new Date();
+    const todayKey = (now.getMonth() + 1) * 100 + now.getDate();
+    const list: { title: string; key: number; daysAhead: number }[] = [];
+    for (const d of calendarDates) {
+      const mm = d.date_month;
+      const dd = d.date_day;
+      if (!mm || !dd) continue;
+      const key = mm * 100 + dd;
+      const year = key < todayKey ? now.getFullYear() + 1 : now.getFullYear();
+      const dt = new Date(year, mm - 1, dd);
+      const diff = Math.round((dt.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      if (diff >= 0 && diff <= 7) list.push({ title: d.title, key, daysAhead: diff });
+    }
+    return list.sort((a, b) => a.daysAhead - b.daysAhead);
+  }, [calendarDates]);
 
   const closingStats = useMemo(() => {
     let returned = 0, waitingGop = 0, waitingMe = 0, waitingFernando = 0, waitingFernandoCarta = 0;
@@ -345,6 +366,32 @@ export default function HomePage() {
           <TodoList items={todoItems} />
         </Card>
       </div>
+
+      {upcomingDates.length > 0 && (
+        <NavLink
+          to="/rh/calendario"
+          className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:border-accent hover:shadow-soft transition-all"
+        >
+          <div className="h-8 w-8 rounded-md bg-accent/10 text-accent flex items-center justify-center shrink-0">
+            <CalendarDays className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Próximas datas comemorativas
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {upcomingDates.map((d) => (
+                <span key={d.key + d.title} className="text-xs px-2 py-1 rounded bg-muted text-foreground">
+                  <span className="font-semibold mr-1">
+                    {d.daysAhead === 0 ? "hoje" : `${d.daysAhead}d`}
+                  </span>
+                  {d.title}
+                </span>
+              ))}
+            </div>
+          </div>
+        </NavLink>
+      )}
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
