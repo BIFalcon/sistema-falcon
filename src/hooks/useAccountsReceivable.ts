@@ -25,6 +25,9 @@ export interface ToInvoiceEntry {
   gg_note: string | null;
   gg_confirmed_by: string | null;
   gg_confirmed_at: string | null;
+  paid_date: string | null;
+  paid_note: string | null;
+  estimated_due_date: string | null;
 }
 
 export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
@@ -33,7 +36,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
@@ -118,18 +121,60 @@ export function useSetToInvoiceGgStatus() {
       id: string;
       gg_status: "pendente" | "faturado" | "nao_faturado";
       gg_note?: string | null;
+      paid_date?: string | null;
+      paid_note?: string | null;
+      estimated_due_date?: string | null;
     }) => {
       const { error } = await supabase
         .from("ar_to_invoice_entries")
         .update({
           gg_status: input.gg_status,
           gg_note: input.gg_note ?? null,
+          ...(input.paid_date !== undefined ? { paid_date: input.paid_date } : {}),
+          ...(input.paid_note !== undefined ? { paid_note: input.paid_note } : {}),
+          ...(input.estimated_due_date !== undefined ? { estimated_due_date: input.estimated_due_date } : {}),
         })
         .eq("id", input.id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+    },
+  });
+}
+
+/* Desfazer upload AR (deleta o upload e as linhas dependentes) */
+export function useDeleteArUpload() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { uploadId: string; kind: "to_invoice" | "open_folio" }) => {
+      const table = input.kind === "to_invoice" ? "ar_to_invoice_entries" : "ar_open_folio_entries";
+      // Remove linhas dependentes (não há FK cascade no schema)
+      await supabase.from(table).delete().eq("upload_id", input.uploadId);
+      const { error } = await supabase.from("ar_uploads").delete().eq("id", input.uploadId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+      qc.invalidateQueries({ queryKey: ["ar-open-folio"] });
+      qc.invalidateQueries({ queryKey: ["ar-latest-upload", v.kind] });
+    },
+  });
+}
+
+/* Lista uploads AR de um kind (para calcular "dias pendente" do Faturamento) */
+export function useArUploadsByKind(kind: "to_invoice" | "open_folio") {
+  return useQuery({
+    queryKey: ["ar-uploads-by-kind", kind],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ar_uploads")
+        .select("id,uploaded_at")
+        .eq("kind", kind)
+        .order("uploaded_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as { id: string; uploaded_at: string }[];
     },
   });
 }

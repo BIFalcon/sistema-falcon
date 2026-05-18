@@ -42,7 +42,8 @@ import {
   useAllOpenFolioNotes,
   useUpsertOpenFolioNote,
   useSetToInvoiceGgStatus,
-  useNotifyGgToInvoice,
+  useDeleteArUpload,
+  useArUploadsByKind,
   findContractTerm,
   addDays,
   type ToInvoiceEntry,
@@ -122,6 +123,56 @@ function exportOpenFolioToExcel(
   toast.success(`${rows.length} folio(s) exportados`);
 }
 
+/* ──────────────── Export Faturamento para Excel ──────────────── */
+function exportToInvoiceToExcel(
+  entries: ToInvoiceEntry[],
+  hotelName: (id: string | null) => string,
+  contracts: ClientContract[] | undefined,
+) {
+  if (!entries.length) {
+    toast.error("Nenhum lançamento para exportar");
+    return;
+  }
+  const fmt = (iso: string | null | undefined) =>
+    iso ? format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "";
+  const rows = entries.map((e) => {
+    const term = findContractTerm(contracts, e.account_number, e.account_name);
+    const estimated =
+      e.estimated_due_date ??
+      (e.gg_confirmed_at && term != null
+        ? addDays(e.gg_confirmed_at.slice(0, 10), term)
+        : null);
+    const statusLabel =
+      e.gg_status === "faturado" ? "Faturado"
+      : e.gg_status === "nao_faturado" ? "Não faturado"
+      : "Pendente";
+    return {
+      "Hotel": hotelName(e.hotel_id),
+      "Hóspede": e.account_name ?? "",
+      "Valor": Number(e.amount ?? 0),
+      "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
+      "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
+        ? format(new Date(e.gg_confirmed_at), "dd/MM/yyyy", { locale: ptBR })
+        : "",
+      "Pago?": e.paid_date ? "Sim" : e.paid_note ? "Não" : "",
+      "Data Pagamento": fmt(e.paid_date),
+      "Justificativa": e.paid_note ?? e.gg_note ?? "",
+      "Vencimento Estimado": fmt(estimated),
+      "Status": statusLabel,
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 28 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+    { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 18 }, { wch: 14 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
+  const stamp = format(new Date(), "yyyyMMdd_HHmm");
+  XLSX.writeFile(wb, `faturamento_${stamp}.xlsx`);
+  toast.success(`${rows.length} linha(s) exportadas`);
+}
+
 export default function ContasReceberPage() {
   const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora, isFernando } = useAuth();
   const isManager = !isFernando && (isMaster || hasRole("financeiro"));
@@ -147,7 +198,7 @@ export default function ContasReceberPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList>
-          <TabsTrigger value="to_invoice">A Faturar</TabsTrigger>
+          <TabsTrigger value="to_invoice">Faturamento</TabsTrigger>
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
@@ -209,7 +260,21 @@ function ToInvoiceSection({
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
   const { data: contracts } = useClientContracts(hotelId || null);
-  const notifyTi = useNotifyGgToInvoice();
+  const { data: tiUploads = [] } = useArUploadsByKind("to_invoice");
+
+  const uploadDateById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of tiUploads) m.set(u.id, u.uploaded_at);
+    return m;
+  }, [tiUploads]);
+
+  function daysSinceUpload(uploadId: string | null | undefined): number | null {
+    if (!uploadId) return null;
+    const iso = uploadDateById.get(uploadId);
+    if (!iso) return null;
+    const diff = Date.now() - new Date(iso).getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  }
 
   const hotelName = (id: string | null) =>
     id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
@@ -263,29 +328,16 @@ function ToInvoiceSection({
                 <Badge className="ml-2">{pendingCount}</Badge>
               )}
             </Button>
-            {isManager && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={notifyTi.isPending}
-                onClick={async () => {
-                  try {
-                    const res = await notifyTi.mutateAsync({ hotel_id: hotelId || undefined });
-                    if (res?.hotels_notified) {
-                      toast.success(`GG notificado em ${res.hotels_notified} hotel(éis)`);
-                    } else {
-                      toast.warning("Nenhum GG ativo encontrado para notificar");
-                    }
-                  } catch (err: any) {
-                    toast.error(err?.message ?? "Erro ao notificar GG");
-                  }
-                }}
-                className="gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                {notifyTi.isPending ? "Enviando…" : "Notificar GG"}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={filteredToInvoice.length === 0}
+              onClick={() => exportToInvoiceToExcel(filteredToInvoice, hotelName, contracts)}
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar Excel
+            </Button>
             {hotelId && (
               <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" /> Contratos do hotel
@@ -297,7 +349,7 @@ function ToInvoiceSection({
         {isLoading ? (
           <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
         ) : filteredToInvoice.length === 0 ? (
-          <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
+          <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={filteredToInvoice} hotelName={hotelName} />
         ) : drillDay ? (
@@ -306,6 +358,7 @@ function ToInvoiceSection({
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
+            daysSinceUpload={daysSinceUpload}
           />
         ) : drillMonth ? (
           <MonthBreakdown
@@ -444,11 +497,13 @@ function DayBreakdown({
   day,
   contracts,
   onBack,
+  daysSinceUpload,
 }: {
   entries: ToInvoiceEntry[];
   day: string;
   contracts: ClientContract[] | undefined;
   onBack: () => void;
+  daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
 }) {
   const { isMaster, hasRole } = useAuth();
   const canConfirm =
@@ -459,6 +514,7 @@ function DayBreakdown({
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -476,14 +532,26 @@ function DayBreakdown({
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
+              <TableHead className="text-right">Dias pendente</TableHead>
               <TableHead>Confirmação GG</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
-              const due = term != null && e.transaction_date ? addDays(e.transaction_date, term) : null;
+              const dueFromConfirm = term != null && e.gg_confirmed_at
+                ? addDays(e.gg_confirmed_at.slice(0, 10), term)
+                : null;
+              const due = e.estimated_due_date ?? dueFromConfirm
+                ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
               const isEditing = editingId === e.id;
+              const dPending = e.gg_status === "pendente" ? (daysSinceUpload?.(e.upload_id) ?? null) : null;
+              const pendingBadge = dPending == null ? null
+                : dPending >= 60 ? { tone: "bg-red-900 text-white", label: `${dPending} dias` }
+                : dPending >= 30 ? { tone: "bg-destructive text-destructive-foreground", label: `${dPending} dias` }
+                : dPending >= 15 ? { tone: "bg-orange-500 text-white", label: `${dPending} dias` }
+                : dPending >= 7  ? { tone: "bg-amber-400 text-black", label: `${dPending} dias` }
+                : null;
               return (
                 <TableRow key={e.id}>
                   <TableCell>
@@ -495,11 +563,39 @@ function DayBreakdown({
                   <TableCell className="text-right text-xs">
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
                   </TableCell>
-                  <TableCell className="text-xs">{due ? formatDay(due) : "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    {due ? (
+                      <>
+                        {formatDay(due)}
+                        {e.gg_status === "faturado" && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">(Vence em)</span>
+                        )}
+                      </>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {pendingBadge ? (
+                      <Badge className={`text-[10px] ${pendingBadge.tone}`}>{pendingBadge.label}</Badge>
+                    ) : dPending != null ? (
+                      <span className="text-muted-foreground">{dPending}d</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs space-y-1 min-w-[220px]">
                     <GgStatusBadge status={e.gg_status} />
                     {e.gg_note && (
                       <div className="text-[11px] text-muted-foreground italic">"{e.gg_note}"</div>
+                    )}
+                    {e.paid_date && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                        Pago em {formatDay(e.paid_date)}
+                      </div>
+                    )}
+                    {e.paid_note && !e.paid_date && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400 italic">
+                        Não pago: "{e.paid_note}"
+                      </div>
                     )}
                     {canConfirm && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
@@ -507,7 +603,18 @@ function DayBreakdown({
                           size="sm"
                           variant={e.gg_status === "faturado" ? "default" : "outline"}
                           className="h-6 px-2 text-[11px]"
-                          onClick={() => setStatus.mutate({ id: e.id, gg_status: "faturado", gg_note: e.gg_note })}
+                          onClick={() => {
+                            const nowIso = new Date().toISOString();
+                            const estimated = term != null
+                              ? addDays(nowIso.slice(0, 10), term)
+                              : null;
+                            setStatus.mutate({
+                              id: e.id,
+                              gg_status: "faturado",
+                              gg_note: e.gg_note,
+                              estimated_due_date: estimated,
+                            });
+                          }}
                         >
                           Faturado
                         </Button>
@@ -521,6 +628,14 @@ function DayBreakdown({
                           }}
                         >
                           Não faturado
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={e.paid_date || e.paid_note ? "default" : "outline"}
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => setPayFor(e)}
+                        >
+                          Pago
                         </Button>
                       </div>
                     )}
@@ -565,7 +680,109 @@ function DayBreakdown({
           </TableBody>
         </Table>
       </div>
+      <PaymentDialog
+        entry={payFor}
+        onClose={() => setPayFor(null)}
+        onSave={async (paid, dateOrNote) => {
+          if (!payFor) return;
+          await setStatus.mutateAsync({
+            id: payFor.id,
+            gg_status: payFor.gg_status,
+            gg_note: payFor.gg_note,
+            paid_date: paid ? dateOrNote : null,
+            paid_note: paid ? null : dateOrNote,
+          });
+          setPayFor(null);
+          toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
+        }}
+      />
     </div>
+  );
+}
+
+function PaymentDialog({
+  entry,
+  onClose,
+  onSave,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onSave: (paid: boolean, dateOrNote: string) => Promise<void>;
+}) {
+  const [paidChoice, setPaidChoice] = useState<"yes" | "no" | null>(null);
+  const [paidDate, setPaidDate] = useState("");
+  const [reason, setReason] = useState("");
+  useEffect(() => {
+    if (entry) {
+      setPaidChoice(entry.paid_date ? "yes" : entry.paid_note ? "no" : null);
+      setPaidDate(entry.paid_date ?? "");
+      setReason(entry.paid_note ?? "");
+    }
+  }, [entry]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Foi pago?</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Button
+              variant={paidChoice === "yes" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPaidChoice("yes")}
+            >
+              Sim
+            </Button>
+            <Button
+              variant={paidChoice === "no" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPaidChoice("no")}
+            >
+              Não
+            </Button>
+          </div>
+          {paidChoice === "yes" && (
+            <div>
+              <Label className="text-xs">Data do pagamento</Label>
+              <input
+                type="date"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          {paidChoice === "no" && (
+            <div>
+              <Label className="text-xs">Justificativa</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Por que ainda não foi pago?"
+                rows={3}
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={
+              !paidChoice ||
+              (paidChoice === "yes" && !paidDate) ||
+              (paidChoice === "no" && !reason.trim())
+            }
+            onClick={() => onSave(paidChoice === "yes", paidChoice === "yes" ? paidDate : reason.trim())}
+          >
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1339,6 +1556,7 @@ function UploadCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const upload = useUploadArReport();
+  const deleteUpload = useDeleteArUpload();
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -1347,11 +1565,52 @@ function UploadCard({
     try {
       const res = await upload.mutateAsync({ file: f, kind });
       const unmapped = (res?.unmapped_properties ?? []) as string[];
+      let undone = false;
+      const baseMsg = `${res.entries} linha(s) processadas`;
       if (unmapped.length) {
-        toast.warning(`${res.entries} linha(s) processadas. ${unmapped.length} hotel(éis) não mapeado(s) — configure em Hotéis.`, { duration: 8000 });
+        toast.warning(`${baseMsg}. ${unmapped.length} hotel(éis) não mapeado(s) — configure em Hotéis.`, {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              undone = true;
+              try {
+                await deleteUpload.mutateAsync({ uploadId: res.upload_id, kind });
+                toast.success("Upload revertido.");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao reverter");
+              }
+            },
+          },
+        });
       } else {
-        toast.success(`${res.entries} linha(s) processadas`);
+        toast.success(baseMsg, {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              undone = true;
+              try {
+                await deleteUpload.mutateAsync({ uploadId: res.upload_id, kind });
+                toast.success("Upload revertido.");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao reverter");
+              }
+            },
+          },
+        });
       }
+      // Notificação automática ao GG (somente se não desfeito após 8s)
+      setTimeout(async () => {
+        if (undone) return;
+        const fn = kind === "to_invoice" ? "notify-gg-to-invoice" : "notify-gg-open-folio";
+        try {
+          await supabase.functions.invoke(fn, { body: { upload_id: res.upload_id } });
+        } catch (err) {
+          // silencioso: notificação automática é best-effort
+          console.warn(`[${fn}] falha:`, err);
+        }
+      }, 8500);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro no upload");
     } finally {
@@ -1368,7 +1627,7 @@ function UploadCard({
         <div className="flex-1 min-w-[240px]">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4 text-accent" />
-            {kind === "to_invoice" ? "Importar relatório A Faturar" : "Importar relatório Open Folio"}
+            {kind === "to_invoice" ? "Importar relatório Faturamento" : "Importar relatório Open Folio"}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {kind === "to_invoice"

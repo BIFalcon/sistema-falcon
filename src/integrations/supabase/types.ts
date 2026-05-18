@@ -613,6 +613,7 @@ export type Database = {
           created_at: string
           departure_date: string | null
           entry_key: string
+          estimated_due_date: string | null
           gg_confirmed_at: string | null
           gg_confirmed_by: string | null
           gg_note: string | null
@@ -623,6 +624,8 @@ export type Database = {
           invoice_status: string | null
           original_amount: number | null
           paid: number | null
+          paid_date: string | null
+          paid_note: string | null
           property_name_raw: string
           raw: Json
           reservation_status: string | null
@@ -639,6 +642,7 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           entry_key: string
+          estimated_due_date?: string | null
           gg_confirmed_at?: string | null
           gg_confirmed_by?: string | null
           gg_note?: string | null
@@ -649,6 +653,8 @@ export type Database = {
           invoice_status?: string | null
           original_amount?: number | null
           paid?: number | null
+          paid_date?: string | null
+          paid_note?: string | null
           property_name_raw: string
           raw?: Json
           reservation_status?: string | null
@@ -665,6 +671,7 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           entry_key?: string
+          estimated_due_date?: string | null
           gg_confirmed_at?: string | null
           gg_confirmed_by?: string | null
           gg_note?: string | null
@@ -675,6 +682,8 @@ export type Database = {
           invoice_status?: string | null
           original_amount?: number | null
           paid?: number | null
+          paid_date?: string | null
+          paid_note?: string | null
           property_name_raw?: string
           raw?: Json
           reservation_status?: string | null
