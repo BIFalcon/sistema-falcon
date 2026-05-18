@@ -125,6 +125,8 @@ export default function ContasPagarPage() {
   const [hideTrivial, setHideTrivial] = useState(true);
   const [groupNd, setGroupNd] = useState(true);
   const [searchText, setSearchText] = useState<string>("");
+  const [scheduledFrom, setScheduledFrom] = useState<string>("");
+  const [scheduledTo, setScheduledTo] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -152,6 +154,8 @@ export default function ContasPagarPage() {
     searchText,
     dateFrom,
     dateTo,
+    scheduledFrom,
+    scheduledTo,
   });
 
   const {
@@ -685,6 +689,32 @@ export default function ContasPagarPage() {
 
             {/* Toggles */}
             <div className="flex flex-wrap items-center gap-4 text-xs">
+              <label className="flex items-center gap-2">
+                <span className="text-muted-foreground">Agendado de</span>
+                <Input
+                  type="date"
+                  className="h-7 w-[140px] text-xs"
+                  value={scheduledFrom}
+                  onChange={(e) => setScheduledFrom(e.target.value)}
+                />
+                <span className="text-muted-foreground">até</span>
+                <Input
+                  type="date"
+                  className="h-7 w-[140px] text-xs"
+                  value={scheduledTo}
+                  onChange={(e) => setScheduledTo(e.target.value)}
+                />
+                {(scheduledFrom || scheduledTo) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => { setScheduledFrom(""); setScheduledTo(""); }}
+                  >
+                    Limpar
+                  </Button>
+                )}
+              </label>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <Checkbox checked={hideTrivial} onCheckedChange={(c) => setHideTrivial(!!c)} />
                 Ocultar lançamentos abaixo de R$ 1,00

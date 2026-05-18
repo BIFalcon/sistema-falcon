@@ -67,6 +67,8 @@ export function useApPageDerived(opts: {
   searchText?: string;
   dateFrom?: string;
   dateTo?: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
 }): ApPageDerived {
   const {
     allEntriesRaw,
@@ -83,6 +85,8 @@ export function useApPageDerived(opts: {
     searchText,
     dateFrom,
     dateTo,
+    scheduledFrom,
+    scheduledTo,
   } = opts;
 
   // ── Separação base ─────────────────────────────────────────────────────
@@ -196,6 +200,11 @@ export function useApPageDerived(opts: {
         if (status === "payment_pago" && e.payment_status !== "pago") return false;
         if (category !== "all" && e.category !== category) return false;
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
+        if (scheduledFrom || scheduledTo) {
+          if (!e.scheduled_date) return false;
+          if (scheduledFrom && e.scheduled_date < scheduledFrom) return false;
+          if (scheduledTo && e.scheduled_date > scheduledTo) return false;
+        }
         if (searchText && searchText.trim()) {
           const q = searchText.toLowerCase().trim();
           if (
@@ -207,7 +216,7 @@ export function useApPageDerived(opts: {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText],
+    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo],
   );
 
   // ── Agrupamento N/D ────────────────────────────────────────────────────
