@@ -7,7 +7,7 @@
  */
 import { useMemo } from "react";
 import type { ApDocument, ApEntry, FinancialSystem } from "@/hooks/useAccountsPayable";
-import { isWithinPeriod, type Period, type StatusFilter } from "@/lib/apPeriodFilter";
+import { isWithinPeriod, type Period } from "@/lib/apPeriodFilter";
 import { type IssueCategory } from "@/lib/apIssueCategories";
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
@@ -58,8 +58,8 @@ export function useApPageDerived(opts: {
   balance: { amount: number } | null | undefined;
   sourceSystem: FinancialSystem | null;
   period: Period;
-  status: StatusFilter;
-  category: string;
+  selectedStatuses: string[];
+  selectedCategories: string[];
   hideTrivial: boolean;
   groupNd: boolean;
   showApproval: boolean;
@@ -76,8 +76,8 @@ export function useApPageDerived(opts: {
     documents,
     balance,
     period,
-    status,
-    category,
+    selectedStatuses,
+    selectedCategories,
     hideTrivial,
     groupNd,
     showApproval,
@@ -194,13 +194,16 @@ export function useApPageDerived(opts: {
     () =>
       entries.filter((e) => {
         if (!isWithinPeriod(e.due_date, period)) return false;
-        if (status === "issues") {
-          if (e.gg_approval === "approved") return false;
+        if (selectedStatuses.length > 0) {
+          const ok = selectedStatuses.some((s) => {
+            if (s === "issues") return e.gg_approval !== "approved";
+            return e.payment_status === s;
+          });
+          if (!ok) return false;
         }
-        if (status === "payment_pendente" && e.payment_status !== "em_aprovacao") return false;
-        if (status === "payment_agendado" && e.payment_status !== "agendado") return false;
-        if (status === "payment_pago" && e.payment_status !== "pago") return false;
-        if (category !== "all" && e.category !== category) return false;
+        if (selectedCategories.length > 0) {
+          if (!e.category || !selectedCategories.includes(e.category)) return false;
+        }
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
         // Filtro de vencimento (também afeta a tabela)
         if (specificDates && specificDates.length > 0) {
@@ -225,7 +228,7 @@ export function useApPageDerived(opts: {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo, specificDates],
+    [entries, period, selectedStatuses, selectedCategories, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo, specificDates],
   );
 
   // ── Agrupamento N/D ────────────────────────────────────────────────────
