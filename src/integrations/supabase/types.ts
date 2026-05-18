@@ -1238,6 +1238,7 @@ export type Database = {
           id: string
           name: string
           opera_property_name: string | null
+          show_in_closing: boolean
         }
         Insert: {
           active?: boolean
@@ -1252,6 +1253,7 @@ export type Database = {
           id: string
           name: string
           opera_property_name?: string | null
+          show_in_closing?: boolean
         }
         Update: {
           active?: boolean
@@ -1266,6 +1268,7 @@ export type Database = {
           id?: string
           name?: string
           opera_property_name?: string | null
+          show_in_closing?: boolean
         }
         Relationships: []
       }
