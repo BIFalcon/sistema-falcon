@@ -28,8 +28,10 @@ export function ClosingTable({ hotelId, month, year }: Props) {
   const ensure = useEnsureClosing();
   const { data: closings = [], isLoading } = useClosings({ hotelId, month, year });
 
-  // Constrói linhas: para cada hotel permitido, exibir o closing existente OU placeholder
-  const visibleHotels = hotelId ? allowedHotels.filter((h) => h.id === hotelId) : allowedHotels;
+  // Constrói linhas: para cada hotel permitido (e que aparece no fechamento),
+  // exibir o closing existente OU placeholder.
+  const closingHotels = allowedHotels.filter((h) => h.show_in_closing !== false);
+  const visibleHotels = hotelId ? closingHotels.filter((h) => h.id === hotelId) : closingHotels;
   const byHotel = new Map(closings.map((c) => [c.hotel_id, c]));
 
   async function startClosing(hid: string) {

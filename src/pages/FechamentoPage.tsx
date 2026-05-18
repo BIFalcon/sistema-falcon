@@ -12,6 +12,11 @@ export default function Index() {
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { data: closings = [] } = useClosings({ hotelId, month, year });
 
+  const closingHotels = useMemo(
+    () => allowedHotels.filter((h) => h.show_in_closing !== false),
+    [allowedHotels],
+  );
+
   const stats = useMemo(() => {
     let approved = 0;
     let inProgress = 0;
@@ -30,8 +35,8 @@ export default function Index() {
       else if (anyStarted) inProgress++;
       else pending++;
     }
-    return { approved, inProgress, pending, returned, total: closings.length || allowedHotels.length };
-  }, [closings, allowedHotels.length]);
+    return { approved, inProgress, pending, returned, total: closings.length || closingHotels.length };
+  }, [closings, closingHotels.length]);
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -42,7 +47,7 @@ export default function Index() {
         <h1 className="text-2xl font-semibold">Fechamento</h1>
         <p className="text-sm text-muted-foreground">
           {MONTHS_PT[month - 1]} de {year} ·{" "}
-          {isMaster ? "Visão Master" : `${allowedHotels.length} ${allowedHotels.length === 1 ? "hotel acessível" : "hotéis acessíveis"}`}
+          {isMaster ? "Visão Master" : `${closingHotels.length} ${closingHotels.length === 1 ? "hotel acessível" : "hotéis acessíveis"}`}
         </p>
       </div>
 

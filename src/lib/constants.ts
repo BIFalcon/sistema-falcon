@@ -35,6 +35,7 @@ export interface Hotel {
   name: string;
   brand: string;
   active: boolean;
+  show_in_closing?: boolean;
 }
 
 // ====== Workflow de Fechamento ======
