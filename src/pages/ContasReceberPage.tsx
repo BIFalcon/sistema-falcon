@@ -105,7 +105,7 @@ function exportOpenFolioToExcel(
       "Departure Date": fmt(e.departure_date),
       "Tempo em aberto (dias)": e.days_open ?? 0,
       "Justificativa GG": last?.note ?? "",
-      "Data prevista de pagamento": fmt(expected),
+      "Data prevista de faturamento": fmt(expected),
       "Data da última atualização": fmtDateTime(lastUpdate),
     };
   });
@@ -1358,7 +1358,7 @@ function NoteDialog({
             rows={4}
           />
           <div>
-            <Label className="text-xs">Data prevista de pagamento (opcional)</Label>
+            <Label className="text-xs">Data prevista de faturamento (opcional)</Label>
             <input
               type="date"
               value={expectedDate}
