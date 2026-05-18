@@ -27,6 +27,13 @@ type ParsedEntry = {
   raw: Record<string, any>;
 };
 
+type SkippedCounters = {
+  other_bank: number;
+  no_amount: number;
+  no_supplier: number;
+  duplicate_entry: number;
+};
+
 function normalize(s: any): string {
   return String(s ?? "").trim();
 }
@@ -94,6 +101,10 @@ function makeLookupKey(supplier: string, doc: string | null): string {
   const sup = toAscii(supplier).replace(/\s+/g, " ").trim();
   const docNorm = (doc ?? "").toString().trim();
   return `${sup}|${docNorm}`.slice(0, 240);
+}
+
+function emptySkipped(): SkippedCounters {
+  return { other_bank: 0, no_amount: 0, no_supplier: 0, duplicate_entry: 0 };
 }
 
 function isDistributionEntry(category: string | null, description: string | null): boolean {
