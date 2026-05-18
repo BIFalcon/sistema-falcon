@@ -992,6 +992,7 @@ export default function ContasPagarPage() {
                         />
                       </TableHead>
                     )}
+                    {showingAllHotels && <TableHead>Hotel</TableHead>}
                     <TableHead>Fornecedor</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
@@ -1011,12 +1012,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0)}
+                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -1028,12 +1029,14 @@ export default function ContasPagarPage() {
                         const colSpan =
                           (showApproval ? 11 : 10) +
                           (sourceSystem === "omie" ? 2 : 0) +
-                          ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0);
+                          ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) +
+                          (showingAllHotels ? 1 : 0);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
                             {(canMarkInsertedAgendado || canMarkPaid) && (
                               <TableCell />
                             )}
+                            {showingAllHotels && <TableCell />}
                             <TableCell className="font-medium">
                               {row.supplier}{" "}
                               <span className="text-muted-foreground font-normal">
@@ -1080,6 +1083,7 @@ export default function ContasPagarPage() {
                           showBank={sourceSystem === "omie"}
                           canEditObservation={canManage}
                           canManageCategory={canManage}
+                          hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
                         />
                       );
                     })
