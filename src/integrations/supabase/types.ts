@@ -189,11 +189,13 @@ export type Database = {
           gg_approval_at: string | null
           gg_approval_by: string | null
           gg_approval_notes: string | null
+          grouped_ids: string[] | null
           hotel_cnpj: string | null
           hotel_id: string
           id: string
           interest_fees: number | null
           is_distribution: boolean
+          is_group: boolean
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
@@ -229,11 +231,13 @@ export type Database = {
           gg_approval_at?: string | null
           gg_approval_by?: string | null
           gg_approval_notes?: string | null
+          grouped_ids?: string[] | null
           hotel_cnpj?: string | null
           hotel_id: string
           id?: string
           interest_fees?: number | null
           is_distribution?: boolean
+          is_group?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
@@ -269,11 +273,13 @@ export type Database = {
           gg_approval_at?: string | null
           gg_approval_by?: string | null
           gg_approval_notes?: string | null
+          grouped_ids?: string[] | null
           hotel_cnpj?: string | null
           hotel_id?: string
           id?: string
           interest_fees?: number | null
           is_distribution?: boolean
+          is_group?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
