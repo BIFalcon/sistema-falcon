@@ -124,6 +124,56 @@ function exportOpenFolioToExcel(
   toast.success(`${rows.length} folio(s) exportados`);
 }
 
+/* ──────────────── Export Faturamento para Excel ──────────────── */
+function exportToInvoiceToExcel(
+  entries: ToInvoiceEntry[],
+  hotelName: (id: string | null) => string,
+  contracts: ClientContract[] | undefined,
+) {
+  if (!entries.length) {
+    toast.error("Nenhum lançamento para exportar");
+    return;
+  }
+  const fmt = (iso: string | null | undefined) =>
+    iso ? format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "";
+  const rows = entries.map((e) => {
+    const term = findContractTerm(contracts, e.account_number, e.account_name);
+    const estimated =
+      e.estimated_due_date ??
+      (e.gg_confirmed_at && term != null
+        ? addDays(e.gg_confirmed_at.slice(0, 10), term)
+        : null);
+    const statusLabel =
+      e.gg_status === "faturado" ? "Faturado"
+      : e.gg_status === "nao_faturado" ? "Não faturado"
+      : "Pendente";
+    return {
+      "Hotel": hotelName(e.hotel_id),
+      "Hóspede": e.account_name ?? "",
+      "Valor": Number(e.amount ?? 0),
+      "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
+      "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
+        ? format(new Date(e.gg_confirmed_at), "dd/MM/yyyy", { locale: ptBR })
+        : "",
+      "Pago?": e.paid_date ? "Sim" : e.paid_note ? "Não" : "",
+      "Data Pagamento": fmt(e.paid_date),
+      "Justificativa": e.paid_note ?? e.gg_note ?? "",
+      "Vencimento Estimado": fmt(estimated),
+      "Status": statusLabel,
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 28 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+    { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 18 }, { wch: 14 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
+  const stamp = format(new Date(), "yyyyMMdd_HHmm");
+  XLSX.writeFile(wb, `faturamento_${stamp}.xlsx`);
+  toast.success(`${rows.length} linha(s) exportadas`);
+}
+
 export default function ContasReceberPage() {
   const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora, isFernando } = useAuth();
   const isManager = !isFernando && (isMaster || hasRole("financeiro"));
