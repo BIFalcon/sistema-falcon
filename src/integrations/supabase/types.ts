@@ -1902,6 +1902,7 @@ export type Database = {
         | "carta_returned"
         | "ap_pendencies_to_gg"
         | "open_folio_pendencies_to_gg"
+        | "open_folio_overdue"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -2084,6 +2085,7 @@ export const Constants = {
         "carta_returned",
         "ap_pendencies_to_gg",
         "open_folio_pendencies_to_gg",
+        "open_folio_overdue",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],

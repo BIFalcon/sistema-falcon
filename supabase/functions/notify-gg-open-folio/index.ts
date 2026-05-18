@@ -23,13 +23,34 @@ Deno.serve(async (req) => {
     const uploadId: string | undefined = body?.upload_id;
     const targetHotelId: string | undefined = body?.hotel_id;
 
+    // Busca folios SEM justificativa (confirmation_numbers sem nota)
+    const { data: justifiedNums } = await admin
+      .from("ar_open_folio_notes")
+      .select("confirmation_number, hotel_id");
+    const justifiedSet = new Set(
+      (justifiedNums ?? []).map((n: any) => `${n.hotel_id}|${n.confirmation_number}`)
+    );
+
     // Agrega folios em aberto por hotel
     let q = admin
       .from("ar_open_folio_entries")
-      .select("hotel_id, balance");
+      .select("hotel_id, balance, confirmation_number")
+      .is("archived_at", null);
     if (targetHotelId) q = q.eq("hotel_id", targetHotelId);
-    const { data: entries, error } = await q;
+    const { data: allEntries, error } = await q;
     if (error) throw error;
+
+    // Filtra apenas os SEM justificativa
+    const entries = (allEntries ?? []).filter((e: any) =>
+      !justifiedSet.has(`${e.hotel_id}|${e.confirmation_number}`)
+    );
+
+    if (!entries.length) {
+      return new Response(
+        JSON.stringify({ ok: true, message: "Todos os folios já estão justificados" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const grouped = new Map<string, { count: number; total: number }>();
     for (const e of entries ?? []) {
@@ -76,6 +97,68 @@ Deno.serve(async (req) => {
         _payload: { upload_id: uploadId, count: info.count, total: info.total },
       });
       total++;
+    }
+
+    // Verifica folios com justificativa mas ainda abertos há 30+ dias
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { data: oldJustified } = await admin
+      .from("ar_open_folio_notes")
+      .select("confirmation_number, hotel_id, created_at")
+      .lt("created_at", thirtyDaysAgo.toISOString());
+
+    for (const note of oldJustified ?? []) {
+      // Verifica se o folio ainda está em aberto
+      const { data: stillOpen } = await admin
+        .from("ar_open_folio_entries")
+        .select("id, balance, first_name, last_name")
+        .eq("hotel_id", note.hotel_id)
+        .eq("confirmation_number", note.confirmation_number)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (!stillOpen) continue;
+
+      const hotelName = hotelMap.get(note.hotel_id) ?? note.hotel_id;
+
+      // Notifica GG
+      const { data: ggs } = await admin.rpc("users_with_role_for_hotel", {
+        _role: "gg", _hotel_id: note.hotel_id,
+      });
+      const ggRecipients = (ggs ?? [])
+        .filter((g: any) => g.user_id && g.email)
+        .map((g: any) => ({ user_id: g.user_id, email: g.email, role: "gg" }));
+
+      // Notifica Financeiro
+      const { data: fins } = await admin.rpc("users_with_role_global", {
+        _role: "financeiro",
+      });
+      const finRecipients = (fins ?? [])
+        .filter((f: any) => f.user_id && f.email)
+        .map((f: any) => ({ user_id: f.user_id, email: f.email, role: "financeiro" }));
+
+      const recipients = [...ggRecipients, ...finRecipients];
+      if (!recipients.length) continue;
+
+      const subject = `[${hotelName}] Folio em aberto há mais de 30 dias — ${stillOpen.first_name} ${stillOpen.last_name}`;
+      const body = `O folio de **${stillOpen.first_name} ${stillOpen.last_name}** (${note.confirmation_number}) ` +
+        `em **${hotelName}** está justificado mas continua em aberto há mais de 30 dias.\n\n` +
+        `**Valor em aberto:** ${brl(Number(stillOpen.balance))}\n\n` +
+        `Por favor, verifique e tome as providências necessárias.\n\n` +
+        `[Ver Open Folio](/financeiro/contas-receber)`;
+
+      await admin.from("notification_queue").insert(
+        recipients.map((r: any) => ({
+          event: "open_folio_overdue",
+          hotel_id: note.hotel_id,
+          recipient_user_id: r.user_id,
+          recipient_email: r.email,
+          recipient_role: r.role,
+          subject,
+          body_md: body,
+          link_url: "/financeiro/contas-receber",
+          payload: { confirmation_number: note.confirmation_number },
+        }))
+      );
     }
 
     return new Response(JSON.stringify({ ok: true, hotels_notified: total }), {
