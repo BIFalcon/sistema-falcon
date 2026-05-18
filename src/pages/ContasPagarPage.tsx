@@ -567,6 +567,7 @@ export default function ContasPagarPage() {
             </Card>
             </CollapsibleContent>
           </Collapsible>
+          )}
 
           {/* Urgência */}
           <Card className="p-5 shadow-soft">
