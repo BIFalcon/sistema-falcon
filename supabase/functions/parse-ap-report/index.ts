@@ -400,7 +400,7 @@ Deno.serve(async (req) => {
     const lowerName = file.name.toLowerCase();
 
     let parsed: ParsedEntry[] = [];
-    let skipped: { other_bank: number; no_amount: number; no_supplier: number } | null = null;
+    let skipped: SkippedCounters | null = null;
     let myCompanyCnpj: string | null = null;
     let reportBuf: ArrayBuffer = arrayBuf;
     let reportName = file.name;
@@ -567,12 +567,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. inserts em chunks
+    // 4. inserts em chunks — upsert evita falha se já existir a mesma chave
+    // no banco por reenvio/duplo clique/importação concorrente.
     if (inserts.length) {
       const chunkSize = 500;
       for (let i = 0; i < inserts.length; i += chunkSize) {
         const chunk = inserts.slice(i, i + chunkSize);
-        const { error: insErr } = await admin.from("ap_entries").insert(chunk);
+        const { error: insErr } = await admin
+          .from("ap_entries")
+          .upsert(chunk, { onConflict: "hotel_id,entry_key" });
         if (insErr) throw insErr;
       }
     }
