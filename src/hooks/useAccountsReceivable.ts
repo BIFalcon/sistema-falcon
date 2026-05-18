@@ -125,16 +125,15 @@ export function useSetToInvoiceGgStatus() {
       paid_note?: string | null;
       estimated_due_date?: string | null;
     }) => {
-      const patch: Record<string, unknown> = {
-        gg_status: input.gg_status,
-        gg_note: input.gg_note ?? null,
-      };
-      if (input.paid_date !== undefined) patch.paid_date = input.paid_date;
-      if (input.paid_note !== undefined) patch.paid_note = input.paid_note;
-      if (input.estimated_due_date !== undefined) patch.estimated_due_date = input.estimated_due_date;
       const { error } = await supabase
         .from("ar_to_invoice_entries")
-        .update(patch)
+        .update({
+          gg_status: input.gg_status,
+          gg_note: input.gg_note ?? null,
+          ...(input.paid_date !== undefined ? { paid_date: input.paid_date } : {}),
+          ...(input.paid_note !== undefined ? { paid_note: input.paid_note } : {}),
+          ...(input.estimated_due_date !== undefined ? { estimated_due_date: input.estimated_due_date } : {}),
+        })
         .eq("id", input.id);
       if (error) throw error;
     },
