@@ -468,12 +468,31 @@ export default function ContasPagarPage() {
             </div>
           </Card>
 
-          {/* Cartão a receber */}
-          <Card className="p-5 shadow-soft space-y-4">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-accent" />
-              <h3 className="text-sm font-semibold uppercase tracking-wider">Cartão a receber</h3>
+          {/* Cartão a receber — compacto */}
+          <Collapsible>
+            <div className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
+                <CreditCard className="h-3.5 w-3.5 text-accent" />
+                {cardReceivables[0] ? (
+                  <span>
+                    Cartão a receber:{" "}
+                    <strong className="text-foreground">{fmtBRL(Number(cardReceivables[0].amount))}</strong>{" "}
+                    ({fmtDate(cardReceivables[0].date_from)} – {fmtDate(cardReceivables[0].date_to)})
+                  </span>
+                ) : (
+                  <span>Cartão a receber: nenhum registro</span>
+                )}
+              </div>
+              {canManage && (
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+                    Editar <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </CollapsibleTrigger>
+              )}
             </div>
+            <CollapsibleContent>
+            <Card className="p-4 mt-2 shadow-soft space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Valor</label>
@@ -535,7 +554,9 @@ export default function ContasPagarPage() {
                 </div>
               </div>
             )}
-          </Card>
+            </Card>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Urgência */}
           <Card className="p-5 shadow-soft">
