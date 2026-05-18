@@ -105,7 +105,7 @@ function exportOpenFolioToExcel(
       "Departure Date": fmt(e.departure_date),
       "Tempo em aberto (dias)": e.days_open ?? 0,
       "Justificativa GG": last?.note ?? "",
-      "Data prevista de pagamento": fmt(expected),
+      "Data prevista de faturamento": fmt(expected),
       "Data da última atualização": fmtDateTime(lastUpdate),
     };
   });
@@ -1074,18 +1074,7 @@ function OpenFolioSection({
                         média {s.avgDays}d
                       </span>
                     </div>
-                    {isManager && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 shrink-0"
-                        disabled={notifying === s.id}
-                        onClick={() => notifyGgForHotel(s.id, s.name)}
-                      >
-                        {notifying === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-                        Notificar GG
-                      </Button>
-                    )}
+                    {/* Notificação automática após upload — botão manual removido */}
                   </div>
                 );
               })}
@@ -1188,18 +1177,7 @@ function HotelOpenFolioDetail({
               <SelectItem value="old">Acima de 90 dias</SelectItem>
             </SelectContent>
           </Select>
-          {onNotifyGg && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={!!notifying || totalCount === 0}
-              onClick={onNotifyGg}
-            >
-              {notifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Notificar GG
-            </Button>
-          )}
+          {/* Notificação automática após upload — botão manual removido */}
           <Button
             variant="outline"
             size="sm"
@@ -1358,7 +1336,7 @@ function NoteDialog({
             rows={4}
           />
           <div>
-            <Label className="text-xs">Data prevista de pagamento (opcional)</Label>
+            <Label className="text-xs">Data prevista de faturamento (opcional)</Label>
             <input
               type="date"
               value={expectedDate}
