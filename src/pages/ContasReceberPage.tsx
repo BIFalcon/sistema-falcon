@@ -195,6 +195,7 @@ function ToInvoiceSection({
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   // Reset drill quando hotel muda
   useEffect(() => {
@@ -220,6 +221,19 @@ function ToInvoiceSection({
     return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
   }, [entries, seesAllHotels, restrictedHotelIds]);
 
+  const pendingCount = useMemo(
+    () => visibleEntries.filter((e) => e.gg_status === "pendente").length,
+    [visibleEntries],
+  );
+
+  const filteredToInvoice = useMemo(
+    () =>
+      showOnlyPending
+        ? visibleEntries.filter((e) => e.gg_status === "pendente")
+        : visibleEntries,
+    [visibleEntries, showOnlyPending],
+  );
+
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={canImportAr} />
@@ -239,6 +253,16 @@ function ToInvoiceSection({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant={showOnlyPending ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowOnlyPending(!showOnlyPending)}
+            >
+              {showOnlyPending ? "Ver todos" : "Ver apenas pendentes"}
+              {!showOnlyPending && pendingCount > 0 && (
+                <Badge className="ml-2">{pendingCount}</Badge>
+              )}
+            </Button>
             {isManager && (
               <Button
                 variant="outline"
@@ -272,26 +296,26 @@ function ToInvoiceSection({
 
         {isLoading ? (
           <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
-        ) : visibleEntries.length === 0 ? (
+        ) : filteredToInvoice.length === 0 ? (
           <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
         ) : !hotelId ? (
-          <ConsolidatedRanking entries={visibleEntries} hotelName={hotelName} />
+          <ConsolidatedRanking entries={filteredToInvoice} hotelName={hotelName} />
         ) : drillDay ? (
           <DayBreakdown
-            entries={visibleEntries.filter((e) => e.transaction_date === drillDay)}
+            entries={filteredToInvoice.filter((e) => e.transaction_date === drillDay)}
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
           />
         ) : drillMonth ? (
           <MonthBreakdown
-            entries={visibleEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
+            entries={filteredToInvoice.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
             month={drillMonth}
             onPickDay={setDrillDay}
             onBack={() => setDrillMonth(null)}
           />
         ) : (
-          <MonthlyOverview entries={visibleEntries} onPickMonth={setDrillMonth} />
+          <MonthlyOverview entries={filteredToInvoice} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
