@@ -89,7 +89,7 @@ export default function ContasPagarPage() {
   const canApproveBase = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
+  const { hotelId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -156,6 +156,7 @@ export default function ContasPagarPage() {
     dateTo,
     scheduledFrom,
     scheduledTo,
+    specificDates,
   });
 
   const {
