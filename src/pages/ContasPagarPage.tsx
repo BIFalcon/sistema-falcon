@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, ShieldCheck, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, ChevronDown, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Search, ShieldCheck, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +27,14 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
@@ -57,7 +65,7 @@ import {
   type FinancialSystem,
 } from "@/hooks/useAccountsPayable";
 import { useApPageDerived } from "@/hooks/useApPageDerived";
-import type { Period, StatusFilter } from "@/lib/apPeriodFilter";
+import type { Period } from "@/lib/apPeriodFilter";
 import { isWithinPeriod } from "@/lib/apPeriodFilter";
 import { fmtBRL, fmtDate, fmtDateTime, handlePasteBRL } from "@/lib/formatters";
 
@@ -120,8 +128,8 @@ export default function ContasPagarPage() {
   const [cardFrom, setCardFrom] = useState("");
   const [cardTo, setCardTo] = useState("");
   const [period, setPeriod] = useState<Period>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [category, setCategory] = useState("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [hideTrivial, setHideTrivial] = useState(true);
   const [groupNd, setGroupNd] = useState(true);
   const [searchText, setSearchText] = useState<string>("");
@@ -145,8 +153,8 @@ export default function ContasPagarPage() {
     balance: balanceItau,
     sourceSystem,
     period,
-    status,
-    category,
+    selectedStatuses,
+    selectedCategories,
     hideTrivial,
     groupNd,
     showApproval,
