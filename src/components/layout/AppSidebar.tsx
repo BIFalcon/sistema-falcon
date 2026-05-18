@@ -19,6 +19,11 @@ import {
   Gauge,
   Home,
   GitCompare,
+  TrendingDown,
+  CalendarDays,
+  Network,
+  GraduationCap,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -86,7 +91,6 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
     items: [
       { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "operacoes", "viewer"] as AppRole[] },
       { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "operacoes", "viewer"] as AppRole[] },
-      { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: Users, soon: true, allowedRoles: ["gop", "gg", "rh", "operacoes", "viewer"] as AppRole[] },
     ],
   },
   {
@@ -113,7 +117,6 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle },
         ],
       },
-      { title: "RH & People", url: "/rh", icon: Users, soon: true, allowedRoles: ["rh"] as AppRole[] },
       {
         title: "Controladoria",
         url: "/controladoria",
@@ -121,6 +124,23 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         allowedRoles: ["controladoria"] as AppRole[],
         children: [
           { title: "Conciliação TOTVS × Opera", url: "/controladoria/conciliacao", icon: GitCompare },
+        ],
+      },
+    ],
+  },
+  {
+    label: "RH",
+    items: [
+      {
+        title: "RH & People",
+        url: "/rh",
+        icon: Users,
+        children: [
+          { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
+          { title: "Calendário", url: "/rh/calendario", icon: CalendarDays },
+          { title: "Organograma", url: "/rh/organograma", icon: Network },
+          { title: "Treinamentos", url: "/rh/treinamentos", icon: GraduationCap },
+          { title: "Políticas", url: "/rh/politicas", icon: FileText },
         ],
       },
     ],
