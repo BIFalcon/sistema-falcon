@@ -498,11 +498,13 @@ function DayBreakdown({
   day,
   contracts,
   onBack,
+  daysSinceUpload,
 }: {
   entries: ToInvoiceEntry[];
   day: string;
   contracts: ClientContract[] | undefined;
   onBack: () => void;
+  daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
 }) {
   const { isMaster, hasRole } = useAuth();
   const canConfirm =
@@ -513,6 +515,7 @@ function DayBreakdown({
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -530,14 +533,26 @@ function DayBreakdown({
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
+              <TableHead className="text-right">Dias pendente</TableHead>
               <TableHead>Confirmação GG</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
-              const due = term != null && e.transaction_date ? addDays(e.transaction_date, term) : null;
+              const dueFromConfirm = term != null && e.gg_confirmed_at
+                ? addDays(e.gg_confirmed_at.slice(0, 10), term)
+                : null;
+              const due = e.estimated_due_date ?? dueFromConfirm
+                ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
               const isEditing = editingId === e.id;
+              const dPending = e.gg_status === "pendente" ? (daysSinceUpload?.(e.upload_id) ?? null) : null;
+              const pendingBadge = dPending == null ? null
+                : dPending >= 60 ? { tone: "bg-red-900 text-white", label: `${dPending} dias` }
+                : dPending >= 30 ? { tone: "bg-destructive text-destructive-foreground", label: `${dPending} dias` }
+                : dPending >= 15 ? { tone: "bg-orange-500 text-white", label: `${dPending} dias` }
+                : dPending >= 7  ? { tone: "bg-amber-400 text-black", label: `${dPending} dias` }
+                : null;
               return (
                 <TableRow key={e.id}>
                   <TableCell>
@@ -549,11 +564,39 @@ function DayBreakdown({
                   <TableCell className="text-right text-xs">
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
                   </TableCell>
-                  <TableCell className="text-xs">{due ? formatDay(due) : "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    {due ? (
+                      <>
+                        {formatDay(due)}
+                        {e.gg_status === "faturado" && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">(Vence em)</span>
+                        )}
+                      </>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {pendingBadge ? (
+                      <Badge className={`text-[10px] ${pendingBadge.tone}`}>{pendingBadge.label}</Badge>
+                    ) : dPending != null ? (
+                      <span className="text-muted-foreground">{dPending}d</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs space-y-1 min-w-[220px]">
                     <GgStatusBadge status={e.gg_status} />
                     {e.gg_note && (
                       <div className="text-[11px] text-muted-foreground italic">"{e.gg_note}"</div>
+                    )}
+                    {e.paid_date && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                        Pago em {formatDay(e.paid_date)}
+                      </div>
+                    )}
+                    {e.paid_note && !e.paid_date && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400 italic">
+                        Não pago: "{e.paid_note}"
+                      </div>
                     )}
                     {canConfirm && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
@@ -561,7 +604,18 @@ function DayBreakdown({
                           size="sm"
                           variant={e.gg_status === "faturado" ? "default" : "outline"}
                           className="h-6 px-2 text-[11px]"
-                          onClick={() => setStatus.mutate({ id: e.id, gg_status: "faturado", gg_note: e.gg_note })}
+                          onClick={() => {
+                            const nowIso = new Date().toISOString();
+                            const estimated = term != null
+                              ? addDays(nowIso.slice(0, 10), term)
+                              : null;
+                            setStatus.mutate({
+                              id: e.id,
+                              gg_status: "faturado",
+                              gg_note: e.gg_note,
+                              estimated_due_date: estimated,
+                            });
+                          }}
                         >
                           Faturado
                         </Button>
@@ -575,6 +629,14 @@ function DayBreakdown({
                           }}
                         >
                           Não faturado
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={e.paid_date || e.paid_note ? "default" : "outline"}
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => setPayFor(e)}
+                        >
+                          Pago
                         </Button>
                       </div>
                     )}
@@ -619,7 +681,109 @@ function DayBreakdown({
           </TableBody>
         </Table>
       </div>
+      <PaymentDialog
+        entry={payFor}
+        onClose={() => setPayFor(null)}
+        onSave={async (paid, dateOrNote) => {
+          if (!payFor) return;
+          await setStatus.mutateAsync({
+            id: payFor.id,
+            gg_status: payFor.gg_status,
+            gg_note: payFor.gg_note,
+            paid_date: paid ? dateOrNote : null,
+            paid_note: paid ? null : dateOrNote,
+          });
+          setPayFor(null);
+          toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
+        }}
+      />
     </div>
+  );
+}
+
+function PaymentDialog({
+  entry,
+  onClose,
+  onSave,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onSave: (paid: boolean, dateOrNote: string) => Promise<void>;
+}) {
+  const [paidChoice, setPaidChoice] = useState<"yes" | "no" | null>(null);
+  const [paidDate, setPaidDate] = useState("");
+  const [reason, setReason] = useState("");
+  useEffect(() => {
+    if (entry) {
+      setPaidChoice(entry.paid_date ? "yes" : entry.paid_note ? "no" : null);
+      setPaidDate(entry.paid_date ?? "");
+      setReason(entry.paid_note ?? "");
+    }
+  }, [entry]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Foi pago?</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Button
+              variant={paidChoice === "yes" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPaidChoice("yes")}
+            >
+              Sim
+            </Button>
+            <Button
+              variant={paidChoice === "no" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPaidChoice("no")}
+            >
+              Não
+            </Button>
+          </div>
+          {paidChoice === "yes" && (
+            <div>
+              <Label className="text-xs">Data do pagamento</Label>
+              <input
+                type="date"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          {paidChoice === "no" && (
+            <div>
+              <Label className="text-xs">Justificativa</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Por que ainda não foi pago?"
+                rows={3}
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={
+              !paidChoice ||
+              (paidChoice === "yes" && !paidDate) ||
+              (paidChoice === "no" && !reason.trim())
+            }
+            onClick={() => onSave(paidChoice === "yes", paidChoice === "yes" ? paidDate : reason.trim())}
+          >
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
