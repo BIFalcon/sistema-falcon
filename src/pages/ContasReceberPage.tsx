@@ -1557,6 +1557,7 @@ function UploadCard({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const upload = useUploadArReport();
+  const deleteUpload = useDeleteArUpload();
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -1565,11 +1566,52 @@ function UploadCard({
     try {
       const res = await upload.mutateAsync({ file: f, kind });
       const unmapped = (res?.unmapped_properties ?? []) as string[];
+      let undone = false;
+      const baseMsg = `${res.entries} linha(s) processadas`;
       if (unmapped.length) {
-        toast.warning(`${res.entries} linha(s) processadas. ${unmapped.length} hotel(éis) não mapeado(s) — configure em Hotéis.`, { duration: 8000 });
+        toast.warning(`${baseMsg}. ${unmapped.length} hotel(éis) não mapeado(s) — configure em Hotéis.`, {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              undone = true;
+              try {
+                await deleteUpload.mutateAsync({ uploadId: res.upload_id, kind });
+                toast.success("Upload revertido.");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao reverter");
+              }
+            },
+          },
+        });
       } else {
-        toast.success(`${res.entries} linha(s) processadas`);
+        toast.success(baseMsg, {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              undone = true;
+              try {
+                await deleteUpload.mutateAsync({ uploadId: res.upload_id, kind });
+                toast.success("Upload revertido.");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao reverter");
+              }
+            },
+          },
+        });
       }
+      // Notificação automática ao GG (somente se não desfeito após 8s)
+      setTimeout(async () => {
+        if (undone) return;
+        const fn = kind === "to_invoice" ? "notify-gg-to-invoice" : "notify-gg-open-folio";
+        try {
+          await supabase.functions.invoke(fn, { body: { upload_id: res.upload_id } });
+        } catch (err) {
+          // silencioso: notificação automática é best-effort
+          console.warn(`[${fn}] falha:`, err);
+        }
+      }, 8500);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro no upload");
     } finally {
@@ -1586,7 +1628,7 @@ function UploadCard({
         <div className="flex-1 min-w-[240px]">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4 text-accent" />
-            {kind === "to_invoice" ? "Importar relatório A Faturar" : "Importar relatório Open Folio"}
+            {kind === "to_invoice" ? "Importar relatório Faturamento" : "Importar relatório Open Folio"}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {kind === "to_invoice"
