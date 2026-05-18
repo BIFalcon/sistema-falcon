@@ -125,6 +125,8 @@ export default function ContasPagarPage() {
   const [hideTrivial, setHideTrivial] = useState(true);
   const [groupNd, setGroupNd] = useState(true);
   const [searchText, setSearchText] = useState<string>("");
+  const [scheduledFrom, setScheduledFrom] = useState<string>("");
+  const [scheduledTo, setScheduledTo] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -152,6 +154,8 @@ export default function ContasPagarPage() {
     searchText,
     dateFrom,
     dateTo,
+    scheduledFrom,
+    scheduledTo,
   });
 
   const {
