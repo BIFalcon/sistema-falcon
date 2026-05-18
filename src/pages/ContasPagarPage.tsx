@@ -340,7 +340,7 @@ export default function ContasPagarPage() {
       ? "Agendado"
       : s === "autorizado"
       ? "Autorizado"
-      : "Em Aprovação";
+      : "Não aprovado pelo GG";
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
