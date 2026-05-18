@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import falconLogo from "@/assets/falcon-logo-white.png";
 
@@ -28,11 +28,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setSubmitting(false);
     if (error) {
-      toast({
-        title: "Falha no acesso",
-        description: "Verifique e-mail e senha.",
-        variant: "destructive",
-      });
+      toast.error("Falha no acesso", { description: "Verifique e-mail e senha." });
     } else {
       navigate("/", { replace: true });
     }
@@ -46,10 +42,9 @@ export default function LoginPage() {
     });
     setSubmitting(false);
     if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast.error("Erro", { description: error.message });
     } else {
-      toast({
-        title: "E-mail enviado",
+      toast.success("E-mail enviado", {
         description: "Verifique sua caixa de entrada para redefinir a senha.",
       });
       setMode("login");
