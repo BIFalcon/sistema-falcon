@@ -10,7 +10,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -31,6 +31,7 @@ interface EntryRowProps {
   issues?: Set<IssueCategory>;
   showBank?: boolean;
   canEditObservation?: boolean;
+  canManageCategory?: boolean;
 }
 
 export function ApEntryRow({
@@ -44,6 +45,7 @@ export function ApEntryRow({
   issues,
   showBank = false,
   canEditObservation = false,
+  canManageCategory = false,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -134,7 +136,18 @@ export function ApEntryRow({
       {/* Categoria — não-compact */}
       {!compact && (
         <TableCell className="text-xs text-muted-foreground hidden lg:table-cell">
-          {entry.category ?? entry.payment_method ?? "—"}
+          <div className="flex items-center gap-1">
+            <span className="truncate">
+              {entry.category ?? entry.payment_method ?? "—"}
+            </span>
+            {canManageCategory && (
+              <SalariosRhToggle
+                entryId={entry.id}
+                hotelId={entry.hotel_id}
+                category={entry.category ?? null}
+              />
+            )}
+          </div>
         </TableCell>
       )}
 
@@ -183,6 +196,38 @@ function isScheduledOverdue(scheduledDate: string): boolean {
   today.setHours(0, 0, 0, 0);
   const d = new Date(scheduledDate + "T00:00:00");
   return d.getTime() < today.getTime();
+}
+
+function SalariosRhToggle({
+  entryId,
+  hotelId,
+  category,
+}: { entryId: string; hotelId: string; category: string | null }) {
+  const update = useUpdateEntryCategory();
+  const isMarked = category === "Salários RH";
+  return (
+    <Button
+      variant={isMarked ? "secondary" : "ghost"}
+      size="sm"
+      className="h-6 px-2 text-[10px]"
+      disabled={update.isPending}
+      onClick={async () => {
+        try {
+          await update.mutateAsync({
+            entryId,
+            hotelId,
+            category: isMarked ? null : "Salários RH",
+          });
+          toast.success(isMarked ? "Marcação removida" : "Marcado como Salários RH");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+        }
+      }}
+      title={isMarked ? "Remover marcação Salários RH" : "Marcar como Salários RH"}
+    >
+      {isMarked ? "✓ Salários RH" : "Salários RH"}
+    </Button>
+  );
 }
 
 function ObservationButton({ entryId, hotelId, initial }: { entryId: string; hotelId: string; initial: string }) {

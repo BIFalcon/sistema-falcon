@@ -710,3 +710,20 @@ export function useUpdateEntryObservation() {
     },
   });
 }
+
+export function useUpdateEntryCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entryId: string; hotelId: string; category: string | null }) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ category: input.category } as never)
+        .eq("id", input.entryId);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
