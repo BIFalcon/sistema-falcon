@@ -17,7 +17,7 @@ import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } 
 import { MONTHS_PT } from "@/lib/constants";
 import { fmtBRL } from "@/lib/formatters";
 import { uploadRetroactiveDre } from "@/lib/retroactiveDreUpload";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -576,10 +576,8 @@ export default function IndicadoresDrePage() {
                       if (!DRE_FILE_EXTENSIONS.test(selected.name)) {
                         setRetroFile(null);
                         e.currentTarget.value = "";
-                        toast({
-                          title: "Formato inválido",
+                        toast.error("Formato inválido", {
                           description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
-                          variant: "destructive",
                         });
                         return;
                       }
@@ -594,10 +592,8 @@ export default function IndicadoresDrePage() {
                   onClick={async () => {
                     if (!user || !retroHotelId || !retroFile) return;
                     if (!DRE_FILE_EXTENSIONS.test(retroFile.name)) {
-                      toast({
-                        title: "Formato inválido",
+                      toast.error("Formato inválido", {
                         description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
-                        variant: "destructive",
                       });
                       return;
                     }
@@ -610,8 +606,7 @@ export default function IndicadoresDrePage() {
                         userId: user.id,
                         upToMonth: retroUpToMonth,
                       });
-                      toast({
-                        title: "DRE enviada",
+                      toast.success("DRE enviada", {
                         description: res.monthsProcessed.length > 0
                           ? `${res.monthsProcessed.length} mês(es) processado(s): ${res.monthsProcessed.map((m) => MONTHS_PT[m - 1]).join(", ")}`
                           : "Nenhum mês com dados encontrado.",
@@ -620,10 +615,8 @@ export default function IndicadoresDrePage() {
                       setRetroOpen(false);
                       queryClient.invalidateQueries({ queryKey: ["dre-analytics"] });
                     } catch (err) {
-                      toast({
-                        title: "Erro no upload",
+                      toast.error("Erro no upload", {
                         description: err instanceof Error ? err.message : "Falha desconhecida",
-                        variant: "destructive",
                       });
                     } finally {
                       setRetroSubmitting(false);
