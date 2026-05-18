@@ -24,6 +24,7 @@ import { MONTHS_PT } from "@/lib/constants";
 import { useEffect } from "react";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
+import { DateFilterPicker } from "@/components/financeiro/DateFilterPicker";
 
 function getModuleFromPath(pathname: string): FilterModule {
   if (pathname.startsWith("/fechamento/consolidado")) return "consolidado";
@@ -44,7 +45,7 @@ function getModuleFromPath(pathname: string): FilterModule {
 export function AppHeader() {
   const { pathname } = useLocation();
   const activeModule = getModuleFromPath(pathname);
-  const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo } = useModuleFilters(activeModule);
+  const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
   const { allowedHotels, profile, signOut, isMaster, isGg, hasRole } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
@@ -205,35 +206,13 @@ export function AppHeader() {
         )}
 
         {isFinanceiro ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            <span className="text-xs text-muted-foreground">até</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            {(dateFrom || dateTo) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0"
-                onClick={() => {
-                  setDateFrom("");
-                  setDateTo("");
-                }}
-                title="Limpar datas"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <DateFilterPicker
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            specificDates={specificDates}
+            onChangeRange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+            onChangeSpecific={setSpecificDates}
+          />
         ) : (
           <>
             <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
