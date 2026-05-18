@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput, isPasswordStrong } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import falconLogo from "@/assets/falcon-logo-white.png";
 
@@ -81,32 +81,28 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionReady) {
-      toast({
-        title: "Sessão não inicializada",
+      toast.error("Sessão não inicializada", {
         description: "Abra novamente o link recebido por e-mail.",
-        variant: "destructive",
       });
       return;
     }
     if (!isPasswordStrong(password)) {
-      toast({
-        title: "Senha não atende aos requisitos",
+      toast.error("Senha não atende aos requisitos", {
         description: "Verifique os requisitos abaixo do campo de senha.",
-        variant: "destructive",
       });
       return;
     }
     if (password !== confirm) {
-      toast({ title: "Senhas diferentes", description: "Confirme a mesma senha.", variant: "destructive" });
+      toast.error("Senhas diferentes", { description: "Confirme a mesma senha." });
       return;
     }
     setSubmitting(true);
     const { error } = await supabase.auth.updateUser({ password });
     setSubmitting(false);
     if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast.error("Erro", { description: error.message });
     } else {
-      toast({ title: "Senha atualizada", description: "Faça login com sua nova senha." });
+      toast.success("Senha atualizada", { description: "Faça login com sua nova senha." });
       await supabase.auth.signOut();
       navigate("/login", { replace: true });
     }

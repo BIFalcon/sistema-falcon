@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Upload, ShieldAlert, FileSpreadsheet } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { uploadRetroactiveDre, type RetroUploadResult } from "@/lib/retroactiveDreUpload";
@@ -38,18 +38,14 @@ export default function UploadRetroativoDrePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !hotelId || !file) {
-      toast({
-        title: "Campos obrigatórios",
+      toast.error("Campos obrigatórios", {
         description: "Selecione hotel, ano e arquivo.",
-        variant: "destructive",
       });
       return;
     }
     if (!DRE_FILE_EXTENSIONS.test(file.name)) {
-      toast({
-        title: "Formato inválido",
+      toast.error("Formato inválido", {
         description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
-        variant: "destructive",
       });
       return;
     }
@@ -64,8 +60,7 @@ export default function UploadRetroativoDrePage() {
         upToMonth,
       });
       setResult(res);
-      toast({
-        title: "DRE enviada",
+      toast.success("DRE enviada", {
         description:
           res.monthsProcessed.length > 0
             ? `${res.monthsProcessed.length} ${
@@ -79,10 +74,8 @@ export default function UploadRetroativoDrePage() {
       const input = document.getElementById("dre-file") as HTMLInputElement | null;
       if (input) input.value = "";
     } catch (err) {
-      toast({
-        title: "Erro no upload",
+      toast.error("Erro no upload", {
         description: err instanceof Error ? err.message : "Falha desconhecida",
-        variant: "destructive",
       });
     } finally {
       setSubmitting(false);
@@ -186,10 +179,8 @@ export default function UploadRetroativoDrePage() {
                 if (!DRE_FILE_EXTENSIONS.test(selected.name)) {
                   setFile(null);
                   e.currentTarget.value = "";
-                  toast({
-                    title: "Formato inválido",
+                  toast.error("Formato inválido", {
                     description: "Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv.",
-                    variant: "destructive",
                   });
                   return;
                 }
