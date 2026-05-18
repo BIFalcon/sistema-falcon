@@ -727,3 +727,81 @@ export function useUpdateEntryCategory() {
     },
   });
 }
+
+/**
+ * Agrupa múltiplos lançamentos em um único novo lançamento com categoria personalizada.
+ * - Cria um novo `ap_entries` com is_group = true, grouped_ids = [ids], soma dos valores
+ * - Arquiva (archived_at = now()) os lançamentos originais
+ */
+export function useGroupEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      hotelId: string;
+      entryIds: string[];
+      categoryName: string;
+    }) => {
+      if (input.entryIds.length < 2) {
+        throw new Error("Selecione ao menos 2 lançamentos para agrupar.");
+      }
+
+      // Busca os lançamentos originais
+      const { data: originals, error: fetchErr } = await supabase
+        .from("ap_entries")
+        .select("*")
+        .in("id", input.entryIds);
+      if (fetchErr) throw fetchErr;
+      if (!originals || originals.length === 0) {
+        throw new Error("Lançamentos não encontrados.");
+      }
+
+      const first = originals[0] as unknown as ApEntry;
+      const total = originals.reduce(
+        (s, e) => s + Number((e as { amount: number }).amount ?? 0),
+        0,
+      );
+      // Vencimento: usa a maior data de vencimento entre os selecionados
+      const dueDates = originals
+        .map((e) => (e as { due_date: string | null }).due_date)
+        .filter((d): d is string => !!d)
+        .sort();
+      const dueDate = dueDates[dueDates.length - 1] ?? null;
+
+      const newEntry = {
+        hotel_id: input.hotelId,
+        upload_id: first.upload_id,
+        source_system: first.source_system,
+        entry_key: `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        supplier: input.categoryName,
+        cnpj: null,
+        document_number: null,
+        description: `Agrupamento de ${originals.length} lançamentos`,
+        due_date: dueDate,
+        amount: total,
+        original_amount: total,
+        category: input.categoryName,
+        is_group: true,
+        grouped_ids: input.entryIds,
+        gg_approval: "approved" as ApApproval,
+        payment_status: "em_aprovacao" as ApPaymentStatus,
+        is_distribution: false,
+      };
+
+      const { error: insertErr } = await supabase
+        .from("ap_entries")
+        .insert(newEntry as never);
+      if (insertErr) throw insertErr;
+
+      // Arquiva os originais
+      const { error: archErr } = await supabase
+        .from("ap_entries")
+        .update({ archived_at: new Date().toISOString() } as never)
+        .in("id", input.entryIds);
+      if (archErr) throw archErr;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
