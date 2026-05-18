@@ -211,7 +211,21 @@ function ToInvoiceSection({
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
   const { data: contracts } = useClientContracts(hotelId || null);
-  const notifyTi = useNotifyGgToInvoice();
+  const { data: tiUploads = [] } = useArUploadsByKind("to_invoice");
+
+  const uploadDateById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of tiUploads) m.set(u.id, u.uploaded_at);
+    return m;
+  }, [tiUploads]);
+
+  function daysSinceUpload(uploadId: string | null | undefined): number | null {
+    if (!uploadId) return null;
+    const iso = uploadDateById.get(uploadId);
+    if (!iso) return null;
+    const diff = Date.now() - new Date(iso).getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  }
 
   const hotelName = (id: string | null) =>
     id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
@@ -265,29 +279,16 @@ function ToInvoiceSection({
                 <Badge className="ml-2">{pendingCount}</Badge>
               )}
             </Button>
-            {isManager && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={notifyTi.isPending}
-                onClick={async () => {
-                  try {
-                    const res = await notifyTi.mutateAsync({ hotel_id: hotelId || undefined });
-                    if (res?.hotels_notified) {
-                      toast.success(`GG notificado em ${res.hotels_notified} hotel(éis)`);
-                    } else {
-                      toast.warning("Nenhum GG ativo encontrado para notificar");
-                    }
-                  } catch (err: any) {
-                    toast.error(err?.message ?? "Erro ao notificar GG");
-                  }
-                }}
-                className="gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                {notifyTi.isPending ? "Enviando…" : "Notificar GG"}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={filteredToInvoice.length === 0}
+              onClick={() => exportToInvoiceToExcel(filteredToInvoice, hotelName, contracts)}
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar Excel
+            </Button>
             {hotelId && (
               <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" /> Contratos do hotel
@@ -299,7 +300,7 @@ function ToInvoiceSection({
         {isLoading ? (
           <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
         ) : filteredToInvoice.length === 0 ? (
-          <EmptyState text="Nenhum lançamento a faturar para os filtros selecionados." />
+          <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={filteredToInvoice} hotelName={hotelName} />
         ) : drillDay ? (
@@ -308,6 +309,7 @@ function ToInvoiceSection({
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
+            daysSinceUpload={daysSinceUpload}
           />
         ) : drillMonth ? (
           <MonthBreakdown
