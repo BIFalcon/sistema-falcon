@@ -132,9 +132,7 @@ export default function ContasPagarPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
-  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
-  const [paidInterest, setPaidInterest] = useState("");
-  const [paidAmount, setPaidAmount] = useState("");
+  const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -184,18 +182,14 @@ export default function ContasPagarPage() {
     return sum;
   }, [selectedIds, entries, distributionEntries]);
 
-  // Auto: agendados cuja data já passou viram "inserido".
-  useEffect(() => {
-    if (!hotelId || entries.length === 0) return;
+  // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
+  const selectionHasOverdue = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const toInsert = entries
-      .filter((e) => e.payment_status === "agendado" && e.scheduled_date && e.scheduled_date <= today)
-      .map((e) => e.id);
-    if (toInsert.length > 0) {
-      setPaymentStatus.mutate({ hotelId, entryIds: toInsert, status: "inserido" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hotelId, entries.length]);
+    const all = [...entries, ...distributionEntries];
+    return all.some(
+      (e) => selectedIds.has(e.id) && e.due_date && e.due_date < today,
+    );
+  }, [selectedIds, entries, distributionEntries]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -242,30 +236,16 @@ export default function ContasPagarPage() {
       toast.error("Apenas a coordenadoria do financeiro pode autorizar pagamentos");
       return;
     }
-    if ((newStatus === "inserido" || newStatus === "agendado") && !canMarkInsertedAgendado) {
+    if (newStatus === "agendado" && !canMarkInsertedAgendado) {
       toast.error("Sem permissão para alterar status");
       return;
     }
-    // Agendado → pede data
+    // Agendado → abre modal (data + valor novo opcional)
     if (newStatus === "agendado") {
       setScheduledDate("");
+      setScheduledPaidAmount("");
       setSchedulingOpen(true);
       return;
-    }
-    // Inserido em lançamento vencido → pede juros/valor pago
-    if (newStatus === "inserido") {
-      const today = new Date().toISOString().slice(0, 10);
-      const allEntries = [...entries, ...distributionEntries];
-      const hasOverdue = ids.some((id) => {
-        const entry = allEntries.find((e) => e.id === id);
-        return entry?.due_date && entry.due_date < today;
-      });
-      if (hasOverdue) {
-        setPaidInterest("");
-        setPaidAmount("");
-        setInterestDialogOpen(true);
-        return;
-      }
     }
     await executeStatusChange(newStatus);
   }
@@ -339,8 +319,6 @@ export default function ContasPagarPage() {
   function labelForStatus(s: ApPaymentStatus) {
     return s === "pago"
       ? "Pago"
-      : s === "inserido"
-      ? "Inserido"
       : s === "agendado"
       ? "Agendado"
       : s === "autorizado"
