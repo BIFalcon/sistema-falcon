@@ -114,6 +114,23 @@ export function ApEntryRow({
         <div>{fmtBRL(Number(entry.amount))}</div>
       </TableCell>
 
+      {/* Valor Original */}
+      <TableCell className="text-right font-mono text-xs text-muted-foreground hidden lg:table-cell">
+        {fmtBRL(Number(entry.original_amount ?? entry.amount))}
+      </TableCell>
+
+      {/* Valor Novo (pago com juros) */}
+      <TableCell className="text-right font-mono text-xs hidden lg:table-cell">
+        {entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}
+      </TableCell>
+
+      {/* Juros */}
+      <TableCell className="text-right font-mono text-xs hidden lg:table-cell">
+        {entry.paid_interest != null && Number(entry.paid_interest) !== 0
+          ? fmtBRL(Number(entry.paid_interest))
+          : "—"}
+      </TableCell>
+
       {/* Categoria — não-compact */}
       {!compact && (
         <TableCell className="text-xs text-muted-foreground hidden lg:table-cell">
@@ -135,6 +152,17 @@ export function ApEntryRow({
         </TableCell>
       )}
 
+      {/* Agendado para */}
+      <TableCell className="text-xs hidden md:table-cell">
+        {entry.payment_status === "agendado" && entry.scheduled_date ? (
+          <span className={isScheduledOverdue(entry.scheduled_date) ? "text-destructive font-semibold" : ""}>
+            {fmtDate(entry.scheduled_date)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+
       {/* Status de pagamento */}
       {!compact && (
         <TableCell>
@@ -148,6 +176,13 @@ export function ApEntryRow({
       )}
     </TableRow>
   );
+}
+
+function isScheduledOverdue(scheduledDate: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(scheduledDate + "T00:00:00");
+  return d.getTime() < today.getTime();
 }
 
 function ObservationButton({ entryId, hotelId, initial }: { entryId: string; hotelId: string; initial: string }) {
