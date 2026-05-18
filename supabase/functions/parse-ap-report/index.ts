@@ -107,6 +107,20 @@ function emptySkipped(): SkippedCounters {
   return { other_bank: 0, no_amount: 0, no_supplier: 0, duplicate_entry: 0 };
 }
 
+function dedupeParsedEntries(entries: ParsedEntry[], skipped: SkippedCounters): ParsedEntry[] {
+  const seen = new Set<string>();
+  const unique: ParsedEntry[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.entry_key)) {
+      skipped.duplicate_entry++;
+      continue;
+    }
+    seen.add(entry.entry_key);
+    unique.push(entry);
+  }
+  return unique;
+}
+
 function isDistributionEntry(category: string | null, description: string | null): boolean {
   const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
   return blob.includes("distribuicao de lucros");
