@@ -334,13 +334,19 @@ export function useApPageDerived(opts: {
     const distTotal = distributionEntries
       .reduce((s, e) => s + Number(e.amount ?? 0), 0);
 
+    if (specificDates && specificDates.length > 0) {
+      const set = new Set(specificDates);
+      return relevant
+        .filter((e) => !!e.due_date && set.has(e.due_date))
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
+    }
     if (!dateFrom || !dateTo) {
       return relevant.reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
     }
     return relevant
       .filter((e) => !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo)
       .reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
-  }, [entries, distributionEntries, dateFrom, dateTo]);
+  }, [entries, distributionEntries, dateFrom, dateTo, specificDates]);
 
   const distributionTotal = useMemo(
     () => distributionEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
