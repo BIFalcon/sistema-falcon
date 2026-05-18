@@ -238,8 +238,11 @@ export default function ContasPagarPage() {
     setUploading(true);
     try {
       const r = await uploadApReport({ hotelId, sourceSystem, file: f });
+      const duplicatesMsg = r.skipped?.duplicate_entry
+        ? ` (${r.skipped.duplicate_entry} duplicado(s) ignorado(s))`
+        : "";
       toast.success(
-        `Importado: ${r.entries} lançamentos${r.documents_extracted ? `, ${r.documents_extracted} documentos` : ""}`,
+        `Importado: ${r.entries} lançamentos${duplicatesMsg}${r.documents_extracted ? `, ${r.documents_extracted} documentos` : ""}`,
       );
       window.dispatchEvent(new CustomEvent("ap:refresh"));
       qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
