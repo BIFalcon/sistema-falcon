@@ -1107,6 +1107,7 @@ export default function ContasPagarPage() {
                   <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
                   <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
                   <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                  <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                   <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
