@@ -54,6 +54,7 @@ import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   uploadApReport,
   useApEntries,
+  useAllApEntries,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useTodayBankBalance,
@@ -112,7 +113,17 @@ export default function ContasPagarPage() {
 
   // ── Dados remotos ──────────────────────────────────────────────────────
   const { data: lastUpload } = useLatestApUpload(hotelId);
-  const { data: allEntriesRaw = [], isLoading: entriesLoading } = useApEntries(hotelId);
+  const { data: hotelEntries = [], isLoading: hotelEntriesLoading } = useApEntries(hotelId);
+  const showingAllHotels = !hotelId;
+  const { data: allHotelEntries = [], isLoading: allEntriesLoading } =
+    useAllApEntries(showingAllHotels);
+  const allEntriesRaw = showingAllHotels ? allHotelEntries : hotelEntries;
+  const entriesLoading = showingAllHotels ? allEntriesLoading : hotelEntriesLoading;
+  const hotelNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    hotels.forEach((h) => m.set(h.id, h.name));
+    return m;
+  }, [hotels]);
   const { data: balanceItau } = useTodayBankBalance(hotelId, "itau");
   const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
   const { data: cardReceivables = [] } = useCardReceivable(hotelId);
