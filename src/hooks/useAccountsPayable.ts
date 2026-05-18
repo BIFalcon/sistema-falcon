@@ -57,6 +57,7 @@ export interface ApEntry {
   hotel_cnpj: string | null;
   paid_interest: number | null;
   paid_amount: number | null;
+  original_amount: number | null;
 }
 
 export interface ApBankBalance {
