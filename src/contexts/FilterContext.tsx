@@ -6,6 +6,7 @@ export type FilterModule =
   | "indicadores"
   | "conciliacao"
   | "consolidado"
+  | "rh"
   | "global";
 
 interface ModuleFilters {
