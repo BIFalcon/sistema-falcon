@@ -301,11 +301,29 @@ export function useApPageDerived(opts: {
   );
 
   const totalToPayPeriod = useMemo(() => {
-    if (!dateFrom || !dateTo) return totalToPayToday;
-    return entries
-      .filter((e) => !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo)
+    const isRelevant = (e: ApEntry) => {
+      const bank = (e.bank_account ?? "").toLowerCase();
+      const cat  = (e.category  ?? "").toLowerCase();
+      const isBank = bank.includes("itau") || bank.includes("santander");
+      const isSalary =
+        cat.includes("salario") || cat.includes("salário") ||
+        cat.includes("folha")   || cat.includes("rescisao") ||
+        cat.includes("rescisão")|| cat.includes("ferias")   ||
+        cat.includes("férias")  || cat.includes("13");
+      return isBank || isSalary;
+    };
+
+    const relevant = entries.filter(isRelevant);
+    const distTotal = distributionEntries
       .reduce((s, e) => s + Number(e.amount ?? 0), 0);
-  }, [entries, dateFrom, dateTo, totalToPayToday]);
+
+    if (!dateFrom || !dateTo) {
+      return relevant.reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
+    }
+    return relevant
+      .filter((e) => !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo)
+      .reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
+  }, [entries, distributionEntries, dateFrom, dateTo]);
 
   const distributionTotal = useMemo(
     () => distributionEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
