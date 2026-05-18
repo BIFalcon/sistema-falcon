@@ -202,7 +202,7 @@ function normalizeBank(account: string | null | undefined): string | null {
 
 function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   entries: ParsedEntry[];
-  skipped: { other_bank: number; no_amount: number; no_supplier: number };
+  skipped: SkippedCounters;
   my_company_cnpj: string | null;
 } {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
@@ -214,7 +214,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   //           Categoria, Nota Fiscal, A Pagar ou Receber, Observação da Conta, Conta Corrente
   // linha 2 = totalizador geral (sem fornecedor — será ignorado pelo filtro de supplier vazio)
   // linhas 3+ = dados reais. Valores de "A Pagar ou Receber" são sempre negativos — usar Math.abs().
-  if (rows.length < 3) return { entries: [], skipped: { other_bank: 0, no_amount: 0, no_supplier: 0 }, my_company_cnpj: null };
+  if (rows.length < 3) return { entries: [], skipped: emptySkipped(), my_company_cnpj: null };
   let headerIdx = 1;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const row = (rows[i] ?? []).map((c: any) => toAscii(normalize(c)));
@@ -262,8 +262,9 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   const colPayMethod = findCol(headerArr, "forma de pagamento");
 
   const out: ParsedEntry[] = [];
-  const skipped = { other_bank: 0, no_amount: 0, no_supplier: 0 };
+  const skipped = emptySkipped();
   let myCompanyCnpj: string | null = null;
+  const seenEntryKeys = new Set<string>();
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
@@ -288,8 +289,11 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
     const due = parseDate(row[colDue]);
     const sitVenc = colSitVenc >= 0 ? normalize(row[colSitVenc] ?? "") : "";
     const sit = colSit >= 0 ? normalize(row[colSit] ?? "") : "";
+    const entryKey = makeKey(supplier, docNumber, due, amount);
+    if (seenEntryKeys.has(entryKey)) { skipped.duplicate_entry++; continue; }
+    seenEntryKeys.add(entryKey);
     out.push({
-      entry_key: makeKey(supplier, docNumber, due, amount),
+      entry_key: entryKey,
       supplier,
       cnpj: normalize(row[colCnpj] ?? "") || null,
       document_number: docNumber || null,
