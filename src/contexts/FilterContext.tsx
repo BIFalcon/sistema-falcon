@@ -16,6 +16,7 @@ interface ModuleFilters {
   year: number;
   dateFrom: string;
   dateTo: string;
+  specificDates: string[]; // se preenchido, ignora dateFrom/dateTo
 }
 
 function getStorageKey(module: FilterModule) {
@@ -35,6 +36,7 @@ function getDefaultFilters(): ModuleFilters {
     year: now.getFullYear(),
     dateFrom: firstOfMonth,
     dateTo: lastOfMonth,
+    specificDates: [],
   };
 }
 
@@ -52,6 +54,7 @@ function loadFilters(module: FilterModule): ModuleFilters {
         year:     typeof v.year   === "number" ? v.year   : def.year,
         dateFrom: typeof v.dateFrom === "string" ? v.dateFrom : def.dateFrom,
         dateTo:   typeof v.dateTo   === "string" ? v.dateTo   : def.dateTo,
+        specificDates: Array.isArray(v.specificDates) ? v.specificDates : def.specificDates,
       };
     }
   } catch { /* noop */ }
@@ -116,6 +119,7 @@ export function useModuleFilters(module: FilterModule) {
   const setYear      = useCallback((v: number)        => setStore(module, f => f.year      === v ? f : ({ ...f, year: v })),     [module]);
   const setDateFrom  = useCallback((v: string)        => setStore(module, f => f.dateFrom  === v ? f : ({ ...f, dateFrom: v })), [module]);
   const setDateTo    = useCallback((v: string)        => setStore(module, f => f.dateTo    === v ? f : ({ ...f, dateTo: v })),   [module]);
+  const setSpecificDates = useCallback((v: string[])  => setStore(module, f => ({ ...f, specificDates: v })), [module]);
 
   return {
     ...filters,
@@ -126,6 +130,7 @@ export function useModuleFilters(module: FilterModule) {
     setYear,
     setDateFrom,
     setDateTo,
+    setSpecificDates,
   };
 }
 
