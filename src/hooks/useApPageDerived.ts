@@ -200,8 +200,6 @@ export function useApPageDerived(opts: {
         if (status === "payment_pago" && e.payment_status !== "pago") return false;
         if (category !== "all" && e.category !== category) return false;
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
-        if (dateFrom && (!e.due_date || e.due_date < dateFrom)) return false;
-        if (dateTo && (!e.due_date || e.due_date > dateTo)) return false;
         if (scheduledFrom || scheduledTo) {
           if (!e.scheduled_date) return false;
           if (scheduledFrom && e.scheduled_date < scheduledFrom) return false;
