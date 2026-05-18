@@ -1101,45 +1101,32 @@ export default function ContasPagarPage() {
                   )}
                   <TableHead>Fornecedor / Sócio</TableHead>
                   <TableHead className="hidden md:table-cell">CPF / CNPJ</TableHead>
+                  <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                  <TableHead className="hidden lg:table-cell">Categoria</TableHead>
+                  <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {distributionEntries.map((e) => {
-                  const isSelected = selectedIds.has(e.id);
-                  const rowBg =
-                    e.payment_status === "pago"
-                      ? "bg-emerald-500/10"
-                      : e.payment_status === "agendado"
-                      ? "bg-violet-500/10"
-                      : "";
-                  return (
-                    <TableRow key={e.id} className={rowBg}>
-                      {(canMarkInsertedAgendado || canMarkPaid) && (
-                        <TableCell className="w-8">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(c) => toggleSelected(e.id, !!c)}
-                            aria-label="Selecionar sócio"
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell className="font-medium">{e.supplier}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
-                        {e.cnpj ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">{fmtDate(e.due_date)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {fmtBRL(Number(e.amount))}
-                      </TableCell>
-                      <TableCell>
-                        <PaymentStatusBadge status={e.payment_status} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {distributionEntries.map((e) => (
+                  <ApEntryRow
+                    key={e.id}
+                    entry={e}
+                    sourceSystem="omie"
+                    showApproval={false}
+                    selectable={canMarkInsertedAgendado || canMarkPaid}
+                    selected={selectedIds.has(e.id)}
+                    onToggleSelected={(v) => toggleSelected(e.id, v)}
+                    showBank={false}
+                    canEditObservation={canManage}
+                    canManageCategory={false}
+                  />
+                ))}
               </TableBody>
             </Table>
           </div>
