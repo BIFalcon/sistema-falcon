@@ -39,6 +39,7 @@ function getModuleFromPath(pathname: string): FilterModule {
   if (pathname.startsWith("/conciliacao")) return "conciliacao";
   if (pathname.startsWith("/financeiro") || pathname.startsWith("/contas-")) return "financeiro";
   if (pathname.startsWith("/indicadores")) return "indicadores";
+  if (pathname.startsWith("/rh")) return "rh";
   return "global";
 }
 

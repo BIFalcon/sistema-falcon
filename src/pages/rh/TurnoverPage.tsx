@@ -3,9 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Upload, Trophy, Loader2 } from "lucide-react";
 import {
@@ -14,7 +11,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useRhEmployees, useUploadRhFile, calcMetrics } from "@/hooks/useRh";
-import { MONTHS_PT } from "@/lib/constants";
 
 const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
 const BAR_COLOR = "hsl(var(--primary))";
@@ -35,7 +31,7 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 
 export default function TurnoverPage() {
   const { allowedHotels, isMaster } = useAuth();
-  const { hotelId, setHotelId, month, year, setMonth, setYear } = useModuleFilters("rh");
+  const { hotelId } = useModuleFilters("rh");
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -95,31 +91,6 @@ export default function TurnoverPage() {
           </p>
         </div>
         <div className="flex items-end gap-3 flex-wrap">
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Hotel</Label>
-            <Select value={hotelId ?? "all"} onValueChange={(v) => setHotelId(v === "all" ? null : v)}>
-              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os hotéis</SelectItem>
-                {allowedHotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Mês</Label>
-            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MONTHS_PT.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Ano</Label>
-            <Input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-[100px]" />
-          </div>
           {(allowedHotels.length > 1 || isMaster) && (
             <Button variant="outline" onClick={() => setRankOpen(true)}>
               <Trophy className="h-4 w-4 mr-2" /> Ver ranking
