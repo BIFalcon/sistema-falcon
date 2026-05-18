@@ -43,6 +43,8 @@ import {
   useUpsertOpenFolioNote,
   useSetToInvoiceGgStatus,
   useNotifyGgToInvoice,
+  useDeleteArUpload,
+  useArUploadsByKind,
   findContractTerm,
   addDays,
   type ToInvoiceEntry,
@@ -147,7 +149,7 @@ export default function ContasReceberPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList>
-          <TabsTrigger value="to_invoice">A Faturar</TabsTrigger>
+          <TabsTrigger value="to_invoice">Faturamento</TabsTrigger>
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
