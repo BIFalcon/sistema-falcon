@@ -1674,6 +1674,354 @@ export type Database = {
         }
         Relationships: []
       }
+      rh_calendar_dates: {
+        Row: {
+          category: string
+          created_at: string
+          date_day: number
+          date_month: number
+          id: string
+          notes: string | null
+          recurring: boolean
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          date_day: number
+          date_month: number
+          id?: string
+          notes?: string | null
+          recurring?: boolean
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          date_day?: number
+          date_month?: number
+          id?: string
+          notes?: string | null
+          recurring?: boolean
+          title?: string
+        }
+        Relationships: []
+      }
+      rh_calendar_posts: {
+        Row: {
+          author_id: string
+          content: string | null
+          created_at: string
+          date_id: string
+          id: string
+          media_url: string | null
+          status: string
+          title: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          author_id: string
+          content?: string | null
+          created_at?: string
+          date_id: string
+          id?: string
+          media_url?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          author_id?: string
+          content?: string | null
+          created_at?: string
+          date_id?: string
+          id?: string
+          media_url?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rh_calendar_posts_date_id_fkey"
+            columns: ["date_id"]
+            isOneToOne: false
+            referencedRelation: "rh_calendar_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rh_employees: {
+        Row: {
+          admission_date: string | null
+          birth_date: string | null
+          cpf: string | null
+          created_at: string
+          department: string | null
+          employee_key: string
+          gender: string | null
+          hotel_id: string
+          id: string
+          name: string
+          position: string | null
+          raw: Json
+          salary: number | null
+          source_format: string | null
+          status: string
+          termination_date: string | null
+          termination_reason: string | null
+          updated_at: string
+          upload_id: string | null
+        }
+        Insert: {
+          admission_date?: string | null
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          department?: string | null
+          employee_key: string
+          gender?: string | null
+          hotel_id: string
+          id?: string
+          name: string
+          position?: string | null
+          raw?: Json
+          salary?: number | null
+          source_format?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          upload_id?: string | null
+        }
+        Update: {
+          admission_date?: string | null
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          department?: string | null
+          employee_key?: string
+          gender?: string | null
+          hotel_id?: string
+          id?: string
+          name?: string
+          position?: string | null
+          raw?: Json
+          salary?: number | null
+          source_format?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          upload_id?: string | null
+        }
+        Relationships: []
+      }
+      rh_org_nodes: {
+        Row: {
+          created_at: string
+          department: string | null
+          hotel_id: string | null
+          id: string
+          is_open_position: boolean
+          name: string
+          parent_id: string | null
+          photo_url: string | null
+          position: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_open_position?: boolean
+          name: string
+          parent_id?: string | null
+          photo_url?: string | null
+          position?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_open_position?: boolean
+          name?: string
+          parent_id?: string | null
+          photo_url?: string | null
+          position?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rh_org_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "rh_org_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rh_org_responsibilities: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          node_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          node_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          node_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rh_org_responsibilities_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "rh_org_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rh_policies: {
+        Row: {
+          category: string | null
+          content: string | null
+          created_at: string
+          created_by: string
+          document_url: string | null
+          id: string
+          published: boolean
+          title: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          category?: string | null
+          content?: string | null
+          created_at?: string
+          created_by: string
+          document_url?: string | null
+          id?: string
+          published?: boolean
+          title: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          category?: string | null
+          content?: string | null
+          created_at?: string
+          created_by?: string
+          document_url?: string | null
+          id?: string
+          published?: boolean
+          title?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
+      rh_trainings: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          mandatory: boolean
+          media_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          mandatory?: boolean
+          media_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          mandatory?: boolean
+          media_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rh_uploads: {
+        Row: {
+          detected_format: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          hotel_id: string | null
+          id: string
+          metadata: Json
+          parse_error: string | null
+          parsed_count: number | null
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          detected_format?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          hotel_id?: string | null
+          id?: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_count?: number | null
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          detected_format?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          hotel_id?: string | null
+          id?: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_count?: number | null
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1801,6 +2149,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1871,6 +2220,7 @@ export type Database = {
       }
       is_master: { Args: { _user_id: string }; Returns: boolean }
       is_protected_user: { Args: { _user_id: string }; Returns: boolean }
+      is_rh_manager: { Args: { _user_id: string }; Returns: boolean }
       is_unsubscribed: {
         Args: {
           _event: Database["public"]["Enums"]["notification_event"]
@@ -1936,6 +2286,8 @@ export type Database = {
         | "viewer"
         | "rh"
         | "operacoes"
+        | "marketing"
+        | "comercial"
       ar_gg_status: "pendente" | "faturado" | "nao_faturado"
       closing_stage: "dre" | "carta" | "financeiro" | "envio"
       closing_status:
@@ -2117,6 +2469,8 @@ export const Constants = {
         "viewer",
         "rh",
         "operacoes",
+        "marketing",
+        "comercial",
       ],
       ar_gg_status: ["pendente", "faturado", "nao_faturado"],
       closing_stage: ["dre", "carta", "financeiro", "envio"],
