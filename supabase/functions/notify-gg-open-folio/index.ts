@@ -99,15 +99,15 @@ Deno.serve(async (req) => {
       total++;
     }
 
-    // Verifica folios com justificativa mas ainda abertos há 30+ dias
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const { data: oldJustified } = await admin
+    // Verifica folios cuja data prevista de faturamento já passou e ainda estão abertos
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: overdueNotes } = await admin
       .from("ar_open_folio_notes")
-      .select("confirmation_number, hotel_id, created_at")
-      .lt("created_at", thirtyDaysAgo.toISOString());
+      .select("confirmation_number, hotel_id, expected_payment_date")
+      .lt("expected_payment_date", today)
+      .not("expected_payment_date", "is", null);
 
-    for (const note of oldJustified ?? []) {
+    for (const note of overdueNotes ?? []) {
       // Verifica se o folio ainda está em aberto
       const { data: stillOpen } = await admin
         .from("ar_open_folio_entries")
@@ -139,11 +139,11 @@ Deno.serve(async (req) => {
       const recipients = [...ggRecipients, ...finRecipients];
       if (!recipients.length) continue;
 
-      const subject = `[${hotelName}] Folio em aberto há mais de 30 dias — ${stillOpen.first_name} ${stillOpen.last_name}`;
-      const body = `O folio de **${stillOpen.first_name} ${stillOpen.last_name}** (${note.confirmation_number}) ` +
-        `em **${hotelName}** está justificado mas continua em aberto há mais de 30 dias.\n\n` +
-        `**Valor em aberto:** ${brl(Number(stillOpen.balance))}\n\n` +
-        `Por favor, verifique e tome as providências necessárias.\n\n` +
+      const subject = `[${hotelName}] Folio vencido — ${stillOpen.first_name} ${stillOpen.last_name}`;
+      const body = `O folio de **${stillOpen.first_name} ${stillOpen.last_name}** ` +
+        `(${note.confirmation_number}) em **${hotelName}** passou da data prevista ` +
+        `de faturamento (${note.expected_payment_date}) e ainda está em aberto.\n\n` +
+        `**Valor:** ${brl(Number(stillOpen.balance))}\n\n` +
         `[Ver Open Folio](/financeiro/contas-receber)`;
 
       await admin.from("notification_queue").insert(
