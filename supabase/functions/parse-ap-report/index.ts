@@ -436,7 +436,8 @@ Deno.serve(async (req) => {
       const r = parseOmieXlsx(arrayBuf, hotelId);
       parsed = r.entries; skipped = r.skipped; myCompanyCnpj = r.my_company_cnpj;
     } else {
-      parsed = parseTotvsXls(arrayBuf);
+      skipped = emptySkipped();
+      parsed = dedupeParsedEntries(parseTotvsXls(arrayBuf), skipped);
     }
 
     // Validação de CNPJ do hotel: comparamos o CNPJ da coluna "Minha Empresa
