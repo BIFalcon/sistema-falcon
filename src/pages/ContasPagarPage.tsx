@@ -80,7 +80,7 @@ export default function ContasPagarPage() {
   } = useAuth();
   const qc = useQueryClient();
   const canManage = !isFernando && (isMaster || hasRole("financeiro"));
-  // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
+  // Marcações em lote — equipe pode marcar Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
     isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
   const canMarkPaid = !isFernando && (isMaster || isFinanceiroCoordenadora);
