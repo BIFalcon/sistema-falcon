@@ -925,6 +925,16 @@ export default function ContasPagarPage() {
                         Limpar
                       </Button>
                     )}
+                    {canManage && selectedIds.size > 1 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setGroupDialogOpen(true)}
+                      >
+                        Agrupar selecionados
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
