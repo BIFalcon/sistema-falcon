@@ -69,6 +69,7 @@ export function useApPageDerived(opts: {
   dateTo?: string;
   scheduledFrom?: string;
   scheduledTo?: string;
+  specificDates?: string[];
 }): ApPageDerived {
   const {
     allEntriesRaw,
@@ -87,6 +88,7 @@ export function useApPageDerived(opts: {
     dateTo,
     scheduledFrom,
     scheduledTo,
+    specificDates,
   } = opts;
 
   // ── Separação base ─────────────────────────────────────────────────────
@@ -200,6 +202,13 @@ export function useApPageDerived(opts: {
         if (status === "payment_pago" && e.payment_status !== "pago") return false;
         if (category !== "all" && e.category !== category) return false;
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
+        // Filtro de vencimento (também afeta a tabela)
+        if (specificDates && specificDates.length > 0) {
+          if (!e.due_date || !specificDates.includes(e.due_date)) return false;
+        } else {
+          if (dateFrom && (!e.due_date || e.due_date < dateFrom)) return false;
+          if (dateTo && (!e.due_date || e.due_date > dateTo)) return false;
+        }
         if (scheduledFrom || scheduledTo) {
           if (!e.scheduled_date) return false;
           if (scheduledFrom && e.scheduled_date < scheduledFrom) return false;
@@ -216,7 +225,7 @@ export function useApPageDerived(opts: {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo],
+    [entries, period, status, category, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo, specificDates],
   );
 
   // ── Agrupamento N/D ────────────────────────────────────────────────────
