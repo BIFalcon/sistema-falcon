@@ -398,18 +398,17 @@ export default function ContasPagarPage() {
         </Card>
       )}
 
-      {/* Placeholder sem hotel */}
-      {!hotelId && (
-        <EmptyHotelState
-          icon={<Wallet className="h-12 w-12" />}
-          title="Contas a Pagar"
-          description="Selecione um hotel para visualizar e gerenciar os lançamentos financeiros."
-        />
+      {showingAllHotels && (
+        <div className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">
+          Vendo lançamentos de <strong className="text-foreground">todos os hotéis</strong>.
+          Selecione um hotel para informar saldos e importar relatórios.
+        </div>
       )}
 
-      {hotelId && (
+      {true && (
         <>
-          {/* Saldo bancário (Itaú + Santander) */}
+          {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
+          {hotelId && (
           <Card className="p-5 shadow-soft space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BankBalanceField
