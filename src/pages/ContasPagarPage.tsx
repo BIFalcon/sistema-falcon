@@ -80,7 +80,7 @@ export default function ContasPagarPage() {
   } = useAuth();
   const qc = useQueryClient();
   const canManage = !isFernando && (isMaster || hasRole("financeiro"));
-  // Marcações em lote — equipe pode marcar Inserido/Agendado; só coordenadora/master pode Pago.
+  // Marcações em lote — equipe pode marcar Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
     isMaster || isFinanceiroEquipe || isFinanceiroCoordenadora;
   const canMarkPaid = !isFernando && (isMaster || isFinanceiroCoordenadora);
@@ -132,9 +132,7 @@ export default function ContasPagarPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
-  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
-  const [paidInterest, setPaidInterest] = useState("");
-  const [paidAmount, setPaidAmount] = useState("");
+  const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -184,18 +182,14 @@ export default function ContasPagarPage() {
     return sum;
   }, [selectedIds, entries, distributionEntries]);
 
-  // Auto: agendados cuja data já passou viram "inserido".
-  useEffect(() => {
-    if (!hotelId || entries.length === 0) return;
+  // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
+  const selectionHasOverdue = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const toInsert = entries
-      .filter((e) => e.payment_status === "agendado" && e.scheduled_date && e.scheduled_date <= today)
-      .map((e) => e.id);
-    if (toInsert.length > 0) {
-      setPaymentStatus.mutate({ hotelId, entryIds: toInsert, status: "inserido" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hotelId, entries.length]);
+    const all = [...entries, ...distributionEntries];
+    return all.some(
+      (e) => selectedIds.has(e.id) && e.due_date && e.due_date < today,
+    );
+  }, [selectedIds, entries, distributionEntries]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -242,30 +236,16 @@ export default function ContasPagarPage() {
       toast.error("Apenas a coordenadoria do financeiro pode autorizar pagamentos");
       return;
     }
-    if ((newStatus === "inserido" || newStatus === "agendado") && !canMarkInsertedAgendado) {
+    if (newStatus === "agendado" && !canMarkInsertedAgendado) {
       toast.error("Sem permissão para alterar status");
       return;
     }
-    // Agendado → pede data
+    // Agendado → abre modal (data + valor novo opcional)
     if (newStatus === "agendado") {
       setScheduledDate("");
+      setScheduledPaidAmount("");
       setSchedulingOpen(true);
       return;
-    }
-    // Inserido em lançamento vencido → pede juros/valor pago
-    if (newStatus === "inserido") {
-      const today = new Date().toISOString().slice(0, 10);
-      const allEntries = [...entries, ...distributionEntries];
-      const hasOverdue = ids.some((id) => {
-        const entry = allEntries.find((e) => e.id === id);
-        return entry?.due_date && entry.due_date < today;
-      });
-      if (hasOverdue) {
-        setPaidInterest("");
-        setPaidAmount("");
-        setInterestDialogOpen(true);
-        return;
-      }
     }
     await executeStatusChange(newStatus);
   }
@@ -339,8 +319,6 @@ export default function ContasPagarPage() {
   function labelForStatus(s: ApPaymentStatus) {
     return s === "pago"
       ? "Pago"
-      : s === "inserido"
-      ? "Inserido"
       : s === "agendado"
       ? "Agendado"
       : s === "autorizado"
@@ -684,7 +662,6 @@ export default function ContasPagarPage() {
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
                   <SelectItem value="issues">Sem aprovação do GG</SelectItem>
-                  <SelectItem value="payment_inserido">Inserido no banco</SelectItem>
                   <SelectItem value="payment_agendado">Agendado</SelectItem>
                   <SelectItem value="payment_pago">Pago</SelectItem>
                   <SelectItem value="payment_pendente">Em Aprovação</SelectItem>
@@ -793,15 +770,6 @@ export default function ContasPagarPage() {
                     )}
                     {canMarkInsertedAgendado && (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 h-8"
-                          disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
-                          onClick={() => handleBulkPaymentStatus("inserido")}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Inserido no banco
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1019,8 +987,6 @@ export default function ContasPagarPage() {
                   const rowBg =
                     e.payment_status === "pago"
                       ? "bg-emerald-500/10"
-                      : e.payment_status === "inserido"
-                      ? "bg-sky-500/10"
                       : e.payment_status === "agendado"
                       ? "bg-violet-500/10"
                       : "";
@@ -1107,81 +1073,58 @@ export default function ContasPagarPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Data de agendamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Selecione a data prevista para inserção no banco. O sistema mudará automaticamente
-              para "Inserido" nessa data.
+              Selecione a data prevista de pagamento. Se houver lançamentos vencidos
+              entre os selecionados, informe também o valor novo pago (com juros).
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            min={new Date().toISOString().slice(0, 10)}
-          />
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Data de agendamento
+              </label>
+              <Input
+                type="date"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+              />
+            </div>
+            {selectionHasOverdue && (
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                  Valor novo pago (com juros)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder={fmtBRL(selectedTotal)}
+                  value={scheduledPaidAmount}
+                  onChange={(e) => setScheduledPaidAmount(e.target.value)}
+                  onPaste={(e) => handlePasteBRL(e, setScheduledPaidAmount)}
+                />
+                {scheduledPaidAmount && !Number.isNaN(parseFloat(scheduledPaidAmount)) && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Juros calculados: <strong>{fmtBRL(parseFloat(scheduledPaidAmount) - selectedTotal)}</strong>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={!scheduledDate}
               onClick={() => {
                 setSchedulingOpen(false);
-                executeStatusChange("agendado", { scheduledDate });
-              }}
-            >
-              Confirmar agendamento
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Modal de juros (lançamentos vencidos marcados como Inserido) */}
-      <AlertDialog open={interestDialogOpen} onOpenChange={setInterestDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Há lançamentos vencidos</AlertDialogTitle>
-            <AlertDialogDescription>
-              Informe o juros pago e o novo valor (com juros) para registrar o pagamento em atraso.
-              Deixe em branco caso não se aplique.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
-                Juros pago
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={paidInterest}
-                onChange={(e) => setPaidInterest(e.target.value)}
-                onPaste={(e) => handlePasteBRL(e, setPaidInterest)}
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
-                Novo valor pago
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                onPaste={(e) => handlePasteBRL(e, setPaidAmount)}
-              />
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setInterestDialogOpen(false);
-                executeStatusChange("inserido", {
-                  paidInterest: paidInterest ? parseFloat(paidInterest) : undefined,
-                  paidAmount: paidAmount ? parseFloat(paidAmount) : undefined,
+                const paidNum = scheduledPaidAmount ? parseFloat(scheduledPaidAmount) : NaN;
+                const hasPaid = !Number.isNaN(paidNum);
+                executeStatusChange("agendado", {
+                  scheduledDate,
+                  paidAmount: hasPaid ? paidNum : undefined,
+                  paidInterest: hasPaid ? paidNum - selectedTotal : undefined,
                 });
               }}
             >
-              Confirmar
+              Confirmar agendamento
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

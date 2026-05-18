@@ -166,13 +166,13 @@ function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
 }
 
 // Mapeia situação OMIE para o status de pagamento Falcon
-type ApPaymentStatus = "em_aprovacao" | "autorizado" | "inserido" | "agendado" | "pago";
+type ApPaymentStatus = "em_aprovacao" | "autorizado" | "agendado" | "pago";
 function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
   if (!situacao) return "em_aprovacao";
   const s = toAscii(situacao);
   if (s.includes("agendado")) return "agendado";
   if (s.includes("pago") || s.includes("liquidado")) return "pago";
-  if (s.includes("pago parcialmente")) return "inserido";
+  if (s.includes("pago parcialmente")) return "agendado";
   if (s.includes("vence hoje") || s.includes("atrasado") ||
       s.includes("a vencer") || s.includes("previsto") ||
       s.includes("aprovado") || s.includes("em aprovacao"))
