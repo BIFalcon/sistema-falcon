@@ -153,10 +153,8 @@ function findCol(header: string[], ...candidates: string[]): number {
   return -1;
 }
 
-function isAllowedBank(account: string): boolean {
-  const a = toAscii(account);
-  if (!a) return true;
-  return a.includes("itau") || a.includes("santander");
+function isAllowedBank(_account: string): boolean {
+  return true; // aceita qualquer conta corrente do OMIE
 }
 
 // 'Em Aprovação' no OMIE = GG já aprovou. 'Agendado' também já passou (foi pro
@@ -174,7 +172,11 @@ function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatu
   const s = toAscii(situacao);
   if (s.includes("agendado")) return "agendado";
   if (s.includes("pago") || s.includes("liquidado")) return "pago";
-  if (s.includes("previsto") || s.includes("aprovado") || s.includes("em aprovacao")) return "em_aprovacao";
+  if (s.includes("pago parcialmente")) return "inserido";
+  if (s.includes("vence hoje") || s.includes("atrasado") ||
+      s.includes("a vencer") || s.includes("previsto") ||
+      s.includes("aprovado") || s.includes("em aprovacao"))
+    return "em_aprovacao";
   return "em_aprovacao";
 }
 
