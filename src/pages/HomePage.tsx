@@ -148,16 +148,17 @@ export default function HomePage() {
 
   const upcomingDates = useMemo(() => {
     const now = new Date();
-    const todayMd = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const list: { name: string; md: string; daysAhead: number }[] = [];
+    const todayKey = (now.getMonth() + 1) * 100 + now.getDate();
+    const list: { title: string; key: number; daysAhead: number }[] = [];
     for (const d of calendarDates) {
-      const md = (d.date_md ?? "").slice(0, 5);
-      if (!/^\d{2}-\d{2}$/.test(md)) continue;
-      const [mm, dd] = md.split("-").map(Number);
-      const year = md < todayMd ? now.getFullYear() + 1 : now.getFullYear();
+      const mm = d.date_month;
+      const dd = d.date_day;
+      if (!mm || !dd) continue;
+      const key = mm * 100 + dd;
+      const year = key < todayKey ? now.getFullYear() + 1 : now.getFullYear();
       const dt = new Date(year, mm - 1, dd);
       const diff = Math.round((dt.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
-      if (diff >= 0 && diff <= 7) list.push({ name: d.name, md, daysAhead: diff });
+      if (diff >= 0 && diff <= 7) list.push({ title: d.title, key, daysAhead: diff });
     }
     return list.sort((a, b) => a.daysAhead - b.daysAhead);
   }, [calendarDates]);
@@ -380,11 +381,11 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap gap-2">
               {upcomingDates.map((d) => (
-                <span key={d.md + d.name} className="text-xs px-2 py-1 rounded bg-muted text-foreground">
+                <span key={d.key + d.title} className="text-xs px-2 py-1 rounded bg-muted text-foreground">
                   <span className="font-semibold mr-1">
                     {d.daysAhead === 0 ? "hoje" : `${d.daysAhead}d`}
                   </span>
-                  {d.name}
+                  {d.title}
                 </span>
               ))}
             </div>
