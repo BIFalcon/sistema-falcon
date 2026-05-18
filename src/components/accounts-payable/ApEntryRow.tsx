@@ -295,9 +295,9 @@ function ApprovalBadge({ status }: { status: string }) {
 
 const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string; tooltip: string; Icon: typeof Banknote }> = {
   em_aprovacao: {
-    label: "Em Aprovação",
+    label: "Não aprovado pelo GG",
     className: "border-amber-500/40 text-amber-700 dark:text-amber-400",
-    tooltip: "Aprovado pelo GG — aguardando autorização do financeiro",
+    tooltip: "Aguardando aprovação do Gerente Geral",
     Icon: CircleDashed,
   },
   autorizado: {
