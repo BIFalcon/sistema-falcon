@@ -182,12 +182,10 @@ function isAllowedBank(_account: string): boolean {
   return true; // aceita qualquer conta corrente do OMIE
 }
 
-// 'Em Aprovação' no OMIE = GG já aprovou. 'Agendado' também já passou (foi pro
-// banco). Os demais ('A Vencer', 'Atrasado', 'Vence Hoje') ainda dependem do GG.
-function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
-  const s = toAscii(sit ?? "");
-  if (s.includes("em aprovacao") || s.startsWith("agendado")) return "approved";
-  return "pending";
+// Todo lançamento importado do OMIE já passou pela aprovação do GG.
+// O GG aprova no OMIE antes de o financeiro importar.
+function omieApprovalFromSituation(_sit: string | null): "pending" | "approved" {
+  return "approved";
 }
 
 // Mapeia situação OMIE para o status de pagamento Falcon
