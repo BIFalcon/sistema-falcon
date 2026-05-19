@@ -1044,12 +1044,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
+                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
+                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -1062,7 +1062,10 @@ export default function ContasPagarPage() {
                           (showApproval ? 11 : 10) +
                           (sourceSystem === "omie" ? 2 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) +
-                          (showingAllHotels ? 1 : 0);
+                          (showingAllHotels ? 1 : 0) -
+                          (showOriginalAmount ? 0 : 1) -
+                          (showPaidAmount ? 0 : 1) -
+                          (showPaidInterest ? 0 : 1);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
                             {(canMarkInsertedAgendado || canMarkPaid) && (
@@ -1116,6 +1119,9 @@ export default function ContasPagarPage() {
                           canEditObservation={canManage}
                           canManageCategory={canManage}
                           hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
+                          showOriginalAmount={showOriginalAmount}
+                          showPaidAmount={showPaidAmount}
+                          showPaidInterest={showPaidInterest}
                         />
                       );
                     })
