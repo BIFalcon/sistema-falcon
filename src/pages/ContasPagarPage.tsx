@@ -100,7 +100,15 @@ export default function ContasPagarPage() {
   const canApproveBase = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
+  const {
+    hotelId,
+    dateFrom,
+    dateTo,
+    specificDates,
+    setDateFrom,
+    setDateTo,
+    setSpecificDates,
+  } = useModuleFilters("financeiro");
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -190,12 +198,33 @@ export default function ContasPagarPage() {
     displayRows,
     categories,
     urgencyCounts,
+    overdueCount,
+    showOriginalAmount,
+    showPaidAmount,
+    showPaidInterest,
     issueCounts,
     issueEntries,
     totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
+
+  // Filtro período x filtro de data: ao escolher uma data manual, reseta o card
+  // de urgência ativo para "all" (não conflitar). A limpeza inversa acontece
+  // nos onClick dos cards de urgência abaixo.
+  useEffect(() => {
+    if ((dateFrom || dateTo || (specificDates && specificDates.length > 0)) && period !== "all") {
+      setPeriod("all");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, specificDates]);
+
+  function selectUrgencyPeriod(next: Period) {
+    setPeriod(period === next ? "all" : next);
+    if (dateFrom) setDateFrom("");
+    if (dateTo) setDateTo("");
+    if (specificDates && specificDates.length > 0) setSpecificDates([]);
+  }
 
   const balanceItauAmount = balanceItau ? Number(balanceItau.amount) : null;
   const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
