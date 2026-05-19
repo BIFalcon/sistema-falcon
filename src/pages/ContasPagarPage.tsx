@@ -1030,9 +1030,9 @@ export default function ContasPagarPage() {
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                    {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
+                    {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
+                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
