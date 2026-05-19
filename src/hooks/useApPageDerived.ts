@@ -283,17 +283,68 @@ export function useApPageDerived(opts: {
   }, [filtered, groupNd]);
 
   // ── Urgência ───────────────────────────────────────────────────────────
+  // filteredSemPeriod: mesmos filtros que "filtered" mas SEM o filtro de período
+  // e SEM o filtro de data (dateFrom/dateTo/specificDates). Usado para os
+  // contadores de urgência — cada card conta o seu próprio período.
+  const filteredSemPeriod = useMemo(
+    () =>
+      entries.filter((e) => {
+        if (selectedStatuses.length > 0) {
+          const ok = selectedStatuses.some((s) => {
+            if (s === "issues") return e.gg_approval !== "approved";
+            return e.payment_status === s;
+          });
+          if (!ok) return false;
+        }
+        if (selectedCategories.length > 0) {
+          if (!e.category || !selectedCategories.includes(e.category)) return false;
+        }
+        if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
+        if (searchText && searchText.trim()) {
+          const q = searchText.toLowerCase().trim();
+          if (
+            !e.supplier?.toLowerCase().includes(q) &&
+            !e.cnpj?.toLowerCase().includes(q) &&
+            !e.document_number?.toLowerCase().includes(q)
+          ) return false;
+        }
+        return true;
+      }),
+    [entries, selectedStatuses, selectedCategories, hideTrivial, searchText],
+  );
+
   const urgencyCounts = useMemo(() => {
     const c = { today: 0, tomorrow: 0, thisWeek: 0, nextWeek: 0, nextMonth: 0 };
-    entries.forEach((e) => {
-      if (isWithinPeriod(e.due_date, "today")) c.today++;
-      else if (isWithinPeriod(e.due_date, "tomorrow")) c.tomorrow++;
+    filteredSemPeriod.forEach((e) => {
+      if (isWithinPeriod(e.due_date, "today"))          c.today++;
+      else if (isWithinPeriod(e.due_date, "tomorrow"))  c.tomorrow++;
       else if (isWithinPeriod(e.due_date, "this_week")) c.thisWeek++;
       else if (isWithinPeriod(e.due_date, "next_week")) c.nextWeek++;
-      else if (isWithinPeriod(e.due_date, "next_month")) c.nextMonth++;
+      else if (isWithinPeriod(e.due_date, "next_month"))c.nextMonth++;
     });
     return c;
-  }, [entries]);
+  }, [filteredSemPeriod]);
+
+  const overdueCount = useMemo(
+    () => filteredSemPeriod.filter((e) => isWithinPeriod(e.due_date, "overdue")).length,
+    [filteredSemPeriod],
+  );
+
+  // Visibilidade das colunas Valor Original/Novo/Juros — só aparecem se houver
+  // pelo menos um entry com valor relevante.
+  const showOriginalAmount = useMemo(
+    () => entries.some((e) => e.original_amount != null
+      && Number(e.original_amount) !== Number(e.amount)),
+    [entries],
+  );
+  const showPaidAmount = useMemo(
+    () => entries.some((e) => e.paid_amount != null),
+    [entries],
+  );
+  const showPaidInterest = useMemo(
+    () => entries.some((e) => e.paid_interest != null && Number(e.paid_interest) !== 0),
+    [entries],
+  );
 
   // ── Problemas ──────────────────────────────────────────────────────────
   const issueCounts = useMemo(() => {
@@ -374,6 +425,10 @@ export function useApPageDerived(opts: {
     allDocsByEntry,
     unlinkedDocs,
     urgencyCounts,
+    overdueCount,
+    showOriginalAmount,
+    showPaidAmount,
+    showPaidInterest,
     issueCounts,
     issueEntries,
     entryIssues,
