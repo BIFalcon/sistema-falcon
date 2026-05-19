@@ -41,6 +41,10 @@ export interface ApPageDerived {
     nextWeek: number;
     nextMonth: number;
   };
+  overdueCount: number;
+  showOriginalAmount: boolean;
+  showPaidAmount: boolean;
+  showPaidInterest: boolean;
   issueCounts: Record<IssueCategory, number>;
   issueEntries: ApEntry[];
   entryIssues: (e: ApEntry) => Set<IssueCategory>;
