@@ -1197,9 +1197,9 @@ export default function ContasPagarPage() {
                   <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                  {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
+                  {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
+                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
                   <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                   <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
@@ -1218,6 +1218,9 @@ export default function ContasPagarPage() {
                     showBank={false}
                     canEditObservation={canManage}
                     canManageCategory={false}
+                    showOriginalAmount={showOriginalAmount}
+                    showPaidAmount={showPaidAmount}
+                    showPaidInterest={showPaidInterest}
                   />
                 ))}
               </TableBody>
