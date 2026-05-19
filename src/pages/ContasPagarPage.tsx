@@ -100,7 +100,15 @@ export default function ContasPagarPage() {
   const canApproveBase = canManage || isGg;
 
   const { data: hotels = [] } = useAllHotels();
-  const { hotelId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
+  const {
+    hotelId,
+    dateFrom,
+    dateTo,
+    specificDates,
+    setDateFrom,
+    setDateTo,
+    setSpecificDates,
+  } = useModuleFilters("financeiro");
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -190,12 +198,33 @@ export default function ContasPagarPage() {
     displayRows,
     categories,
     urgencyCounts,
+    overdueCount,
+    showOriginalAmount,
+    showPaidAmount,
+    showPaidInterest,
     issueCounts,
     issueEntries,
     totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
+
+  // Filtro período x filtro de data: ao escolher uma data manual, reseta o card
+  // de urgência ativo para "all" (não conflitar). A limpeza inversa acontece
+  // nos onClick dos cards de urgência abaixo.
+  useEffect(() => {
+    if ((dateFrom || dateTo || (specificDates && specificDates.length > 0)) && period !== "all") {
+      setPeriod("all");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, specificDates]);
+
+  function selectUrgencyPeriod(next: Period) {
+    setPeriod(period === next ? "all" : next);
+    if (dateFrom) setDateFrom("");
+    if (dateTo) setDateTo("");
+    if (specificDates && specificDates.length > 0) setSpecificDates([]);
+  }
 
   const balanceItauAmount = balanceItau ? Number(balanceItau.amount) : null;
   const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
@@ -582,16 +611,16 @@ export default function ContasPagarPage() {
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 <UrgencyCell
                   label="Vencidos"
-                  count={entries.filter((e) => isWithinPeriod(e.due_date, "overdue")).length}
+                  count={overdueCount}
                   tone="danger"
                   active={period === "overdue"}
-                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
+                  onClick={() => selectUrgencyPeriod("overdue")}
                 />
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => setPeriod(period === "today" ? "all" : "today")} />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => setPeriod(period === "tomorrow" ? "all" : "tomorrow")} />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => setPeriod(period === "this_week" ? "all" : "this_week")} />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
+                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => selectUrgencyPeriod("today")} />
+                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => selectUrgencyPeriod("tomorrow")} />
+                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => selectUrgencyPeriod("this_week")} />
+                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => selectUrgencyPeriod("next_week")} />
+                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => selectUrgencyPeriod("next_month")} />
               </div>
               {distributionEntries.length > 0 && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
@@ -1001,9 +1030,9 @@ export default function ContasPagarPage() {
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                    {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
+                    {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
+                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
@@ -1015,12 +1044,12 @@ export default function ContasPagarPage() {
                   {entriesLoading ? (
                     <TableSkeleton
                       rows={8}
-                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
+                      cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
                     />
                   ) : displayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0)}
+                        colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
                         className="text-center text-sm text-muted-foreground py-8"
                       >
                         Nenhum lançamento encontrado.
@@ -1033,7 +1062,10 @@ export default function ContasPagarPage() {
                           (showApproval ? 11 : 10) +
                           (sourceSystem === "omie" ? 2 : 0) +
                           ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) +
-                          (showingAllHotels ? 1 : 0);
+                          (showingAllHotels ? 1 : 0) -
+                          (showOriginalAmount ? 0 : 1) -
+                          (showPaidAmount ? 0 : 1) -
+                          (showPaidInterest ? 0 : 1);
                         return (
                           <TableRow key={`g-${idx}`} className="bg-muted/30">
                             {(canMarkInsertedAgendado || canMarkPaid) && (
@@ -1087,6 +1119,9 @@ export default function ContasPagarPage() {
                           canEditObservation={canManage}
                           canManageCategory={canManage}
                           hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
+                          showOriginalAmount={showOriginalAmount}
+                          showPaidAmount={showPaidAmount}
+                          showPaidInterest={showPaidInterest}
                         />
                       );
                     })
@@ -1162,9 +1197,9 @@ export default function ContasPagarPage() {
                   <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>
-                  <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>
+                  {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
+                  {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
+                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
                   <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                   <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
@@ -1183,6 +1218,9 @@ export default function ContasPagarPage() {
                     showBank={false}
                     canEditObservation={canManage}
                     canManageCategory={false}
+                    showOriginalAmount={showOriginalAmount}
+                    showPaidAmount={showPaidAmount}
+                    showPaidInterest={showPaidInterest}
                   />
                 ))}
               </TableBody>
