@@ -34,6 +34,9 @@ interface EntryRowProps {
   canManageCategory?: boolean;
   /** Quando definido, renderiza uma célula extra com o nome do hotel (modo "todos os hotéis"). */
   hotelLabel?: string;
+  showOriginalAmount?: boolean;
+  showPaidAmount?: boolean;
+  showPaidInterest?: boolean;
 }
 
 export function ApEntryRow({
@@ -49,6 +52,9 @@ export function ApEntryRow({
   canEditObservation = false,
   canManageCategory = false,
   hotelLabel,
+  showOriginalAmount = true,
+  showPaidAmount = true,
+  showPaidInterest = true,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -65,7 +71,7 @@ export function ApEntryRow({
       className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
     >
       {selectable && (
-        <TableCell className="w-8">
+        <TableCell className="w-8 px-2 py-1.5">
           <Checkbox
             checked={selected}
             onCheckedChange={(c) => onToggleSelected?.(!!c)}
@@ -74,12 +80,12 @@ export function ApEntryRow({
         </TableCell>
       )}
       {hotelLabel !== undefined && (
-        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1.5">
           {hotelLabel}
         </TableCell>
       )}
       {/* Fornecedor */}
-      <TableCell className="font-medium">
+      <TableCell className="font-medium text-xs px-2 py-1.5">
         <div className="flex items-center gap-2">
           <span>{entry.supplier}</span>
           {archived && (
@@ -108,46 +114,74 @@ export function ApEntryRow({
 
       {/* CNPJ — só OMIE e não-compact */}
       {!compact && sourceSystem === "omie" && (
-        <TableCell className="text-xs text-muted-foreground hidden md:table-cell">{entry.cnpj ?? "—"}</TableCell>
+        <TableCell className="text-xs text-muted-foreground hidden md:table-cell px-2 py-1.5 max-w-[100px] truncate">
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block truncate">{entry.cnpj ?? "—"}</span>
+              </TooltipTrigger>
+              {entry.cnpj && (
+                <TooltipContent side="top"><p className="text-xs">{entry.cnpj}</p></TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        </TableCell>
       )}
 
       {/* Nº Doc — não-compact */}
       {!compact && (
-        <TableCell className="text-xs hidden md:table-cell">{entry.document_number ?? "—"}</TableCell>
+        <TableCell className="text-xs hidden md:table-cell px-2 py-1.5">{entry.document_number ?? "—"}</TableCell>
       )}
 
       {/* Vencimento */}
-      <TableCell className="text-xs">{fmtDate(entry.due_date)}</TableCell>
+      <TableCell className="text-xs px-2 py-1.5">{fmtDate(entry.due_date)}</TableCell>
 
       {/* Valor */}
-      <TableCell className="text-right font-mono text-sm">
+      <TableCell className="text-right font-mono text-xs px-2 py-1.5">
         <div>{fmtBRL(Number(entry.amount))}</div>
       </TableCell>
 
       {/* Valor Original */}
-      <TableCell className="text-right font-mono text-xs text-muted-foreground hidden lg:table-cell">
-        {fmtBRL(Number(entry.original_amount ?? entry.amount))}
-      </TableCell>
+      {showOriginalAmount && (
+        <TableCell className="text-right font-mono text-xs text-muted-foreground hidden lg:table-cell px-2 py-1.5">
+          {entry.original_amount != null ? fmtBRL(Number(entry.original_amount)) : "—"}
+        </TableCell>
+      )}
 
       {/* Valor Novo (pago com juros) */}
-      <TableCell className="text-right font-mono text-xs hidden lg:table-cell">
-        {entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}
-      </TableCell>
+      {showPaidAmount && (
+        <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
+          {entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}
+        </TableCell>
+      )}
 
       {/* Juros */}
-      <TableCell className="text-right font-mono text-xs hidden lg:table-cell">
-        {entry.paid_interest != null && Number(entry.paid_interest) !== 0
-          ? fmtBRL(Number(entry.paid_interest))
-          : "—"}
-      </TableCell>
+      {showPaidInterest && (
+        <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
+          {entry.paid_interest != null && Number(entry.paid_interest) !== 0
+            ? fmtBRL(Number(entry.paid_interest))
+            : "—"}
+        </TableCell>
+      )}
 
       {/* Categoria — não-compact */}
       {!compact && (
-        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell">
+        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell px-2 py-1.5 max-w-[120px]">
           <div className="flex items-center gap-1">
-            <span className="truncate">
-              {entry.category ?? entry.payment_method ?? "—"}
-            </span>
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="block truncate max-w-[120px]">
+                    {entry.category ?? entry.payment_method ?? "—"}
+                  </span>
+                </TooltipTrigger>
+                {(entry.category || entry.payment_method) && (
+                  <TooltipContent side="top">
+                    <p className="text-xs">{entry.category ?? entry.payment_method}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             {canManageCategory && (
               <SalariosRhToggle
                 entryId={entry.id}
@@ -161,20 +195,20 @@ export function ApEntryRow({
 
       {/* Conta corrente (Itaú/Santander) */}
       {!compact && showBank && (
-        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell capitalize">
+        <TableCell className="text-xs text-muted-foreground hidden lg:table-cell capitalize px-2 py-1.5">
           {entry.bank_account ?? "—"}
         </TableCell>
       )}
 
       {/* Aprovação GG */}
       {showApproval && (
-        <TableCell>
+        <TableCell className="px-2 py-1.5">
           <ApprovalBadge status={entry.gg_approval} />
         </TableCell>
       )}
 
       {/* Agendado para */}
-      <TableCell className="text-xs hidden md:table-cell">
+      <TableCell className="text-xs hidden md:table-cell px-2 py-1.5">
         {entry.payment_status === "agendado" && entry.scheduled_date ? (
           <span className={isScheduledOverdue(entry.scheduled_date) ? "text-destructive font-semibold" : ""}>
             {fmtDate(entry.scheduled_date)}
@@ -186,7 +220,7 @@ export function ApEntryRow({
 
       {/* Status de pagamento */}
       {!compact && (
-        <TableCell>
+        <TableCell className="px-2 py-1.5">
           <div className="flex items-center gap-1">
             <PaymentStatusBadge status={entry.payment_status} />
             {canEditObservation && (
