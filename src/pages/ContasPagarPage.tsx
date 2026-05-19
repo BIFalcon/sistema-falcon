@@ -611,16 +611,16 @@ export default function ContasPagarPage() {
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 <UrgencyCell
                   label="Vencidos"
-                  count={entries.filter((e) => isWithinPeriod(e.due_date, "overdue")).length}
+                  count={overdueCount}
                   tone="danger"
                   active={period === "overdue"}
-                  onClick={() => setPeriod(period === "overdue" ? "all" : "overdue")}
+                  onClick={() => selectUrgencyPeriod("overdue")}
                 />
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => setPeriod(period === "today" ? "all" : "today")} />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => setPeriod(period === "tomorrow" ? "all" : "tomorrow")} />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => setPeriod(period === "this_week" ? "all" : "this_week")} />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => setPeriod(period === "next_week" ? "all" : "next_week")} />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => setPeriod(period === "next_month" ? "all" : "next_month")} />
+                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => selectUrgencyPeriod("today")} />
+                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => selectUrgencyPeriod("tomorrow")} />
+                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => selectUrgencyPeriod("this_week")} />
+                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => selectUrgencyPeriod("next_week")} />
+                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => selectUrgencyPeriod("next_month")} />
               </div>
               {distributionEntries.length > 0 && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
