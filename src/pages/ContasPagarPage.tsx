@@ -1118,6 +1118,7 @@ export default function ContasPagarPage() {
                           showBank={sourceSystem === "omie"}
                           canEditObservation={canManage}
                           canManageCategory={canManage}
+                          canManage={canManage}
                           hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
                           showOriginalAmount={showOriginalAmount}
                           showPaidAmount={showPaidAmount}
