@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import { sendLovableEmail } from "npm:@lovable.dev/email-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,21 @@ const fmtDate = (s: string | null) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 };
+
+function buildEmailHtml(md: string, baseUrl: string): string {
+  // Conversão simples de markdown para HTML.
+  const html = md
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[(.+?)\]\((\/[^)]+)\)/g, `<a href="${baseUrl}$2">$1</a>`)
+    .replace(/\[(.+?)\]\((.+?)\)/g, `<a href="$2">$1</a>`)
+    .replace(/\n/g, "<br/>");
+  return `<!doctype html>
+<html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;line-height:1.5;max-width:640px;margin:0 auto;padding:24px;">
+  <div style="font-size:14px;">${html}</div>
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
+  <p style="font-size:12px;color:#777;">Sistema Falcon Hotels</p>
+</body></html>`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
