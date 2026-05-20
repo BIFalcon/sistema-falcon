@@ -213,6 +213,36 @@ export default function ContasPagarPage() {
     balanceDiff,
   } = derived;
 
+  // Aplica ordenação por coluna em cima do displayRows derivado.
+  // Linhas do tipo "group" são mantidas no topo (a ordenação só altera entre singles).
+  const displayRows = useMemo(() => {
+    if (!sortField) return displayRowsRaw;
+    const groups = displayRowsRaw.filter((r) => r.kind === "group");
+    const singles = displayRowsRaw.filter((r) => r.kind === "single");
+    const sortedSingles = [...singles].sort((a, b) => {
+      const ea = (a as { entry: ApEntry }).entry;
+      const eb = (b as { entry: ApEntry }).entry;
+      if (sortField === "amount") {
+        const va = Number(ea.amount ?? 0);
+        const vb = Number(eb.amount ?? 0);
+        return sortDir === "asc" ? va - vb : vb - va;
+      }
+      // due_date — string YYYY-MM-DD
+      const va = ea.due_date ?? "";
+      const vb = eb.due_date ?? "";
+      if (va === vb) return 0;
+      return sortDir === "asc" ? (va < vb ? -1 : 1) : (va < vb ? 1 : -1);
+    });
+    return [...groups, ...sortedSingles];
+  }, [displayRowsRaw, sortField, sortDir]);
+
+  function toggleSort(field: "amount" | "due_date") {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("desc"); }
+  }
+  const sortIndicator = (field: "amount" | "due_date") =>
+    sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
+
   // Filtro período x filtro de data: ao escolher uma data manual, reseta o card
   // de urgência ativo para "all" (não conflitar). A limpeza inversa acontece
   // nos onClick dos cards de urgência abaixo.
