@@ -199,7 +199,7 @@ export default function ContasPagarPage() {
     entries,
     distributionEntries,
     filtered,
-    displayRows,
+    displayRows: displayRowsRaw,
     categories,
     urgencyCounts,
     overdueCount,
