@@ -168,6 +168,10 @@ export default function ContasPagarPage() {
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
 
+  // Ordenação por coluna (Valor / Vencimento)
+  const [sortField, setSortField] = useState<"amount" | "due_date" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Derivações ─────────────────────────────────────────────────────────
@@ -195,7 +199,7 @@ export default function ContasPagarPage() {
     entries,
     distributionEntries,
     filtered,
-    displayRows,
+    displayRows: displayRowsRaw,
     categories,
     urgencyCounts,
     overdueCount,
@@ -208,6 +212,36 @@ export default function ContasPagarPage() {
     distributionTotal,
     balanceDiff,
   } = derived;
+
+  // Aplica ordenação por coluna em cima do displayRows derivado.
+  // Linhas do tipo "group" são mantidas no topo (a ordenação só altera entre singles).
+  const displayRows = useMemo(() => {
+    if (!sortField) return displayRowsRaw;
+    const groups = displayRowsRaw.filter((r) => r.kind === "group");
+    const singles = displayRowsRaw.filter((r) => r.kind === "single");
+    const sortedSingles = [...singles].sort((a, b) => {
+      const ea = (a as { entry: ApEntry }).entry;
+      const eb = (b as { entry: ApEntry }).entry;
+      if (sortField === "amount") {
+        const va = Number(ea.amount ?? 0);
+        const vb = Number(eb.amount ?? 0);
+        return sortDir === "asc" ? va - vb : vb - va;
+      }
+      // due_date — string YYYY-MM-DD
+      const va = ea.due_date ?? "";
+      const vb = eb.due_date ?? "";
+      if (va === vb) return 0;
+      return sortDir === "asc" ? (va < vb ? -1 : 1) : (va < vb ? 1 : -1);
+    });
+    return [...groups, ...sortedSingles];
+  }, [displayRowsRaw, sortField, sortDir]);
+
+  function toggleSort(field: "amount" | "due_date") {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("desc"); }
+  }
+  const sortIndicator = (field: "amount" | "due_date") =>
+    sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
   // Filtro período x filtro de data: ao escolher uma data manual, reseta o card
   // de urgência ativo para "all" (não conflitar). A limpeza inversa acontece
@@ -748,7 +782,6 @@ export default function ContasPagarPage() {
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
-                  { value: "issues", label: "Sem aprovação do GG" },
                 ];
                 return (
                   <DropdownMenu>
@@ -1028,8 +1061,12 @@ export default function ContasPagarPage() {
                     <TableHead>Fornecedor</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("due_date")}>
+                      Vencimento {sortIndicator("due_date")}
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("amount")}>
+                      Valor {sortIndicator("amount")}
+                    </TableHead>
                     {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                     {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
                     {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
@@ -1118,6 +1155,7 @@ export default function ContasPagarPage() {
                           showBank={sourceSystem === "omie"}
                           canEditObservation={canManage}
                           canManageCategory={canManage}
+                          canManage={canManage}
                           hotelLabel={showingAllHotels ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : undefined}
                           showOriginalAmount={showOriginalAmount}
                           showPaidAmount={showPaidAmount}

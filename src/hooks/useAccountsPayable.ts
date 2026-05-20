@@ -58,6 +58,8 @@ export interface ApEntry {
   paid_interest: number | null;
   paid_amount: number | null;
   original_amount: number | null;
+  is_group?: boolean | null;
+  grouped_ids?: string[] | null;
 }
 
 export interface ApBankBalance {
@@ -576,6 +578,40 @@ export function useSetEntryPaymentStatus() {
   });
 }
 
+/**
+ * Desagrupa um lançamento agrupado: desarquiva os originais e arquiva o grupo.
+ */
+export function useUngroupEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { groupId: string; hotelId: string }) => {
+      const { data: group, error: gErr } = await supabase
+        .from("ap_entries")
+        .select("grouped_ids")
+        .eq("id", input.groupId)
+        .single();
+      const groupedIds = (group as { grouped_ids?: string[] | null } | null)?.grouped_ids ?? [];
+      if (gErr || groupedIds.length === 0) throw new Error("Grupo não encontrado");
+
+      const { error: uErr } = await supabase
+        .from("ap_entries")
+        .update({ archived_at: null } as never)
+        .in("id", groupedIds);
+      if (uErr) throw uErr;
+
+      const { error: aErr } = await supabase
+        .from("ap_entries")
+        .update({ archived_at: new Date().toISOString() } as never)
+        .eq("id", input.groupId);
+      if (aErr) throw aErr;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
 // ── Cartão a receber ──────────────────────────────────────────────────────
 export interface ApCardReceivable {
   id: string;
@@ -772,7 +808,7 @@ export function useGroupEntries() {
         upload_id: first.upload_id,
         source_system: first.source_system,
         entry_key: `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        supplier: input.categoryName,
+        supplier: first.supplier, // mantém o nome do fornecedor original
         cnpj: null,
         document_number: null,
         description: `Agrupamento de ${originals.length} lançamentos`,

@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import { sendLovableEmail } from "npm:@lovable.dev/email-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,21 @@ const fmtDate = (s: string | null) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 };
+
+function buildEmailHtml(md: string, baseUrl: string): string {
+  // Conversão simples de markdown para HTML.
+  const html = md
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[(.+?)\]\((\/[^)]+)\)/g, `<a href="${baseUrl}$2">$1</a>`)
+    .replace(/\[(.+?)\]\((.+?)\)/g, `<a href="$2">$1</a>`)
+    .replace(/\n/g, "<br/>");
+  return `<!doctype html>
+<html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;line-height:1.5;max-width:640px;margin:0 auto;padding:24px;">
+  <div style="font-size:14px;">${html}</div>
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
+  <p style="font-size:12px;color:#777;">Sistema Falcon Hotels</p>
+</body></html>`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -122,45 +138,27 @@ Deno.serve(async (req) => {
 
     const linkUrl = `/financeiro/contas-pagar`;
 
-    // Inserir na fila (usa enqueue_workflow_notification existente)
-    const recipientsJson = recipients.map((r) => ({
-      user_id: r.user_id ?? null,
-      email: r.email,
-      role: "gg",
-    }));
-
-    // closing_id é NOT NULL na tabela; usamos um placeholder buscando o último closing do hotel
-    const { data: anyClosing } = await admin
-      .from("closings")
-      .select("id")
-      .eq("hotel_id", hotelId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!anyClosing) {
-      return new Response(JSON.stringify({ error: "no_closing_anchor" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Envia e-mail diretamente para cada destinatário (sem depender de closing_id)
+    const APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://sistema-falcon.lovable.app";
+    let sent = 0;
+    for (const r of recipients) {
+      try {
+        await sendLovableEmail({
+          from: "Sistema Falcon <notificacoes@notify.falconhoteis.com.br>",
+          to: r.email,
+          subject,
+          html: buildEmailHtml(bodyMd, APP_URL),
+        });
+        sent++;
+      } catch (err) {
+        console.error("[notify-gg-ap] falha ao enviar para", r.email, err);
+      }
     }
 
-    const { data: inserted, error: enqErr } = await admin.rpc("enqueue_workflow_notification", {
-      _event: "ap_pendencies_to_gg",
-      _closing_id: anyClosing.id,
-      _hotel_id: hotelId,
-      _recipients: recipientsJson,
-      _subject: subject,
-      _body_md: bodyMd,
-      _link_url: linkUrl,
-      _payload: { entry_ids: entryIds, total },
-    });
-    if (enqErr) throw enqErr;
-
-    return new Response(JSON.stringify({
-      ok: true,
-      sent: inserted ?? recipients.length,
-      recipients: recipients.length,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({ ok: true, sent, recipients: recipients.length, link_url: linkUrl }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("notify-gg-ap error", err);
     return new Response(JSON.stringify({ error: err?.message ?? String(err) }), {

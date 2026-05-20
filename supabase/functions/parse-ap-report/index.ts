@@ -550,12 +550,21 @@ Deno.serve(async (req) => {
         // Preserva: gg_approval*, primary_document_id, observation
         // Status: 'pago' nunca retroage. Se OMIE traz status específico
         // (agendado/pago) usa ele; caso contrário mantém o atual.
-        const preservedStatus =
-          prev.payment_status === "pago"
-            ? "pago"
-            : omieFalconStatus !== "em_aprovacao"
-              ? omieFalconStatus
-              : (prev.payment_status ?? "em_aprovacao");
+        const preservedStatus = (() => {
+          // Pago nunca retroage
+          if (prev.payment_status === "pago") return "pago";
+          // Agendado só mantém se OMIE confirma que está agendado
+          if (prev.payment_status === "agendado" && omieFalconStatus === "agendado")
+            return "agendado";
+          // Autorizado mantém se OMIE não rebaixou o status
+          if (
+            prev.payment_status === "autorizado" &&
+            (omieFalconStatus === "agendado" || omieFalconStatus === "em_aprovacao")
+          )
+            return "autorizado";
+          // Nos demais casos usa o status do OMIE
+          return omieFalconStatus;
+        })();
         updates.push({
           id: prev.id,
           ...baseFields,

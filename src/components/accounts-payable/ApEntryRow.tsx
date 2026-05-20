@@ -10,7 +10,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -32,6 +32,7 @@ interface EntryRowProps {
   showBank?: boolean;
   canEditObservation?: boolean;
   canManageCategory?: boolean;
+  canManage?: boolean;
   /** Quando definido, renderiza uma célula extra com o nome do hotel (modo "todos os hotéis"). */
   hotelLabel?: string;
   showOriginalAmount?: boolean;
@@ -51,6 +52,7 @@ export function ApEntryRow({
   showBank = false,
   canEditObservation = false,
   canManageCategory = false,
+  canManage = false,
   hotelLabel,
   showOriginalAmount = true,
   showPaidAmount = true,
@@ -93,6 +95,7 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
+          {entry.is_group && canManage && <UngroupButton entry={entry} />}
           {issues?.has("cnpj_divergente") && (
             <Badge
               variant="outline"
@@ -238,6 +241,29 @@ function isScheduledOverdue(scheduledDate: string): boolean {
   today.setHours(0, 0, 0, 0);
   const d = new Date(scheduledDate + "T00:00:00");
   return d.getTime() < today.getTime();
+}
+
+function UngroupButton({ entry }: { entry: ApEntry }) {
+  const ungroup = useUngroupEntries();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-[10px]"
+      disabled={ungroup.isPending}
+      onClick={async () => {
+        if (!confirm("Desagrupar este lançamento?")) return;
+        try {
+          await ungroup.mutateAsync({ groupId: entry.id, hotelId: entry.hotel_id });
+          toast.success("Lançamentos desagrupados.");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Erro ao desagrupar");
+        }
+      }}
+    >
+      Desagrupar
+    </Button>
+  );
 }
 
 function SalariosRhToggle({
