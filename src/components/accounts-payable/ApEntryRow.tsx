@@ -243,6 +243,29 @@ function isScheduledOverdue(scheduledDate: string): boolean {
   return d.getTime() < today.getTime();
 }
 
+function UngroupButton({ entry }: { entry: ApEntry }) {
+  const ungroup = useUngroupEntries();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-[10px]"
+      disabled={ungroup.isPending}
+      onClick={async () => {
+        if (!confirm("Desagrupar este lançamento?")) return;
+        try {
+          await ungroup.mutateAsync({ groupId: entry.id, hotelId: entry.hotel_id });
+          toast.success("Lançamentos desagrupados.");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Erro ao desagrupar");
+        }
+      }}
+    >
+      Desagrupar
+    </Button>
+  );
+}
+
 function SalariosRhToggle({
   entryId,
   hotelId,
