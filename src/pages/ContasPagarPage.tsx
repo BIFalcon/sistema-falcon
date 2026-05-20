@@ -168,6 +168,10 @@ export default function ContasPagarPage() {
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
 
+  // Ordenação por coluna (Valor / Vencimento)
+  const [sortField, setSortField] = useState<"amount" | "due_date" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Derivações ─────────────────────────────────────────────────────────
