@@ -748,7 +748,6 @@ export default function ContasPagarPage() {
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
-                  { value: "issues", label: "Sem aprovação do GG" },
                 ];
                 return (
                   <DropdownMenu>
