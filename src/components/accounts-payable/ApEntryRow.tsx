@@ -10,7 +10,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -32,6 +32,7 @@ interface EntryRowProps {
   showBank?: boolean;
   canEditObservation?: boolean;
   canManageCategory?: boolean;
+  canManage?: boolean;
   /** Quando definido, renderiza uma célula extra com o nome do hotel (modo "todos os hotéis"). */
   hotelLabel?: string;
   showOriginalAmount?: boolean;
@@ -51,6 +52,7 @@ export function ApEntryRow({
   showBank = false,
   canEditObservation = false,
   canManageCategory = false,
+  canManage = false,
   hotelLabel,
   showOriginalAmount = true,
   showPaidAmount = true,
@@ -93,6 +95,7 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
+          {entry.is_group && canManage && <UngroupButton entry={entry} />}
           {issues?.has("cnpj_divergente") && (
             <Badge
               variant="outline"
