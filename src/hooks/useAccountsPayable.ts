@@ -774,7 +774,7 @@ export function useGroupEntries() {
         upload_id: first.upload_id,
         source_system: first.source_system,
         entry_key: `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        supplier: input.categoryName,
+        supplier: first.supplier, // mantém o nome do fornecedor original
         cnpj: null,
         document_number: null,
         description: `Agrupamento de ${originals.length} lançamentos`,
