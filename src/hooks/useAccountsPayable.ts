@@ -58,6 +58,8 @@ export interface ApEntry {
   paid_interest: number | null;
   paid_amount: number | null;
   original_amount: number | null;
+  is_group?: boolean | null;
+  grouped_ids?: string[] | null;
 }
 
 export interface ApBankBalance {
