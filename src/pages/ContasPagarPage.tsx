@@ -1061,8 +1061,12 @@ export default function ContasPagarPage() {
                     <TableHead>Fornecedor</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden md:table-cell">CNPJ</TableHead>}
                     <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("due_date")}>
+                      Vencimento {sortIndicator("due_date")}
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("amount")}>
+                      Valor {sortIndicator("amount")}
+                    </TableHead>
                     {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                     {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
                     {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
