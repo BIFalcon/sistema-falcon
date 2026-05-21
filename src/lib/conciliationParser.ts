@@ -142,7 +142,20 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
             isTotalizador: isTot,
           });
         }
-        resolve(lines);
+        // Identifica documentos que aparecem como débito E crédito = estornos
+        const docsComDebito = new Set(
+          lines.filter((l) => l.valorDebito > 0 && l.documento).map((l) => l.documento)
+        );
+        const docsComCredito = new Set(
+          lines.filter((l) => l.valorCredito > 0 && l.documento).map((l) => l.documento)
+        );
+        const estornos = new Set(
+          [...docsComDebito].filter((doc) => docsComCredito.has(doc))
+        );
+        const linesFiltradas = lines.filter(
+          (l) => !l.documento || !estornos.has(l.documento)
+        );
+        resolve(linesFiltradas);
       } catch (err) {
         reject(err);
       }

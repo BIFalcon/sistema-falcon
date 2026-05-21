@@ -86,10 +86,9 @@ export function useConciliation(
       );
       const creditosRazao  = razaoDestaCateg.filter((l) => !l.isTotalizador && l.valorCredito > 0);
 
-      // totalDebito = soma dos MOVIMENTOs (linhas totalizadoras) da categoria.
-      // MOVIMENTOs são lançamentos contábeis de fechamento e não têm par no Journal.
+      // Soma TODOS os débitos da categoria (não só os com flag isTotalizador)
       const totalDebito = razaoDestaCateg
-        .filter((l) => l.isTotalizador && l.valorDebito > 0)
+        .filter((l) => l.valorDebito > 0)
         .reduce((s, l) => s + l.valorDebito, 0);
       const totalCreditoRazao = creditosRazao.reduce((s, l) => s + l.valorCredito, 0);
 
