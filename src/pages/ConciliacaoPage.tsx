@@ -123,6 +123,20 @@ function CategoryCard({ result }: { result: CategoryResult }) {
         </div>
       </div>
 
+      {!result.conciliado && result.totalDebito > 0 && result.linhasDebito?.length > 0 && (
+        <div className="mx-4 mb-4 p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-900/40">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-2">
+            Débito TOTVS sem correspondência:
+          </p>
+          {result.linhasDebito.map((d, i) => (
+            <div key={i} className="flex justify-between text-xs text-amber-700 dark:text-amber-300">
+              <span>{d.lancamento} — {d.historico?.slice(0, 80)}</span>
+              <span className="font-mono">{fmtBRL(d.valorDebito)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {expanded && hasDetails && (
         <div className="border-t">
           {result.apenasNoJournal.length > 0 && (
