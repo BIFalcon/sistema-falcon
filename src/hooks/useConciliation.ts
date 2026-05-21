@@ -13,6 +13,7 @@ export interface CategoryResult {
   apenasNoJournal: JournalLine[];
   apenasNoRazao: RazaoLine[];
   emAmbos: Array<{ razao: RazaoLine; journal: JournalLine }>;
+  linhasDebito: RazaoLine[];
 }
 
 export interface ConciliationResult {
@@ -99,43 +100,29 @@ export function useConciliation(
       // Cruzamento por VALOR + NOME do hóspede (Transaction Number != Documento)
       const journalReal = journalDestaCateg.filter((l) => l.credit > 0);
 
-      // Agrupa créditos do Razão por valor em centavos
-      const razaoByValue = new Map<number, RazaoLine[]>();
+      // Cruzamento direto por Documento (Razão) = Transaction Number (Journal)
+      const razaoByDoc = new Map<string, RazaoLine>();
       for (const r of creditosRazao) {
-        const cents = toCents(r.valorCredito);
-        if (!razaoByValue.has(cents)) razaoByValue.set(cents, []);
-        razaoByValue.get(cents)!.push(r);
+        if (r.documento) razaoByDoc.set(r.documento.trim(), r);
       }
 
-      // Cruza Journal com Razão por valor + nome
-      const matchedRazaoIndices = new Map<number, Set<number>>();
       const emAmbos: CategoryResult["emAmbos"] = [];
       const apenasNoJournal: JournalLine[] = [];
 
       for (const j of journalReal) {
-        const cents = toCents(j.credit);
-        const candidates = razaoByValue.get(cents) ?? [];
-        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
-        const matchIdx = candidates.findIndex(
-          (r, idx) =>
-            !usedIndices.has(idx) &&
-            namesMatch(r.historico, j.guestFullName || j.companyName || "")
-        );
-        if (matchIdx >= 0) {
-          usedIndices.add(matchIdx);
-          matchedRazaoIndices.set(cents, usedIndices);
-          emAmbos.push({ journal: j, razao: candidates[matchIdx] });
+        const trn = j.transactionNumber?.trim();
+        const match = trn ? razaoByDoc.get(trn) : undefined;
+        if (match) {
+          emAmbos.push({ journal: j, razao: match });
+          razaoByDoc.delete(trn!);
         } else {
           apenasNoJournal.push(j);
         }
       }
 
-      const apenasNoRazao = creditosRazao.filter((r) => {
-        const cents = toCents(r.valorCredito);
-        const candidates = razaoByValue.get(cents) ?? [];
-        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
-        return !usedIndices.has(candidates.indexOf(r));
-      });
+      const apenasNoRazao = creditosRazao.filter(
+        (r) => !emAmbos.some((m) => m.razao.documento === r.documento)
+      );
 
       // Divergência = apenas TOTVS interno: débito vs soma de créditos
       // O Journal é INFORMATIVO — não entra no cálculo de divergência
@@ -151,6 +138,7 @@ export function useConciliation(
         apenasNoJournal,
         apenasNoRazao,
         emAmbos,
+        linhasDebito: razaoDestaCateg.filter((l) => l.isTotalizador && l.valorDebito > 0),
       };
     });
 
