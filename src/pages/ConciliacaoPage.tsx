@@ -125,8 +125,44 @@ function CategoryCard({ result }: { result: CategoryResult }) {
 
       {expanded && hasDetails && (
         <div className="border-t">
-          {result.apenasNoJournal.length > 0 && (
+          {!result.conciliado && result.debitLines.length > 0 && (
             <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-semibold text-destructive">
+                  {result.debitLines.length} débito(s) no TOTVS — confira contra os créditos
+                </p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Documento</TableHead>
+                    <TableHead>Histórico</TableHead>
+                    <TableHead className="text-right">Valor débito</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {result.debitLines.map((l) => (
+                    <TableRow
+                      key={`deb-${l.lancamento}`}
+                      className="bg-destructive/5"
+                    >
+                      <TableCell className="font-mono text-xs">
+                        {l.documento || (l.isTotalizador ? "movimento" : "—")}
+                      </TableCell>
+                      <TableCell className="text-xs">{l.historico}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {fmtBRL(l.valorDebito)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {result.apenasNoJournal.length > 0 && (
+            <div className="p-4 border-t">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
