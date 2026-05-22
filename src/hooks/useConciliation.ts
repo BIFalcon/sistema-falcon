@@ -13,6 +13,8 @@ export interface CategoryResult {
   apenasNoJournal: JournalLine[];
   apenasNoRazao: RazaoLine[];
   emAmbos: Array<{ razao: RazaoLine; journal: JournalLine }>;
+  debitLines: RazaoLine[];
+  estornados: RazaoLine[];
 }
 
 export interface ConciliationResult {
@@ -80,15 +82,45 @@ export function useConciliation(
     const firstDate = razaoLines[0]?.date ?? journalLines[0]?.date ?? "";
 
     const results: CategoryResult[] = CATEGORIES.map((cat) => {
-      const razaoDestaCateg = razaoLines.filter(
+      const razaoDestaCategAll = razaoLines.filter(
         (l) => normalizaDescricaoRazao(l.descricao) === cat
       );
-      const creditosRazao  = razaoDestaCateg.filter((l) => !l.isTotalizador && l.valorCredito > 0);
+
+      // ESTORNOS: quando um mesmo Documento (não-movimento) aparece em DÉBITO
+      // e em CRÉDITO dentro da mesma categoria com o mesmo valor, é um estorno
+      // e ambas as linhas devem ser ignoradas da conciliação.
+      const estornoKeys = new Set<string>();
+      const estornados: RazaoLine[] = [];
+      const debitsWithDoc = razaoDestaCategAll.filter(
+        (l) => l.valorDebito > 0 && l.documento && !l.isTotalizador,
+      );
+      const creditsWithDoc = razaoDestaCategAll.filter(
+        (l) => l.valorCredito > 0 && l.documento,
+      );
+      for (const d of debitsWithDoc) {
+        const match = creditsWithDoc.find(
+          (c) =>
+            c.documento === d.documento &&
+            toCents(c.valorCredito) === toCents(d.valorDebito) &&
+            !estornoKeys.has(`c:${c.lancamento}`),
+        );
+        if (match) {
+          estornoKeys.add(`d:${d.lancamento}`);
+          estornoKeys.add(`c:${match.lancamento}`);
+          estornados.push(d, match);
+        }
+      }
+
+      const razaoDestaCateg = razaoDestaCategAll.filter(
+        (l) =>
+          !estornoKeys.has(`d:${l.lancamento}`) &&
+          !estornoKeys.has(`c:${l.lancamento}`),
+      );
+      const creditosRazao = razaoDestaCateg.filter((l) => !l.isTotalizador && l.valorCredito > 0);
+      const debitLines = razaoDestaCateg.filter((l) => l.valorDebito > 0);
 
       // Soma TODOS os débitos da categoria (não só os com flag isTotalizador)
-      const totalDebito = razaoDestaCateg
-        .filter((l) => l.valorDebito > 0)
-        .reduce((s, l) => s + l.valorDebito, 0);
+      const totalDebito = debitLines.reduce((s, l) => s + l.valorDebito, 0);
       const totalCreditoRazao = creditosRazao.reduce((s, l) => s + l.valorCredito, 0);
 
       const journalDestaCateg = journalLines.filter(
@@ -96,46 +128,55 @@ export function useConciliation(
       );
       const totalJournal = journalDestaCateg.reduce((s, l) => s + l.credit, 0);
 
-      // Cruzamento por VALOR + NOME do hóspede (Transaction Number != Documento)
+      // Cruzamento: 1) Documento == Transaction Number, 2) valor + nome.
       const journalReal = journalDestaCateg.filter((l) => l.credit > 0);
+      const usedRazao = new Set<string>();
+      const usedJournal = new Set<string>();
+      const emAmbos: CategoryResult["emAmbos"] = [];
 
-      // Agrupa créditos do Razão por valor em centavos
+      // Passo 1: match exato por número de documento.
+      const razaoByDoc = new Map<string, RazaoLine>();
+      for (const r of creditosRazao) {
+        const k = normKey(r.documento);
+        if (k && !razaoByDoc.has(k)) razaoByDoc.set(k, r);
+      }
+      for (const j of journalReal) {
+        const k = normKey(j.transactionNumber);
+        const r = k ? razaoByDoc.get(k) : undefined;
+        if (r && !usedRazao.has(r.lancamento)) {
+          usedRazao.add(r.lancamento);
+          usedJournal.add(j.transactionNumber);
+          emAmbos.push({ journal: j, razao: r });
+        }
+      }
+
+      // Passo 2: match por valor + nome (fallback).
       const razaoByValue = new Map<number, RazaoLine[]>();
       for (const r of creditosRazao) {
+        if (usedRazao.has(r.lancamento)) continue;
         const cents = toCents(r.valorCredito);
         if (!razaoByValue.has(cents)) razaoByValue.set(cents, []);
         razaoByValue.get(cents)!.push(r);
       }
-
-      // Cruza Journal com Razão por valor + nome
-      const matchedRazaoIndices = new Map<number, Set<number>>();
-      const emAmbos: CategoryResult["emAmbos"] = [];
       const apenasNoJournal: JournalLine[] = [];
-
       for (const j of journalReal) {
+        if (usedJournal.has(j.transactionNumber)) continue;
         const cents = toCents(j.credit);
         const candidates = razaoByValue.get(cents) ?? [];
-        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
-        const matchIdx = candidates.findIndex(
-          (r, idx) =>
-            !usedIndices.has(idx) &&
-            namesMatch(r.historico, j.guestFullName || j.companyName || "")
+        const idx = candidates.findIndex(
+          (r) =>
+            !usedRazao.has(r.lancamento) &&
+            namesMatch(r.historico, j.guestFullName || j.companyName || ""),
         );
-        if (matchIdx >= 0) {
-          usedIndices.add(matchIdx);
-          matchedRazaoIndices.set(cents, usedIndices);
-          emAmbos.push({ journal: j, razao: candidates[matchIdx] });
+        if (idx >= 0) {
+          const r = candidates[idx];
+          usedRazao.add(r.lancamento);
+          emAmbos.push({ journal: j, razao: r });
         } else {
           apenasNoJournal.push(j);
         }
       }
-
-      const apenasNoRazao = creditosRazao.filter((r) => {
-        const cents = toCents(r.valorCredito);
-        const candidates = razaoByValue.get(cents) ?? [];
-        const usedIndices = matchedRazaoIndices.get(cents) ?? new Set<number>();
-        return !usedIndices.has(candidates.indexOf(r));
-      });
+      const apenasNoRazao = creditosRazao.filter((r) => !usedRazao.has(r.lancamento));
 
       // Divergência = apenas TOTVS interno: débito vs soma de créditos
       // O Journal é INFORMATIVO — não entra no cálculo de divergência
@@ -151,6 +192,8 @@ export function useConciliation(
         apenasNoJournal,
         apenasNoRazao,
         emAmbos,
+        debitLines,
+        estornados,
       };
     });
 
