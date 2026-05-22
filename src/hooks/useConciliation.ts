@@ -173,7 +173,26 @@ export function useConciliation(
           usedRazao.add(r.lancamento);
           emAmbos.push({ journal: j, razao: r });
         } else {
-          apenasNoJournal.push(j);
+          // Passo 3: valor + data + qualquer parte do nome (>=3 chars) no histórico.
+          // Aceita como mesmo lançamento quando documento difere mas tudo o mais bate.
+          const idx2 = candidates.findIndex((r) => {
+            if (usedRazao.has(r.lancamento)) return false;
+            if (!r.date || !j.date || r.date !== j.date) return false;
+            const hist = r.historico
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase();
+            const parts = `${j.guestFirstName} ${j.guestLastName} ${j.companyName ?? ""}`
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase().split(/\s+/).filter((p) => p.length >= 3);
+            return parts.some((p) => hist.includes(p));
+          });
+          if (idx2 >= 0) {
+            const r = candidates[idx2];
+            usedRazao.add(r.lancamento);
+            emAmbos.push({ journal: j, razao: r });
+          } else {
+            apenasNoJournal.push(j);
+          }
         }
       }
       const apenasNoRazao = creditosRazao.filter((r) => !usedRazao.has(r.lancamento));
