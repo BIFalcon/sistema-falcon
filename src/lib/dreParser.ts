@@ -766,6 +766,9 @@ function bestMonthValueColumn(
     let score = dataCount;
     if (/realizado|actual|valor/.test(subHeader)) score += 1000;
     if (/orcado|budget|ano\s*anterior|desvio|varia|%/.test(subHeader)) score -= 1000;
+    if (/acumulado|total|m[ée]dia|ytd|year|anual|semestral/i.test(subHeader)) {
+      score -= 99999;
+    }
     if (score > best.score) best = { colIndex: c, dataCount, score };
   }
   return { colIndex: best.colIndex, dataCount: best.dataCount };
