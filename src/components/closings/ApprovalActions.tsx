@@ -128,7 +128,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
             className="gap-2"
           >
             <CheckCircle2 className="h-4 w-4" />
-            {currentStatus === "aguardando_fernando" ? "Aprovação Final" : `Aprovar — ${STATUS_LABELS[nextStatus]}`}
+            Aprovar
           </Button>
         )}
         {prevStatus && (
