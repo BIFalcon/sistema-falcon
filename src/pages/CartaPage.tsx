@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,13 +47,34 @@ export default function CartaPage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
+  const { data: existingClosing } = useQuery({
+    enabled: !resolvedId && !!hotelId,
+    queryKey: ["closing-lookup", hotelId, month, year],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("closings")
+        .select("id")
+        .eq("hotel_id", hotelId!)
+        .eq("month", month)
+        .eq("year", year)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   useEffect(() => {
-    if (!resolvedId && hotelId) {
+    if (resolvedId) return;
+    if (!hotelId) return;
+    if (existingClosing?.id) {
+      setResolvedId(existingClosing.id);
+      return;
+    }
+    if (existingClosing === null) {
       ensure.mutateAsync({ hotelId, month, year })
         .then((c) => setResolvedId(c.id))
         .catch((err) => toast.error(err.message));
     }
-  }, [resolvedId, hotelId, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resolvedId, hotelId, month, year, existingClosing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
   const { data: letter } = useLetter(resolvedId);
