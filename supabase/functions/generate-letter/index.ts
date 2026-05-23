@@ -47,9 +47,22 @@ Deno.serve(async (req) => {
 
     const closing = await supabase.from("closings").select("*").eq("id", closing_id).maybeSingle();
     if (closing.error || !closing.data) return json({ error: "Fechamento não encontrado" }, 404);
+
+    // Authorization: caller must have access to this hotel
+    const allowed = await supabase.rpc("is_hotel_allowed", {
+      _user_id: userId,
+      _hotel_id: closing.data.hotel_id,
+    });
+    if (allowed.error || allowed.data !== true) {
+      return json({ error: "Acesso negado a este hotel" }, 403);
+    }
+
     const hotel = await supabase.from("hotels").select("*").eq("id", closing.data.hotel_id).maybeSingle();
     const letter = await supabase.from("investor_letters").select("*").eq("id", letter_id).maybeSingle();
     if (letter.error || !letter.data) return json({ error: "Carta não encontrada" }, 404);
+    if (letter.data.closing_id !== closing_id) {
+      return json({ error: "Carta não pertence a este fechamento" }, 403);
+    }
 
     const nextVersion = (letter.data.ai_version_number ?? 0) + 1;
     if (manual_text) {

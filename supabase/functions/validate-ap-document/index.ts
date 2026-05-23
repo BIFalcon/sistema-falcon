@@ -57,6 +57,16 @@ Deno.serve(async (req) => {
     ]);
     if (!doc || !entry) return json({ error: "not_found" }, 404);
 
+    // Authorization: caller must have access to this entry's hotel
+    const userId = userData.user.id;
+    const allowed = await admin.rpc("is_hotel_allowed", {
+      _user_id: userId,
+      _hotel_id: entry.hotel_id,
+    });
+    if (allowed.error || allowed.data !== true) {
+      return json({ error: "forbidden" }, 403);
+    }
+
     if (!aiKey) {
       // Sem IA configurada — registra como "pending" e devolve aviso
       await admin.from("ap_documents").update({
