@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,13 +47,34 @@ export default function CartaPage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
+  const { data: existingClosing } = useQuery({
+    enabled: !resolvedId && !!hotelId,
+    queryKey: ["closing-lookup", hotelId, month, year],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("closings")
+        .select("id")
+        .eq("hotel_id", hotelId!)
+        .eq("month", month)
+        .eq("year", year)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   useEffect(() => {
-    if (!resolvedId && hotelId) {
+    if (resolvedId) return;
+    if (!hotelId) return;
+    if (existingClosing?.id) {
+      setResolvedId(existingClosing.id);
+      return;
+    }
+    if (existingClosing === null) {
       ensure.mutateAsync({ hotelId, month, year })
         .then((c) => setResolvedId(c.id))
         .catch((err) => toast.error(err.message));
     }
-  }, [resolvedId, hotelId, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resolvedId, hotelId, month, year, existingClosing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
   const { data: letter } = useLetter(resolvedId);
@@ -70,6 +92,7 @@ export default function CartaPage() {
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const hasDreData = indicators.length > 0;
 
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
@@ -253,6 +276,12 @@ export default function CartaPage() {
       <Card className="p-5 shadow-soft">
         <CartaStageStepper status={closing.status_carta} />
       </Card>
+
+      {!hasDreData && closing && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          ⚠️ A DRE deste hotel ainda não foi importada para este mês. Os dados dos indicadores aparecerão automaticamente após a Controladoria fazer o upload da DRE.
+        </div>
+      )}
 
       {skip ? (
         <Card className="p-6 shadow-soft">
