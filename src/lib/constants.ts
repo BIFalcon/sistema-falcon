@@ -126,12 +126,12 @@ export const DRE_STAGE_APPROVER: Record<ClosingStatus, AppRole | null> = {
 
 // Sequência de avanço do DRE
 export const DRE_NEXT_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
-  nao_iniciado: "aguardando_comentarios",
+  nao_iniciado: "aguardando_controladoria",
   aguardando_comentarios: "aguardando_controladoria",
   aguardando_controladoria: "aguardando_gop",
   aguardando_gop: "aguardando_fernando",
   aguardando_fernando: "aprovado",
-  devolvido: "aguardando_comentarios",
+  devolvido: "aguardando_controladoria",
 };
 
 // Estágio anterior para devolução

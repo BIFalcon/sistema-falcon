@@ -279,7 +279,7 @@ export function useUploadDre() {
       if (c && c.status_dre === "nao_iniciado") {
         await supabase
           .from("closings")
-          .update({ status_dre: "aguardando_comentarios" } as TablesUpdate<"closings">)
+          .update({ status_dre: "aguardando_controladoria" } as TablesUpdate<"closings">)
           .eq("id", closingId);
       }
 
