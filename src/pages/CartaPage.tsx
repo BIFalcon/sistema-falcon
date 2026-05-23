@@ -92,6 +92,7 @@ export default function CartaPage() {
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const hasDreData = indicators.length > 0;
 
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
@@ -275,6 +276,12 @@ export default function CartaPage() {
       <Card className="p-5 shadow-soft">
         <CartaStageStepper status={closing.status_carta} />
       </Card>
+
+      {!hasDreData && closing && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          ⚠️ A DRE deste hotel ainda não foi importada para este mês. Os dados dos indicadores aparecerão automaticamente após a Controladoria fazer o upload da DRE.
+        </div>
+      )}
 
       {skip ? (
         <Card className="p-6 shadow-soft">
