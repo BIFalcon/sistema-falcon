@@ -31,7 +31,16 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 
 export default function TurnoverPage() {
   const { allowedHotels, isMaster } = useAuth();
-  const { hotelId } = useModuleFilters("rh");
+  const { hotelId, month, year } = useModuleFilters("rh");
+  const [periodMonths, setPeriodMonths] = useState(1);
+
+  const PERIOD_OPTIONS = [
+    { value: 1, label: "Mensal" },
+    { value: 2, label: "Bimestral" },
+    { value: 3, label: "Trimestral" },
+    { value: 6, label: "Semestral" },
+    { value: 12, label: "Anual" },
+  ];
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -44,7 +53,10 @@ export default function TurnoverPage() {
     [allEmployees, hotelId],
   );
 
-  const metrics = useMemo(() => calcMetrics(scopedEmployees), [scopedEmployees]);
+  const metrics = useMemo(
+    () => calcMetrics(scopedEmployees, month, year),
+    [scopedEmployees, month, year],
+  );
 
   const sexData = [
     { name: "Masculino", value: metrics.porSexo.M },
@@ -99,6 +111,19 @@ export default function TurnoverPage() {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        {PERIOD_OPTIONS.map((p) => (
+          <Button
+            key={p.value}
+            size="sm"
+            variant={periodMonths === p.value ? "default" : "outline"}
+            onClick={() => setPeriodMonths(p.value)}
+          >
+            {p.label}
+          </Button>
+        ))}
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard label="Ativos" value={String(metrics.ativos)} />
@@ -117,8 +142,17 @@ export default function TurnoverPage() {
             <p className="text-sm text-muted-foreground py-8 text-center">Sem dados.</p>
           ) : (
             <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={sexData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+              <PieChart margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
+                <Pie
+                  data={sexData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={65}
+                  label={({ value, percent }) => `${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                  labelLine
+                >
                   {sexData.map((_, i) => <Cell key={i} fill={SEX_COLORS[i % SEX_COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
