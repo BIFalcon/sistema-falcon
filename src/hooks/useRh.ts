@@ -280,7 +280,12 @@ function diffDays(from: string | null, to: Date): number | null {
   return Math.floor((to.getTime() - d.getTime()) / 86400000);
 }
 
-export function calcMetrics(employees: RhEmployee[], referenceDate: Date = new Date()): RhMetrics {
+export function calcMetrics(
+  employees: RhEmployee[],
+  filterMonth?: number,
+  filterYear?: number,
+): RhMetrics {
+  const referenceDate = new Date();
   const total = employees.length;
   const ativos = employees.filter((e) => e.status === "ativo").length;
   const inativos = total - ativos;
@@ -325,15 +330,20 @@ export function calcMetrics(employees: RhEmployee[], referenceDate: Date = new D
       if (!Number.isNaN(adm) && refTs - adm < ninetyMs) novos++;
     }
 
-    // movimentações nos últimos 12 meses (para turnover/rotatividade)
-    const yearMs = 365 * 86400000;
+    // movimentações do mês/ano filtrados
+    const targetMonth = filterMonth ?? (new Date().getMonth() + 1);
+    const targetYear = filterYear ?? new Date().getFullYear();
     if (e.admission_date) {
-      const adm = new Date(e.admission_date).getTime();
-      if (!Number.isNaN(adm) && refTs - adm < yearMs) admissoes++;
+      const adm = new Date(e.admission_date);
+      if (adm.getFullYear() === targetYear && adm.getMonth() + 1 === targetMonth) {
+        admissoes++;
+      }
     }
     if (e.termination_date) {
-      const term = new Date(e.termination_date).getTime();
-      if (!Number.isNaN(term) && refTs - term < yearMs) desligamentos++;
+      const term = new Date(e.termination_date);
+      if (term.getFullYear() === targetYear && term.getMonth() + 1 === targetMonth) {
+        desligamentos++;
+      }
     }
   }
 
