@@ -8,7 +8,8 @@ export type ApPaymentStatus =
   | "em_aprovacao" // GG aprovou no OMIE — aguardando autorização do financeiro
   | "autorizado"   // coordenadora autorizou para pagamento
   | "agendado"     // agendado (unifica antigo "inserido")
-  | "pago";        // pago
+  | "pago"         // pago
+  | "pago_parcialmente"; // pago parcialmente (OMIE)
 
 export interface ApUpload {
   id: string;
