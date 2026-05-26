@@ -182,24 +182,33 @@ function isAllowedBank(_account: string): boolean {
   return true; // aceita qualquer conta corrente do OMIE
 }
 
-// Todo lançamento importado do OMIE já passou pela aprovação do GG.
-// O GG aprova no OMIE antes de o financeiro importar.
-function omieApprovalFromSituation(_sit: string | null): "pending" | "approved" {
-  return "approved";
+// OMIE: somente "Em Aprovação" e "Agendado" indicam que o GG já aprovou.
+// Demais situações (a vencer, vence hoje, atrasado, etc.) = não aprovado.
+function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
+  const s = toAscii(sit ?? "").toLowerCase();
+  if (s.includes("em aprovacao") || s.includes("agendado")) return "approved";
+  return "pending";
 }
 
 // Mapeia situação OMIE para o status de pagamento Falcon
-type ApPaymentStatus = "em_aprovacao" | "autorizado" | "agendado" | "pago";
+type ApPaymentStatus =
+  | "em_aprovacao"
+  | "autorizado"
+  | "agendado"
+  | "pago"
+  | "pago_parcialmente";
 function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
   if (!situacao) return "em_aprovacao";
-  const s = toAscii(situacao);
+  const s = toAscii(situacao).toLowerCase();
   if (s.includes("agendado")) return "agendado";
+  if (s.includes("pago parcialmente")) return "pago_parcialmente";
   if (s.includes("pago") || s.includes("liquidado")) return "pago";
-  if (s.includes("pago parcialmente")) return "agendado";
-  if (s.includes("vence hoje") || s.includes("atrasado") ||
-      s.includes("a vencer") || s.includes("previsto") ||
-      s.includes("aprovado") || s.includes("em aprovacao"))
-    return "em_aprovacao";
+  if (
+    s.includes("em aprovacao") ||
+    s.includes("previsto") ||
+    s.includes("aprovado")
+  ) return "em_aprovacao";
+  // "a vencer", "vence hoje", "atrasado" = não aprovado pelo GG
   return "em_aprovacao";
 }
 
