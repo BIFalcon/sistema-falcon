@@ -1289,6 +1289,7 @@ export type Database = {
       hotels: {
         Row: {
           active: boolean
+          bank_accounts: Json | null
           brand: string
           brand_logo_url: string | null
           cnpj: string | null
@@ -1304,6 +1305,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          bank_accounts?: Json | null
           brand: string
           brand_logo_url?: string | null
           cnpj?: string | null
@@ -1319,6 +1321,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          bank_accounts?: Json | null
           brand?: string
           brand_logo_url?: string | null
           cnpj?: string | null
