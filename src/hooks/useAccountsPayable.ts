@@ -8,7 +8,8 @@ export type ApPaymentStatus =
   | "em_aprovacao" // GG aprovou no OMIE — aguardando autorização do financeiro
   | "autorizado"   // coordenadora autorizou para pagamento
   | "agendado"     // agendado (unifica antigo "inserido")
-  | "pago";        // pago
+  | "pago"         // pago
+  | "pago_parcialmente"; // pago parcialmente (OMIE)
 
 export interface ApUpload {
   id: string;
@@ -410,6 +411,26 @@ export function useApEntries(hotelId: string | null) {
         .select("*")
         .eq("hotel_id", hotelId)
         .order("due_date", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      return (data ?? []) as ApEntry[];
+    },
+  });
+}
+
+/** Lançamentos pagos arquivados — usado pelo toggle "Ver pagos". */
+export function useApPaidEntries(hotelId: string | null, enabled = false) {
+  return useQuery({
+    enabled: enabled && !!hotelId,
+    queryKey: ["ap-paid", hotelId],
+    queryFn: async (): Promise<ApEntry[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .not("archived_at", "is", null)
+        .eq("payment_status", "pago")
+        .order("due_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ApEntry[];
     },

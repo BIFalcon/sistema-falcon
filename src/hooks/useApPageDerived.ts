@@ -222,12 +222,16 @@ export function useApPageDerived(opts: {
           if (scheduledTo && e.scheduled_date > scheduledTo) return false;
         }
         if (searchText && searchText.trim()) {
-          const q = searchText.toLowerCase().trim();
-          if (
-            !e.supplier?.toLowerCase().includes(q) &&
-            !e.cnpj?.toLowerCase().includes(q) &&
-            !e.document_number?.toLowerCase().includes(q)
-          ) return false;
+          const q = searchText.toLowerCase().replace(",", ".").replace("r$", "").trim();
+          const matchText =
+            e.supplier?.toLowerCase().includes(q) ||
+            e.cnpj?.toLowerCase().includes(q) ||
+            e.document_number?.toLowerCase().includes(q);
+          if (!matchText) {
+            const val = Number(e.amount ?? 0).toFixed(2);
+            const valBR = val.replace(".", ",");
+            if (!val.includes(q) && !valBR.includes(q)) return false;
+          }
         }
         return true;
       }),
@@ -301,12 +305,16 @@ export function useApPageDerived(opts: {
         }
         if (hideTrivial && Number(e.amount ?? 0) < 1) return false;
         if (searchText && searchText.trim()) {
-          const q = searchText.toLowerCase().trim();
-          if (
-            !e.supplier?.toLowerCase().includes(q) &&
-            !e.cnpj?.toLowerCase().includes(q) &&
-            !e.document_number?.toLowerCase().includes(q)
-          ) return false;
+          const q = searchText.toLowerCase().replace(",", ".").replace("r$", "").trim();
+          const matchText =
+            e.supplier?.toLowerCase().includes(q) ||
+            e.cnpj?.toLowerCase().includes(q) ||
+            e.document_number?.toLowerCase().includes(q);
+          if (!matchText) {
+            const val = Number(e.amount ?? 0).toFixed(2);
+            const valBR = val.replace(".", ",");
+            if (!val.includes(q) && !valBR.includes(q)) return false;
+          }
         }
         return true;
       }),

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import React from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import FechamentoPage from "./pages/FechamentoPage";
@@ -62,8 +63,43 @@ function RoleGuard({
   return <>{children}</>;
 }
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <p className="text-lg font-semibold text-destructive">
+            Algo deu errado ao carregar o sistema.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {this.state.error?.message}
+          </p>
+          <button
+            className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm"
+            onClick={() => window.location.reload()}
+          >
+            Recarregar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
     <TooltipProvider>
       <Sonner richColors closeButton />
       <BrowserRouter>
@@ -129,6 +165,7 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
+    </ErrorBoundary>
   </QueryClientProvider>
 );
 

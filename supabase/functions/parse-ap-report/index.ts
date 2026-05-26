@@ -182,24 +182,33 @@ function isAllowedBank(_account: string): boolean {
   return true; // aceita qualquer conta corrente do OMIE
 }
 
-// Todo lançamento importado do OMIE já passou pela aprovação do GG.
-// O GG aprova no OMIE antes de o financeiro importar.
-function omieApprovalFromSituation(_sit: string | null): "pending" | "approved" {
-  return "approved";
+// OMIE: somente "Em Aprovação" e "Agendado" indicam que o GG já aprovou.
+// Demais situações (a vencer, vence hoje, atrasado, etc.) = não aprovado.
+function omieApprovalFromSituation(sit: string | null): "pending" | "approved" {
+  const s = toAscii(sit ?? "").toLowerCase();
+  if (s.includes("em aprovacao") || s.includes("agendado")) return "approved";
+  return "pending";
 }
 
 // Mapeia situação OMIE para o status de pagamento Falcon
-type ApPaymentStatus = "em_aprovacao" | "autorizado" | "agendado" | "pago";
+type ApPaymentStatus =
+  | "em_aprovacao"
+  | "autorizado"
+  | "agendado"
+  | "pago"
+  | "pago_parcialmente";
 function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
   if (!situacao) return "em_aprovacao";
-  const s = toAscii(situacao);
+  const s = toAscii(situacao).toLowerCase();
   if (s.includes("agendado")) return "agendado";
+  if (s.includes("pago parcialmente")) return "pago_parcialmente";
   if (s.includes("pago") || s.includes("liquidado")) return "pago";
-  if (s.includes("pago parcialmente")) return "agendado";
-  if (s.includes("vence hoje") || s.includes("atrasado") ||
-      s.includes("a vencer") || s.includes("previsto") ||
-      s.includes("aprovado") || s.includes("em aprovacao"))
-    return "em_aprovacao";
+  if (
+    s.includes("em aprovacao") ||
+    s.includes("previsto") ||
+    s.includes("aprovado")
+  ) return "em_aprovacao";
+  // "a vencer", "vence hoje", "atrasado" = não aprovado pelo GG
   return "em_aprovacao";
 }
 
@@ -547,28 +556,12 @@ Deno.serve(async (req) => {
       const omieFalconStatus = sourceSystem === "omie" ? omieStatusToFalcon(p.omie_situation) : "em_aprovacao";
       if (prev) {
         updatedIds.add(prev.id);
-        // Preserva: gg_approval*, primary_document_id, observation
-        // Status: 'pago' nunca retroage. Se OMIE traz status específico
-        // (agendado/pago) usa ele; caso contrário mantém o atual.
-        const preservedStatus = (() => {
-          // Pago nunca retroage
-          if (prev.payment_status === "pago") return "pago";
-          // Agendado só mantém se OMIE confirma que está agendado
-          if (prev.payment_status === "agendado" && omieFalconStatus === "agendado")
-            return "agendado";
-          // Autorizado mantém se OMIE não rebaixou o status
-          if (
-            prev.payment_status === "autorizado" &&
-            (omieFalconStatus === "agendado" || omieFalconStatus === "em_aprovacao")
-          )
-            return "autorizado";
-          // Nos demais casos usa o status do OMIE
-          return omieFalconStatus;
-        })();
+        // Nova remessa substitui TUDO — apenas observation (comentário) é preservado
+        const preservedStatus = omieFalconStatus;
         updates.push({
           id: prev.id,
           ...baseFields,
-          observation: prev.observation ?? p.observation,
+          observation: prev.observation ?? null, // preserva comentário
           payment_status: preservedStatus,
           // Preserva original_amount: nunca sobrescreve se já existe;
           // garante valor para registros antigos que ainda não têm.

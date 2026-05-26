@@ -51,6 +51,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
+  const isHomePage = pathname === "/" || pathname === "/home";
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
@@ -94,9 +95,16 @@ export function AppHeader() {
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
+  const selectedHotelData = allowedHotels.find((h) => h.id === hotelId) as
+    | (typeof allowedHotels[number] & { bank_accounts?: Array<{ bank: string; account: string }> | null })
+    | undefined;
+  const accounts = (selectedHotelData?.bank_accounts ?? []) as Array<{ bank: string; account: string }>;
+
   return (
     <header className="h-16 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-30">
       <div className="flex items-center gap-2 flex-1">
+        {!isHomePage && (
+        <>
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden md:inline">
           Filtros
         </span>
@@ -104,7 +112,14 @@ export function AppHeader() {
         {isGg ? (
           <div className="h-9 px-3 flex items-center gap-2 rounded-md border border-input bg-muted/50 text-sm font-medium min-w-[180px]">
             <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
+            <div className="flex flex-col leading-tight">
+              <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
+              {accounts.length > 0 && (
+                <span className="text-[10px] text-muted-foreground leading-none">
+                  {accounts.map((a) => `${a.bank === "itau" ? "Itaú" : "Santander"} ${a.account}`).join(" · ")}
+                </span>
+              )}
+            </div>
           </div>
         ) : isIndicadores ? (
           <Popover>
@@ -165,6 +180,7 @@ export function AppHeader() {
             </PopoverContent>
           </Popover>
         ) : (
+          <div className="flex flex-col gap-0.5">
           <Select
             value={hotelId ?? "__all__"}
             onValueChange={(v) => setHotelId(v === "__all__" ? null : v)}
@@ -185,6 +201,12 @@ export function AppHeader() {
               ))}
             </SelectContent>
           </Select>
+          {hotelId && accounts.length > 0 && (
+            <span className="text-[10px] text-muted-foreground leading-none pl-1">
+              {accounts.map((a) => `${a.bank === "itau" ? "Itaú" : "Santander"} ${a.account}`).join(" · ")}
+            </span>
+          )}
+          </div>
         )}
 
         {isIndicadores && !isGg && gopManagers.length > 0 && (
@@ -242,6 +264,8 @@ export function AppHeader() {
               </SelectContent>
             </Select>
           </>
+        )}
+        </>
         )}
       </div>
 

@@ -386,6 +386,12 @@ const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string;
     tooltip: "Pagamento confirmado",
     Icon: Banknote,
   },
+  pago_parcialmente: {
+    label: "Pago Parcialmente",
+    className: "border-yellow-500/40 text-yellow-700 bg-yellow-50",
+    tooltip: "Pagamento parcial registrado no OMIE",
+    Icon: Banknote,
+  },
 };
 
 export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
