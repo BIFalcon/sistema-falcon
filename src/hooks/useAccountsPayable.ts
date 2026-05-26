@@ -417,6 +417,26 @@ export function useApEntries(hotelId: string | null) {
   });
 }
 
+/** Lançamentos pagos arquivados — usado pelo toggle "Ver pagos". */
+export function useApPaidEntries(hotelId: string | null, enabled = false) {
+  return useQuery({
+    enabled: enabled && !!hotelId,
+    queryKey: ["ap-paid", hotelId],
+    queryFn: async (): Promise<ApEntry[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .not("archived_at", "is", null)
+        .eq("payment_status", "pago")
+        .order("due_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ApEntry[];
+    },
+  });
+}
+
 /** Busca lançamentos AP de todos os hotéis acessíveis ao usuário (RLS aplica). */
 export function useAllApEntries(enabled = true) {
   return useQuery({
