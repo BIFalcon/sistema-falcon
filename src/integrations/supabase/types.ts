@@ -2275,6 +2275,7 @@ export type Database = {
         | "pago"
         | "em_aprovacao"
         | "autorizado"
+        | "pago_parcialmente"
       app_role:
         | "processos"
         | "fernando"
@@ -2457,6 +2458,7 @@ export const Constants = {
         "pago",
         "em_aprovacao",
         "autorizado",
+        "pago_parcialmente",
       ],
       app_role: [
         "processos",
