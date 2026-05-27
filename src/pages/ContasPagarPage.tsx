@@ -145,6 +145,9 @@ export default function ContasPagarPage() {
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
   const upsertCard = useUpsertCardReceivable();
+  const updateCard = useUpdateCardReceivable();
+  const deleteCard = useDeleteCardReceivable();
+  const updateCategory = useUpdateEntryCategory();
 
   // ── Estado local ───────────────────────────────────────────────────────
   const [balanceItauInput, setBalanceItauInput] = useState("");
@@ -171,6 +174,16 @@ export default function ContasPagarPage() {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
+
+  // Toggle "Ver pagos" (Bloco 7)
+  const [showPaid, setShowPaid] = useState(false);
+  const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
+
+  // Edição inline de cartão a receber (Bloco 11)
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editCardAmount, setEditCardAmount] = useState("");
+  const [editCardFrom, setEditCardFrom] = useState("");
+  const [editCardTo, setEditCardTo] = useState("");
 
   // Ordenação por coluna (Valor / Vencimento)
   const [sortField, setSortField] = useState<"amount" | "due_date" | null>(null);
