@@ -185,13 +185,7 @@ export function ApEntryRow({
                 )}
               </Tooltip>
             </TooltipProvider>
-            {canManageCategory && (
-              <SalariosRhToggle
-                entryId={entry.id}
-                hotelId={entry.hotel_id}
-                category={entry.category ?? null}
-              />
-            )}
+            {/* botão "Salários RH" foi movido para a barra de ações em lote */}
           </div>
         </TableCell>
       )}

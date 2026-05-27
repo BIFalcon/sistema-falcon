@@ -673,6 +673,8 @@ export type Database = {
           gg_status: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id: string | null
           id: string
+          invoice_file_1: string | null
+          invoice_file_2: string | null
           invoice_number: string | null
           invoice_status: string | null
           original_amount: number | null
@@ -702,6 +704,8 @@ export type Database = {
           gg_status?: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id?: string | null
           id?: string
+          invoice_file_1?: string | null
+          invoice_file_2?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
           original_amount?: number | null
@@ -731,6 +735,8 @@ export type Database = {
           gg_status?: Database["public"]["Enums"]["ar_gg_status"]
           hotel_id?: string | null
           id?: string
+          invoice_file_1?: string | null
+          invoice_file_2?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
           original_amount?: number | null
