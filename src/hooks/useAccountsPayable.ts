@@ -654,7 +654,7 @@ export function useCardReceivable(hotelId: string | null) {
         .from("ap_card_receivable")
         .select("*")
         .eq("hotel_id", hotelId)
-        .order("date_from", { ascending: false });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ApCardReceivable[];
     },
@@ -683,6 +683,48 @@ export function useUpsertCardReceivable() {
           },
           { onConflict: "hotel_id,date_from,date_to" },
         );
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-card-receivable", v.hotelId] });
+    },
+  });
+}
+
+export function useUpdateCardReceivable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      hotelId: string;
+      amount: number;
+      dateFrom: string;
+      dateTo: string;
+    }) => {
+      const { error } = await supabase
+        .from("ap_card_receivable")
+        .update({
+          amount: input.amount,
+          date_from: input.dateFrom,
+          date_to: input.dateTo,
+        })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-card-receivable", v.hotelId] });
+    },
+  });
+}
+
+export function useDeleteCardReceivable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; hotelId: string }) => {
+      const { error } = await supabase
+        .from("ap_card_receivable")
+        .delete()
+        .eq("id", input.id);
       if (error) throw error;
     },
     onSuccess: (_n, v) => {
