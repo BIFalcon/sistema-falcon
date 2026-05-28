@@ -808,13 +808,25 @@ export default function ContasPagarPage() {
             {/* Cabeçalho do card */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wider">Lançamentos</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wider">
+                  {showPaid ? "Lançamentos pagos (arquivados)" : "Lançamentos"}
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"} · total{" "}
-                  {entries.length}
+                  {showPaid
+                    ? `${paidEntries.length} lançamento(s) pago(s)`
+                    : `${filtered.length} ${filtered.length === 1 ? "lançamento" : "lançamentos"} · total ${entries.length}`}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {hotelId && (
+                  <Button
+                    variant={showPaid ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setShowPaid((p) => !p); setSelectedIds(new Set()); }}
+                  >
+                    {showPaid ? "Ver ativos" : "Ver pagos"}
+                  </Button>
+                )}
                 {lastUpload && (
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <FileSpreadsheet className="h-3.5 w-3.5" />
