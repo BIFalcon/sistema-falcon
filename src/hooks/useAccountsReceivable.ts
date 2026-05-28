@@ -28,6 +28,8 @@ export interface ToInvoiceEntry {
   paid_date: string | null;
   paid_note: string | null;
   estimated_due_date: string | null;
+  invoice_file_1: string | null;
+  invoice_file_2: string | null;
 }
 
 export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
@@ -36,7 +38,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
@@ -124,6 +126,8 @@ export function useSetToInvoiceGgStatus() {
       paid_date?: string | null;
       paid_note?: string | null;
       estimated_due_date?: string | null;
+      invoice_file_1?: string | null;
+      invoice_file_2?: string | null;
     }) => {
       const { error } = await supabase
         .from("ar_to_invoice_entries")
@@ -133,6 +137,8 @@ export function useSetToInvoiceGgStatus() {
           ...(input.paid_date !== undefined ? { paid_date: input.paid_date } : {}),
           ...(input.paid_note !== undefined ? { paid_note: input.paid_note } : {}),
           ...(input.estimated_due_date !== undefined ? { estimated_due_date: input.estimated_due_date } : {}),
+          ...(input.invoice_file_1 !== undefined ? { invoice_file_1: input.invoice_file_1 } : {}),
+          ...(input.invoice_file_2 !== undefined ? { invoice_file_2: input.invoice_file_2 } : {}),
         })
         .eq("id", input.id);
       if (error) throw error;
