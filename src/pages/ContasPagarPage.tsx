@@ -852,9 +852,9 @@ export default function ContasPagarPage() {
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  disabled={displayRows.length === 0}
+                  disabled={effectiveDisplayRows.length === 0}
                   onClick={() => {
-                    const data = displayRows.flatMap((row) => {
+                    const data = effectiveDisplayRows.flatMap((row) => {
                       if (row.kind === "group") return [];
                       const e = row.entry;
                       return [{
