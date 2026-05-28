@@ -272,10 +272,40 @@ export default function ContasPagarPage() {
   }, [dateFrom, dateTo, specificDates]);
 
   function selectUrgencyPeriod(next: Period) {
-    setPeriod(period === next ? "all" : next);
-    if (dateFrom) setDateFrom("");
-    if (dateTo) setDateTo("");
+    const toggleOff = period === next;
+    setPeriod(toggleOff ? "all" : next);
     if (specificDates && specificDates.length > 0) setSpecificDates([]);
+    if (toggleOff) {
+      setDateFrom("");
+      setDateTo("");
+      return;
+    }
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayIso = iso(today);
+    if (next === "today") { setDateFrom(todayIso); setDateTo(todayIso); }
+    else if (next === "tomorrow") {
+      const t = new Date(today); t.setDate(t.getDate() + 1);
+      const tIso = iso(t);
+      setDateFrom(tIso); setDateTo(tIso);
+    } else if (next === "this_week") {
+      const end = new Date(today); end.setDate(end.getDate() + (6 - today.getDay()));
+      setDateFrom(todayIso); setDateTo(iso(end));
+    } else if (next === "next_week") {
+      const start = new Date(today); start.setDate(start.getDate() + (7 - today.getDay()));
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      setDateFrom(iso(start)); setDateTo(iso(end));
+    } else if (next === "next_month") {
+      const start = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      setDateFrom(iso(start)); setDateTo(iso(end));
+    } else if (next === "overdue") {
+      setDateFrom("2020-01-01");
+      const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+      setDateTo(iso(yest));
+    } else {
+      setDateFrom(""); setDateTo("");
+    }
   }
 
   const balanceItauAmount = balanceItau ? Number(balanceItau.amount) : null;
