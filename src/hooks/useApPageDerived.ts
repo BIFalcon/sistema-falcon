@@ -25,6 +25,7 @@ export type DisplayRow =
 export interface ApPageDerived {
   entries: ApEntry[];
   distributionEntries: ApEntry[];
+  filteredDistribution: ApEntry[];
   archivedEntries: ApEntry[];
   filtered: ApEntry[];
   displayRows: DisplayRow[];
@@ -419,12 +420,28 @@ export function useApPageDerived(opts: {
     [distributionEntries],
   );
 
+  // Distribuição filtrada pelos mesmos filtros de data
+  const filteredDistribution = useMemo(
+    () =>
+      distributionEntries.filter((e) => {
+        if (specificDates && specificDates.length > 0) {
+          if (!e.due_date || !specificDates.includes(e.due_date)) return false;
+        } else {
+          if (dateFrom && (!e.due_date || e.due_date < dateFrom)) return false;
+          if (dateTo && (!e.due_date || e.due_date > dateTo)) return false;
+        }
+        return true;
+      }),
+    [distributionEntries, dateFrom, dateTo, specificDates],
+  );
+
   const balanceAmount = balance ? Number(balance.amount) : null;
   const balanceDiff = balanceAmount !== null ? balanceAmount - totalToPayPeriod : null;
 
   return {
     entries,
     distributionEntries,
+    filteredDistribution,
     archivedEntries,
     filtered,
     displayRows,
