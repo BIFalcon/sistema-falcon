@@ -258,6 +258,12 @@ export default function ContasPagarPage() {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortField(field); setSortDir("desc"); }
   }
+
+  // Linhas efetivas exibidas — alterna entre ativos (displayRows) e pagos
+  const effectiveDisplayRows = useMemo<typeof displayRows>(() => {
+    if (!showPaid) return displayRows;
+    return paidEntries.map((e) => ({ kind: "single" as const, entry: e }));
+  }, [showPaid, displayRows, paidEntries]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
