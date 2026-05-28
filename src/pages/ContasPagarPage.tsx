@@ -1197,8 +1197,8 @@ export default function ContasPagarPage() {
                       <TableHead className="w-8">
                         <Checkbox
                           checked={
-                            displayRows.length > 0 &&
-                            displayRows
+                            effectiveDisplayRows.length > 0 &&
+                            effectiveDisplayRows
                               .filter((r) => r.kind === "single")
                               .every((r) => selectedIds.has((r as { entry: ApEntry }).entry.id))
                           }
@@ -1233,7 +1233,7 @@ export default function ContasPagarPage() {
                       rows={8}
                       cols={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
                     />
-                  ) : displayRows.length === 0 ? (
+                  ) : effectiveDisplayRows.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={(showApproval ? 11 : 10) + ((canMarkInsertedAgendado || canMarkPaid) ? 1 : 0) + (sourceSystem === "omie" ? 2 : 0) + (showingAllHotels ? 1 : 0) - (showOriginalAmount ? 0 : 1) - (showPaidAmount ? 0 : 1) - (showPaidInterest ? 0 : 1)}
@@ -1243,7 +1243,7 @@ export default function ContasPagarPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    displayRows.map((row, idx) => {
+                    effectiveDisplayRows.map((row, idx) => {
                       if (row.kind === "group") {
                         const colSpan =
                           (showApproval ? 11 : 10) +
