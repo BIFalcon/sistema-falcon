@@ -1365,9 +1365,53 @@ export default function ContasPagarPage() {
               Distribuição de Lucros — Sócios
             </h3>
             <p className="text-xs text-muted-foreground">
-              {distributionEntries.length} lançamento(s) · total {fmtBRL(distributionTotal)}
+              {filteredDistribution.length} de {distributionEntries.length} lançamento(s) · total {fmtBRL(distributionTotal)}
             </p>
           </div>
+          {/* Barra de ações em lote (distribuição) */}
+          {(canMarkInsertedAgendado || canMarkPaid) && (
+            <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md bg-muted/30 flex-wrap">
+              <div className="text-xs text-muted-foreground">
+                {Array.from(selectedIds).filter((id) => filteredDistribution.some((e) => e.id === id)).length > 0
+                  ? `${Array.from(selectedIds).filter((id) => filteredDistribution.some((e) => e.id === id)).length} selecionado(s) na distribuição`
+                  : "Selecione sócios para marcar status em lote"}
+              </div>
+              <div className="flex items-center gap-2">
+                {canMarkAutorizado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-400"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("autorizado")}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" /> Autorizado
+                  </Button>
+                )}
+                {canMarkInsertedAgendado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("agendado")}
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" /> Agendado
+                  </Button>
+                )}
+                {canMarkPaid && (
+                  <Button
+                    size="sm"
+                    className="gap-1 h-8"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("pago")}
+                  >
+                    <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
@@ -1376,14 +1420,14 @@ export default function ContasPagarPage() {
                     <TableHead className="w-8">
                       <Checkbox
                         checked={
-                          distributionEntries.length > 0 &&
-                          distributionEntries.every((e) => selectedIds.has(e.id))
+                          filteredDistribution.length > 0 &&
+                          filteredDistribution.every((e) => selectedIds.has(e.id))
                         }
                         onCheckedChange={(c) => {
                           setSelectedIds((prev) => {
                             const next = new Set(prev);
-                            if (c) distributionEntries.forEach((e) => next.add(e.id));
-                            else distributionEntries.forEach((e) => next.delete(e.id));
+                            if (c) filteredDistribution.forEach((e) => next.add(e.id));
+                            else filteredDistribution.forEach((e) => next.delete(e.id));
                             return next;
                           });
                         }}
@@ -1405,7 +1449,7 @@ export default function ContasPagarPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {distributionEntries.map((e) => (
+                {filteredDistribution.map((e) => (
                   <ApEntryRow
                     key={e.id}
                     entry={e}
