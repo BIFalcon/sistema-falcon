@@ -1167,6 +1167,17 @@ export default function ContasPagarPage() {
                         <Banknote className="h-3.5 w-3.5" /> Marcar Pago
                       </Button>
                     )}
+                    {selectedIds.size > 0 && canManage && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={updateCategory.isPending}
+                        onClick={() => handleBulkCategory("Salários RH")}
+                      >
+                        Salários RH
+                      </Button>
+                    )}
                     {selectedIds.size > 0 && (
                       <Button
                         size="sm"
