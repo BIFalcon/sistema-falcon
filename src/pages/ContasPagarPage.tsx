@@ -469,6 +469,56 @@ export default function ContasPagarPage() {
       : "Não aprovado pelo GG";
   }
 
+  // Block 8 — Marca categoria "Salários RH" em lote
+  async function handleBulkCategory(category: string) {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      for (const id of ids) {
+        await updateCategory.mutateAsync({ entryId: id, hotelId, category });
+      }
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} lançamento(s) marcado(s) como ${category}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar categoria");
+    }
+  }
+
+  // Block 11 — Editar/excluir entradas de saldo de cartão
+  function startEditCard(c: { id: string; amount: number | string; date_from: string; date_to: string }) {
+    setEditingCardId(c.id);
+    setEditCardAmount(String(c.amount));
+    setEditCardFrom(c.date_from);
+    setEditCardTo(c.date_to);
+  }
+  async function saveEditCard() {
+    if (!editingCardId || !hotelId) return;
+    try {
+      await updateCard.mutateAsync({
+        id: editingCardId,
+        hotelId,
+        amount: parseFloat(editCardAmount),
+        dateFrom: editCardFrom,
+        dateTo: editCardTo,
+      });
+      toast.success("Registro atualizado");
+      setEditingCardId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+    }
+  }
+  async function handleDeleteCard(id: string) {
+    if (!hotelId) return;
+    if (!confirm("Excluir este registro de saldo de cartão?")) return;
+    try {
+      await deleteCard.mutateAsync({ id, hotelId });
+      toast.success("Registro removido");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-[1400px]">
