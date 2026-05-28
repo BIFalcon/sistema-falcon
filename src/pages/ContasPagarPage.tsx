@@ -215,6 +215,7 @@ export default function ContasPagarPage() {
   const {
     entries,
     distributionEntries,
+    filteredDistribution,
     filtered,
     displayRows: displayRowsRaw,
     categories,
