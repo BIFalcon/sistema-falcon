@@ -458,7 +458,7 @@ export default function ContasPagarPage() {
   function toggleSelectAllVisible(checked: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      const visibleIds = displayRows.flatMap((r) => (r.kind === "single" ? [r.entry.id] : []));
+      const visibleIds = effectiveDisplayRows.flatMap((r) => (r.kind === "single" ? [r.entry.id] : []));
       if (checked) visibleIds.forEach((id) => next.add(id));
       else visibleIds.forEach((id) => next.delete(id));
       return next;
