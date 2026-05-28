@@ -718,14 +718,48 @@ export default function ContasPagarPage() {
               <div className="space-y-1">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Últimos registros</p>
                 <div className="space-y-1">
-                  {cardReceivables.slice(0, 5).map((c) => (
-                    <div key={c.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-1.5">
-                      <span className="text-muted-foreground">
-                        {fmtDate(c.date_from)} → {fmtDate(c.date_to)}
-                      </span>
-                      <span className="font-mono font-semibold">{fmtBRL(Number(c.amount))}</span>
-                    </div>
-                  ))}
+                  {cardReceivables.slice(0, 5).map((c) => {
+                    const isEditing = editingCardId === c.id;
+                    if (isEditing) {
+                      return (
+                        <div key={c.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center border rounded-md px-3 py-2">
+                          <Input type="number" step="0.01" value={editCardAmount} onChange={(e) => setEditCardAmount(e.target.value)} className="h-8" />
+                          <Input type="date" value={editCardFrom} onChange={(e) => setEditCardFrom(e.target.value)} className="h-8" />
+                          <Input type="date" value={editCardTo} onChange={(e) => setEditCardTo(e.target.value)} className="h-8" />
+                          <div className="flex gap-1 justify-end">
+                            <Button size="sm" className="h-8" onClick={saveEditCard} disabled={updateCard.isPending}>Salvar</Button>
+                            <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingCardId(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    const ts = c.created_at
+                      ? `${fmtDate(c.created_at)} às ${new Date(c.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                      : null;
+                    return (
+                      <div key={c.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-1.5 gap-2">
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">
+                            {fmtDate(c.date_from)} → {fmtDate(c.date_to)}
+                          </span>
+                          {ts && <span className="text-[10px] text-muted-foreground/80">Atualizado: {ts}</span>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-semibold">{fmtBRL(Number(c.amount))}</span>
+                          {canManage && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditCard(c)}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteCard(c.id)}>
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
