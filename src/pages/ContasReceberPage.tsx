@@ -247,6 +247,8 @@ function ToInvoiceSection({
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
   const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [faturamentoFilter, setFaturamentoFilter] = useState<"todos" | "pendente" | "faturado" | "pago">("todos");
+  const [clientSearch, setClientSearch] = useState("");
 
   // Reset drill quando hotel muda
   useEffect(() => {
@@ -299,6 +301,26 @@ function ToInvoiceSection({
     [visibleEntries, showOnlyPending],
   );
 
+  const finalEntries = useMemo(() => {
+    let arr = filteredToInvoice;
+    if (faturamentoFilter !== "todos") {
+      if (faturamentoFilter === "pago") {
+        arr = arr.filter((e) => !!e.paid_date);
+      } else {
+        arr = arr.filter((e) => e.gg_status === faturamentoFilter);
+      }
+    }
+    if (clientSearch.trim()) {
+      const q = clientSearch.toLowerCase();
+      arr = arr.filter(
+        (e) =>
+          e.account_name?.toLowerCase().includes(q) ||
+          e.account_number?.toLowerCase().includes(q),
+      );
+    }
+    return arr;
+  }, [filteredToInvoice, faturamentoFilter, clientSearch]);
+
   return (
     <div className="space-y-5">
       <UploadCard kind="to_invoice" lastUpload={lastUpload} isManager={canImportAr} />
@@ -318,6 +340,23 @@ function ToInvoiceSection({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Input
+              placeholder="Buscar por nome do cliente..."
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              className="w-56 h-9"
+            />
+            <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as typeof faturamentoFilter)}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="pendente">Pendentes</SelectItem>
+                <SelectItem value="faturado">Faturados</SelectItem>
+                <SelectItem value="pago">Pagos</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant={showOnlyPending ? "default" : "outline"}
               size="sm"
@@ -332,8 +371,8 @@ function ToInvoiceSection({
               variant="outline"
               size="sm"
               className="gap-2"
-              disabled={filteredToInvoice.length === 0}
-              onClick={() => exportToInvoiceToExcel(filteredToInvoice, hotelName, contracts)}
+              disabled={finalEntries.length === 0}
+              onClick={() => exportToInvoiceToExcel(finalEntries, hotelName, contracts)}
             >
               <FileDown className="h-4 w-4" />
               Exportar Excel
@@ -348,13 +387,13 @@ function ToInvoiceSection({
 
         {isLoading ? (
           <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
-        ) : filteredToInvoice.length === 0 ? (
+        ) : finalEntries.length === 0 ? (
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
-          <ConsolidatedRanking entries={filteredToInvoice} hotelName={hotelName} />
+          <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
         ) : drillDay ? (
           <DayBreakdown
-            entries={filteredToInvoice.filter((e) => e.transaction_date === drillDay)}
+            entries={finalEntries.filter((e) => e.transaction_date === drillDay)}
             day={drillDay}
             contracts={contracts}
             onBack={() => setDrillDay(null)}
@@ -362,13 +401,13 @@ function ToInvoiceSection({
           />
         ) : drillMonth ? (
           <MonthBreakdown
-            entries={filteredToInvoice.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
+            entries={finalEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
             month={drillMonth}
             onPickDay={setDrillDay}
             onBack={() => setDrillMonth(null)}
           />
         ) : (
-          <MonthlyOverview entries={filteredToInvoice} onPickMonth={setDrillMonth} />
+          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
