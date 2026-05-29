@@ -20,10 +20,18 @@ const APP_BASE_URL =
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Endpoint interno (cron): aceita apenas chamadas com a service role key.
+  const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+  if (!token || token !== serviceKey) {
+    return new Response(
+      JSON.stringify({ error: "forbidden" }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
 
   // Pega lote de pendentes (limite 50)
   const { data: pending, error } = await supabase

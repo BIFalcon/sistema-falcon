@@ -20,6 +20,43 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Acesso restrito: service role (chamadas internas, e.g. parse-ar-report)
+    // ou usuário autenticado com papel de gestor financeiro (financeiro/processos).
+    const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (token !== serviceKey) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: userRes, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userRes.user) {
+        return new Response(
+          JSON.stringify({ error: "unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const tmpAdmin = createClient(supabaseUrl, serviceKey);
+      const { data: roleRows } = await tmpAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userRes.user.id);
+      const roleSet = new Set((roleRows ?? []).map((r: any) => r.role));
+      const isAllowed = roleSet.has("processos") || roleSet.has("fernando") || roleSet.has("financeiro");
+      if (!isAllowed) {
+        return new Response(
+          JSON.stringify({ error: "forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const admin = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json().catch(() => ({}));

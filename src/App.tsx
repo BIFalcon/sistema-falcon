@@ -74,6 +74,9 @@ class ErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[ErrorBoundary]", error, info);
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -82,7 +85,7 @@ class ErrorBoundary extends React.Component<
             Algo deu errado ao carregar o sistema.
           </p>
           <p className="text-sm text-muted-foreground">
-            {this.state.error?.message}
+            Tente recarregar a página. Se o problema persistir, entre em contato com o suporte.
           </p>
           <button
             className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm"

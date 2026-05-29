@@ -286,11 +286,51 @@ Deno.serve(async (req) => {
         if (!payload.user_id || !payload.status)
           return json({ error: "missing_args" }, 400);
 
+        // Bloqueia ban de usuários protegidos (processos/fernando)
+        if (payload.status === "banned") {
+          const { data: targetRoles } = await admin
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", payload.user_id);
+          const targetSet = new Set((targetRoles ?? []).map((r) => r.role));
+          if (targetSet.has("processos") || targetSet.has("fernando")) {
+            return json({ error: "cannot_ban_protected_user" }, 403);
+          }
+        }
+
         const { error } = await admin
           .from("profiles")
           .update({ status: payload.status })
           .eq("user_id", payload.user_id);
         if (error) return json({ error: error.message }, 400);
+
+        if (payload.status === "banned") {
+          // Remove TODOS os vínculos para revogar acesso via RLS imediatamente.
+          await admin
+            .from("user_roles")
+            .delete()
+            .eq("user_id", payload.user_id)
+            .not("role", "in", "(processos,fernando)");
+          await admin.from("user_hotels").delete().eq("user_id", payload.user_id);
+          // Invalida sessões/JWT ativos do usuário banido.
+          try {
+            await admin.auth.admin.updateUserById(payload.user_id, {
+              ban_duration: "876000h",
+            });
+          } catch (banErr) {
+            console.error("[set_status] falha ao banir sessão:", banErr);
+          }
+        } else if (payload.status === "active") {
+          // Reativa: remove o ban no auth (não restaura roles automaticamente).
+          try {
+            await admin.auth.admin.updateUserById(payload.user_id, {
+              ban_duration: "none",
+            });
+          } catch (unbanErr) {
+            console.error("[set_status] falha ao reativar sessão:", unbanErr);
+          }
+        }
+
         return json({ ok: true });
       }
 
