@@ -82,7 +82,7 @@ class ErrorBoundary extends React.Component<
             Algo deu errado ao carregar o sistema.
           </p>
           <p className="text-sm text-muted-foreground">
-            {this.state.error?.message}
+            Tente recarregar a página. Se o problema persistir, entre em contato com o suporte.
           </p>
           <button
             className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm"
