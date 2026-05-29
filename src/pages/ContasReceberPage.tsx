@@ -836,14 +836,13 @@ function InvoiceUploadDialog({
               }}
             />
             {file1Url && (
-              <a
-                href={file1Url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-primary underline truncate block"
+              <button
+                type="button"
+                onClick={() => openStoredFile(file1Url)}
+                className="text-[11px] text-primary underline truncate block text-left"
               >
                 Arquivo 1 enviado ✓
-              </a>
+              </button>
             )}
           </div>
           <div className="space-y-2">
@@ -858,14 +857,13 @@ function InvoiceUploadDialog({
               }}
             />
             {file2Url && (
-              <a
-                href={file2Url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-primary underline truncate block"
+              <button
+                type="button"
+                onClick={() => openStoredFile(file2Url)}
+                className="text-[11px] text-primary underline truncate block text-left"
               >
                 Arquivo 2 enviado ✓
-              </a>
+              </button>
             )}
           </div>
         </div>
