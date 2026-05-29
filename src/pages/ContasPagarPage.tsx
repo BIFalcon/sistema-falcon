@@ -558,6 +558,20 @@ export default function ContasPagarPage() {
               </Badge>
             )}
           </div>
+          {(() => {
+            const accounts = (((hotel as unknown as { bank_accounts?: Array<{ bank: string; account: string }> | null })?.bank_accounts) ?? []) as Array<{ bank: string; account: string }>;
+            if (accounts.length === 0) return null;
+            return (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Contas:</span>
+                {accounts.map((a, i) => (
+                  <Badge key={i} variant="secondary" className="font-mono text-xs">
+                    {a.bank === "itau" ? "Itaú" : "Santander"} {a.account}
+                  </Badge>
+                ))}
+              </div>
+            );
+          })()}
           {!sourceSystem && (
             <p className="text-xs text-amber-600 flex items-center gap-1 w-full">
               <AlertTriangle className="h-3.5 w-3.5" />
