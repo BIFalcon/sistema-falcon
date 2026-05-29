@@ -554,6 +554,7 @@ function DayBreakdown({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
+  const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -642,18 +643,7 @@ function DayBreakdown({
                           size="sm"
                           variant={e.gg_status === "faturado" ? "default" : "outline"}
                           className="h-6 px-2 text-[11px]"
-                          onClick={() => {
-                            const nowIso = new Date().toISOString();
-                            const estimated = term != null
-                              ? addDays(nowIso.slice(0, 10), term)
-                              : null;
-                            setStatus.mutate({
-                              id: e.id,
-                              gg_status: "faturado",
-                              gg_note: e.gg_note,
-                              estimated_due_date: estimated,
-                            });
-                          }}
+                          onClick={() => setInvoiceFor({ entry: e, term })}
                         >
                           Faturado
                         </Button>
@@ -735,7 +725,156 @@ function DayBreakdown({
           toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
         }}
       />
+      <InvoiceUploadDialog
+        entry={invoiceFor?.entry ?? null}
+        onClose={() => setInvoiceFor(null)}
+        onConfirm={async (file1Url, file2Url) => {
+          if (!invoiceFor) return;
+          const term = invoiceFor.term;
+          const estimated = term != null
+            ? addDays(new Date().toISOString().slice(0, 10), term)
+            : null;
+          await setStatus.mutateAsync({
+            id: invoiceFor.entry.id,
+            gg_status: "faturado",
+            gg_note: invoiceFor.entry.gg_note,
+            estimated_due_date: estimated,
+            invoice_file_1: file1Url,
+            invoice_file_2: file2Url,
+          });
+          setInvoiceFor(null);
+          toast.success("Marcado como faturado");
+        }}
+      />
     </div>
+  );
+}
+
+function InvoiceUploadDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (file1Url: string, file2Url: string | null) => Promise<void>;
+}) {
+  const [file1Url, setFile1Url] = useState<string | null>(null);
+  const [file2Url, setFile2Url] = useState<string | null>(null);
+  const [uploading1, setUploading1] = useState(false);
+  const [uploading2, setUploading2] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (entry) {
+      setFile1Url(entry.invoice_file_1 ?? null);
+      setFile2Url(entry.invoice_file_2 ?? null);
+    } else {
+      setFile1Url(null);
+      setFile2Url(null);
+    }
+  }, [entry]);
+
+  async function handleUpload(file: File, slot: 1 | 2) {
+    if (!entry) return;
+    const setLoading = slot === 1 ? setUploading1 : setUploading2;
+    setLoading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/${Date.now()}-${slot}.${ext}`;
+      const { error } = await supabase.storage
+        .from("invoices")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      const { data } = supabase.storage.from("invoices").getPublicUrl(path);
+      if (slot === 1) setFile1Url(data.publicUrl);
+      else setFile2Url(data.publicUrl);
+      toast.success(`Arquivo ${slot} enviado`);
+    } catch (err) {
+      toast.error(`Falha ao enviar arquivo: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Marcar como faturado</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label className="text-xs">
+              Nota Fiscal / Boleto <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              disabled={uploading1}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload(f, 1);
+              }}
+            />
+            {file1Url && (
+              <a
+                href={file1Url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-primary underline truncate block"
+              >
+                Arquivo 1 enviado ✓
+              </a>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Arquivo adicional (opcional)</Label>
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              disabled={uploading2}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload(f, 2);
+              }}
+            />
+            {file2Url && (
+              <a
+                href={file2Url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-primary underline truncate block"
+              >
+                Arquivo 2 enviado ✓
+              </a>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={!file1Url || uploading1 || uploading2 || saving}
+            onClick={async () => {
+              if (!file1Url) return;
+              setSaving(true);
+              try {
+                await onConfirm(file1Url, file2Url);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
