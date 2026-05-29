@@ -20,6 +20,17 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Endpoint interno: aceita apenas chamadas com a service role key
+    // (usado por parse-ar-report e por jobs administrativos).
+    const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+    if (!token || token !== serviceKey) {
+      return new Response(
+        JSON.stringify({ error: "forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const admin = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json().catch(() => ({}));
