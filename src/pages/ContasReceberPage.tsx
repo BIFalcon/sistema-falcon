@@ -775,6 +775,22 @@ function InvoiceUploadDialog({
     }
   }, [entry]);
 
+  async function openStoredFile(value: string) {
+    // Compat: rows previously stored a public URL; new rows store the storage path.
+    if (/^https?:\/\//i.test(value)) {
+      window.open(value, "_blank", "noopener");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("invoices")
+      .createSignedUrl(value, 60 * 10);
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir o arquivo");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
+  }
+
   async function handleUpload(file: File, slot: 1 | 2) {
     if (!entry) return;
     const setLoading = slot === 1 ? setUploading1 : setUploading2;
@@ -786,9 +802,8 @@ function InvoiceUploadDialog({
         .from("invoices")
         .upload(path, file, { upsert: true, contentType: file.type });
       if (error) throw error;
-      const { data } = supabase.storage.from("invoices").getPublicUrl(path);
-      if (slot === 1) setFile1Url(data.publicUrl);
-      else setFile2Url(data.publicUrl);
+      if (slot === 1) setFile1Url(path);
+      else setFile2Url(path);
       toast.success(`Arquivo ${slot} enviado`);
     } catch (err) {
       toast.error(`Falha ao enviar arquivo: ${(err as Error).message}`);
@@ -821,14 +836,13 @@ function InvoiceUploadDialog({
               }}
             />
             {file1Url && (
-              <a
-                href={file1Url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-primary underline truncate block"
+              <button
+                type="button"
+                onClick={() => openStoredFile(file1Url)}
+                className="text-[11px] text-primary underline truncate block text-left"
               >
                 Arquivo 1 enviado ✓
-              </a>
+              </button>
             )}
           </div>
           <div className="space-y-2">
@@ -843,14 +857,13 @@ function InvoiceUploadDialog({
               }}
             />
             {file2Url && (
-              <a
-                href={file2Url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-primary underline truncate block"
+              <button
+                type="button"
+                onClick={() => openStoredFile(file2Url)}
+                className="text-[11px] text-primary underline truncate block text-left"
               >
                 Arquivo 2 enviado ✓
-              </a>
+              </button>
             )}
           </div>
         </div>
