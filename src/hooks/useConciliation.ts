@@ -53,6 +53,16 @@ const normKey = (s: string) => {
   return onlyDigits || String(s ?? "").trim();
 };
 
+/**
+ * Extrai o Transaction Number do Journal a partir do campo Histórico do Razão.
+ * O TOTVS costuma gravar como "Doc: 310685257 Data emissão:..."
+ */
+function extractDocFromHistorico(historico: string | null | undefined): string {
+  if (!historico) return "";
+  const m = historico.match(/Doc:\s*(\d+)/i);
+  return m ? m[1] : "";
+}
+
 function namesMatch(historico: string, guestFullName: string): boolean {
   const hist = historico
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -137,7 +147,11 @@ export function useConciliation(
       // Passo 1: match exato por número de documento.
       const razaoByDoc = new Map<string, RazaoLine>();
       for (const r of creditosRazao) {
-        const k = normKey(r.documento);
+        let k = normKey(r.documento);
+        if (!k) {
+          // Fallback: tenta extrair "Doc: <n>" do histórico
+          k = normKey(extractDocFromHistorico(r.historico));
+        }
         if (k && !razaoByDoc.has(k)) razaoByDoc.set(k, r);
       }
       for (const j of journalReal) {

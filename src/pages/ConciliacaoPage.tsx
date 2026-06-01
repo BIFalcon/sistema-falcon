@@ -101,12 +101,16 @@ function CategoryCard({ result }: { result: CategoryResult }) {
               {fmtBRL(result.totalCreditoRazao)}
             </p>
           </div>
-          {result.totalJournal >= 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground">Opera (Journal)</p>
-              <p className="text-sm font-semibold">{fmtBRL(result.totalJournal)}</p>
-            </div>
-          )}
+          <div>
+            <p className="text-xs text-muted-foreground">Opera (Journal)</p>
+            <p
+              className={`text-sm font-semibold ${
+                result.conciliado ? "text-muted-foreground" : "text-foreground"
+              }`}
+            >
+              {fmtBRL(result.totalJournal)}
+            </p>
+          </div>
           {!result.conciliado && (
             <div>
               <p className="text-xs text-muted-foreground">Divergência</p>

@@ -142,7 +142,22 @@ export function parseRazao(file: File): Promise<RazaoLine[]> {
             isTotalizador: isTot,
           });
         }
-        resolve(lines);
+        // Estornos: mesmo Documento aparece como Débito em uma categoria e
+        // Crédito em outra. Essas linhas se cancelam e devem ser ignoradas
+        // da conciliação para não inflar débitos nem créditos.
+        const docsComDebito = new Set(
+          lines.filter((l) => l.valorDebito > 0 && l.documento).map((l) => l.documento),
+        );
+        const docsComCredito = new Set(
+          lines.filter((l) => l.valorCredito > 0 && l.documento).map((l) => l.documento),
+        );
+        const estornos = new Set(
+          [...docsComDebito].filter((doc) => docsComCredito.has(doc)),
+        );
+        const filtered = lines.filter(
+          (l) => !l.documento || !estornos.has(l.documento),
+        );
+        resolve(filtered);
       } catch (err) {
         reject(err);
       }
