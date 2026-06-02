@@ -47,9 +47,6 @@ export default function CartaPage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
-  // Bloqueio: exige hotel selecionado quando não há closing direto via URL.
-  const showHotelGate = !closingIdParam && !hotelId;
-
   const { data: existingClosing } = useQuery({
     enabled: !resolvedId && !!hotelId,
     queryKey: ["closing-lookup", hotelId, month, year],
