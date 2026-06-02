@@ -89,9 +89,17 @@ function parseDate(v: any): string | null {
   return null;
 }
 
-function makeKey(supplier: string, doc: string | null, due: string | null, amount: number): string {
+function makeKey(
+  supplier: string,
+  doc: string | null,
+  due: string | null,
+  amount: number,
+  idx = 0,
+): string {
   const base = `${toAscii(supplier)}|${(doc ?? "").toString().trim()}|${due ?? ""}|${amount.toFixed(2)}`;
-  return base.replace(/\s+/g, " ").slice(0, 240);
+  const key = base.replace(/\s+/g, " ");
+  // idx > 0 diferencia duplicatas legítimas (ex: 4 parcelas INSS idênticas)
+  return (idx > 0 ? `${key}|dup${idx}` : key).slice(0, 240);
 }
 
 // Stable identity used to preserve user-attached documents across re-uploads,
@@ -131,6 +139,7 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
   const out: ParsedEntry[] = [];
+  const keyCount = new Map<string, number>();
   for (const row of rows) {
     if (!row || row.length === 0) continue;
     const supplier = normalize(row[0]);
@@ -145,8 +154,12 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
     const lower = toAscii(supplier);
     if (lower.includes("fornecedor") || lower.includes("total") || lower.includes("relat")) continue;
     const due = parseDate(dueRaw);
+    const rawKey = makeKey(supplier, docNumber, due, amount);
+    const count = keyCount.get(rawKey) ?? 0;
+    keyCount.set(rawKey, count + 1);
+    const entryKey = makeKey(supplier, docNumber, due, amount, count);
     out.push({
-      entry_key: makeKey(supplier, docNumber, due, amount),
+      entry_key: entryKey,
       supplier,
       cnpj: null,
       document_number: docNumber || null,
@@ -285,7 +298,7 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
   const out: ParsedEntry[] = [];
   const skipped = emptySkipped();
   let myCompanyCnpj: string | null = null;
-  const seenEntryKeys = new Set<string>();
+  const keyCount = new Map<string, number>();
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
@@ -310,9 +323,12 @@ function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
     const due = parseDate(row[colDue]);
     const sitVenc = colSitVenc >= 0 ? normalize(row[colSitVenc] ?? "") : "";
     const sit = colSit >= 0 ? normalize(row[colSit] ?? "") : "";
-    const entryKey = makeKey(supplier, docNumber, due, amount);
-    if (seenEntryKeys.has(entryKey)) { skipped.duplicate_entry++; continue; }
-    seenEntryKeys.add(entryKey);
+    // Block 3: duplicatas legítimas (mesmo fornecedor/doc/data/valor)
+    // recebem sufixo |dup1, |dup2... para serem todas importadas.
+    const rawKey = makeKey(supplier, docNumber, due, amount);
+    const count = keyCount.get(rawKey) ?? 0;
+    keyCount.set(rawKey, count + 1);
+    const entryKey = makeKey(supplier, docNumber, due, amount, count);
     out.push({
       entry_key: entryKey,
       supplier,
