@@ -64,6 +64,8 @@ export function ApEntryRow({
   const paymentRowClass =
     entry.payment_status === "pago"
       ? "bg-emerald-500/10 dark:bg-emerald-500/10"
+      : entry.payment_status === "pago_parcialmente"
+      ? "bg-yellow-500/10 dark:bg-yellow-500/10"
       : entry.payment_status === "agendado"
       ? "bg-violet-500/10 dark:bg-violet-500/10"
       : "";

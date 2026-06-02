@@ -120,7 +120,7 @@ export function AppHeader() {
                   {hotelIds.length === 0
                     ? selectedGop
                       ? `Todos da carteira (${visibleHotels.length})`
-                      : "Todos os hotéis"
+                      : "Selecionar hotel"
                     : hotelIds.length === 1
                     ? visibleHotels.find((h) => h.id === hotelIds[0])?.name ?? "1 hotel"
                     : `${hotelIds.length} hotéis selecionados`}

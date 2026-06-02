@@ -23,6 +23,8 @@ interface AuthContextValue {
   isMaster: boolean;
   isGg: boolean;
   isFernando: boolean;
+  /** É o Fernando CEO (identificado pelo e-mail), não apenas alguém com role 'fernando'. */
+  isFernandoCEO: boolean;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: () => boolean;
   /** Sub-papel do financeiro: equipe (ops) ou coordenadora (chefe). */
@@ -35,6 +37,12 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+/** E-mail do Fernando CEO real — usado para restrições específicas dele. */
+const FERNANDO_CEO_EMAIL = "fernando.fonseca@falconhoteis.com.br";
+
+/** Duração máxima de uma sessão antes de exigir novo login. */
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -54,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("user_hotels")
           .select("hotel_id, hotels(id,name,brand,active)")
           .eq("user_id", uid),
-        supabase.from("hotels").select("*").order("name"),
+        supabase.from("hotels").select("*").eq("is_active", true).order("name"),
       ]);
 
     setProfile((prof ?? null) as Profile | null);
@@ -62,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserHotels(
       (hotelRows ?? [])
         .map((r: { hotels: Hotel | null }) => r.hotels)
-        .filter((h): h is Hotel => !!h),
+        .filter((h): h is Hotel => !!h && (h as { is_active?: boolean }).is_active !== false),
     );
     setAllHotels((allHotelRows ?? []) as Hotel[]);
   };
@@ -70,6 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // listener ANTES do getSession
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Block 9: força expiração de sessão após 24h do último login.
+      if (newSession?.user?.last_sign_in_at) {
+        const signInTime = new Date(newSession.user.last_sign_in_at).getTime();
+        if (Date.now() - signInTime > SESSION_MAX_AGE_MS) {
+          supabase.auth.signOut().catch(() => {});
+          return;
+        }
+      }
       const newUid = newSession?.user?.id ?? null;
       // Atualiza session sempre (token refresh, etc.)
       setSession(newSession);
@@ -97,6 +113,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      // Block 9: descarta sessão antiga (>24h) já carregada do storage.
+      if (s?.user?.last_sign_in_at) {
+        const signInTime = new Date(s.user.last_sign_in_at).getTime();
+        if (Date.now() - signInTime > SESSION_MAX_AGE_MS) {
+          supabase.auth.signOut().finally(() => setLoading(false));
+          return;
+        }
+      }
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -133,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isMaster,
     isGg: roles.includes("gg" as AppRole),
     isFernando: roles.includes("fernando" as AppRole),
+    isFernandoCEO: user?.email?.toLowerCase() === FERNANDO_CEO_EMAIL,
     hasRole: (r) => roles.includes(r),
     hasAnyRole: () => roles.length > 0,
     financeiroSubrole,

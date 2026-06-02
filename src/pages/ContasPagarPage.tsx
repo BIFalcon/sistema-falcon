@@ -468,6 +468,8 @@ export default function ContasPagarPage() {
   function labelForStatus(s: ApPaymentStatus) {
     return s === "pago"
       ? "Pago"
+      : s === "pago_parcialmente"
+      ? "Pago Parcialmente"
       : s === "agendado"
       ? "Agendado"
       : s === "autorizado"
@@ -754,7 +756,15 @@ export default function ContasPagarPage() {
                       );
                     }
                     const ts = c.created_at
-                      ? `${fmtDate(c.created_at)} às ${new Date(c.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                      ? (() => {
+                          const d = new Date(c.created_at);
+                          const date = d.toLocaleDateString("pt-BR");
+                          const time = d.toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                          return `${date} às ${time}`;
+                        })()
                       : null;
                     return (
                       <div key={c.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-1.5 gap-2">
@@ -946,6 +956,7 @@ export default function ContasPagarPage() {
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
+                  { value: "pago_parcialmente", label: "Pago Parcialmente" },
                 ];
                 return (
                   <DropdownMenu>

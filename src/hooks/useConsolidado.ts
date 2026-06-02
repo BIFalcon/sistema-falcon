@@ -82,13 +82,23 @@ export function useConsolidadoData(input: {
     queryKey: ["consolidado", input.hotelIds, input.year, input.month],
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<ConsolidadoRow[]> => {
-      const { data: closings, error: cErr } = await supabase
+      const [{ data: closings, error: cErr }, { data: hotelRows }] = await Promise.all([
+        supabase
         .from("closings")
         .select("id, hotel_id, final_distribution, estimated_distribution")
         .in("hotel_id", input.hotelIds)
         .eq("year", input.year)
-        .eq("month", input.month);
+        .eq("month", input.month),
+        supabase
+          .from("hotels")
+          .select("id, num_apartments")
+          .in("id", input.hotelIds),
+      ]);
       if (cErr) throw cErr;
+      const numApartmentsByHotel = new Map<string, number | null>();
+      for (const h of (hotelRows ?? []) as { id: string; num_apartments: number | null }[]) {
+        numApartmentsByHotel.set(h.id, h.num_apartments ?? null);
+      }
 
       const closingIds = (closings ?? []).map((c) => c.id);
       const linesByClosing = new Map<string, ParsedLine[]>();
@@ -167,8 +177,10 @@ export function useConsolidadoData(input: {
           : (() => {
               const fromDre = findLineByPattern(lines, DISTRIBUICAO_POR_UH_PATTERNS);
               if (fromDre != null) return Math.abs(fromDre);
-              return distribuicaoTotal != null && uhsDisponiveis && uhsDisponiveis > 0
-                ? distribuicaoTotal / uhsDisponiveis
+              // Block 12: usa nº fixo de apartamentos do hotel (não UHs do mês).
+              const numApartments = numApartmentsByHotel.get(hotelId) ?? null;
+              return distribuicaoTotal != null && numApartments && numApartments > 0
+                ? distribuicaoTotal / numApartments
                 : null;
             })();
         return {

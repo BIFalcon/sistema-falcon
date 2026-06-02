@@ -109,7 +109,8 @@ export function hotelSkipsCarta(hotelId: string | null | undefined): boolean {
 
 // Quem aprova qual estágio do DRE
 export const DRE_STAGE_APPROVER: Record<ClosingStatus, AppRole | null> = {
-  aguardando_comentarios: null, // GG ou GOP comentam — qualquer um pode "marcar OK" e avançar
+  // Apenas a controladoria pode avançar a etapa de comentários — GG/GOP só comentam.
+  aguardando_comentarios: "controladoria",
   aguardando_controladoria: "controladoria",
   aguardando_gop: "gop",
   aguardando_fernando: "fernando",
