@@ -1305,7 +1305,9 @@ export type Database = {
             | Database["public"]["Enums"]["financial_system"]
             | null
           id: string
+          is_active: boolean
           name: string
+          num_apartments: number | null
           opera_property_name: string | null
           show_in_closing: boolean
         }
@@ -1321,7 +1323,9 @@ export type Database = {
             | Database["public"]["Enums"]["financial_system"]
             | null
           id: string
+          is_active?: boolean
           name: string
+          num_apartments?: number | null
           opera_property_name?: string | null
           show_in_closing?: boolean
         }
@@ -1337,7 +1341,9 @@ export type Database = {
             | Database["public"]["Enums"]["financial_system"]
             | null
           id?: string
+          is_active?: boolean
           name?: string
+          num_apartments?: number | null
           opera_property_name?: string | null
           show_in_closing?: boolean
         }
