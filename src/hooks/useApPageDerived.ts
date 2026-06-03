@@ -110,9 +110,18 @@ export function useApPageDerived(opts: {
     () => activeEntries.filter((e) => e.is_distribution),
     [activeEntries],
   );
-  const entries = useMemo(
+  const allEntriesNoDist = useMemo(
     () => activeEntries.filter((e) => !e.is_distribution),
     [activeEntries],
+  );
+  // Salários RH ficam em aba separada (abaixo de Lançamentos, acima de Distribuição)
+  const salaryEntries = useMemo(
+    () => allEntriesNoDist.filter((e) => e.category === "Salários RH"),
+    [allEntriesNoDist],
+  );
+  const entries = useMemo(
+    () => allEntriesNoDist.filter((e) => e.category !== "Salários RH"),
+    [allEntriesNoDist],
   );
 
   // ── Documentos ─────────────────────────────────────────────────────────
@@ -241,14 +250,23 @@ export function useApPageDerived(opts: {
     [entries, period, selectedStatuses, selectedCategories, hideTrivial, showApproval, hotelCnpj, docsByEntry, searchText, dateFrom, dateTo, scheduledFrom, scheduledTo, specificDates],
   );
 
+  // Ocultar lançamentos de contas que não são Itaú ou Santander
+  // (são importados mas não exibidos na tabela; o total já considera só esses bancos).
+  // null/vazio = sem banco definido → mostra.
+  const VISIBLE_BANKS = new Set(["itau", "santander", ""]);
+  const filteredVisible = useMemo(
+    () => filtered.filter((e) => VISIBLE_BANKS.has((e.bank_account ?? "").toLowerCase())),
+    [filtered], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   // ── Agrupamento N/D ────────────────────────────────────────────────────
   const displayRows = useMemo<DisplayRow[]>(() => {
-    if (!groupNd) return filtered.map((e) => ({ kind: "single", entry: e }));
+    if (!groupNd) return filteredVisible.map((e) => ({ kind: "single", entry: e }));
 
     const groups = new Map<string, ApEntry[]>();
     const singles: ApEntry[] = [];
 
-    for (const e of filtered) {
+    for (const e of filteredVisible) {
       const isNd =
         !e.document_number ||
         e.document_number.trim() === "" ||
@@ -286,7 +304,7 @@ export function useApPageDerived(opts: {
       return da.localeCompare(db);
     });
     return rows;
-  }, [filtered, groupNd]);
+  }, [filteredVisible, groupNd]);
 
   // ── Urgência ───────────────────────────────────────────────────────────
   // filteredSemPeriod: mesmos filtros que "filtered" mas SEM o filtro de período
@@ -441,10 +459,11 @@ export function useApPageDerived(opts: {
 
   return {
     entries,
+    salaryEntries,
     distributionEntries,
     filteredDistribution,
     archivedEntries,
-    filtered,
+    filtered: filteredVisible,
     displayRows,
     categories,
     docsByEntry,
