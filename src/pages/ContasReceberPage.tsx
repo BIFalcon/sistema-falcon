@@ -556,11 +556,16 @@ function DayBreakdown({
     hasRole("gg") ||
     hasRole("financeiro") ||
     hasRole("controladoria");
+  const canFinanceiro = isMaster || hasRole("financeiro");
+  const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
+  const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
+  const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
+  const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
