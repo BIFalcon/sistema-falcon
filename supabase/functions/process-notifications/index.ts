@@ -107,6 +107,11 @@ Deno.serve(async (req) => {
           </div>
         </div></body></html>`;
 
+      // Plain text version (required by the email API)
+      const text = `${bodyMd
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\[(.+?)\]\((.+?)\)/g, "$1 ($2)")}\n\n---\nSistema Falcon Hotels\nGerenciar notificações: ${APP_BASE_URL}/notificacoes`;
+
       const messageId = `notif-${item.id}`;
       const payload = {
         message_id: messageId,
@@ -118,6 +123,7 @@ Deno.serve(async (req) => {
         sender_domain: SENDER_DOMAIN,
         subject: item.subject,
         html,
+        text,
         queued_at: new Date().toISOString(),
         link_url: linkHref,
       };
