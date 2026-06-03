@@ -1761,7 +1761,7 @@ function NoteDialog({
             rows={4}
           />
           <div>
-            <Label className="text-xs">Data prevista de faturamento (opcional)</Label>
+            <Label className="text-xs">Data prevista de fechamento (opcional)</Label>
             <input
               type="date"
               value={expectedDate}
