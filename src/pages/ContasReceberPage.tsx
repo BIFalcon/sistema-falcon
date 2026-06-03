@@ -1289,6 +1289,99 @@ function NotBillableDialog({
 }
 
 function ConsolidatedRanking({
+
+function SendDocsDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (file1: string | null, file2: string | null, proof: string | null) => Promise<void>;
+}) {
+  const [file1, setFile1] = useState<string | null>(null);
+  const [file2, setFile2] = useState<string | null>(null);
+  const [proof, setProof] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | 1 | 2 | 3>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setFile1(entry?.invoice_file_1 ?? null);
+    setFile2(entry?.invoice_file_2 ?? null);
+    setProof(entry?.proof_file ?? null);
+  }, [entry?.id]);
+  async function handleUpload(file: File, slot: 1 | 2 | 3) {
+    if (!entry) return;
+    setBusy(slot);
+    try {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/send-${slot}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("invoices")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      if (slot === 1) setFile1(path);
+      else if (slot === 2) setFile2(path);
+      else setProof(path);
+      toast.success("Arquivo enviado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha no upload");
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enviar documentos</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {([1, 2, 3] as const).map((slot) => {
+            const cur = slot === 1 ? file1 : slot === 2 ? file2 : proof;
+            const label = slot === 1 ? "NF / Boleto 1" : slot === 2 ? "NF / Boleto 2 (opcional)" : "Comprovante de envio";
+            return (
+              <div key={slot} className="space-y-1">
+                <Label className="text-xs">{label}</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    onChange={(ev) => {
+                      const f = ev.target.files?.[0];
+                      if (f) handleUpload(f, slot);
+                      ev.target.value = "";
+                    }}
+                    disabled={busy === slot}
+                    className="text-xs"
+                  />
+                  {busy === slot && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {cur && <Badge variant="secondary" className="text-[10px]">ok</Badge>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={saving || !file1 || !proof}
+            onClick={async () => {
+              setSaving(true);
+              try { await onConfirm(file1, file2, proof); } finally { setSaving(false); }
+            }}
+          >
+            {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            Enviar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConsolidatedRanking_DUPLICATE_DELETE_ME({
   entries,
   hotelName,
 }: {
