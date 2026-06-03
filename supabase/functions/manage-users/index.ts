@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
           .from("user_roles")
           .delete()
           .eq("user_id", userId)
-          .not("role", "in", "(processos,fernando)");
+          .neq("role", "processos");
 
         const rolesToInsert: { user_id: string; role: AppRole; assigned_by: string }[] = [];
         if (payload.is_master) {
