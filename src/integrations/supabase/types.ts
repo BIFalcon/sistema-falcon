@@ -2317,6 +2317,7 @@ export type Database = {
         Returns: boolean
       }
       is_master: { Args: { _user_id: string }; Returns: boolean }
+      is_patronos: { Args: { _user_id: string }; Returns: boolean }
       is_protected_user: { Args: { _user_id: string }; Returns: boolean }
       is_rh_manager: { Args: { _user_id: string }; Returns: boolean }
       is_unsubscribed: {
