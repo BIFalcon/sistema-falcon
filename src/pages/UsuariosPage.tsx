@@ -73,13 +73,13 @@ import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "fernando", label: "Fernando (CEO)", scope: "Aprovação final de DRE e Carta — visualização total" },
   { value: "controladoria", label: "Controladoria", scope: "Acesso a todos os hotéis" },
-  { value: "financeiro", label: "Financeiro", scope: "Acesso a todos os hotéis" },
+  { value: "patronos", label: "Patronos (Coordenadoria Financeiro)", scope: "Acesso total + autoriza pagamento" },
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
   { value: "gop", label: "Gerente de Operações (GOP)", scope: "Acesso à cartela de hotéis definida" },
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
   { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
-  { value: "viewer", label: "Visualizador", scope: "Acesso somente leitura à seção de Análise" },
+  { value: "viewer", label: "Visualizador / Generalista", scope: "Somente leitura em todos os módulos" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -298,7 +298,7 @@ function UserRow({
           </div>
         </TableCell>
         <TableCell>
-          {user.is_master || ["controladoria", "financeiro", "ri"].includes(user.roles[0] ?? "") ? (
+          {user.is_master || ["controladoria", "patronos", "ri"].includes(user.roles[0] ?? "") ? (
             <span className="text-xs text-muted-foreground italic">Todos</span>
           ) : hotelNames.length === 0 ? (
             <span className="text-xs text-muted-foreground">—</span>
@@ -481,7 +481,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const needsHotelSelection =
     !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg");
   const hasGlobalAccess =
-    isMasterFlag || ["fernando", "controladoria", "financeiro", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
+    isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
 
   // Validações por etapa
   const canAdvanceStep1 =

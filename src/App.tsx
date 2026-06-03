@@ -56,11 +56,17 @@ function RoleGuard({
   children: React.ReactNode;
   masterOnly?: boolean;
 }) {
-  const { isMaster, roles } = useAuth();
+  const { isMaster, hasRole } = useAuth();
   if (masterOnly && !isMaster) return <Navigate to="/" replace />;
-  if (allowed && !isMaster && !allowed.some((r) => roles.includes(r))) {
+  if (allowed && !isMaster && !allowed.some((r) => hasRole(r))) {
     return <Navigate to="/" replace />;
   }
+  return <>{children}</>;
+}
+
+function PerformanceSlaGuard({ children }: { children: React.ReactNode }) {
+  const { canViewPerformanceSla } = useAuth();
+  if (!canViewPerformanceSla) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -123,13 +129,13 @@ const App = () => (
               <Route path="/fechamento" element={<FechamentoPage />} />
               <Route path="/fechamento/dre" element={<DrePage />} />
               <Route path="/fechamento/carta" element={<CartaPage />} />
-              <Route path="/fechamento/financeiro" element={<RoleGuard roles={["financeiro"]}><FinanceiroPage /></RoleGuard>} />
+              <Route path="/fechamento/financeiro" element={<RoleGuard roles={["controladoria","patronos"]}><FinanceiroPage /></RoleGuard>} />
               <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />
-              <Route path="/fechamento/performance" element={<RoleGuard masterOnly><PerformanceSlaPage /></RoleGuard>} />
+              <Route path="/fechamento/performance" element={<PerformanceSlaGuard><PerformanceSlaPage /></PerformanceSlaGuard>} />
               <Route
                 path="/fechamento/consolidado"
                 element={
-                  <RoleGuard roles={["controladoria", "gop", "ri", "financeiro", "processos"]}>
+                  <RoleGuard roles={["controladoria","patronos","gop","ri","processos"]}>
                     <ConsolidadoPage />
                   </RoleGuard>
                 }
@@ -140,14 +146,14 @@ const App = () => (
               <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
 
               {/* Análise */}
-              <Route path="/indicadores" element={<RoleGuard roles={["gop", "gg", "controladoria", "operacoes", "viewer"]}><IndicadoresDrePage /></RoleGuard>} />
+              <Route path="/indicadores" element={<RoleGuard roles={["gop","gg","controladoria","patronos","operacoes","viewer","rh"]}><IndicadoresDrePage /></RoleGuard>} />
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
-              <Route path="/financeiro" element={<RoleGuard roles={["financeiro", "gg"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["financeiro"]}><ContasPagarPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg", "adm", "gop"]}><ContasReceberPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["financeiro", "gg", "adm"]}><ClientesPage /></RoleGuard>} />
+              <Route path="/financeiro" element={<RoleGuard roles={["controladoria","patronos","gg","viewer"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ContasPagarPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","viewer"]}><ContasReceberPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<TurnoverPage />} />
               <Route path="/rh/calendario" element={<CalendarioPage />} />
@@ -155,7 +161,7 @@ const App = () => (
               <Route path="/rh/treinamentos" element={<TreinamentosPage />} />
               <Route path="/rh/politicas" element={<PoliticasPage />} />
               <Route path="/controladoria" element={<EmBreve />} />
-              <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria"]}><ConciliacaoPage /></RoleGuard>} />
+              <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos"]}><ConciliacaoPage /></RoleGuard>} />
 
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />

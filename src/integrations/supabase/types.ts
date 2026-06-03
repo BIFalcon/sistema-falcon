@@ -2317,6 +2317,7 @@ export type Database = {
         Returns: boolean
       }
       is_master: { Args: { _user_id: string }; Returns: boolean }
+      is_patronos: { Args: { _user_id: string }; Returns: boolean }
       is_protected_user: { Args: { _user_id: string }; Returns: boolean }
       is_rh_manager: { Args: { _user_id: string }; Returns: boolean }
       is_unsubscribed: {
@@ -2388,6 +2389,7 @@ export type Database = {
         | "marketing"
         | "comercial"
         | "adm"
+        | "patronos"
       ar_gg_status:
         | "pendente"
         | "faturado"
@@ -2580,6 +2582,7 @@ export const Constants = {
         "marketing",
         "comercial",
         "adm",
+        "patronos",
       ],
       ar_gg_status: [
         "pendente",

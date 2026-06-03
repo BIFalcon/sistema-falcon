@@ -187,7 +187,7 @@ export function AppSidebar() {
   const { state, setOpen } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { profile, roles, isMaster } = useAuth();
+  const { profile, roles, isMaster, hasRole, canViewPerformanceSla } = useAuth();
 
   // Mostra TODOS os roles do usuário, com prefixo "Master" quando aplicável.
   const roleNames = roles.map((r) => ROLE_LABELS[r] ?? r);
@@ -237,10 +237,14 @@ export function AppSidebar() {
                   const parentActive = isActiveUrl(item.url, false);
 
                   if (!hasChildren) {
+                    // Performance SLA tem regra própria (master | viewer | Fernando CEO)
+                    if (item.url === "/fechamento/performance") {
+                      if (!canViewPerformanceSla) return null;
+                    }
                     const allowed = item.requireMaster
                       ? (isMaster || roles.includes("processos"))
                       : item.allowedRoles
-                        ? (isMaster || item.allowedRoles.some((r) => roles.includes(r)))
+                        ? (isMaster || item.allowedRoles.some((r) => hasRole(r)))
                         : true;
                     if (!allowed) return null;
                     return (
@@ -259,7 +263,7 @@ export function AppSidebar() {
                   const groupAllowed = item.requireMaster
                     ? (isMaster || roles.includes("processos"))
                     : item.allowedRoles
-                      ? (isMaster || item.allowedRoles.some((r) => roles.includes(r)))
+                      ? (isMaster || item.allowedRoles.some((r) => hasRole(r)))
                       : true;
                   if (!groupAllowed) return null;
 
@@ -286,7 +290,8 @@ export function AppSidebar() {
                               {item.children!
                                 .filter((child) => {
                                   if (child.requireMaster) return isMaster || roles.includes("processos");
-                                  if (child.allowedRoles) return isMaster || child.allowedRoles.some((r) => roles.includes(r));
+                                  if (child.url === "/fechamento/performance") return canViewPerformanceSla;
+                                  if (child.allowedRoles) return isMaster || child.allowedRoles.some((r) => hasRole(r));
                                   return true;
                                 })
                                 .map((child) => (
