@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       `Olá,\n\nVocê tem **${entries.length} lançamento(s)** com pendências em **${hotel?.name ?? "seu hotel"}** ` +
       `totalizando **${fmtBRL(total)}**:\n\n` +
       lines.join("\n") +
-      (customMessage ? `\n\n**Mensagem:**\n${customMessage}\n` : "") +
+      (safeCustomMessage ? `\n\n**Mensagem:**\n${safeCustomMessage}\n` : "") +
       `\n\n${cta}\n\n[Abrir Contas a Pagar](/financeiro/contas-pagar)`;
 
     const linkUrl = `/financeiro/contas-pagar`;
