@@ -10,6 +10,64 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+const SENDER_DOMAIN = "notify.falconhoteis.com.br";
+const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
+
+async function getUnsubscribeToken(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<string> {
+  const { data: existing } = await admin
+    .from("email_unsubscribe_tokens")
+    .select("token")
+    .eq("email", email)
+    .is("used_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.token) return existing.token as string;
+  const token =
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "");
+  await admin.from("email_unsubscribe_tokens").insert({ email, token });
+  return token;
+}
+
+async function enqueueInviteEmail(
+  admin: ReturnType<typeof createClient>,
+  args: { to: string; subject: string; html: string; text: string; label: string },
+): Promise<boolean> {
+  try {
+    const unsubscribeToken = await getUnsubscribeToken(admin, args.to);
+    const messageId = `${args.label}-${args.to}-${Date.now()}`;
+    const { error } = await admin.rpc("enqueue_email", {
+      queue_name: "transactional_emails",
+      payload: {
+        message_id: messageId,
+        idempotency_key: messageId,
+        purpose: "transactional",
+        label: args.label,
+        to: args.to,
+        from: FROM_ADDRESS,
+        sender_domain: SENDER_DOMAIN,
+        subject: args.subject,
+        html: args.html,
+        text: args.text,
+        unsubscribe_token: unsubscribeToken,
+        queued_at: new Date().toISOString(),
+      },
+    });
+    if (error) {
+      console.error("[invite] enqueue_email failed:", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[invite] enqueue exception:", e);
+    return false;
+  }
+}
+
 type AppRole =
   | "processos"
   | "fernando"
