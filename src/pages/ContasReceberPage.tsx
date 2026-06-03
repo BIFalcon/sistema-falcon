@@ -1625,7 +1625,7 @@ function HotelOpenFolioDetail({
               <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
               <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
               <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
-              <TableHead>Previsto pagto</TableHead>
+              <TableHead>Previsto fechamento</TableHead>
               <TableHead>Justificativa</TableHead>
             </TableRow>
           </TableHeader>
@@ -1644,7 +1644,16 @@ function HotelOpenFolioDetail({
                 const overdue = expected && expected < todayIso;
                 return (
                   <TableRow key={e.id}>
-                    <TableCell className="text-sm">{fullName(e)}</TableCell>
+                    <TableCell className="text-sm">
+                      <div>{fullName(e)}</div>
+                      {(e.company || e.travel_agent) && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                          {e.company && <span>🏢 {e.company}</span>}
+                          {e.company && e.travel_agent && <span> · </span>}
+                          {e.travel_agent && <span>✈ {e.travel_agent}</span>}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
                     <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
