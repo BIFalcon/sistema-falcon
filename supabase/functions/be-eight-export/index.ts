@@ -19,6 +19,8 @@ const COLUMN_BLOCKLIST: Record<string, string[]> = {
   profiles: [],
   user_permissions: [],
   system_settings: [],
+  rh_employees: ["cpf", "salary", "birth_date", "raw"],
+  hotels: ["bank_accounts", "cnpj"],
 };
 
 // Global column-name patterns that are always stripped, regardless of table.
@@ -36,6 +38,11 @@ const GLOBAL_SENSITIVE_PATTERNS = [
   /_hash$/i,
   /signed_url/i,
   /credentials?/i,
+  /^cpf$/i,
+  /salary/i,
+  /birth_date/i,
+  /bank_accounts/i,
+  /^cnpj$/i,
 ];
 
 // Allowlist of exportable tables.
