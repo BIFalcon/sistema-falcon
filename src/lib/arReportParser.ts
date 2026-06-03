@@ -31,6 +31,8 @@ export interface ParsedOpenFolioEntry {
   departure_date: string | null;
   extraction_date: string | null;
   days_open: number | null;
+  company: string | null;
+  travel_agent: string | null;
 }
 
 function normalize(value: unknown): string {
@@ -173,6 +175,8 @@ function parseOpenFolio(rows: unknown[][]): ParsedOpenFolioEntry[] {
   const cDep = findCol(header, "departure date");
   const cExtraction = findCol(header, "data de extracao", "extraction date");
   const cDays = findCol(header, "tempo em aberto", "days open");
+  const cCompany = findCol(header, "company");
+  const cTravelAgent = findCol(header, "travel agent");
 
   const entries: ParsedOpenFolioEntry[] = [];
   for (let i = 3; i < rows.length; i += 1) {
@@ -191,6 +195,8 @@ function parseOpenFolio(rows: unknown[][]): ParsedOpenFolioEntry[] {
       departure_date: parseDate(row[cDep]),
       extraction_date: parseDate(row[cExtraction]),
       days_open: Number.parseInt(String(row[cDays] ?? "").replace(/\D/g, ""), 10) || null,
+      company: cCompany >= 0 ? (normalize(row[cCompany] ?? "") || null) : null,
+      travel_agent: cTravelAgent >= 0 ? (normalize(row[cTravelAgent] ?? "") || null) : null,
     });
   }
 
