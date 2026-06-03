@@ -1085,6 +1085,131 @@ function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
   return <Badge variant="outline">Pendente</Badge>;
 }
 
+function ProblemDocsDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  useEffect(() => { setNote(entry?.documents_problem_note ?? ""); }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Problema nos documentos</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label className="text-xs">Descreva o problema</Label>
+          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="O que está incorreto nos documentos?" />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Registrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DefaultingDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  useEffect(() => { setNote(entry?.defaulting_note ?? ""); }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Marcar como inadimplente</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label className="text-xs">Justificativa</Label>
+          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalhes da inadimplência" />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const NOT_BILLABLE_REASONS = [
+  "Cortesia",
+  "No-show coberto",
+  "Estorno",
+  "Erro de lançamento",
+  "Compensação interna",
+  "Outro",
+];
+
+function NotBillableDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (reason: string, note: string | null) => Promise<void>;
+}) {
+  const [reason, setReason] = useState<string>("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    setReason(entry?.not_billable_reason ?? "");
+    setNote(entry?.not_billable_note ?? "");
+  }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Não vai ser faturado</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Motivo *</Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {NOT_BILLABLE_REASONS.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Observação (opcional)</Label>
+            <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!reason} onClick={() => onConfirm(reason, note.trim() || null)}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ConsolidatedRanking({
   entries,
   hotelName,
