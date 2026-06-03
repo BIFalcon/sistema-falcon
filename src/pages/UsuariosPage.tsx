@@ -244,7 +244,9 @@ function UserRow({
   async function handleResend() {
     try {
       const res = await resend.mutateAsync(user.user_id);
-      if (res.invite_link) {
+      if (res.email_queued) {
+        toast.success("Convite reenviado por e-mail");
+      } else if (res.invite_link) {
         setLinkDialog(res.invite_link);
       } else {
         toast.success("Convite reenviado");
