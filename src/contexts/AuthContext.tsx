@@ -29,6 +29,10 @@ interface AuthContextValue {
   isFernandoCEO: boolean;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: () => boolean;
+  /** True quando o usuário é da coordenadoria (patronos). */
+  isPatronos: boolean;
+  /** True quando pode visualizar Performance SLA. */
+  canViewPerformanceSla: boolean;
   /** Sub-papel do financeiro: equipe (ops) ou coordenadora (chefe). */
   financeiroSubrole: "equipe" | "coordenadora" | null;
   isFinanceiroEquipe: boolean;
@@ -136,17 +140,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isMaster = roles.some((r) => (MASTER_ROLES as readonly string[]).includes(r));
-  const GLOBAL_ACCESS_ROLES = ["fernando", "controladoria", "financeiro", "ri", "rh", "operacoes", "viewer"];
+  const GLOBAL_ACCESS_ROLES = ["fernando", "controladoria", "patronos", "ri", "rh", "operacoes", "viewer"];
   const hasGlobalAccess = isMaster || roles.some((r) => GLOBAL_ACCESS_ROLES.includes(r as string));
   const allowedHotels = hasGlobalAccess ? allHotels : userHotels;
 
-  const hasFinanceiroRole = roles.includes("financeiro" as AppRole);
-  // Default histórico: financeiro sem sub-flag = coordenadora.
-  const financeiroSubrole: "equipe" | "coordenadora" | null = hasFinanceiroRole
-    ? (profile?.financeiro_subrole ?? "coordenadora")
-    : null;
-  const isFinanceiroEquipe = hasFinanceiroRole && financeiroSubrole === "equipe";
-  const isFinanceiroCoordenadora = hasFinanceiroRole && financeiroSubrole === "coordenadora";
+  const isPatronos = roles.includes("patronos" as AppRole);
+  // O papel "financeiro" foi descontinuado: equipe migrou para controladoria, coordenadoria virou patronos.
+  const financeiroSubrole: "equipe" | "coordenadora" | null = null;
+  const isFinanceiroEquipe = false;
+  // Mantido como alias de patronos para compatibilidade com código existente que checa "marcar como Pago".
+  const isFinanceiroCoordenadora = isPatronos;
+  const isFernandoCEO = user?.email?.toLowerCase() === FERNANDO_CEO_EMAIL;
+
+  /**
+   * Shim de compatibilidade: o papel "financeiro" foi removido. Qualquer código
+   * legado que ainda peça hasRole("financeiro") deve receber true se o usuário
+   * for controladoria OU patronos (sucessores naturais).
+   */
+  const hasRoleShim = (r: AppRole) => {
+    if ((r as string) === "financeiro") {
+      return roles.includes("controladoria" as AppRole) || roles.includes("patronos" as AppRole);
+    }
+    return roles.includes(r);
+  };
 
   const value: AuthContextValue = {
     user,
@@ -160,9 +176,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isGg: roles.includes("gg" as AppRole),
     isFernando: roles.includes("fernando" as AppRole),
     isAdm: roles.includes("adm" as AppRole),
-    isFernandoCEO: user?.email?.toLowerCase() === FERNANDO_CEO_EMAIL,
-    hasRole: (r) => roles.includes(r),
+    isFernandoCEO,
+    hasRole: hasRoleShim,
     hasAnyRole: () => roles.length > 0,
+    isPatronos,
+    canViewPerformanceSla: isMaster || roles.includes("viewer" as AppRole) || isFernandoCEO,
     financeiroSubrole,
     isFinanceiroEquipe,
     isFinanceiroCoordenadora,
