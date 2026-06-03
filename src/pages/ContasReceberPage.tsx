@@ -381,14 +381,9 @@ function ToInvoiceSection({
             </Button>
             {hotelId && (
               <Button variant="outline" size="sm" onClick={() => setContractsOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" /> Contratos do hotel
+                <Plus className="h-4 w-4" /> Cadastro de Clientes
               </Button>
             )}
-            <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link to="/financeiro/contas-receber/clientes">
-                <Plus className="h-4 w-4" /> Clientes
-              </Link>
-            </Button>
           </div>
         </div>
 
@@ -1957,7 +1952,7 @@ function ContractsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Contratos — {hotelName}</DialogTitle>
+          <DialogTitle>Cadastro de Clientes — {hotelName}</DialogTitle>
           <DialogDescription>
             Prazo de recebimento por cliente. Vencimento estimado = data da transação + prazo.
           </DialogDescription>
