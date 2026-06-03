@@ -24,6 +24,7 @@ export type DisplayRow =
 
 export interface ApPageDerived {
   entries: ApEntry[];
+  salaryEntries: ApEntry[];
   distributionEntries: ApEntry[];
   filteredDistribution: ApEntry[];
   archivedEntries: ApEntry[];
