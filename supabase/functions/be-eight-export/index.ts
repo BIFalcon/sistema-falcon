@@ -293,8 +293,10 @@ async function exportTable(
     table,
     cursor_column: cursorCol,
     incremental_column: incrementalCol,
+    limit,
     count: rows.length,
     next_cursor: nextCursor,
+    has_more: nextCursor !== null,
     rows,
   }, 200, ctx.requestId);
 }
@@ -319,22 +321,36 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await approxRowCount(ctx.supabase, t);
+    const blocked = cols.filter((c) => isSensitiveColumn(t, c));
     tables.push({
       table: t,
       columns: visible,
-      hidden_columns: cols.filter((c) => isSensitiveColumn(t, c)),
+      hidden_columns: blocked,
+      blocked_columns: blocked,
       row_count: rowCount,
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
-      contains_sensitive: cols.some((c) => isSensitiveColumn(t, c)),
+      supports_cursor: true,
+      supports_updated_since: incrementalCol !== null,
+      non_paginated: false,
+      contains_sensitive: blocked.length > 0,
+      contains_sensitive_data: blocked.length > 0,
     });
   }
+  const derived = [
+    { resource: "dre_latest_lines", cursor_column: "closing_id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "dre_latest_indicators", cursor_column: "closing_id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "rh_summary", cursor_column: "hotel_id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "table_counts", cursor_column: "table", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "latest_updates", cursor_column: "table", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+  ];
   return json({
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
     generated_at: new Date().toISOString(),
     tables,
     derived_resources: DERIVED_RESOURCES,
+    derived: derived,
   }, 200, ctx.requestId);
 }
 
@@ -361,35 +377,76 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   const hotelId = url.searchParams.get("hotel_id");
 
   if (resource === "dre_latest_lines" || resource === "dre_latest_indicators") {
-    // Find latest version per closing_id and return its rows.
-    let closingsQ = ctx.supabase.from("closings").select("id, hotel_id").order("id", { ascending: true }).limit(limit);
-    if (hotelId) closingsQ = closingsQ.eq("hotel_id", hotelId);
-    if (closingId) closingsQ = closingsQ.eq("id", closingId);
+    // Keyset pagination by closing_id. Fetch a window of closings, then load
+    // only their latest DRE lines via RPC. The cursor advances over closings,
+    // not over lines, but the response still respects `limit` by returning at
+    // most `limit` rows per page (lines that don't fit are deferred).
     const parsed = parseCursor(cursorParam);
-    if (parsed?.value) closingsQ = closingsQ.gt("id", parsed.value as never);
+    const batchSize = Math.min(50, limit);
+    let collected: Array<Record<string, unknown>> = [];
+    let lastClosingId: string | null = parsed?.value ? String(parsed.value) : null;
+    let exhausted = false;
 
-    const { data: closingsData, error: cErr } = await closingsQ;
-    if (cErr) return errorResponse(500, "query_failed", cErr.message, ctx.requestId);
-    const ids = (closingsData ?? []).map((c) => (c as { id: string }).id);
-    if (ids.length === 0) {
-      return json({
-        schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-        count: 0, next_cursor: null, rows: [],
-      }, 200, ctx.requestId);
+    while (collected.length < limit) {
+      let closingsQ = ctx.supabase
+        .from("closings")
+        .select("id, hotel_id")
+        .order("id", { ascending: true })
+        .limit(batchSize);
+      if (hotelId) closingsQ = closingsQ.eq("hotel_id", hotelId);
+      if (closingId) closingsQ = closingsQ.eq("id", closingId);
+      if (lastClosingId) closingsQ = closingsQ.gt("id", lastClosingId);
+
+      const { data: closingsData, error: cErr } = await closingsQ;
+      if (cErr) return errorResponse(500, "query_failed", cErr.message, ctx.requestId);
+      const batch = (closingsData ?? []) as Array<{ id: string }>;
+      if (batch.length === 0) { exhausted = true; break; }
+
+      const ids = batch.map((c) => c.id);
+      const { data: linesData, error: lErr } = await ctx.supabase
+        .rpc("get_latest_dre_lines_by_closings", { _closing_ids: ids });
+      if (lErr) return errorResponse(500, "rpc_failed", lErr.message, ctx.requestId);
+
+      let lines = (linesData ?? []) as Array<{ closing_id: string; line_type: string }>;
+      if (resource === "dre_latest_indicators") {
+        lines = lines.filter((r) => r.line_type === "indicator");
+      }
+      // Group by closing_id (preserve closing order).
+      const byClosing = new Map<string, Array<Record<string, unknown>>>();
+      for (const id of ids) byClosing.set(id, []);
+      for (const l of lines) {
+        const arr = byClosing.get(l.closing_id);
+        if (arr) arr.push(l as unknown as Record<string, unknown>);
+      }
+
+      let stopped = false;
+      for (const id of ids) {
+        const arr = byClosing.get(id) ?? [];
+        if (collected.length + arr.length > limit) {
+          // Don't split a closing across pages — stop before it.
+          if (collected.length === 0) {
+            // A single closing exceeds limit; truncate to keep contract.
+            collected = arr.slice(0, limit);
+            lastClosingId = id;
+          }
+          stopped = true;
+          break;
+        }
+        collected = collected.concat(arr);
+        lastClosingId = id;
+        if (collected.length >= limit) { stopped = true; break; }
+      }
+      if (stopped) break;
+      if (batch.length < batchSize) { exhausted = true; break; }
+      if (closingId) { exhausted = true; break; }
     }
 
-    const { data: linesData, error: lErr } = await ctx.supabase
-      .rpc("get_latest_dre_lines_by_closings", { _closing_ids: ids });
-    if (lErr) return errorResponse(500, "rpc_failed", lErr.message, ctx.requestId);
-
-    let rows = (linesData ?? []) as Array<{ line_type: string }>;
-    if (resource === "dre_latest_indicators") {
-      rows = rows.filter((r) => r.line_type === "indicator");
-    }
-    const nextCursor = ids.length === limit ? encodeCursor(ids[ids.length - 1], null) : null;
+    const hasMore = !exhausted;
+    const nextCursor = hasMore && lastClosingId ? encodeCursor(lastClosingId, null) : null;
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-      count: rows.length, next_cursor: nextCursor, rows,
+      limit, count: collected.length, next_cursor: nextCursor, has_more: hasMore,
+      rows: collected,
     }, 200, ctx.requestId);
   }
 
@@ -409,27 +466,47 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
       else if (g === "F") byHotel[h].female++;
       else byHotel[h].other++;
     }
-    const rows = Object.values(byHotel);
+    const all = Object.values(byHotel).sort((a, b) => a.hotel_id.localeCompare(b.hotel_id));
+    const parsed = parseCursor(cursorParam);
+    const startIdx = parsed?.value
+      ? all.findIndex((r) => r.hotel_id > String(parsed.value))
+      : 0;
+    const sliceStart = startIdx === -1 ? all.length : startIdx;
+    const page = all.slice(sliceStart, sliceStart + limit);
+    const hasMore = sliceStart + page.length < all.length;
+    const nextCursor = hasMore && page.length > 0
+      ? encodeCursor(page[page.length - 1].hotel_id, null) : null;
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-      count: rows.length, next_cursor: null, rows,
+      limit, count: page.length, next_cursor: nextCursor, has_more: hasMore, rows: page,
     }, 200, ctx.requestId);
   }
 
   if (resource === "table_counts") {
+    const parsed = parseCursor(cursorParam);
+    const startToken = parsed?.value ? String(parsed.value) : "";
+    const remaining = TABLE_ALLOWLIST.filter((t) => t > startToken);
+    const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; row_count: number | null }> = [];
-    for (const t of TABLE_ALLOWLIST) {
+    for (const t of page) {
       rows.push({ table: t, row_count: await approxRowCount(ctx.supabase, t) });
     }
+    const hasMore = remaining.length > page.length;
+    const nextCursor = hasMore && page.length > 0
+      ? encodeCursor(page[page.length - 1], null) : null;
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-      count: rows.length, next_cursor: null, rows,
+      limit, count: rows.length, next_cursor: nextCursor, has_more: hasMore, rows,
     }, 200, ctx.requestId);
   }
 
   if (resource === "latest_updates") {
+    const parsed = parseCursor(cursorParam);
+    const startToken = parsed?.value ? String(parsed.value) : "";
+    const remaining = TABLE_ALLOWLIST.filter((t) => t > startToken);
+    const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; column: string | null; latest: string | null }> = [];
-    for (const t of TABLE_ALLOWLIST) {
+    for (const t of page) {
       let col: string | null = null;
       try { col = await pickColumn(ctx.supabase, t, INCREMENTAL_CANDIDATES); } catch { col = null; }
       if (!col) { rows.push({ table: t, column: null, latest: null }); continue; }
@@ -439,9 +516,12 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
       const latest = data && data[0] ? (data[0] as Record<string, string>)[col] : null;
       rows.push({ table: t, column: col, latest });
     }
+    const hasMore = remaining.length > page.length;
+    const nextCursor = hasMore && page.length > 0
+      ? encodeCursor(page[page.length - 1], null) : null;
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-      count: rows.length, next_cursor: null, rows,
+      limit, count: rows.length, next_cursor: nextCursor, has_more: hasMore, rows,
     }, 200, ctx.requestId);
   }
 
