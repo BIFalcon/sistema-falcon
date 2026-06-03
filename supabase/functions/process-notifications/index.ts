@@ -1,11 +1,8 @@
-// Edge function: processa fila de notificações do workflow.
-// Enquanto o domínio notify.falconhoteis.com.br não estiver configurado,
-// marca como `skipped` com motivo "domain_not_configured".
-// Quando o domínio estiver pronto, basta alterar EMAIL_DOMAIN_READY=true e
-// implementar o envio real (provider já preparado).
+// Edge function: drena a fila lógica `notification_queue` enfileirando
+// cada mensagem na pgmq `transactional_emails`, que é processada pelo
+// cron `process-email-queue` a cada 5s.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
-import { sendLovableEmail } from "npm:@lovable.dev/email-js";
+import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,25 +10,57 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const EMAIL_DOMAIN_READY = true; // notify.falconhoteis.com.br ativo
 const APP_BASE_URL =
-  Deno.env.get("APP_BASE_URL") ?? "https://app.falconhoteis.com.br";
+  Deno.env.get("APP_BASE_URL") ?? "https://sistema-falcon.lovable.app";
+const SENDER_DOMAIN = "notify.falconhoteis.com.br";
+const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
+
+function parseJwtClaims(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payload = parts[1]
+      .replaceAll("-", "+")
+      .replaceAll("_", "/")
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
+    return JSON.parse(atob(payload)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
-  // Endpoint interno (cron): aceita apenas chamadas com a service role key.
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
-  if (!token || token !== serviceKey) {
+  // Aceita: (a) service-role (cron/admin), (b) master autenticado.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace("Bearer ", "").trim();
+  let authorized = false;
+
+  if (token && token === serviceKey) {
+    authorized = true;
+  } else if (token) {
+    const claims = parseJwtClaims(token);
+    if (claims?.role === "service_role") {
+      authorized = true;
+    } else if (claims?.sub) {
+      const admin = createClient(supabaseUrl, serviceKey);
+      const { data: isMaster } = await admin.rpc("is_master", { _user_id: claims.sub });
+      if (isMaster === true) authorized = true;
+    }
+  }
+
+  if (!authorized) {
     return new Response(
       JSON.stringify({ error: "forbidden" }),
       { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   // Pega lote de pendentes (limite 50)
   const { data: pending, error } = await supabase
@@ -55,60 +84,61 @@ Deno.serve(async (req) => {
     });
   }
 
-  let dispatched = 0;
-  let skipped = 0;
+  let enqueued = 0;
+  let failed = 0;
 
   for (const item of pending) {
-    if (!EMAIL_DOMAIN_READY) {
-      await supabase
-        .from("notification_queue")
-        .update({
-          status: "skipped",
-          dispatched_at: new Date().toISOString(),
-          error_message: "domain_not_configured: aguardando notify.falconhoteis.com.br",
-        })
-        .eq("id", item.id);
-      skipped++;
-      continue;
-    }
-
     try {
-      const fullLink = `${APP_BASE_URL}${item.link_url}`;
-
-      // Converte body_md para HTML simples
-      const bodyHtml = (item.body_md as string)
+      // Re-aponta links relativos para a URL absoluta da app.
+      const linkHref = item.link_url
+        ? (String(item.link_url).startsWith("http") ? String(item.link_url) : `${APP_BASE_URL}${item.link_url}`)
+        : APP_BASE_URL;
+      const bodyMd = String(item.body_md ?? "").replace(/\]\((\/[^)]+)\)/g, `](${APP_BASE_URL}$1)`);
+      const bodyHtml = bodyMd
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#1e40af;text-decoration:underline;">$1</a>')
         .replace(/\n/g, "<br/>");
 
-      const html = `
+      const html = `<!doctype html><html><body style="background:#ffffff;margin:0;padding:0;">
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1f2937;">
-          <div style="font-size:14px;line-height:1.6;">
-            ${bodyHtml}
-          </div>
+          <div style="font-size:14px;line-height:1.6;">${bodyHtml}</div>
           <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
-            Sistema Falcon Hotels ·
-            <a href="${APP_BASE_URL}/notificacoes" style="color:#6b7280;">Gerenciar notificações</a>
+            Sistema Falcon Hotels · <a href="${APP_BASE_URL}/notificacoes" style="color:#6b7280;">Gerenciar notificações</a>
           </div>
-        </div>
-      `;
+        </div></body></html>`;
 
-      await sendLovableEmail({
-        from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
-        to: item.recipient_email as string,
-        subject: item.subject as string,
+      const messageId = `notif-${item.id}`;
+      const payload = {
+        message_id: messageId,
+        idempotency_key: messageId,
+        purpose: "transactional",
+        label: `workflow:${item.event ?? "notification"}`,
+        to: item.recipient_email,
+        from: FROM_ADDRESS,
+        sender_domain: SENDER_DOMAIN,
+        subject: item.subject,
         html,
+        queued_at: new Date().toISOString(),
+        link_url: linkHref,
+      };
+
+      const { error: enqError } = await supabase.rpc("enqueue_email", {
+        queue_name: "transactional_emails",
+        payload,
       });
+      if (enqError) throw enqError;
 
       await supabase
         .from("notification_queue")
         .update({
           status: "dispatched",
           dispatched_at: new Date().toISOString(),
+          error_message: null,
         })
         .eq("id", item.id);
-      dispatched++;
+      enqueued++;
     } catch (err) {
+      failed++;
       await supabase
         .from("notification_queue")
         .update({
@@ -120,12 +150,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({
-      processed: pending.length,
-      dispatched,
-      skipped,
-      domain_ready: EMAIL_DOMAIN_READY,
-    }),
+    JSON.stringify({ processed: pending.length, enqueued, failed }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
