@@ -501,7 +501,7 @@ export default function ContasPagarPage() {
           onClick: async () => {
             try {
               for (const { id, prev } of prevCategories) {
-                await updateCategory.mutateAsync({ entryId: id, hotelId, category: prev ?? "" });
+                await updateCategory.mutateAsync({ entryId: id, hotelId, category: prev });
               }
               qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
               toast.success("Marcação desfeita.");
