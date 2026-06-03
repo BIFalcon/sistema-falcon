@@ -244,7 +244,9 @@ function UserRow({
   async function handleResend() {
     try {
       const res = await resend.mutateAsync(user.user_id);
-      if (res.invite_link) {
+      if (res.email_queued) {
+        toast.success("Convite reenviado por e-mail");
+      } else if (res.invite_link) {
         setLinkDialog(res.invite_link);
       } else {
         toast.success("Convite reenviado");
@@ -529,9 +531,13 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
             subrole: financeiroSubrole,
           });
         }
-        toast.success("Convite criado");
+        if (res.email_queued) {
+          toast.success("Convite criado e enviado por e-mail");
+        } else {
+          toast.success("Convite criado");
+        }
         onOpenChange(false);
-        if (res.invite_link) setLinkDialog(res.invite_link);
+        if (!res.email_queued && res.invite_link) setLinkDialog(res.invite_link);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");

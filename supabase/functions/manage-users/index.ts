@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { sendLovableEmail } from "npm:@lovable.dev/email-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +9,64 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+const SENDER_DOMAIN = "notify.falconhoteis.com.br";
+const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
+
+async function getUnsubscribeToken(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<string> {
+  const { data: existing } = await admin
+    .from("email_unsubscribe_tokens")
+    .select("token")
+    .eq("email", email)
+    .is("used_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.token) return existing.token as string;
+  const token =
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "");
+  await admin.from("email_unsubscribe_tokens").insert({ email, token });
+  return token;
+}
+
+async function enqueueInviteEmail(
+  admin: ReturnType<typeof createClient>,
+  args: { to: string; subject: string; html: string; text: string; label: string },
+): Promise<boolean> {
+  try {
+    const unsubscribeToken = await getUnsubscribeToken(admin, args.to);
+    const messageId = `${args.label}-${args.to}-${Date.now()}`;
+    const { error } = await admin.rpc("enqueue_email", {
+      queue_name: "transactional_emails",
+      payload: {
+        message_id: messageId,
+        idempotency_key: messageId,
+        purpose: "transactional",
+        label: args.label,
+        to: args.to,
+        from: FROM_ADDRESS,
+        sender_domain: SENDER_DOMAIN,
+        subject: args.subject,
+        html: args.html,
+        text: args.text,
+        unsubscribe_token: unsubscribeToken,
+        queued_at: new Date().toISOString(),
+      },
+    });
+    if (error) {
+      console.error("[invite] enqueue_email failed:", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[invite] enqueue exception:", e);
+    return false;
+  }
+}
 
 type AppRole =
   | "processos"
@@ -204,20 +261,23 @@ Deno.serve(async (req) => {
               </p>
             </div>
           `;
-          try {
-            await sendLovableEmail({
-              from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
-              to: payload.email,
-              subject: "Convite — Sistema Falcon Hotels",
-              html,
-            });
-          } catch (emailErr) {
-            console.error("[invite] falha ao enviar e-mail:", emailErr);
-            // Não bloqueia — o link ainda é retornado para copiar manualmente
-          }
+          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const emailQueued = await enqueueInviteEmail(admin, {
+            to: payload.email,
+            subject: "Convite — Sistema Falcon Hotels",
+            html,
+            text,
+            label: "invite",
+          });
+          return json({
+            ok: true,
+            user_id: userId,
+            invite_link: actionLink,
+            email_queued: emailQueued,
+          });
         }
 
-        return json({ ok: true, user_id: userId, invite_link: actionLink });
+        return json({ ok: true, user_id: userId, invite_link: actionLink, email_queued: false });
       }
 
       case "update": {
@@ -379,22 +439,22 @@ Deno.serve(async (req) => {
               </p>
             </div>
           `;
-          try {
-            await sendLovableEmail({
-              from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
-              to: prof.email,
-              subject: "Novo acesso — Sistema Falcon Hotels",
-              html,
-            });
-          } catch (emailErr) {
-            console.error("[resend_invite] falha ao enviar e-mail:", emailErr);
-          }
+          const text = `Seu link de acesso ao Sistema Falcon foi renovado.\n\nAcesse:\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const emailQueued = await enqueueInviteEmail(admin, {
+            to: prof.email,
+            subject: "Novo acesso — Sistema Falcon Hotels",
+            html,
+            text,
+            label: "resend_invite",
+          });
+          return json({
+            ok: true,
+            invite_link: actionLink,
+            email_queued: emailQueued,
+          });
         }
 
-        return json({
-          ok: true,
-          invite_link: actionLink,
-        });
+        return json({ ok: true, invite_link: actionLink, email_queued: false });
       }
 
       case "delete_user": {
