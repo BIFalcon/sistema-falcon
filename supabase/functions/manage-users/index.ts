@@ -230,8 +230,7 @@ Deno.serve(async (req) => {
           .select("role")
           .eq("user_id", targetId);
         const targetSet = new Set((targetRoles ?? []).map((r) => r.role));
-        const targetIsProtected =
-          targetSet.has("processos") || targetSet.has("fernando");
+        const targetIsProtected = targetSet.has("processos");
 
         if (targetIsProtected && !payload.is_master) {
           return json({ error: "cannot_demote_protected_user" }, 403);
@@ -250,7 +249,7 @@ Deno.serve(async (req) => {
           .from("user_roles")
           .delete()
           .eq("user_id", targetId)
-          .not("role", "in", "(processos,fernando)");
+          .neq("role", "processos");
 
         const rolesToInsert: { user_id: string; role: AppRole; assigned_by: string }[] = [];
         if (payload.is_master && !targetSet.has("fernando")) {
@@ -293,7 +292,7 @@ Deno.serve(async (req) => {
             .select("role")
             .eq("user_id", payload.user_id);
           const targetSet = new Set((targetRoles ?? []).map((r) => r.role));
-          if (targetSet.has("processos") || targetSet.has("fernando")) {
+          if (targetSet.has("processos")) {
             return json({ error: "cannot_ban_protected_user" }, 403);
           }
         }
@@ -310,7 +309,7 @@ Deno.serve(async (req) => {
             .from("user_roles")
             .delete()
             .eq("user_id", payload.user_id)
-            .not("role", "in", "(processos,fernando)");
+            .neq("role", "processos");
           await admin.from("user_hotels").delete().eq("user_id", payload.user_id);
           // Invalida sessões/JWT ativos do usuário banido.
           try {
@@ -406,7 +405,7 @@ Deno.serve(async (req) => {
           .select("role")
           .eq("user_id", payload.user_id);
         const targetSet = new Set((targetRoles ?? []).map((r) => r.role));
-        if (targetSet.has("processos") || targetSet.has("fernando")) {
+        if (targetSet.has("processos")) {
           return json({ error: "cannot_delete_protected_user" }, 403);
         }
         // Limpa vínculos (FKs sem cascade) e depois deleta o auth user.
