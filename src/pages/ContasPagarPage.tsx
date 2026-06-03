@@ -214,6 +214,7 @@ export default function ContasPagarPage() {
 
   const {
     entries,
+    salaryEntries,
     distributionEntries,
     filteredDistribution,
     filtered,
@@ -482,12 +483,34 @@ export default function ContasPagarPage() {
     if (!hotelId) return;
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
+    // Guarda categorias anteriores para permitir desfazer
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const prevCategories = ids.map((id) => ({
+      id,
+      prev: allEntries.find((e) => e.id === id)?.category ?? null,
+    }));
     try {
       for (const id of ids) {
         await updateCategory.mutateAsync({ entryId: id, hotelId, category });
       }
       setSelectedIds(new Set());
-      toast.success(`${ids.length} lançamento(s) marcado(s) como ${category}`);
+      toast.success(`${ids.length} lançamento(s) marcado(s) como ${category}`, {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            try {
+              for (const { id, prev } of prevCategories) {
+                await updateCategory.mutateAsync({ entryId: id, hotelId, category: prev });
+              }
+              qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
+              toast.success("Marcação desfeita.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Erro ao desfazer");
+            }
+          },
+        },
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar categoria");
     }
@@ -1380,6 +1403,116 @@ export default function ContasPagarPage() {
             )}
           </Card>
         </>
+      )}
+
+      {/* Tabela de Salários RH */}
+      {hotelId && salaryEntries.length > 0 && (
+        <Card className="p-5 shadow-soft space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider">
+              Salários RH
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {salaryEntries.length} lançamento(s) · total {fmtBRL(
+                salaryEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
+              )}
+            </p>
+          </div>
+          {(canMarkInsertedAgendado || canMarkPaid) && (
+            <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md bg-muted/30 flex-wrap">
+              <div className="text-xs text-muted-foreground">
+                {Array.from(selectedIds).filter((id) => salaryEntries.some((e) => e.id === id)).length > 0
+                  ? `${Array.from(selectedIds).filter((id) => salaryEntries.some((e) => e.id === id)).length} selecionado(s)`
+                  : "Selecione salários para marcar status em lote"}
+              </div>
+              <div className="flex items-center gap-2">
+                {canMarkAutorizado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-400"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("autorizado")}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" /> Autorizado
+                  </Button>
+                )}
+                {canMarkInsertedAgendado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("agendado")}
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" /> Agendado
+                  </Button>
+                )}
+                {canMarkPaid && (
+                  <Button
+                    size="sm"
+                    className="gap-1 h-8"
+                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                    onClick={() => handleBulkPaymentStatus("pago")}
+                  >
+                    <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {(canMarkInsertedAgendado || canMarkPaid) && (
+                    <TableHead className="w-8">
+                      <Checkbox
+                        checked={
+                          salaryEntries.length > 0 &&
+                          salaryEntries.every((e) => selectedIds.has(e.id))
+                        }
+                        onCheckedChange={(c) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (c) salaryEntries.forEach((e) => next.add(e.id));
+                            else salaryEntries.forEach((e) => next.delete(e.id));
+                            return next;
+                          });
+                        }}
+                        aria-label="Selecionar todos salários"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead>Fornecedor</TableHead>
+                  <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="hidden lg:table-cell">Categoria</TableHead>
+                  <TableHead className="hidden md:table-cell">Agendado para</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {salaryEntries.map((e) => (
+                  <ApEntryRow
+                    key={e.id}
+                    entry={e}
+                    sourceSystem={sourceSystem}
+                    showApproval={false}
+                    selectable={canMarkInsertedAgendado || canMarkPaid}
+                    selected={selectedIds.has(e.id)}
+                    onToggleSelected={(v) => toggleSelected(e.id, v)}
+                    showBank={false}
+                    canEditObservation={canManage}
+                    canManageCategory={canManage}
+                    canManage={canManage}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       )}
 
       {/* Tabela de Distribuição de Lucros */}
