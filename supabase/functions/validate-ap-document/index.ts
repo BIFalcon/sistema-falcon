@@ -67,6 +67,16 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
+    // Block viewer/ri roles explicitly (is_hotel_allowed returns true for them).
+    const { data: roleRows } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const roleSet = new Set((roleRows ?? []).map((r: any) => r.role));
+    if (roleSet.has("viewer") || roleSet.has("ri")) {
+      return json({ error: "forbidden" }, 403);
+    }
+
     if (!aiKey) {
       // Sem IA configurada — registra como "pending" e devolve aviso
       await admin.from("ap_documents").update({
