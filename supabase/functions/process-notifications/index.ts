@@ -87,6 +87,22 @@ Deno.serve(async (req) => {
   let enqueued = 0;
   let failed = 0;
 
+  // Generate or fetch an unsubscribe token for a recipient email.
+  async function getUnsubscribeToken(email: string): Promise<string> {
+    const { data: existing } = await supabase
+      .from("email_unsubscribe_tokens")
+      .select("token")
+      .eq("email", email)
+      .is("used_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existing?.token) return existing.token as string;
+    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+    await supabase.from("email_unsubscribe_tokens").insert({ email, token });
+    return token;
+  }
+
   for (const item of pending) {
     try {
       // Re-aponta links relativos para a URL absoluta da app.
@@ -113,6 +129,7 @@ Deno.serve(async (req) => {
         .replace(/\[(.+?)\]\((.+?)\)/g, "$1 ($2)")}\n\n---\nSistema Falcon Hotels\nGerenciar notificações: ${APP_BASE_URL}/notificacoes`;
 
       const messageId = `notif-${item.id}`;
+      const unsubscribeToken = await getUnsubscribeToken(item.recipient_email);
       const payload = {
         message_id: messageId,
         idempotency_key: messageId,
@@ -124,6 +141,7 @@ Deno.serve(async (req) => {
         subject: item.subject,
         html,
         text,
+        unsubscribe_token: unsubscribeToken,
         queued_at: new Date().toISOString(),
         link_url: linkHref,
       };
