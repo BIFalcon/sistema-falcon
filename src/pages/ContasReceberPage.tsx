@@ -59,6 +59,8 @@ import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { useQuery } from "@tanstack/react-query";
+import { useArClients, type ArClient } from "@/hooks/useArClients";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -559,6 +561,28 @@ function DayBreakdown({
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
+  // Load clients for every hotel present in this day's entries
+  const hotelIdsInDay = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.hotel_id).filter(Boolean) as string[])),
+    [entries],
+  );
+  const clientsByHotel = useQuery({
+    enabled: hotelIdsInDay.length > 0,
+    queryKey: ["ar-clients-multi", hotelIdsInDay],
+    queryFn: async (): Promise<Record<string, ArClient[]>> => {
+      const { data, error } = await supabase
+        .from("ar_clients")
+        .select("*")
+        .in("hotel_id", hotelIdsInDay)
+        .order("name");
+      if (error) throw error;
+      const grouped: Record<string, ArClient[]> = {};
+      for (const c of (data ?? []) as ArClient[]) {
+        (grouped[c.hotel_id] ??= []).push(c);
+      }
+      return grouped;
+    },
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
@@ -566,6 +590,7 @@ function DayBreakdown({
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
   const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
+  const [sendDocsFor, setSendDocsFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -608,6 +633,32 @@ function DayBreakdown({
                   <TableCell>
                     <div className="font-medium text-sm">{e.account_name ?? "—"}</div>
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
+                    {canAdmOrGg && e.hotel_id && (
+                      <div className="pt-1">
+                        <Select
+                          value={e.client_id ?? "__none__"}
+                          onValueChange={async (val) => {
+                            await setStatus.mutateAsync({
+                              id: e.id,
+                              gg_status: e.gg_status,
+                              gg_note: e.gg_note,
+                              client_id: val === "__none__" ? null : val,
+                            });
+                            toast.success("Cliente vinculado");
+                          }}
+                        >
+                          <SelectTrigger className="h-6 text-[11px]">
+                            <SelectValue placeholder="Vincular cliente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— sem cliente —</SelectItem>
+                            {(clientsByHotel.data?.[e.hotel_id!] ?? []).map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
@@ -705,6 +756,16 @@ function DayBreakdown({
                             onClick={() => setNotBillableFor(e)}
                           >
                             Não faturável
+                          </Button>
+                        )}
+                        {canAdmOrGg && e.gg_status === "pendente" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setSendDocsFor(e)}
+                          >
+                            Enviar docs
                           </Button>
                         )}
                       </div>
@@ -836,6 +897,23 @@ function DayBreakdown({
           });
           setNotBillableFor(null);
           toast.success("Marcado como não faturável");
+        }}
+      />
+      <SendDocsDialog
+        entry={sendDocsFor}
+        onClose={() => setSendDocsFor(null)}
+        onConfirm={async (file1, file2, proof) => {
+          if (!sendDocsFor) return;
+          await setStatus.mutateAsync({
+            id: sendDocsFor.id,
+            gg_status: "documentos_enviados",
+            gg_note: sendDocsFor.gg_note,
+            invoice_file_1: file1,
+            invoice_file_2: file2,
+            proof_file: proof,
+          });
+          setSendDocsFor(null);
+          toast.success("Documentos enviados ao Financeiro");
         }}
       />
     </div>
@@ -1204,6 +1282,97 @@ function NotBillableDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={!reason} onClick={() => onConfirm(reason, note.trim() || null)}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SendDocsDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (file1: string | null, file2: string | null, proof: string | null) => Promise<void>;
+}) {
+  const [file1, setFile1] = useState<string | null>(null);
+  const [file2, setFile2] = useState<string | null>(null);
+  const [proof, setProof] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | 1 | 2 | 3>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setFile1(entry?.invoice_file_1 ?? null);
+    setFile2(entry?.invoice_file_2 ?? null);
+    setProof(entry?.proof_file ?? null);
+  }, [entry?.id]);
+  async function handleUpload(file: File, slot: 1 | 2 | 3) {
+    if (!entry) return;
+    setBusy(slot);
+    try {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/send-${slot}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("invoices")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      if (slot === 1) setFile1(path);
+      else if (slot === 2) setFile2(path);
+      else setProof(path);
+      toast.success("Arquivo enviado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha no upload");
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enviar documentos</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {([1, 2, 3] as const).map((slot) => {
+            const cur = slot === 1 ? file1 : slot === 2 ? file2 : proof;
+            const label = slot === 1 ? "NF / Boleto 1" : slot === 2 ? "NF / Boleto 2 (opcional)" : "Comprovante de envio";
+            return (
+              <div key={slot} className="space-y-1">
+                <Label className="text-xs">{label}</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    onChange={(ev) => {
+                      const f = ev.target.files?.[0];
+                      if (f) handleUpload(f, slot);
+                      ev.target.value = "";
+                    }}
+                    disabled={busy === slot}
+                    className="text-xs"
+                  />
+                  {busy === slot && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {cur && <Badge variant="secondary" className="text-[10px]">ok</Badge>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={saving || !file1 || !proof}
+            onClick={async () => {
+              setSaving(true);
+              try { await onConfirm(file1, file2, proof); } finally { setSaving(false); }
+            }}
+          >
+            {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            Enviar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
