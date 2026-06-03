@@ -2270,6 +2270,14 @@ export type Database = {
         Returns: number
       }
       get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
+      get_hotel_financial: {
+        Args: { _hotel_id: string }
+        Returns: {
+          bank_accounts: Json
+          cnpj: string
+          id: string
+        }[]
+      }
       get_latest_dre_lines: {
         Args: { _closing_id: string }
         Returns: {
