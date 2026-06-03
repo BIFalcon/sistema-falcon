@@ -2304,7 +2304,15 @@ export type Database = {
         | "operacoes"
         | "marketing"
         | "comercial"
-      ar_gg_status: "pendente" | "faturado" | "nao_faturado"
+        | "adm"
+      ar_gg_status:
+        | "pendente"
+        | "faturado"
+        | "nao_faturado"
+        | "documentos_enviados"
+        | "nao_faturavel"
+        | "pago"
+        | "inadimplente"
       closing_stage: "dre" | "carta" | "financeiro" | "envio"
       closing_status:
         | "nao_iniciado"
@@ -2488,8 +2496,17 @@ export const Constants = {
         "operacoes",
         "marketing",
         "comercial",
+        "adm",
       ],
-      ar_gg_status: ["pendente", "faturado", "nao_faturado"],
+      ar_gg_status: [
+        "pendente",
+        "faturado",
+        "nao_faturado",
+        "documentos_enviados",
+        "nao_faturavel",
+        "pago",
+        "inadimplente",
+      ],
       closing_stage: ["dre", "carta", "financeiro", "envio"],
       closing_status: [
         "nao_iniciado",
