@@ -112,25 +112,6 @@ export default function NotificacoesPage() {
         )}
       </div>
 
-      {canManage && (
-      <Card className="p-4 shadow-soft border-warning/30 bg-warning/5">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium text-foreground mb-1">
-              Domínio de e-mail aguardando configuração
-            </p>
-            <p className="text-muted-foreground">
-              O domínio <code className="px-1 py-0.5 rounded bg-muted text-xs">notify.falconhoteis.com.br</code> ainda
-              não está ativo. Os e-mails são gerados e enfileirados normalmente, mas o disparo real fica como{" "}
-              <strong>ignorado</strong> até o domínio ser configurado. Quando estiver pronto, os próximos e-mails
-              da fila serão enviados automaticamente.
-            </p>
-          </div>
-        </div>
-      </Card>
-      )}
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Pendentes", value: stats.pending, icon: Clock, color: "text-amber-600" },
