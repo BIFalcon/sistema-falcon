@@ -758,6 +758,16 @@ function DayBreakdown({
                             Não faturável
                           </Button>
                         )}
+                        {canAdmOrGg && e.gg_status === "pendente" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setSendDocsFor(e)}
+                          >
+                            Enviar docs
+                          </Button>
+                        )}
                       </div>
                     )}
                     {canConfirm && isEditing && (
