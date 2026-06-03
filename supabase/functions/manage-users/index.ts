@@ -261,20 +261,23 @@ Deno.serve(async (req) => {
               </p>
             </div>
           `;
-          try {
-            await sendLovableEmail({
-              from: "Sistema Falcon <noreply@notify.falconhoteis.com.br>",
-              to: payload.email,
-              subject: "Convite — Sistema Falcon Hotels",
-              html,
-            });
-          } catch (emailErr) {
-            console.error("[invite] falha ao enviar e-mail:", emailErr);
-            // Não bloqueia — o link ainda é retornado para copiar manualmente
-          }
+          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const emailQueued = await enqueueInviteEmail(admin, {
+            to: payload.email,
+            subject: "Convite — Sistema Falcon Hotels",
+            html,
+            text,
+            label: "invite",
+          });
+          return json({
+            ok: true,
+            user_id: userId,
+            invite_link: actionLink,
+            email_queued: emailQueued,
+          });
         }
 
-        return json({ ok: true, user_id: userId, invite_link: actionLink });
+        return json({ ok: true, user_id: userId, invite_link: actionLink, email_queued: false });
       }
 
       case "update": {
