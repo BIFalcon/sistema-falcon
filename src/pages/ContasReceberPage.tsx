@@ -899,6 +899,23 @@ function DayBreakdown({
           toast.success("Marcado como não faturável");
         }}
       />
+      <SendDocsDialog
+        entry={sendDocsFor}
+        onClose={() => setSendDocsFor(null)}
+        onConfirm={async (file1, file2, proof) => {
+          if (!sendDocsFor) return;
+          await setStatus.mutateAsync({
+            id: sendDocsFor.id,
+            gg_status: "documentos_enviados",
+            gg_note: sendDocsFor.gg_note,
+            invoice_file_1: file1,
+            invoice_file_2: file2,
+            proof_file: proof,
+          });
+          setSendDocsFor(null);
+          toast.success("Documentos enviados ao Financeiro");
+        }}
+      />
     </div>
   );
 }
