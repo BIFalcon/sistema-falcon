@@ -677,6 +677,36 @@ function DayBreakdown({
                         >
                           Pago
                         </Button>
+                        {canFinanceiro && (
+                          <Button
+                            size="sm"
+                            variant={e.documents_problem_at ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setProblemFor(e)}
+                          >
+                            Problema docs
+                          </Button>
+                        )}
+                        {canFinanceiro && (
+                          <Button
+                            size="sm"
+                            variant={e.gg_status === "inadimplente" ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setDefaultingFor(e)}
+                          >
+                            Inadimplente
+                          </Button>
+                        )}
+                        {canAdmOrGg && (
+                          <Button
+                            size="sm"
+                            variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setNotBillableFor(e)}
+                          >
+                            Não faturável
+                          </Button>
+                        )}
                       </div>
                     )}
                     {canConfirm && isEditing && (
