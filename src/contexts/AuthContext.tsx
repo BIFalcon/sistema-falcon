@@ -23,6 +23,8 @@ interface AuthContextValue {
   isMaster: boolean;
   isGg: boolean;
   isFernando: boolean;
+  /** Administrativo do hotel — adm. */
+  isAdm: boolean;
   /** É o Fernando CEO (identificado pelo e-mail), não apenas alguém com role 'fernando'. */
   isFernandoCEO: boolean;
   hasRole: (role: AppRole) => boolean;
