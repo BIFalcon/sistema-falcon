@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilters } from "@/contexts/FilterContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { useArClients, useUpsertArClient, useDeleteArClient, type ArClient } from "@/hooks/useArClients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import EmptyHotelState from "@/components/ui/EmptyHotelState";
+import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
 
 interface FormState {
   id?: string;
@@ -33,9 +33,8 @@ interface FormState {
 const EMPTY: FormState = { name: "", cnpj_cpf: "", email: "", payment_term_days: 30, notes: "" };
 
 export default function ClientesPage() {
-  const { hasRole, isMaster } = useAuth();
-  const { selectedHotel } = useFilters();
-  const hotelId = selectedHotel?.id ?? null;
+  const { hasRole, isMaster, allowedHotels } = useAuth();
+  const { hotelId } = useModuleFilters("ar");
 
   const canEdit = isMaster || hasRole("financeiro") || hasRole("adm") || hasRole("gg");
 
@@ -94,7 +93,16 @@ export default function ClientesPage() {
   }
 
   if (!hotelId) {
-    return <EmptyHotelState message="Selecione um hotel para gerenciar clientes." />;
+    return (
+      <EmptyHotelState
+        title="Selecione um hotel"
+        description={
+          allowedHotels.length === 0
+            ? "Você não tem hotéis atribuídos."
+            : "Use o filtro no topo para escolher o hotel."
+        }
+      />
+    );
   }
 
   return (
