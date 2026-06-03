@@ -57,6 +57,16 @@ Deno.serve(async (req) => {
       return json({ error: "Acesso negado a este hotel" }, 403);
     }
 
+    // Authorization: caller must have a role allowed to author/update letters
+    const { data: roleRows, error: roleErr } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (roleErr) return json({ error: "Falha ao verificar permissões" }, 500);
+    const roleSet = new Set((roleRows ?? []).map((r: { role: string }) => r.role));
+    const canWrite = ["processos", "fernando", "controladoria", "gop", "gg"].some((r) => roleSet.has(r));
+    if (!canWrite) return json({ error: "Acesso negado: papel insuficiente" }, 403);
+
     const hotel = await supabase.from("hotels").select("*").eq("id", closing.data.hotel_id).maybeSingle();
     const letter = await supabase.from("investor_letters").select("*").eq("id", letter_id).maybeSingle();
     if (letter.error || !letter.data) return json({ error: "Carta não encontrada" }, 404);
