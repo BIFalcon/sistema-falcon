@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<string, string> = {
   ri: "Relações com Investidores",
   financeiro: "Financeiro",
   gg: "Gerente Geral",
+  adm: "Administrativo do Hotel",
   rh: "RH & People",
   marketing: "Marketing",
   comercial: "Comercial",
@@ -28,6 +29,7 @@ export type AppRole =
   | "ri"
   | "financeiro"
   | "gg"
+  | "adm"
   | "rh"
   | "marketing"
   | "comercial"

@@ -536,11 +536,100 @@ export type Database = {
           },
         ]
       }
+      ar_clients: {
+        Row: {
+          cnpj_cpf: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          hotel_id: string
+          id: string
+          name: string
+          notes: string | null
+          payment_term_days: number
+          updated_at: string
+        }
+        Insert: {
+          cnpj_cpf?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          hotel_id: string
+          id?: string
+          name: string
+          notes?: string | null
+          payment_term_days?: number
+          updated_at?: string
+        }
+        Update: {
+          cnpj_cpf?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          hotel_id?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_term_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_clients_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_open_folio_date_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          entry_id: string
+          hotel_id: string
+          id: string
+          new_date: string | null
+          note: string | null
+          old_date: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          entry_id: string
+          hotel_id: string
+          id?: string
+          new_date?: string | null
+          note?: string | null
+          old_date?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          entry_id?: string
+          hotel_id?: string
+          id?: string
+          new_date?: string | null
+          note?: string | null
+          old_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_open_folio_date_history_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "ar_open_folio_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ar_open_folio_entries: {
         Row: {
           archived_at: string | null
           arrival_date: string | null
           balance: number | null
+          company: string | null
           confirmation_number: string | null
           created_at: string
           days_open: number | null
@@ -555,12 +644,14 @@ export type Database = {
           property_name_raw: string
           raw: Json
           reservation_status: string | null
+          travel_agent: string | null
           upload_id: string
         }
         Insert: {
           archived_at?: string | null
           arrival_date?: string | null
           balance?: number | null
+          company?: string | null
           confirmation_number?: string | null
           created_at?: string
           days_open?: number | null
@@ -575,12 +666,14 @@ export type Database = {
           property_name_raw: string
           raw?: Json
           reservation_status?: string | null
+          travel_agent?: string | null
           upload_id: string
         }
         Update: {
           archived_at?: string | null
           arrival_date?: string | null
           balance?: number | null
+          company?: string | null
           confirmation_number?: string | null
           created_at?: string
           days_open?: number | null
@@ -595,6 +688,7 @@ export type Database = {
           property_name_raw?: string
           raw?: Json
           reservation_status?: string | null
+          travel_agent?: string | null
           upload_id?: string
         }
         Relationships: [
@@ -662,9 +756,15 @@ export type Database = {
           account_type: string | null
           amount: number | null
           ar_open: number | null
+          billed_at: string | null
+          client_id: string | null
           confirmation_number: string | null
           created_at: string
+          defaulting_at: string | null
+          defaulting_note: string | null
           departure_date: string | null
+          documents_problem_at: string | null
+          documents_problem_note: string | null
           entry_key: string
           estimated_due_date: string | null
           gg_confirmed_at: string | null
@@ -677,10 +777,17 @@ export type Database = {
           invoice_file_2: string | null
           invoice_number: string | null
           invoice_status: string | null
+          is_defaulting: boolean
+          is_not_billable: boolean
+          is_paid: boolean
+          not_billable_note: string | null
+          not_billable_reason: string | null
           original_amount: number | null
           paid: number | null
+          paid_at: string | null
           paid_date: string | null
           paid_note: string | null
+          proof_file: string | null
           property_name_raw: string
           raw: Json
           reservation_status: string | null
@@ -693,9 +800,15 @@ export type Database = {
           account_type?: string | null
           amount?: number | null
           ar_open?: number | null
+          billed_at?: string | null
+          client_id?: string | null
           confirmation_number?: string | null
           created_at?: string
+          defaulting_at?: string | null
+          defaulting_note?: string | null
           departure_date?: string | null
+          documents_problem_at?: string | null
+          documents_problem_note?: string | null
           entry_key: string
           estimated_due_date?: string | null
           gg_confirmed_at?: string | null
@@ -708,10 +821,17 @@ export type Database = {
           invoice_file_2?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
+          is_defaulting?: boolean
+          is_not_billable?: boolean
+          is_paid?: boolean
+          not_billable_note?: string | null
+          not_billable_reason?: string | null
           original_amount?: number | null
           paid?: number | null
+          paid_at?: string | null
           paid_date?: string | null
           paid_note?: string | null
+          proof_file?: string | null
           property_name_raw: string
           raw?: Json
           reservation_status?: string | null
@@ -724,9 +844,15 @@ export type Database = {
           account_type?: string | null
           amount?: number | null
           ar_open?: number | null
+          billed_at?: string | null
+          client_id?: string | null
           confirmation_number?: string | null
           created_at?: string
+          defaulting_at?: string | null
+          defaulting_note?: string | null
           departure_date?: string | null
+          documents_problem_at?: string | null
+          documents_problem_note?: string | null
           entry_key?: string
           estimated_due_date?: string | null
           gg_confirmed_at?: string | null
@@ -739,10 +865,17 @@ export type Database = {
           invoice_file_2?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
+          is_defaulting?: boolean
+          is_not_billable?: boolean
+          is_paid?: boolean
+          not_billable_note?: string | null
+          not_billable_reason?: string | null
           original_amount?: number | null
           paid?: number | null
+          paid_at?: string | null
           paid_date?: string | null
           paid_note?: string | null
+          proof_file?: string | null
           property_name_raw?: string
           raw?: Json
           reservation_status?: string | null
@@ -750,6 +883,13 @@ export type Database = {
           upload_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_to_invoice_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "ar_clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_to_invoice_entries_hotel_id_fkey"
             columns: ["hotel_id"]
@@ -2304,7 +2444,15 @@ export type Database = {
         | "operacoes"
         | "marketing"
         | "comercial"
-      ar_gg_status: "pendente" | "faturado" | "nao_faturado"
+        | "adm"
+      ar_gg_status:
+        | "pendente"
+        | "faturado"
+        | "nao_faturado"
+        | "documentos_enviados"
+        | "nao_faturavel"
+        | "pago"
+        | "inadimplente"
       closing_stage: "dre" | "carta" | "financeiro" | "envio"
       closing_status:
         | "nao_iniciado"
@@ -2488,8 +2636,17 @@ export const Constants = {
         "operacoes",
         "marketing",
         "comercial",
+        "adm",
       ],
-      ar_gg_status: ["pendente", "faturado", "nao_faturado"],
+      ar_gg_status: [
+        "pendente",
+        "faturado",
+        "nao_faturado",
+        "documentos_enviados",
+        "nao_faturavel",
+        "pago",
+        "inadimplente",
+      ],
       closing_stage: ["dre", "carta", "financeiro", "envio"],
       closing_status: [
         "nao_iniciado",

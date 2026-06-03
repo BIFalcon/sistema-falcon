@@ -20,6 +20,7 @@ import UsuariosPage from "./pages/UsuariosPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
 import ContasPagarPage from "./pages/ContasPagarPage";
 import ContasReceberPage from "./pages/ContasReceberPage";
+import ClientesPage from "./pages/ClientesPage";
 import FinanceiroVisaoGeralPage from "./pages/FinanceiroVisaoGeralPage";
 import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
@@ -145,7 +146,8 @@ const App = () => (
               {/* Gestão — Financeiro */}
               <Route path="/financeiro" element={<RoleGuard roles={["financeiro", "gg"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["financeiro"]}><ContasPagarPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg"]}><ContasReceberPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["financeiro", "gg", "adm", "gop"]}><ContasReceberPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["financeiro", "gg", "adm"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<TurnoverPage />} />
               <Route path="/rh/calendario" element={<CalendarioPage />} />
