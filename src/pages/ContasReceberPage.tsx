@@ -1288,8 +1288,6 @@ function NotBillableDialog({
   );
 }
 
-function ConsolidatedRanking({
-
 function SendDocsDialog({
   entry,
   onClose,
@@ -1381,7 +1379,7 @@ function SendDocsDialog({
   );
 }
 
-function ConsolidatedRanking_DUPLICATE_DELETE_ME({
+function ConsolidatedRanking({
   entries,
   hotelName,
 }: {
