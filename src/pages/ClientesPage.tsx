@@ -20,6 +20,7 @@ import {
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
+import { Users } from "lucide-react";
 
 interface FormState {
   id?: string;
@@ -34,7 +35,7 @@ const EMPTY: FormState = { name: "", cnpj_cpf: "", email: "", payment_term_days:
 
 export default function ClientesPage() {
   const { hasRole, isMaster, allowedHotels } = useAuth();
-  const { hotelId } = useModuleFilters("ar");
+  const { hotelId } = useModuleFilters("financeiro");
 
   const canEdit = isMaster || hasRole("financeiro") || hasRole("adm") || hasRole("gg");
 
@@ -95,6 +96,7 @@ export default function ClientesPage() {
   if (!hotelId) {
     return (
       <EmptyHotelState
+        icon={<Users className="h-16 w-16" />}
         title="Selecione um hotel"
         description={
           allowedHotels.length === 0
