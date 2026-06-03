@@ -21,7 +21,7 @@ export interface ToInvoiceEntry {
   confirmation_number: string | null;
   reservation_status: string | null;
   departure_date: string | null;
-  gg_status: "pendente" | "faturado" | "nao_faturado";
+  gg_status: "pendente" | "faturado" | "nao_faturado" | "documentos_enviados" | "nao_faturavel" | "pago" | "inadimplente";
   gg_note: string | null;
   gg_confirmed_by: string | null;
   gg_confirmed_at: string | null;
@@ -30,6 +30,19 @@ export interface ToInvoiceEntry {
   estimated_due_date: string | null;
   invoice_file_1: string | null;
   invoice_file_2: string | null;
+  client_id: string | null;
+  is_not_billable: boolean;
+  not_billable_reason: string | null;
+  not_billable_note: string | null;
+  proof_file: string | null;
+  is_paid: boolean;
+  paid_at: string | null;
+  is_defaulting: boolean;
+  defaulting_note: string | null;
+  defaulting_at: string | null;
+  documents_problem_note: string | null;
+  documents_problem_at: string | null;
+  billed_at: string | null;
 }
 
 export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
@@ -38,7 +51,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,client_id,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
@@ -121,13 +134,26 @@ export function useSetToInvoiceGgStatus() {
   return useMutation({
     mutationFn: async (input: {
       id: string;
-      gg_status: "pendente" | "faturado" | "nao_faturado";
+      gg_status: ToInvoiceEntry["gg_status"];
       gg_note?: string | null;
       paid_date?: string | null;
       paid_note?: string | null;
       estimated_due_date?: string | null;
       invoice_file_1?: string | null;
       invoice_file_2?: string | null;
+      client_id?: string | null;
+      is_not_billable?: boolean;
+      not_billable_reason?: string | null;
+      not_billable_note?: string | null;
+      proof_file?: string | null;
+      is_paid?: boolean;
+      paid_at?: string | null;
+      is_defaulting?: boolean;
+      defaulting_note?: string | null;
+      defaulting_at?: string | null;
+      documents_problem_note?: string | null;
+      documents_problem_at?: string | null;
+      billed_at?: string | null;
     }) => {
       const { error } = await supabase
         .from("ar_to_invoice_entries")
@@ -139,6 +165,19 @@ export function useSetToInvoiceGgStatus() {
           ...(input.estimated_due_date !== undefined ? { estimated_due_date: input.estimated_due_date } : {}),
           ...(input.invoice_file_1 !== undefined ? { invoice_file_1: input.invoice_file_1 } : {}),
           ...(input.invoice_file_2 !== undefined ? { invoice_file_2: input.invoice_file_2 } : {}),
+          ...(input.client_id !== undefined ? { client_id: input.client_id } : {}),
+          ...(input.is_not_billable !== undefined ? { is_not_billable: input.is_not_billable } : {}),
+          ...(input.not_billable_reason !== undefined ? { not_billable_reason: input.not_billable_reason } : {}),
+          ...(input.not_billable_note !== undefined ? { not_billable_note: input.not_billable_note } : {}),
+          ...(input.proof_file !== undefined ? { proof_file: input.proof_file } : {}),
+          ...(input.is_paid !== undefined ? { is_paid: input.is_paid } : {}),
+          ...(input.paid_at !== undefined ? { paid_at: input.paid_at } : {}),
+          ...(input.is_defaulting !== undefined ? { is_defaulting: input.is_defaulting } : {}),
+          ...(input.defaulting_note !== undefined ? { defaulting_note: input.defaulting_note } : {}),
+          ...(input.defaulting_at !== undefined ? { defaulting_at: input.defaulting_at } : {}),
+          ...(input.documents_problem_note !== undefined ? { documents_problem_note: input.documents_problem_note } : {}),
+          ...(input.documents_problem_at !== undefined ? { documents_problem_at: input.documents_problem_at } : {}),
+          ...(input.billed_at !== undefined ? { billed_at: input.billed_at } : {}),
         })
         .eq("id", input.id);
       if (error) throw error;
