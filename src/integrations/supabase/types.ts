@@ -2388,6 +2388,7 @@ export type Database = {
         | "marketing"
         | "comercial"
         | "adm"
+        | "patronos"
       ar_gg_status:
         | "pendente"
         | "faturado"
@@ -2580,6 +2581,7 @@ export const Constants = {
         "marketing",
         "comercial",
         "adm",
+        "patronos",
       ],
       ar_gg_status: [
         "pendente",
