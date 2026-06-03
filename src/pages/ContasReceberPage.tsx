@@ -561,6 +561,28 @@ function DayBreakdown({
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
+  // Load clients for every hotel present in this day's entries
+  const hotelIdsInDay = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.hotel_id).filter(Boolean) as string[])),
+    [entries],
+  );
+  const clientsByHotel = useQuery({
+    enabled: hotelIdsInDay.length > 0,
+    queryKey: ["ar-clients-multi", hotelIdsInDay],
+    queryFn: async (): Promise<Record<string, ArClient[]>> => {
+      const { data, error } = await supabase
+        .from("ar_clients")
+        .select("*")
+        .in("hotel_id", hotelIdsInDay)
+        .order("name");
+      if (error) throw error;
+      const grouped: Record<string, ArClient[]> = {};
+      for (const c of (data ?? []) as ArClient[]) {
+        (grouped[c.hotel_id] ??= []).push(c);
+      }
+      return grouped;
+    },
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
@@ -568,6 +590,7 @@ function DayBreakdown({
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
   const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
+  const [sendDocsFor, setSendDocsFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
