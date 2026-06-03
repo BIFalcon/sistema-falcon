@@ -1,59 +1,106 @@
-Plano para aplicar `lovable-contas-receber-v2.md` na íntegra. Aplico em ordem, parando para confirmação só se aparecer ambiguidade.
+# Plano: nova matriz de roles + remoção de `financeiro`
 
-## Bloco 1 — Role `adm`
-- Migration: `ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'adm'`.
-- `AuthContext.tsx`: expor `isAdm`. Decidir se `adm` entra em `is_hotel_allowed` (sim, mas só via `user_hotels`, sem bypass global).
-- `AppSidebar`/rotas: esconder Contas a Pagar e Fechamento de quem só tem `adm`.
-- `constants.ts`: adicionar `'adm'` à lista de `AppRole`.
+## 1. Migração de banco (uma migration grande)
 
-## Bloco 2 — Cadastro de clientes
-- Migration `ar_clients` + colunas novas em `ar_to_invoice_entries` (`client_id`, `is_not_billable`, `not_billable_reason`, `proof_file`, `is_paid`, `paid_at`, `is_defaulting`, `defaulting_note`, `defaulting_at`). Campos `invoice_file_1/2` e `estimated_due_date` já existem.
-- GRANTs + RLS (`is_master`, `financeiro`, `adm`, `gg`, `gop` com `is_hotel_allowed`).
-- Hook `useArClients` (list/create/update/delete).
-- `src/pages/ClientesPage.tsx` + rota `/financeiro/contas-receber/clientes`.
-- Link a partir do `ContasReceberPage`.
+### 1.1 Enum `app_role`
+- Adicionar valor `patronos` ao enum.
+- **Remover** o valor `financeiro` no fim da migration (após reescrever tudo que usa).
 
-## Bloco 3 — Novo fluxo de Faturamento
-Reorganizar a aba "A Faturar" em `ContasReceberPage.tsx`:
-- Coluna nova **Cliente** (select de `ar_clients` ligado à linha).
-- Adm/GG, quando `gg_status='pendente'`: dois inputs de NF/Boleto + comprovante de envio; botão "Enviar documentos" (vira `gg_status='documentos_enviados'`).
-- Financeiro: botão "Faturado" (define `gg_status='faturado'`, calcula `estimated_due_date = hoje + payment_term_days`), "Pago" (`is_paid`, `paid_at`), "Inadimplente" (`is_defaulting`, `defaulting_note`).
-- Financeiro: botão "Problema nos documentos" com Textarea → cria notificação para adm e GG (reaproveitar `enqueue_workflow_notification` ou tabela `notification_queue`).
-- Adm/GG: botão "Não vai ser faturado" com motivo (select) + observação → `is_not_billable=true`.
-- Estender o enum/coluna `gg_status` adicionando `documentos_enviados`, `nao_faturavel`, `pago`, `inadimplente` (a coluna é `ar_gg_status`).
-- Storage: subir arquivos em bucket `accounts-receivable` (já existe). Definir paths `arInvoices/{entry_id}/...`.
+Como Postgres não permite remover valor de enum em uso, vou:
+1. Criar `app_role_new` com os valores finais (sem `financeiro`, com `patronos`).
+2. Migrar `user_roles.role` e todas as funções/policies para o tipo novo.
+3. Dropar o antigo e renomear.
 
-## Bloco 4 — Filtros
-- Manter filtro global de mês (data lançamento).
-- Adicionar filtros: data de vencimento (from/to), status (pendente, documentos_enviados, faturado, pago, inadimplente, nao_faturavel).
-- Permissões: adm/GG/GOP podem filtrar e ver "Pago".
+### 1.2 Migração de dados (antes do swap de enum)
+- 3 usuários `financeiro` + subrole `equipe` → `controladoria`.
+- 1 usuário `financeiro` + subrole `coordenadora` → `patronos`.
+- Limpar `profiles.financeiro_subrole` (manter coluna por enquanto, só zerar valores).
 
-## Bloco 5 — Open Folio
-- Migration: `ar_open_folio_date_history` (entry_id, hotel_id, old_date, new_date, changed_by, note, created_at) + RLS + GRANTs.
-- Migration: `ar_open_folio_entries` adicionar `company`, `travel_agent`.
-- `src/lib/arReportParser.ts` (open folio): ler colunas "Company" e "Travel Agent".
-- UI Open Folio: renomear label "Data prevista de pagamento" → "Data prevista de fechamento" (mantém campo `expected_payment_date`).
-- Ao gravar nova data, inserir em `ar_open_folio_date_history`. Popover mostrando histórico.
-- Adm e GG podem editar data + justificativa; não podem importar arquivo.
-- Mostrar colunas Company/Travel Agent quando preenchidas.
-- Habilitar GOP somente leitura em todo Contas a Receber.
+### 1.3 Reescrever funções SECURITY DEFINER
+Trocar `has_role(_, 'financeiro')` por `(has_role(_, 'controladoria') OR has_role(_, 'patronos'))`:
+- `is_ap_manager` → controladoria OR patronos
+- `is_ar_manager` → controladoria OR patronos
+- `is_hotel_allowed` → trocar `financeiro` por `controladoria` e `patronos`
+- `has_global_data_access` → trocar `financeiro` por `controladoria` e `patronos`
+- `is_dre_uploader` → **somente master** (remove controladoria e gop)
+- `is_financeiro_coordenadora` → vira `is_patronos` (retorna `has_role(_, 'patronos')`)
+- `is_financeiro_equipe` → manter retornando false (compat) ou remover; remover é mais limpo.
 
-## Bloco 6 — Carta
-- `CartaPage.tsx`: antes de chamar `useEnsureClosing`, consultar closing existente por (hotel, month, year). Só criar se for `null`.
-- `useDre.ts` (`useDreIndicators`): `staleTime = 30min`, `gcTime = 1h`.
-- Botão "Recarregar dados da DRE" que invalida a query.
-- Função de download da carta: usar `URL.createObjectURL` + `<a download>` + revoke (compatibilidade Safari/Edge).
+### 1.4 Reescrever RLS policies que mencionam `financeiro`
+Todas as policies listadas no contexto que usam `'financeiro'::app_role` serão recriadas trocando por `controladoria` ou `controladoria + patronos` conforme a regra:
+- AP (ap_entries, ap_documents, ap_uploads, ap_bank_balance, ap_anticipation, ap_card_receivable, ap_notification_log): managers = controladoria + patronos. **Bloquear GG** (remover `has_role(_,'gg')` das policies de update de ap_entries e ap_documents).
+- AR (ar_*): managers idem; manter políticas adm/gg como estão.
+- ar_client_contracts: substituir financeiro por controladoria/patronos.
+- closing_status_log, dre_parsed_lines, dre_versions, closings: via `has_global_data_access` (já cobre).
+- approvals, comments: usam `has_any_role` + exclusões de viewer/ri — manter.
 
-## Notas técnicas
-- Tudo em migrations separadas por bloco para facilitar revisão.
-- `app_role` ALTER TYPE precisa estar em migration própria (sem outro DDL no mesmo statement de commit) — Postgres exige commit antes de uso.
-- `ar_gg_status` enum: adicionar novos valores via `ALTER TYPE ... ADD VALUE`.
-- Notificações: usar `notification_queue` via `enqueue_workflow_notification` se o `notification_event` aceitar; caso contrário criar evento próprio ou reaproveitar `ar_to_invoice_pending_to_gg`.
-- Tabelas novas com GRANT explícito (`authenticated`, `service_role`).
-- Reutilizar `Toast`, `Dialog`, `Select` existentes — sem novas libs.
+### 1.5 `enforce_ap_payment_status_change`
+Marcar "Pago" só permitido por master OR `is_patronos`.
 
-## Perguntas
-1. Quero confirmação para criar **novos `notification_event`** (`ar_documents_problem`, `ar_defaulting`, `ar_not_billable`)? Senão reuso o evento existente `ar_to_invoice_pending_to_gg` com `payload.kind` diferenciado.
-2. O **bucket `accounts-receivable`** é privado — manter privado e gerar signed URLs para visualizar/baixar?
+### 1.6 Drop/swap do enum
+Após reescrever tudo, drop enum antigo e rename `app_role_new` → `app_role`.
 
-Pode aprovar para eu seguir com os blocos 1→6 nesta ordem, ou indicar se quer pular/ajustar algum bloco.
+### 1.7 GRANTs
+Reaplicar GRANTs nas tabelas tocadas (sem mudança real, mas garantir).
+
+## 2. Frontend
+
+### 2.1 `src/lib/constants.ts`
+- Atualizar `AppRole` removendo `financeiro`, adicionando `patronos`.
+- `MASTER_ROLES` inalterado.
+
+### 2.2 `src/contexts/AuthContext.tsx`
+- Trocar checagens `roles.includes("financeiro")` por `controladoria` ou `patronos`.
+- `GLOBAL_ACCESS_ROLES`: substituir `financeiro` por `controladoria`, `patronos`.
+- Adicionar `isPatronos`. Remover `isFinanceiroEquipe/Coordenadora/financeiroSubrole` (ou manter sempre `false/null` para não quebrar imports — escolha: **manter como deprecated** retornando false/null para evitar refactor enorme; pode remover depois).
+- Adicionar helper `canViewPerformanceSla` = master || viewer || `isFernandoCEO`.
+- Adicionar helper `canUploadRetroactiveDre` = `isMaster` apenas.
+
+### 2.3 `src/App.tsx` — RoleGuards
+- `/fechamento/financeiro` → `["controladoria","patronos"]`
+- `/fechamento/consolidado` → trocar `financeiro` por `controladoria, patronos`
+- `/financeiro` (visão geral) → `["controladoria","patronos","gg","viewer"]` (viewer leitura; GG só do hotel dele via RLS)
+- `/financeiro/contas-pagar` → `["controladoria","patronos","viewer"]` (sem GG)
+- `/financeiro/contas-receber` → `["controladoria","patronos","gg","adm","gop","viewer"]`
+- `/financeiro/contas-receber/clientes` → `["controladoria","patronos","gg","adm"]`
+- `/fechamento/performance` → guard custom: master || viewer || FernandoCEO
+- `/indicadores` → adicionar `rh`
+- `/controladoria/conciliacao` → `["controladoria","patronos"]`
+
+### 2.4 Sidebar (`AppSidebar.tsx`)
+- Renomear seção "Financeiro" para "Controladoria"; manter os 4 itens dentro.
+- Esconder Contas a Pagar para GG.
+- Esconder Upload retroativo de DRE para todos exceto master.
+- Performance SLA visível só para master/viewer/FernandoCEO.
+
+### 2.5 Upload retroativo DRE
+- Página `UploadRetroativoDrePage`: bloquear render se `!isMaster`.
+- Esconder link na sidebar para não-master.
+
+### 2.6 Telas read-only para viewer
+- AP/AR/Visão Geral: as RLS já garantem leitura. Frontend precisa esconder botões de ação se `viewer`. Auditar `ContasPagarPage`, `ContasReceberPage`, `FinanceiroVisaoGeralPage` e adicionar `const readOnly = roles.includes('viewer') && !isMaster` para desabilitar ações.
+
+### 2.7 Hooks/componentes que referenciam `financeiro` ou subrole
+- `useUsers.ts`: remover `financeiro_subrole` (ou deixar deprecated).
+- `useAccountsPayable.ts`, `useAccountsReceivable.ts`, formulários de aprovação, etc — trocar checagens.
+
+### 2.8 `UsuariosPage` formulário
+- Remover opção `financeiro` da lista de roles; adicionar `patronos` e `controladoria` (já existe).
+- Remover seletor de subrole financeiro.
+
+## 3. Edge functions
+- `be-eight-export`: o `COLUMN_BLOCKLIST` não muda. Verificar se há referências a role `financeiro` em manage-users etc. e ajustar.
+- `manage-users/index.ts`: validar role válida — remover `financeiro` da lista permitida, adicionar `patronos`.
+
+## 4. Ordem de execução
+
+1. Migration única (steps 1.1 → 1.7).
+2. Após approve da migration, regenera tipos — então atualizo código frontend e edge functions.
+3. Validação manual: lint, build, smoke test login.
+
+## Riscos e mitigação
+- **Remover enum value `financeiro`**: requer recriar TODAS as policies e funções que o referenciam. Faço tudo em uma migration transacional; se algo falhar, rollback completo.
+- **Frontend pós-migration**: tipos regerados vão quebrar compilação onde ainda houver `"financeiro"`. Vou atualizar todos os arquivos no mesmo PR pós-migration.
+
+## Pergunta de confirmação
+A migration vai falhar se algum arquivo/política não-listada também referenciar `'financeiro'::app_role`. Vou rodar uma varredura no banco (`pg_policies`, `pg_proc`) durante a migration para garantir cobertura. Se aparecer algo inesperado, paro e aviso antes de prosseguir. Posso seguir?
