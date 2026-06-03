@@ -1405,11 +1405,7 @@ export default function ContasPagarPage() {
         </>
       )}
 
-      {/* Tabela de Distribuição de Lucros */}
-      {hotelId && distributionEntries.length > 0 && (
-        null
-      )}
-      {/* placeholder removed */}
+      {/* Tabela de Salários RH */}
       {hotelId && salaryEntries.length > 0 && (
         <Card className="p-5 shadow-soft space-y-3">
           <div>
