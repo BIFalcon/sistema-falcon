@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
     if (roleErr) return json({ error: "Falha ao verificar permissões" }, 500);
     const roleSet = new Set((roleRows ?? []).map((r: { role: string }) => r.role));
-    const canWrite = ["master", "processos", "controladoria", "gop", "gg"].some((r) => roleSet.has(r));
+    const canWrite = ["processos", "fernando", "controladoria", "gop", "gg"].some((r) => roleSet.has(r));
     if (!canWrite) return json({ error: "Acesso negado: papel insuficiente" }, 403);
 
     const hotel = await supabase.from("hotels").select("*").eq("id", closing.data.hotel_id).maybeSingle();
