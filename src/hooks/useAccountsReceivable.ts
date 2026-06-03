@@ -255,6 +255,8 @@ export interface OpenFolioEntry {
   days_open: number | null;
   expected_payment_date: string | null;
   archived_at: string | null;
+  company: string | null;
+  travel_agent: string | null;
 }
 
 export type { ParsedOpenFolioEntry, ParsedToInvoiceEntry };
@@ -265,7 +267,7 @@ export function useOpenFolioEntries() {
     queryFn: async (): Promise<OpenFolioEntry[]> => {
       const { data, error } = await supabase
         .from("ar_open_folio_entries")
-        .select("id,hotel_id,property_name_raw,confirmation_number,reservation_status,first_name,last_name,balance,arrival_date,departure_date,extraction_date,days_open,expected_payment_date,archived_at")
+        .select("id,hotel_id,property_name_raw,confirmation_number,reservation_status,first_name,last_name,balance,arrival_date,departure_date,extraction_date,days_open,expected_payment_date,archived_at,company,travel_agent")
         .is("archived_at", null)
         .order("balance", { ascending: false })
         .limit(5000);
