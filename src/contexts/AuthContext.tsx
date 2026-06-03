@@ -159,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isMaster,
     isGg: roles.includes("gg" as AppRole),
     isFernando: roles.includes("fernando" as AppRole),
+    isAdm: roles.includes("adm" as AppRole),
     isFernandoCEO: user?.email?.toLowerCase() === FERNANDO_CEO_EMAIL,
     hasRole: (r) => roles.includes(r),
     hasAnyRole: () => roles.length > 0,
