@@ -92,6 +92,10 @@ export default function CartaPage() {
 
   const skip = hotelSkipsCarta(closing?.hotel_id);
   const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
+  const canEditReserveFund =
+    !canEdit &&
+    hasRole("financeiro") &&
+    closing?.status_carta === "aguardando_gg";
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const hasDreData = indicators.length > 0;
 
@@ -309,10 +313,36 @@ export default function CartaPage() {
                   <Input
                     inputMode="decimal"
                     value={draft.reserve_fund}
-                    disabled={!canEdit}
+                    disabled={!canEdit && !canEditReserveFund}
                     onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: e.target.value }))}
                     placeholder="Ex.: 25000"
                   />
+                  {canEditReserveFund && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-1 h-7 text-xs"
+                      onClick={async () => {
+                        if (!letter) return;
+                        const v = draft.reserve_fund.replace(",", ".").trim();
+                        if (!v || Number.isNaN(Number(v))) {
+                          toast.error("Fundo de Reserva inválido");
+                          return;
+                        }
+                        const { error } = await supabase
+                          .from("investor_letters")
+                          .update({ reserve_fund: Number(v) })
+                          .eq("id", letter.id);
+                        if (error) toast.error(error.message);
+                        else {
+                          toast.success("Fundo de Reserva salvo");
+                          qc.invalidateQueries({ queryKey: ["letter", resolvedId] });
+                        }
+                      }}
+                    >
+                      Salvar Fundo de Reserva
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">
