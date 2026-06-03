@@ -61,6 +61,14 @@ Deno.serve(async (req) => {
       ? body.extra_emails.map((s: unknown) => String(s).trim()).filter(Boolean)
       : [];
     const customMessage: string | null = body.message ? String(body.message) : null;
+    const safeCustomMessage = customMessage
+      ? customMessage
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;")
+      : null;
     if (!hotelId || entryIds.length === 0) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
