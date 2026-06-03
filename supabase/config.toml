@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.notify-gg-to-invoice]
 verify_jwt = true
+
+[functions.be-eight-export]
+verify_jwt = false
