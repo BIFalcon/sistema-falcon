@@ -105,7 +105,7 @@ export function useInviteUser() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { user_id: string; invite_link: string | null };
+      return data as { user_id: string; invite_link: string | null; email_queued?: boolean };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["managed-users"] }),
   });
@@ -157,7 +157,7 @@ export function useResendInvite() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { invite_link: string | null };
+      return data as { invite_link: string | null; email_queued?: boolean };
     },
   });
 }
