@@ -633,6 +633,32 @@ function DayBreakdown({
                   <TableCell>
                     <div className="font-medium text-sm">{e.account_name ?? "—"}</div>
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
+                    {canAdmOrGg && e.hotel_id && (
+                      <div className="pt-1">
+                        <Select
+                          value={e.client_id ?? "__none__"}
+                          onValueChange={async (val) => {
+                            await setStatus.mutateAsync({
+                              id: e.id,
+                              gg_status: e.gg_status,
+                              gg_note: e.gg_note,
+                              client_id: val === "__none__" ? null : val,
+                            });
+                            toast.success("Cliente vinculado");
+                          }}
+                        >
+                          <SelectTrigger className="h-6 text-[11px]">
+                            <SelectValue placeholder="Vincular cliente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— sem cliente —</SelectItem>
+                            {(clientsByHotel.data?.[e.hotel_id!] ?? []).map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
