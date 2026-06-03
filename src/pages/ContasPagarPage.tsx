@@ -214,6 +214,7 @@ export default function ContasPagarPage() {
 
   const {
     entries,
+    salaryEntries,
     distributionEntries,
     filteredDistribution,
     filtered,
@@ -482,12 +483,34 @@ export default function ContasPagarPage() {
     if (!hotelId) return;
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
+    // Guarda categorias anteriores para permitir desfazer
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const prevCategories = ids.map((id) => ({
+      id,
+      prev: allEntries.find((e) => e.id === id)?.category ?? null,
+    }));
     try {
       for (const id of ids) {
         await updateCategory.mutateAsync({ entryId: id, hotelId, category });
       }
       setSelectedIds(new Set());
-      toast.success(`${ids.length} lançamento(s) marcado(s) como ${category}`);
+      toast.success(`${ids.length} lançamento(s) marcado(s) como ${category}`, {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            try {
+              for (const { id, prev } of prevCategories) {
+                await updateCategory.mutateAsync({ entryId: id, hotelId, category: prev ?? "" });
+              }
+              qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
+              toast.success("Marcação desfeita.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Erro ao desfazer");
+            }
+          },
+        },
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar categoria");
     }
