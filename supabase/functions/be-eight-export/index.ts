@@ -42,7 +42,7 @@ const GLOBAL_SENSITIVE_PATTERNS = [
   /salary/i,
   /birth_date/i,
   /bank_accounts/i,
-  /^cnpj$/i,
+  /cnpj/i,
 ];
 
 // Allowlist of exportable tables.
