@@ -49,6 +49,8 @@ type OpenFolioPayload = {
   departure_date: string | null;
   extraction_date: string | null;
   days_open: number | null;
+  company: string | null;
+  travel_agent: string | null;
 };
 
 function makeOpenFolioKey(p: { confirmation_number: string | null; property_name_raw: string; arrival_date: string | null; departure_date: string | null }): string {
@@ -137,6 +139,8 @@ function mapOpenFolioEntries(entries: OpenFolioPayload[], hotelMap: HotelMap, up
         departure_date: entry.departure_date,
         extraction_date: entry.extraction_date,
         days_open: entry.days_open,
+        company: entry.company ?? null,
+        travel_agent: entry.travel_agent ?? null,
         entry_key: makeOpenFolioKey({
           confirmation_number: entry.confirmation_number,
           property_name_raw: propRaw,
