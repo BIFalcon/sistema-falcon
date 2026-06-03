@@ -782,9 +782,60 @@ function DayBreakdown({
             estimated_due_date: estimated,
             invoice_file_1: file1Url,
             invoice_file_2: file2Url,
+            billed_at: new Date().toISOString(),
           });
           setInvoiceFor(null);
           toast.success("Marcado como faturado");
+        }}
+      />
+      <ProblemDocsDialog
+        entry={problemFor}
+        onClose={() => setProblemFor(null)}
+        onConfirm={async (note) => {
+          if (!problemFor) return;
+          await setStatus.mutateAsync({
+            id: problemFor.id,
+            gg_status: "pendente",
+            gg_note: problemFor.gg_note,
+            documents_problem_note: note,
+            documents_problem_at: new Date().toISOString(),
+          });
+          setProblemFor(null);
+          toast.success("Problema registrado. Adm/GG serão avisados.");
+        }}
+      />
+      <DefaultingDialog
+        entry={defaultingFor}
+        onClose={() => setDefaultingFor(null)}
+        onConfirm={async (note) => {
+          if (!defaultingFor) return;
+          await setStatus.mutateAsync({
+            id: defaultingFor.id,
+            gg_status: "inadimplente",
+            gg_note: defaultingFor.gg_note,
+            is_defaulting: true,
+            defaulting_note: note,
+            defaulting_at: new Date().toISOString(),
+          });
+          setDefaultingFor(null);
+          toast.success("Marcado como inadimplente");
+        }}
+      />
+      <NotBillableDialog
+        entry={notBillableFor}
+        onClose={() => setNotBillableFor(null)}
+        onConfirm={async (reason, note) => {
+          if (!notBillableFor) return;
+          await setStatus.mutateAsync({
+            id: notBillableFor.id,
+            gg_status: "nao_faturavel",
+            gg_note: notBillableFor.gg_note,
+            is_not_billable: true,
+            not_billable_reason: reason,
+            not_billable_note: note,
+          });
+          setNotBillableFor(null);
+          toast.success("Marcado como não faturável");
         }}
       />
     </div>
