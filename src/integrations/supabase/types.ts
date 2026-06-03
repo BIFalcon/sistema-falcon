@@ -536,53 +536,6 @@ export type Database = {
           },
         ]
       }
-      ar_clients: {
-        Row: {
-          cnpj_cpf: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          hotel_id: string
-          id: string
-          name: string
-          notes: string | null
-          payment_term_days: number
-          updated_at: string
-        }
-        Insert: {
-          cnpj_cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          hotel_id: string
-          id?: string
-          name: string
-          notes?: string | null
-          payment_term_days?: number
-          updated_at?: string
-        }
-        Update: {
-          cnpj_cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          hotel_id?: string
-          id?: string
-          name?: string
-          notes?: string | null
-          payment_term_days?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ar_clients_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ar_open_folio_date_history: {
         Row: {
           changed_at: string
@@ -757,7 +710,6 @@ export type Database = {
           amount: number | null
           ar_open: number | null
           billed_at: string | null
-          client_id: string | null
           confirmation_number: string | null
           created_at: string
           defaulting_at: string | null
@@ -801,7 +753,6 @@ export type Database = {
           amount?: number | null
           ar_open?: number | null
           billed_at?: string | null
-          client_id?: string | null
           confirmation_number?: string | null
           created_at?: string
           defaulting_at?: string | null
@@ -845,7 +796,6 @@ export type Database = {
           amount?: number | null
           ar_open?: number | null
           billed_at?: string | null
-          client_id?: string | null
           confirmation_number?: string | null
           created_at?: string
           defaulting_at?: string | null
@@ -883,13 +833,6 @@ export type Database = {
           upload_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "ar_to_invoice_entries_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "ar_clients"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "ar_to_invoice_entries_hotel_id_fkey"
             columns: ["hotel_id"]

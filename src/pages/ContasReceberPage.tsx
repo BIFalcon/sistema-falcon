@@ -60,7 +60,6 @@ import * as XLSX from "xlsx";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useArClients, type ArClient } from "@/hooks/useArClients";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -561,28 +560,6 @@ function DayBreakdown({
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
-  // Load clients for every hotel present in this day's entries
-  const hotelIdsInDay = useMemo(
-    () => Array.from(new Set(entries.map((e) => e.hotel_id).filter(Boolean) as string[])),
-    [entries],
-  );
-  const clientsByHotel = useQuery({
-    enabled: hotelIdsInDay.length > 0,
-    queryKey: ["ar-clients-multi", hotelIdsInDay],
-    queryFn: async (): Promise<Record<string, ArClient[]>> => {
-      const { data, error } = await supabase
-        .from("ar_clients")
-        .select("*")
-        .in("hotel_id", hotelIdsInDay)
-        .order("name");
-      if (error) throw error;
-      const grouped: Record<string, ArClient[]> = {};
-      for (const c of (data ?? []) as ArClient[]) {
-        (grouped[c.hotel_id] ??= []).push(c);
-      }
-      return grouped;
-    },
-  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
@@ -633,32 +610,6 @@ function DayBreakdown({
                   <TableCell>
                     <div className="font-medium text-sm">{e.account_name ?? "—"}</div>
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
-                    {canAdmOrGg && e.hotel_id && (
-                      <div className="pt-1">
-                        <Select
-                          value={e.client_id ?? "__none__"}
-                          onValueChange={async (val) => {
-                            await setStatus.mutateAsync({
-                              id: e.id,
-                              gg_status: e.gg_status,
-                              gg_note: e.gg_note,
-                              client_id: val === "__none__" ? null : val,
-                            });
-                            toast.success("Cliente vinculado");
-                          }}
-                        >
-                          <SelectTrigger className="h-6 text-[11px]">
-                            <SelectValue placeholder="Vincular cliente" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">— sem cliente —</SelectItem>
-                            {(clientsByHotel.data?.[e.hotel_id!] ?? []).map((c) => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>

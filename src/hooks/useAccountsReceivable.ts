@@ -30,7 +30,6 @@ export interface ToInvoiceEntry {
   estimated_due_date: string | null;
   invoice_file_1: string | null;
   invoice_file_2: string | null;
-  client_id: string | null;
   is_not_billable: boolean;
   not_billable_reason: string | null;
   not_billable_note: string | null;
@@ -51,7 +50,7 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       let q = supabase
         .from("ar_to_invoice_entries")
-        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,client_id,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at")
+        .select("id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at")
         .order("transaction_date", { ascending: false })
         .limit(5000);
       if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
@@ -141,7 +140,6 @@ export function useSetToInvoiceGgStatus() {
       estimated_due_date?: string | null;
       invoice_file_1?: string | null;
       invoice_file_2?: string | null;
-      client_id?: string | null;
       is_not_billable?: boolean;
       not_billable_reason?: string | null;
       not_billable_note?: string | null;
@@ -165,7 +163,6 @@ export function useSetToInvoiceGgStatus() {
           ...(input.estimated_due_date !== undefined ? { estimated_due_date: input.estimated_due_date } : {}),
           ...(input.invoice_file_1 !== undefined ? { invoice_file_1: input.invoice_file_1 } : {}),
           ...(input.invoice_file_2 !== undefined ? { invoice_file_2: input.invoice_file_2 } : {}),
-          ...(input.client_id !== undefined ? { client_id: input.client_id } : {}),
           ...(input.is_not_billable !== undefined ? { is_not_billable: input.is_not_billable } : {}),
           ...(input.not_billable_reason !== undefined ? { not_billable_reason: input.not_billable_reason } : {}),
           ...(input.not_billable_note !== undefined ? { not_billable_note: input.not_billable_note } : {}),

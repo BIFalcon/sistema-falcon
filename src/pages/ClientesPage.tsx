@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useArClients, useUpsertArClient, useDeleteArClient, type ArClient } from "@/hooks/useArClients";
+import {
+  useClientContracts,
+  useUpsertContract,
+  useDeleteContract,
+  type ClientContract,
+} from "@/hooks/useAccountsReceivable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,45 +22,46 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
-import { Users } from "lucide-react";
 
 interface FormState {
   id?: string;
-  name: string;
-  cnpj_cpf: string;
-  email: string;
+  account_number: string;
+  account_name: string;
   payment_term_days: number;
   notes: string;
 }
 
-const EMPTY: FormState = { name: "", cnpj_cpf: "", email: "", payment_term_days: 30, notes: "" };
+const EMPTY: FormState = { account_number: "", account_name: "", payment_term_days: 30, notes: "" };
 
 export default function ClientesPage() {
-  const { hasRole, isMaster, allowedHotels } = useAuth();
+  const { user, hasRole, isMaster, allowedHotels } = useAuth();
   const { hotelId } = useModuleFilters("financeiro");
 
   const canEdit = isMaster || hasRole("financeiro") || hasRole("adm") || hasRole("gg");
+  const canDelete = isMaster || hasRole("financeiro");
 
-  const { data: clients = [], isLoading } = useArClients(hotelId);
-  const upsert = useUpsertArClient();
-  const del = useDeleteArClient();
+  const { data: clients = [], isLoading } = useClientContracts(hotelId);
+  const upsert = useUpsertContract();
+  const del = useDeleteContract();
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [confirmDel, setConfirmDel] = useState<ArClient | null>(null);
+  const [confirmDel, setConfirmDel] = useState<ClientContract | null>(null);
 
-  const sorted = useMemo(() => [...clients].sort((a, b) => a.name.localeCompare(b.name)), [clients]);
+  const sorted = useMemo(
+    () => [...clients].sort((a, b) => (a.account_name ?? "").localeCompare(b.account_name ?? "")),
+    [clients],
+  );
 
   function openCreate() { setForm(EMPTY); setOpen(true); }
-  function openEdit(c: ArClient) {
+  function openEdit(c: ClientContract) {
     setForm({
       id: c.id,
-      name: c.name,
-      cnpj_cpf: c.cnpj_cpf ?? "",
-      email: c.email ?? "",
+      account_number: c.account_number ?? "",
+      account_name: c.account_name ?? "",
       payment_term_days: c.payment_term_days,
       notes: c.notes ?? "",
     });
@@ -63,17 +69,20 @@ export default function ClientesPage() {
   }
 
   async function handleSave() {
-    if (!hotelId) return;
-    if (!form.name.trim()) { toast.error("Informe o nome do cliente"); return; }
+    if (!hotelId || !user) return;
+    if (!form.account_number.trim() && !form.account_name.trim()) {
+      toast.error("Informe Account Number ou Account Name");
+      return;
+    }
     try {
       await upsert.mutateAsync({
         id: form.id,
         hotel_id: hotelId,
-        name: form.name.trim(),
-        cnpj_cpf: form.cnpj_cpf.trim() || null,
-        email: form.email.trim() || null,
+        account_number: form.account_number.trim() || null,
+        account_name: form.account_name.trim() || null,
         payment_term_days: Math.max(0, Number(form.payment_term_days) || 0),
         notes: form.notes.trim() || null,
+        created_by: user.id,
       });
       toast.success(form.id ? "Cliente atualizado" : "Cliente cadastrado");
       setOpen(false);
@@ -113,7 +122,7 @@ export default function ClientesPage() {
         <div>
           <h1 className="text-2xl font-semibold">Clientes</h1>
           <p className="text-sm text-muted-foreground">
-            Cadastro de clientes (contratos) com prazo de pagamento.
+            Cadastro de clientes (Account Number / Name do Opera) com prazo de pagamento.
           </p>
         </div>
         {canEdit && (
@@ -126,14 +135,13 @@ export default function ClientesPage() {
                 <DialogTitle>{form.id ? "Editar cliente" : "Novo cliente"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
-                <div>
-                  <Label>Nome *</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>CNPJ/CPF</Label>
-                    <Input value={form.cnpj_cpf} onChange={(e) => setForm({ ...form, cnpj_cpf: e.target.value })} />
+                    <Label>Account Number</Label>
+                    <Input
+                      value={form.account_number}
+                      onChange={(e) => setForm({ ...form, account_number: e.target.value })}
+                    />
                   </div>
                   <div>
                     <Label>Prazo (dias) *</Label>
@@ -145,13 +153,20 @@ export default function ClientesPage() {
                   </div>
                 </div>
                 <div>
-                  <Label>E-mail</Label>
-                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  <Label>Account Name</Label>
+                  <Input
+                    value={form.account_name}
+                    onChange={(e) => setForm({ ...form, account_name: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Observações</Label>
                   <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Informe pelo menos Account Number ou Account Name. O sistema usa esse cadastro
+                  para calcular o vencimento estimado dos lançamentos a faturar.
+                </p>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
@@ -168,10 +183,10 @@ export default function ClientesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>CNPJ/CPF</TableHead>
-              <TableHead>E-mail</TableHead>
+              <TableHead>Account Number</TableHead>
+              <TableHead>Account Name</TableHead>
               <TableHead className="text-right">Prazo (dias)</TableHead>
+              <TableHead>Observações</TableHead>
               <TableHead className="w-[120px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -182,19 +197,21 @@ export default function ClientesPage() {
               <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum cliente cadastrado.</TableCell></TableRow>
             ) : sorted.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell>{c.cnpj_cpf ?? "—"}</TableCell>
-                <TableCell>{c.email ?? "—"}</TableCell>
+                <TableCell className="font-mono text-xs">{c.account_number ?? "—"}</TableCell>
+                <TableCell className="font-medium">{c.account_name ?? "—"}</TableCell>
                 <TableCell className="text-right">{c.payment_term_days}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{c.notes ?? ""}</TableCell>
                 <TableCell className="text-right">
                   {canEdit && (
                     <div className="flex justify-end gap-1">
                       <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setConfirmDel(c)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canDelete && (
+                        <Button size="icon" variant="ghost" onClick={() => setConfirmDel(c)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </TableCell>
@@ -209,7 +226,8 @@ export default function ClientesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é permanente. Lançamentos vinculados manterão a referência em branco.
+              Esta ação é permanente. Os lançamentos vinculados continuarão existindo
+              mas perderão o prazo de pagamento associado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
