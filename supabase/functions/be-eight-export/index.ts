@@ -30,6 +30,12 @@ const GLOBAL_SENSITIVE_PATTERNS = [
   /access_token/i,
   /refresh_token/i,
   /private_key/i,
+  /token$/i,
+  /_token$/i,
+  /token_hash/i,
+  /_hash$/i,
+  /signed_url/i,
+  /credentials?/i,
 ];
 
 // Allowlist of exportable tables.
