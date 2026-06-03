@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ import { StatusBadge } from "@/components/closings/StatusBadge";
 import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
 import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
-import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,7 @@ import type { IndicatorKey } from "@/lib/dreParser";
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
 
@@ -377,6 +378,18 @@ export default function CartaPage() {
                     <FileDown className="h-4 w-4" /> Baixar PDF v{letter.pdf_version}
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    qc.invalidateQueries({ queryKey: ["dre-indicators", resolvedId] });
+                    toast.success("Dados da DRE recarregados");
+                  }}
+                  className="gap-2"
+                  title="Força releitura dos indicadores da DRE"
+                >
+                  <RefreshCw className="h-4 w-4" /> Recarregar dados da DRE
+                </Button>
               </div>
               {!assetsReady && hotelRow && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-xs">
