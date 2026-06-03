@@ -556,11 +556,16 @@ function DayBreakdown({
     hasRole("gg") ||
     hasRole("financeiro") ||
     hasRole("controladoria");
+  const canFinanceiro = isMaster || hasRole("financeiro");
+  const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
+  const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
+  const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
+  const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -672,6 +677,36 @@ function DayBreakdown({
                         >
                           Pago
                         </Button>
+                        {canFinanceiro && (
+                          <Button
+                            size="sm"
+                            variant={e.documents_problem_at ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setProblemFor(e)}
+                          >
+                            Problema docs
+                          </Button>
+                        )}
+                        {canFinanceiro && (
+                          <Button
+                            size="sm"
+                            variant={e.gg_status === "inadimplente" ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setDefaultingFor(e)}
+                          >
+                            Inadimplente
+                          </Button>
+                        )}
+                        {canAdmOrGg && (
+                          <Button
+                            size="sm"
+                            variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setNotBillableFor(e)}
+                          >
+                            Não faturável
+                          </Button>
+                        )}
                       </div>
                     )}
                     {canConfirm && isEditing && (
@@ -747,9 +782,60 @@ function DayBreakdown({
             estimated_due_date: estimated,
             invoice_file_1: file1Url,
             invoice_file_2: file2Url,
+            billed_at: new Date().toISOString(),
           });
           setInvoiceFor(null);
           toast.success("Marcado como faturado");
+        }}
+      />
+      <ProblemDocsDialog
+        entry={problemFor}
+        onClose={() => setProblemFor(null)}
+        onConfirm={async (note) => {
+          if (!problemFor) return;
+          await setStatus.mutateAsync({
+            id: problemFor.id,
+            gg_status: "pendente",
+            gg_note: problemFor.gg_note,
+            documents_problem_note: note,
+            documents_problem_at: new Date().toISOString(),
+          });
+          setProblemFor(null);
+          toast.success("Problema registrado. Adm/GG serão avisados.");
+        }}
+      />
+      <DefaultingDialog
+        entry={defaultingFor}
+        onClose={() => setDefaultingFor(null)}
+        onConfirm={async (note) => {
+          if (!defaultingFor) return;
+          await setStatus.mutateAsync({
+            id: defaultingFor.id,
+            gg_status: "inadimplente",
+            gg_note: defaultingFor.gg_note,
+            is_defaulting: true,
+            defaulting_note: note,
+            defaulting_at: new Date().toISOString(),
+          });
+          setDefaultingFor(null);
+          toast.success("Marcado como inadimplente");
+        }}
+      />
+      <NotBillableDialog
+        entry={notBillableFor}
+        onClose={() => setNotBillableFor(null)}
+        onConfirm={async (reason, note) => {
+          if (!notBillableFor) return;
+          await setStatus.mutateAsync({
+            id: notBillableFor.id,
+            gg_status: "nao_faturavel",
+            gg_note: notBillableFor.gg_note,
+            is_not_billable: true,
+            not_billable_reason: reason,
+            not_billable_note: note,
+          });
+          setNotBillableFor(null);
+          toast.success("Marcado como não faturável");
         }}
       />
     </div>
@@ -988,7 +1074,140 @@ function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
     return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Faturado</Badge>;
   if (status === "nao_faturado")
     return <Badge variant="destructive">Não faturado</Badge>;
+  if (status === "documentos_enviados")
+    return <Badge className="bg-sky-600 hover:bg-sky-600 text-white">Docs enviados</Badge>;
+  if (status === "nao_faturavel")
+    return <Badge className="bg-zinc-500 hover:bg-zinc-500 text-white">Não faturável</Badge>;
+  if (status === "pago")
+    return <Badge className="bg-emerald-700 hover:bg-emerald-700 text-white">Pago</Badge>;
+  if (status === "inadimplente")
+    return <Badge className="bg-red-700 hover:bg-red-700 text-white">Inadimplente</Badge>;
   return <Badge variant="outline">Pendente</Badge>;
+}
+
+function ProblemDocsDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  useEffect(() => { setNote(entry?.documents_problem_note ?? ""); }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Problema nos documentos</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label className="text-xs">Descreva o problema</Label>
+          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="O que está incorreto nos documentos?" />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Registrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DefaultingDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  useEffect(() => { setNote(entry?.defaulting_note ?? ""); }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Marcar como inadimplente</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label className="text-xs">Justificativa</Label>
+          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalhes da inadimplência" />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const NOT_BILLABLE_REASONS = [
+  "Cortesia",
+  "No-show coberto",
+  "Estorno",
+  "Erro de lançamento",
+  "Compensação interna",
+  "Outro",
+];
+
+function NotBillableDialog({
+  entry,
+  onClose,
+  onConfirm,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onConfirm: (reason: string, note: string | null) => Promise<void>;
+}) {
+  const [reason, setReason] = useState<string>("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    setReason(entry?.not_billable_reason ?? "");
+    setNote(entry?.not_billable_note ?? "");
+  }, [entry?.id]);
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Não vai ser faturado</DialogTitle>
+          <DialogDescription>
+            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Motivo *</Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {NOT_BILLABLE_REASONS.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Observação (opcional)</Label>
+            <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!reason} onClick={() => onConfirm(reason, note.trim() || null)}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ConsolidatedRanking({
@@ -1406,7 +1625,7 @@ function HotelOpenFolioDetail({
               <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
               <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
               <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
-              <TableHead>Previsto pagto</TableHead>
+              <TableHead>Previsto fechamento</TableHead>
               <TableHead>Justificativa</TableHead>
             </TableRow>
           </TableHeader>
@@ -1425,7 +1644,16 @@ function HotelOpenFolioDetail({
                 const overdue = expected && expected < todayIso;
                 return (
                   <TableRow key={e.id}>
-                    <TableCell className="text-sm">{fullName(e)}</TableCell>
+                    <TableCell className="text-sm">
+                      <div>{fullName(e)}</div>
+                      {(e.company || e.travel_agent) && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                          {e.company && <span>🏢 {e.company}</span>}
+                          {e.company && e.travel_agent && <span> · </span>}
+                          {e.travel_agent && <span>✈ {e.travel_agent}</span>}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
                     <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
@@ -1533,7 +1761,7 @@ function NoteDialog({
             rows={4}
           />
           <div>
-            <Label className="text-xs">Data prevista de faturamento (opcional)</Label>
+            <Label className="text-xs">Data prevista de fechamento (opcional)</Label>
             <input
               type="date"
               value={expectedDate}
