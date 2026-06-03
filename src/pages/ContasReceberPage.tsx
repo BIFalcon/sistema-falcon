@@ -988,6 +988,14 @@ function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
     return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Faturado</Badge>;
   if (status === "nao_faturado")
     return <Badge variant="destructive">Não faturado</Badge>;
+  if (status === "documentos_enviados")
+    return <Badge className="bg-sky-600 hover:bg-sky-600 text-white">Docs enviados</Badge>;
+  if (status === "nao_faturavel")
+    return <Badge className="bg-zinc-500 hover:bg-zinc-500 text-white">Não faturável</Badge>;
+  if (status === "pago")
+    return <Badge className="bg-emerald-700 hover:bg-emerald-700 text-white">Pago</Badge>;
+  if (status === "inadimplente")
+    return <Badge className="bg-red-700 hover:bg-red-700 text-white">Inadimplente</Badge>;
   return <Badge variant="outline">Pendente</Badge>;
 }
 
