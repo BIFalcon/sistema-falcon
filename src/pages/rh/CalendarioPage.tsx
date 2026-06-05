@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Sparkles, Building2, Loader2 } from "lucide-react";
+import { Plus, Sparkles, Building2, Loader2, Paperclip, X, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRhCalendarDates, useAddCalendarPost, type RhCalendarDate } from "@/hooks/useRh";
@@ -65,6 +65,27 @@ export default function CalendarioPage() {
   const posts = useCalendarPosts(open?.id ?? null, year);
 
   const [form, setForm] = useState({ title: "", content: "", status: "draft" });
+  const [attachments, setAttachments] = useState<Array<{ name: string; url: string }>>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded: Array<{ name: string; url: string }> = [];
+      for (const file of Array.from(files)) {
+        const ext = file.name.split(".").pop() ?? "bin";
+        const path = `calendar/${year}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error } = await supabase.storage.from("rh-photos").upload(path, file, { upsert: true });
+        if (error) { toast.error(`Erro ao enviar ${file.name}`); continue; }
+        const { data } = supabase.storage.from("rh-photos").getPublicUrl(path);
+        uploaded.push({ name: file.name, url: data.publicUrl });
+      }
+      setAttachments((a) => [...a, ...uploaded]);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (status: "draft" | "ideia" | "acao") => {
     if (!open) return;
@@ -72,9 +93,11 @@ export default function CalendarioPage() {
     try {
       await addPost.mutateAsync({
         date_id: open.id, year, title: form.title, content: form.content || undefined, status,
+        attachments,
       });
       toast.success("Registrado com sucesso.");
       setForm({ title: "", content: "", status: "draft" });
+      setAttachments([]);
       posts.refetch();
     } catch (e: any) {
       toast.error("Erro: " + (e?.message ?? "desconhecido"));
@@ -162,6 +185,22 @@ export default function CalendarioPage() {
                             <div key={p.id} className="py-3">
                               <p className="text-sm font-medium">{p.title}</p>
                               {p.content && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{p.content}</p>}
+                              {Array.isArray(p.attachments) && p.attachments.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {p.attachments.map((att: { name: string; url: string }, i: number) => (
+                                    <a
+                                      key={i}
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border border-border hover:bg-muted/50"
+                                    >
+                                      <FileText className="h-3 w-3" />
+                                      <span className="truncate max-w-[180px]">{att.name}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -181,10 +220,41 @@ export default function CalendarioPage() {
                             onChange={(e) => setForm({ ...form, content: e.target.value })}
                             rows={3}
                           />
+                          <div className="space-y-1.5">
+                            <Label className="text-xs flex items-center gap-1.5">
+                              <Paperclip className="h-3 w-3" /> Anexos (opcional)
+                            </Label>
+                            <Input
+                              type="file"
+                              multiple
+                              disabled={uploading}
+                              onChange={(e) => handleFiles(e.target.files)}
+                            />
+                            {attachments.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {attachments.map((att, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-background border border-border"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    <span className="truncate max-w-[140px]">{att.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
+                                      className="text-muted-foreground hover:text-destructive"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <Button
                             size="sm"
                             onClick={() => handleSubmit(tab === "ideias" ? "ideia" : "acao")}
-                            disabled={addPost.isPending}
+                            disabled={addPost.isPending || uploading}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" />
                             {tab === "ideias" ? "Postar ideia" : "Registrar ação"}

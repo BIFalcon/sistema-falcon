@@ -3,8 +3,10 @@
  * Acessível apenas a quem tem acesso a todos os hotéis (não para GG).
  */
 import { useMemo } from "react";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -80,18 +82,76 @@ export default function ConsolidadoPage() {
     };
   }, [rows]);
 
+  const handleDownloadXlsx = () => {
+    const header = [
+      "Hotel",
+      "Tx. Ocup. (%)",
+      "Diária Média (R$)",
+      "RevPAR (R$)",
+      "Receita Bruta (R$)",
+      "Fee/Rec.Bruta (R$)",
+      "Incentive Fee (R$)",
+      "Distrib. Total (R$)",
+      "Distrib./UH (R$)",
+      "GOP (R$)",
+    ];
+    const pctVal = (v: number | null) =>
+      v == null ? null : Number((v <= 1 ? v * 100 : v).toFixed(2));
+    const num = (v: number | null) => (v == null ? null : Number(v.toFixed(2)));
+    const body = rows.map((r) => [
+      hotelById.get(r.hotelId)?.name ?? r.hotelId,
+      pctVal(r.ocupacao),
+      num(r.adr),
+      num(r.revpar),
+      num(r.receitaBruta),
+      num(r.taxaFee),
+      num(r.incentiveFee),
+      num(r.distribuicaoTotal),
+      num(r.distribuicaoPorUh),
+      num(r.gop),
+    ]);
+    const totalRow = [
+      "Total Geral",
+      pctVal(totals.ocupacao),
+      num(totals.adr),
+      num(totals.revpar),
+      num(totals.receitaBruta),
+      num(totals.taxaFee),
+      num(totals.incentiveFee),
+      num(totals.distribuicaoTotal),
+      num(totals.distribuicaoPorUh),
+      num(totals.gop),
+    ];
+    const sheet = XLSX.utils.aoa_to_sheet([header, ...body, totalRow]);
+    sheet["!cols"] = header.map((h, i) => ({ wch: i === 0 ? 30 : 16 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, `${MONTHS_PT[month - 1]} ${year}`);
+    XLSX.writeFile(wb, `Consolidado-${year}-${String(month).padStart(2, "0")}.xlsx`);
+  };
+
   return (
     <div className="space-y-6 max-w-[1400px]">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-          Fechamento
-        </p>
-        <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-          <LayoutGrid className="h-6 w-6" /> Consolidado de Resultados
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {MONTHS_PT[month - 1]} de {year} — visão consolidada de todos os hotéis
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+            Fechamento
+          </p>
+          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+            <LayoutGrid className="h-6 w-6" /> Consolidado de Resultados
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {MONTHS_PT[month - 1]} de {year} — visão consolidada de todos os hotéis
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadXlsx}
+          disabled={isLoading || rows.length === 0}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Baixar Excel
+        </Button>
       </div>
 
       <Card className="p-5 shadow-soft">
