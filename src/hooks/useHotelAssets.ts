@@ -17,8 +17,6 @@ export interface HotelRow {
 export const FALCON_LOGO_KEY = "falcon_logo_url";
 
 /** Safe column list — bank_accounts and cnpj are revoked at the column-grant level. */
-const HOTEL_SAFE_COLUMNS =
-  "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,created_at,cnpj:id" as const;
 const HOTEL_SELECT_COLUMNS =
   "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,created_at";
 
