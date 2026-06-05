@@ -68,7 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("user_hotels")
           .select("hotel_id, hotels(id,name,brand,active)")
           .eq("user_id", uid),
-        supabase.from("hotels").select("*").eq("is_active", true).order("name"),
+        supabase
+          .from("hotels")
+          .select(
+            "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,created_at",
+          )
+          .eq("is_active", true)
+          .order("name"),
       ]);
 
     setProfile((prof ?? null) as Profile | null);
