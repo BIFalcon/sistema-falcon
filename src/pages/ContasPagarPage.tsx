@@ -140,6 +140,7 @@ export default function ContasPagarPage() {
   const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
   const { data: cardReceivables = [] } = useCardReceivable(hotelId);
   const { data: notifLog = [] } = useApNotificationLog(hotelId);
+  const { data: hotelFinancial = null } = useHotelFinancial(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
