@@ -585,7 +585,7 @@ export default function ContasPagarPage() {
             )}
           </div>
           {(() => {
-            const accounts = (((hotel as unknown as { bank_accounts?: Array<{ bank: string; account: string }> | null })?.bank_accounts) ?? []) as Array<{ bank: string; account: string }>;
+            const accounts = hotelFinancial?.bank_accounts ?? [];
             if (accounts.length === 0) return null;
             return (
               <div className="flex items-center gap-2 flex-wrap">
