@@ -215,6 +215,7 @@ export function useAddCalendarPost() {
       content?: string;
       media_url?: string;
       status?: string;
+      attachments?: Array<{ name: string; url: string }>;
     }) => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
@@ -229,6 +230,7 @@ export function useAddCalendarPost() {
           content: input.content ?? null,
           media_url: input.media_url ?? null,
           status: input.status ?? "draft",
+          attachments: (input.attachments ?? []) as never,
         })
         .select()
         .single();

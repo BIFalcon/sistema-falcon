@@ -1807,6 +1807,7 @@ export type Database = {
       }
       rh_calendar_posts: {
         Row: {
+          attachments: Json
           author_id: string
           content: string | null
           created_at: string
@@ -1819,6 +1820,7 @@ export type Database = {
           year: number
         }
         Insert: {
+          attachments?: Json
           author_id: string
           content?: string | null
           created_at?: string
@@ -1831,6 +1833,7 @@ export type Database = {
           year: number
         }
         Update: {
+          attachments?: Json
           author_id?: string
           content?: string | null
           created_at?: string

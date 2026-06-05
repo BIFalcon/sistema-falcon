@@ -59,7 +59,7 @@ function OrgNode({
   const isVacant = node.is_open_position;
 
   return (
-    <div className="flex flex-row items-center">
+    <div className="flex flex-col items-center">
       <div className="relative group">
         <div
           className={`w-36 rounded-xl border bg-card p-3 shadow-sm select-none transition-shadow
@@ -100,7 +100,7 @@ function OrgNode({
             </Button>
           )}
           {hasChildren && (
-            <div className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shadow-sm z-10">
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-2.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shadow-sm z-10">
               {expanded ? "−" : "+"}
             </div>
           )}
@@ -108,17 +108,13 @@ function OrgNode({
       </div>
 
       {expanded && hasChildren && (
-        <div className="flex flex-row items-center ml-5">
-          <div className="w-5 border-t border-border" />
-          <div className="flex flex-col gap-3">
-            {node.children.map((child, idx) => (
-              <div key={child.id} className="flex flex-row items-center">
+        <div className="flex flex-col items-center mt-5">
+          <div className="h-5 border-l border-border" />
+          <div className="flex flex-row items-start gap-4">
+            {node.children.map((child) => (
+              <div key={child.id} className="flex flex-col items-center">
                 {node.children.length > 1 && (
-                  <div
-                    className={`w-4 border-t border-border border-l
-                      ${idx === 0 ? "rounded-tl" : ""}
-                      ${idx === node.children.length - 1 ? "rounded-bl" : ""}`}
-                  />
+                  <div className="h-4 border-l border-border" />
                 )}
                 <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
               </div>
@@ -276,7 +272,7 @@ export default function OrganogramaPage() {
         </TabsList>
         <TabsContent value="matriz" className="mt-4">
           <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
-            <div className="flex flex-row items-start gap-6 w-max">
+            <div className="flex flex-col items-center gap-6 w-full">
               {matriz.map((root) => (
                 <OrgNode key={root.id} node={root} canEdit={canEdit} onEdit={handleEdit} />
               ))}
@@ -288,7 +284,7 @@ export default function OrganogramaPage() {
         </TabsContent>
         <TabsContent value="hoteis" className="mt-4">
           <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
-            <div className="flex flex-row items-start gap-6 w-max">
+            <div className="flex flex-col items-center gap-6 w-full">
               {hoteisTree.map((root) => (
                 <OrgNode key={root.id} node={root} canEdit={false} onEdit={handleEdit} />
               ))}
