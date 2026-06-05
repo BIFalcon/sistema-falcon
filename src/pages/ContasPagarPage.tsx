@@ -204,7 +204,7 @@ export default function ContasPagarPage() {
     hideTrivial,
     groupNd,
     showApproval,
-    hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
+    hotelCnpj: hotelFinancial?.cnpj ?? null,
     searchText,
     dateFrom,
     dateTo,
