@@ -50,7 +50,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
+import { useAllHotels, useHotelFinancial, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   uploadApReport,
   useApEntries,
