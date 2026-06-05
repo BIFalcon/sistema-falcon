@@ -16,13 +16,17 @@ export interface HotelRow {
 
 export const FALCON_LOGO_KEY = "falcon_logo_url";
 
+/** Safe column list — bank_accounts and cnpj are revoked at the column-grant level. */
+const HOTEL_SELECT_COLUMNS =
+  "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,created_at";
+
 export function useAllHotels() {
   return useQuery({
     queryKey: ["hotels", "all"],
     queryFn: async (): Promise<HotelRow[]> => {
       const { data, error } = await supabase
         .from("hotels")
-        .select("*")
+        .select(HOTEL_SELECT_COLUMNS)
         .order("name");
       if (error) throw error;
       return (data ?? []) as HotelRow[];
@@ -38,11 +42,36 @@ export function useHotel(hotelId: string | null | undefined) {
       if (!hotelId) return null;
       const { data, error } = await supabase
         .from("hotels")
-        .select("*")
+        .select(HOTEL_SELECT_COLUMNS)
         .eq("id", hotelId)
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as HotelRow | null;
+    },
+  });
+}
+
+/**
+ * Sensitive fields (bank_accounts, cnpj) are only fetchable via a SECURITY DEFINER
+ * RPC. Authorized roles: master, controladoria, patronos.
+ */
+export function useHotelFinancial(hotelId: string | null | undefined) {
+  return useQuery({
+    enabled: !!hotelId,
+    queryKey: ["hotels", "financial", hotelId],
+    queryFn: async (): Promise<{ bank_accounts: Array<{ bank: string; account: string }>; cnpj: string | null } | null> => {
+      if (!hotelId) return null;
+      const { data, error } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelId });
+      if (error) {
+        // Not authorized → silently return null so the UI can hide the section.
+        return null;
+      }
+      const row = (data ?? [])[0] as { bank_accounts: unknown; cnpj: string | null } | undefined;
+      if (!row) return null;
+      return {
+        bank_accounts: (row.bank_accounts as Array<{ bank: string; account: string }>) ?? [],
+        cnpj: row.cnpj,
+      };
     },
   });
 }

@@ -50,7 +50,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useAllHotels, type HotelRow } from "@/hooks/useHotelAssets";
+import { useAllHotels, useHotelFinancial, type HotelRow } from "@/hooks/useHotelAssets";
 import {
   uploadApReport,
   useApEntries,
@@ -140,6 +140,7 @@ export default function ContasPagarPage() {
   const { data: balanceSantander } = useTodayBankBalance(hotelId, "santander");
   const { data: cardReceivables = [] } = useCardReceivable(hotelId);
   const { data: notifLog = [] } = useApNotificationLog(hotelId);
+  const { data: hotelFinancial = null } = useHotelFinancial(hotelId);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
@@ -203,7 +204,7 @@ export default function ContasPagarPage() {
     hideTrivial,
     groupNd,
     showApproval,
-    hotelCnpj: (hotel as { cnpj?: string | null } | null)?.cnpj ?? null,
+    hotelCnpj: hotelFinancial?.cnpj ?? null,
     searchText,
     dateFrom,
     dateTo,
@@ -584,7 +585,7 @@ export default function ContasPagarPage() {
             )}
           </div>
           {(() => {
-            const accounts = (((hotel as unknown as { bank_accounts?: Array<{ bank: string; account: string }> | null })?.bank_accounts) ?? []) as Array<{ bank: string; account: string }>;
+            const accounts = hotelFinancial?.bank_accounts ?? [];
             if (accounts.length === 0) return null;
             return (
               <div className="flex items-center gap-2 flex-wrap">

@@ -2278,7 +2278,7 @@ export type Database = {
         Returns: {
           bank_accounts: Json
           cnpj: string
-          id: string
+          hotel_id: string
         }[]
       }
       get_latest_dre_lines: {
