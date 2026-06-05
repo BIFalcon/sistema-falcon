@@ -56,13 +56,6 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "ap_anticipation_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       ap_bank_balance: {
@@ -104,13 +97,6 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "ap_bank_balance_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       ap_card_receivable: {
@@ -147,13 +133,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ap_card_receivable_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -226,13 +205,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ap_documents_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
           {
@@ -380,13 +352,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ap_entries_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ap_entries_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
@@ -432,13 +397,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ap_notification_log_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -492,13 +450,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ap_uploads_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -581,13 +532,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ar_client_contracts_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -709,13 +653,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ar_open_folio_entries_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ar_open_folio_entries_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
@@ -761,13 +698,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ar_open_folio_notes_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -908,13 +838,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ar_to_invoice_entries_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
           {
@@ -1099,13 +1022,6 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "closings_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       comments: {
@@ -1283,13 +1199,6 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conciliation_uploads_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2286,13 +2195,6 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_hotels_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       user_permissions: {
@@ -2345,57 +2247,7 @@ export type Database = {
       }
     }
     Views: {
-      hotels_safe: {
-        Row: {
-          active: boolean | null
-          brand: string | null
-          brand_logo_url: string | null
-          cover_url: string | null
-          created_at: string | null
-          financial_system:
-            | Database["public"]["Enums"]["financial_system"]
-            | null
-          id: string | null
-          is_active: boolean | null
-          name: string | null
-          num_apartments: number | null
-          opera_property_name: string | null
-          show_in_closing: boolean | null
-        }
-        Insert: {
-          active?: boolean | null
-          brand?: string | null
-          brand_logo_url?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          financial_system?:
-            | Database["public"]["Enums"]["financial_system"]
-            | null
-          id?: string | null
-          is_active?: boolean | null
-          name?: string | null
-          num_apartments?: number | null
-          opera_property_name?: string | null
-          show_in_closing?: boolean | null
-        }
-        Update: {
-          active?: boolean | null
-          brand?: string | null
-          brand_logo_url?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          financial_system?:
-            | Database["public"]["Enums"]["financial_system"]
-            | null
-          id?: string | null
-          is_active?: boolean | null
-          name?: string | null
-          num_apartments?: number | null
-          opera_property_name?: string | null
-          show_in_closing?: boolean | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
@@ -2426,7 +2278,7 @@ export type Database = {
         Returns: {
           bank_accounts: Json
           cnpj: string
-          id: string
+          hotel_id: string
         }[]
       }
       get_latest_dre_lines: {
