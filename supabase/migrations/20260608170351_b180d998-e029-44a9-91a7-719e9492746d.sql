@@ -1,0 +1,1 @@
+ALTER TABLE public.rh_trainings ADD COLUMN IF NOT EXISTS image_url text;
