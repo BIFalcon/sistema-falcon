@@ -129,13 +129,13 @@ const App = () => (
               <Route path="/fechamento" element={<FechamentoPage />} />
               <Route path="/fechamento/dre" element={<DrePage />} />
               <Route path="/fechamento/carta" element={<CartaPage />} />
-              <Route path="/fechamento/financeiro" element={<RoleGuard roles={["controladoria","patronos"]}><FinanceiroPage /></RoleGuard>} />
+              <Route path="/fechamento/financeiro" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><FinanceiroPage /></RoleGuard>} />
               <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />
               <Route path="/fechamento/performance" element={<PerformanceSlaGuard><PerformanceSlaPage /></PerformanceSlaGuard>} />
               <Route
                 path="/fechamento/consolidado"
                 element={
-                  <RoleGuard roles={["controladoria","patronos","gop","ri","processos"]}>
+                  <RoleGuard roles={["controladoria","patronos","gop","ri","processos","viewer"]}>
                     <ConsolidadoPage />
                   </RoleGuard>
                 }
@@ -153,7 +153,7 @@ const App = () => (
               <Route path="/financeiro" element={<RoleGuard roles={["controladoria","patronos","gg","viewer"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ContasPagarPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","viewer"]}><ContasReceberPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm"]}><ClientesPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<TurnoverPage />} />
               <Route path="/rh/calendario" element={<CalendarioPage />} />
@@ -161,7 +161,7 @@ const App = () => (
               <Route path="/rh/treinamentos" element={<TreinamentosPage />} />
               <Route path="/rh/politicas" element={<PoliticasPage />} />
               <Route path="/controladoria" element={<EmBreve />} />
-              <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos"]}><ConciliacaoPage /></RoleGuard>} />
+              <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConciliacaoPage /></RoleGuard>} />
 
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />
