@@ -57,6 +57,7 @@ export interface RhTraining {
   duration_minutes: number | null;
   mandatory: boolean;
   media_url: string | null;
+  image_url: string | null;
   created_by: string;
   created_at: string;
 }

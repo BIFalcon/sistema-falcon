@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, ExternalLink, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, ExternalLink, Pencil, Trash2, Loader2, Upload, X } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRhTrainings, type RhTraining } from "@/hooks/useRh";
@@ -21,7 +21,9 @@ export default function TreinamentosPage() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<RhTraining | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false });
+  const [form, setForm] = useState({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false, image_url: "" as string | null | "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
 
   const grouped = useMemo(() => {
     const map: Record<string, RhTraining[]> = {};
@@ -35,22 +37,41 @@ export default function TreinamentosPage() {
       setForm({
         title: t.title, description: t.description ?? "", category: t.category ?? "",
         media_url: t.media_url ?? "", duration_minutes: String(t.duration_minutes ?? ""), mandatory: t.mandatory,
+        image_url: t.image_url ?? "",
       });
     } else {
       setCreating(true);
-      setForm({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false });
+      setForm({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false, image_url: "" });
     }
+    setImageFile(null);
   };
-  const close = () => { setEditing(null); setCreating(false); };
+  const close = () => { setEditing(null); setCreating(false); setImageFile(null); };
 
   const save = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
+      let image_url: string | null = form.image_url || null;
+      if (imageFile) {
+        const safeName = imageFile.name
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        const path = `trainings/${Date.now()}_${safeName || "imagem"}`;
+        const { error: upErr } = await supabase.storage
+          .from("rh-assets")
+          .upload(path, imageFile, { upsert: false, contentType: imageFile.type });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("rh-assets").getPublicUrl(path);
+        image_url = pub.publicUrl;
+      }
       const payload = {
         title: form.title,
         description: form.description || null,
         category: form.category || null,
         media_url: form.media_url || null,
+        image_url,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
         mandatory: form.mandatory,
         created_by: u.user?.id ?? "",
@@ -92,6 +113,11 @@ export default function TreinamentosPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((t) => (
               <Card key={t.id} className="p-4 shadow-soft flex flex-col gap-2">
+                {t.image_url && (
+                  <div className="-mx-4 -mt-4 mb-1 h-32 overflow-hidden rounded-t-md bg-muted">
+                    <img src={t.image_url} alt={t.title} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold flex-1">{t.title}</p>
                   {t.mandatory && <Badge variant="outline" className="border-destructive/40 text-destructive text-[10px]">Obrigatório</Badge>}
@@ -126,6 +152,39 @@ export default function TreinamentosPage() {
             <div><Label>Descrição</Label><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             <div><Label>URL (Solid)</Label><Input value={form.media_url} onChange={(e) => setForm({ ...form, media_url: e.target.value })} placeholder="https://..." /></div>
             <div><Label>Duração (min)</Label><Input type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div>
+            <div>
+              <Label>Imagem (opcional)</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {(imageFile || form.image_url) && (
+                  <div className="relative h-16 w-16 rounded-md overflow-hidden bg-muted shrink-0">
+                    <img
+                      src={imageFile ? URL.createObjectURL(imageFile) : (form.image_url || "")}
+                      alt="preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setForm({ ...form, image_url: "" }); if (imgRef.current) imgRef.current.value = ""; }}
+                      className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"
+                      aria-label="Remover imagem"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={imgRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => imgRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5 mr-1" />
+                  {imageFile || form.image_url ? "Trocar imagem" : "Selecionar imagem"}
+                </Button>
+              </div>
+            </div>
             <div className="flex items-center gap-2"><Checkbox checked={form.mandatory} onCheckedChange={(v) => setForm({ ...form, mandatory: !!v })} /><Label className="!mt-0">Obrigatório</Label></div>
           </div>
           <DialogFooter>

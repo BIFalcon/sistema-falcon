@@ -35,7 +35,16 @@ export default function PoliticasPage() {
       const { data: u } = await supabase.auth.getUser();
       let document_url: string | null = null;
       if (form.file) {
-        const path = `${Date.now()}_${form.file.name}`;
+        // Sanitize filename: Supabase Storage only accepts ASCII letters,
+        // numbers, and a few symbols in object keys. Accents, spaces and
+        // other characters cause "Invalid key" errors.
+        const safeName = form.file.name
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "") // strip accents
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        const path = `${Date.now()}_${safeName || "documento"}`;
         const { error: upErr } = await supabase.storage.from("rh-policies").upload(path, form.file);
         if (upErr) throw upErr;
         document_url = path;
