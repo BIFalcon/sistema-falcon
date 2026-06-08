@@ -41,7 +41,7 @@ async function enqueueInviteEmail(
     const unsubscribeToken = await getUnsubscribeToken(admin, args.to);
     const messageId = `${args.label}-${args.to}-${Date.now()}`;
     const { error } = await admin.rpc("enqueue_email", {
-      queue_name: "transactional_emails",
+      queue_name: "auth_emails",
       payload: {
         message_id: messageId,
         idempotency_key: messageId,
