@@ -52,17 +52,32 @@ export async function fetchLetterHistory(
     .maybeSingle();
   if (!closing?.id) return { current, previous };
 
+  // Descobre a versão mais recente da DRE deste closing
+  const { data: latest } = await supabase
+    .from("dre_parsed_lines")
+    .select("version_number")
+    .eq("closing_id", closing.id)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const top = latest?.version_number;
+  if (top == null) return { current, previous };
+
+  // Busca apenas as linhas de série da última versão (evita o limite default
+  // de 1000 linhas do PostgREST com DREs grandes, que estava deixando os
+  // gráficos da Carta vazios).
   const { data: lines } = await supabase
     .from("dre_parsed_lines")
     .select("line_label, line_value, version_number")
     .eq("closing_id", closing.id)
+    .eq("version_number", top)
     .eq("line_type", "indicator")
-    .order("version_number", { ascending: false });
+    .like("line_label", "[series_%")
+    .limit(2000);
   if (!lines || lines.length === 0) return { current, previous };
-  const top = lines[0].version_number;
 
   const rx = /^\[series_(cur|prev)_(\w+)_(\d{1,2})\]$/;
-  for (const r of lines.filter((l) => l.version_number === top)) {
+  for (const r of lines) {
     const m = rx.exec(r.line_label);
     if (!m) continue;
     const scope = m[1] as "cur" | "prev";
@@ -83,14 +98,22 @@ export async function fetchLetterHistory(
  *  rede de segurança para a tabela DRE da Carta.
  */
 export async function fetchDreLines(closingId: string): Promise<{ label: string; value: number | null }[]> {
-  const { data } = await supabase
+  const { data: latest } = await supabase
     .from("dre_parsed_lines")
-    .select("line_label, line_value, line_type, version_number")
+    .select("version_number")
     .eq("closing_id", closingId)
-    .order("version_number", { ascending: false });
-  if (!data || data.length === 0) return [];
-  const top = data[0].version_number;
-  const topRows = data.filter((r) => r.version_number === top);
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const top = latest?.version_number;
+  if (top == null) return [];
+  const { data: topRows } = await supabase
+    .from("dre_parsed_lines")
+    .select("line_label, line_value, line_type")
+    .eq("closing_id", closingId)
+    .eq("version_number", top)
+    .limit(5000);
+  if (!topRows || topRows.length === 0) return [];
   const out: { label: string; value: number | null }[] = topRows
     .filter((r) => r.line_type === "line")
     .map((r) => ({ label: r.line_label, value: r.line_value }));
