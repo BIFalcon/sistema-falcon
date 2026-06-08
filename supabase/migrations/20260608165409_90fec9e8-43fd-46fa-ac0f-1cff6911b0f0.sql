@@ -1,0 +1,1 @@
+UPDATE public.email_send_state SET transactional_email_ttl_minutes = 1440, retry_after_until = NULL;
