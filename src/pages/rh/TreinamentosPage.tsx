@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, ExternalLink, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, ExternalLink, Pencil, Trash2, Loader2, Upload, X } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRhTrainings, type RhTraining } from "@/hooks/useRh";
@@ -21,7 +21,9 @@ export default function TreinamentosPage() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<RhTraining | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false });
+  const [form, setForm] = useState({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false, image_url: "" as string | null | "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
 
   const grouped = useMemo(() => {
     const map: Record<string, RhTraining[]> = {};
@@ -35,22 +37,41 @@ export default function TreinamentosPage() {
       setForm({
         title: t.title, description: t.description ?? "", category: t.category ?? "",
         media_url: t.media_url ?? "", duration_minutes: String(t.duration_minutes ?? ""), mandatory: t.mandatory,
+        image_url: t.image_url ?? "",
       });
     } else {
       setCreating(true);
-      setForm({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false });
+      setForm({ title: "", description: "", category: "", media_url: "", duration_minutes: "", mandatory: false, image_url: "" });
     }
+    setImageFile(null);
   };
-  const close = () => { setEditing(null); setCreating(false); };
+  const close = () => { setEditing(null); setCreating(false); setImageFile(null); };
 
   const save = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
+      let image_url: string | null = form.image_url || null;
+      if (imageFile) {
+        const safeName = imageFile.name
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        const path = `trainings/${Date.now()}_${safeName || "imagem"}`;
+        const { error: upErr } = await supabase.storage
+          .from("rh-assets")
+          .upload(path, imageFile, { upsert: false, contentType: imageFile.type });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("rh-assets").getPublicUrl(path);
+        image_url = pub.publicUrl;
+      }
       const payload = {
         title: form.title,
         description: form.description || null,
         category: form.category || null,
         media_url: form.media_url || null,
+        image_url,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
         mandatory: form.mandatory,
         created_by: u.user?.id ?? "",
