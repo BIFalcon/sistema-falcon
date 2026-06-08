@@ -115,15 +115,26 @@ Deno.serve(async (req) => {
       .eq("letter_id", letter_id)
       .order("sort_order", { ascending: true });
 
+    // Descobre a última versão da DRE deste fechamento
+    const topRes = await supabase
+      .from("dre_parsed_lines")
+      .select("version_number")
+      .eq("closing_id", closing_id)
+      .order("version_number", { ascending: false })
+      .limit(1);
+    const top = topRes.data?.[0]?.version_number ?? null;
+    if (top == null) {
+      return json({ error: "Nenhuma DRE encontrada para este fechamento. Anexe a DRE antes de gerar a Carta." }, 400);
+    }
+    // Busca TODOS os indicadores da última versão (sem cair no limite default de 1000)
     const indicators = await supabase
       .from("dre_parsed_lines")
       .select("line_label, line_value, version_number")
       .eq("closing_id", closing_id)
       .eq("line_type", "indicator")
-      .order("version_number", { ascending: false });
-
-    const top = indicators.data?.[0]?.version_number;
-    const inds = (indicators.data ?? []).filter((r) => r.version_number === top);
+      .eq("version_number", top)
+      .range(0, 9999);
+    const inds = (indicators.data ?? []);
     // Separa correntes ([key]) de previous ([prev_key]) e ignora séries mensais
     type Row = { line_label: string; line_value: number | null };
     const cur = new Map<string, Row>();
