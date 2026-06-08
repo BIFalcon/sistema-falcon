@@ -397,7 +397,7 @@ Deno.serve(async (req) => {
         if (!payload.user_id) return json({ error: "user_id_required" }, 400);
         const { data: prof } = await admin
           .from("profiles")
-          .select("email, display_name")
+          .select("email, display_name, status")
           .eq("user_id", payload.user_id)
           .maybeSingle();
         if (!prof?.email) return json({ error: "user_not_found" }, 404);
@@ -405,19 +405,35 @@ Deno.serve(async (req) => {
         const redirectTo =
           (req.headers.get("origin") ?? "") + "/reset-password";
 
-        // Sempre usa magiclink para garantir que o usuário
-        // recebe um e-mail funcional independente do estado
-        const linkType = "magiclink" as const;
-
-        // Gera UM único link — invalida qualquer token anterior pendente,
-        // dispara o email novo e retorna a URL para copiar.
-        const { data: linkData, error: linkErr } =
-          await admin.auth.admin.generateLink({
-            type: linkType,
-            email: prof.email,
+        // Usuários pendentes (e-mail não confirmado) não conseguem receber
+        // magiclink/recovery — precisam de um novo convite. Já usuários ativos
+        // recebem um link de recovery (redefinir senha) que sempre funciona.
+        // Faz fallback automático em caso de erro do Supabase Auth.
+        const tryGenerate = async (
+          type: "recovery" | "invite" | "magiclink",
+        ) =>
+          admin.auth.admin.generateLink({
+            type,
+            email: prof.email!,
             options: { redirectTo },
           });
-        if (linkErr) return json({ error: linkErr.message }, 400);
+
+        const primaryType: "recovery" | "invite" =
+          prof.status === "pending" ? "invite" : "recovery";
+        let { data: linkData, error: linkErr } = await tryGenerate(primaryType);
+        if (linkErr) {
+          console.warn("[resend_invite] primary generateLink failed", {
+            primaryType,
+            error: linkErr.message,
+          });
+          const fallbackType: "recovery" | "invite" =
+            primaryType === "recovery" ? "invite" : "recovery";
+          ({ data: linkData, error: linkErr } = await tryGenerate(fallbackType));
+        }
+        if (linkErr) {
+          console.error("[resend_invite] generateLink failed", linkErr);
+          return json({ error: linkErr.message }, 400);
+        }
         const actionLink = linkData?.properties?.action_link ?? null;
 
         if (actionLink) {
