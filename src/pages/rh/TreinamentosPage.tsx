@@ -113,6 +113,11 @@ export default function TreinamentosPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((t) => (
               <Card key={t.id} className="p-4 shadow-soft flex flex-col gap-2">
+                {t.image_url && (
+                  <div className="-mx-4 -mt-4 mb-1 h-32 overflow-hidden rounded-t-md bg-muted">
+                    <img src={t.image_url} alt={t.title} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold flex-1">{t.title}</p>
                   {t.mandatory && <Badge variant="outline" className="border-destructive/40 text-destructive text-[10px]">Obrigatório</Badge>}
@@ -147,6 +152,39 @@ export default function TreinamentosPage() {
             <div><Label>Descrição</Label><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             <div><Label>URL (Solid)</Label><Input value={form.media_url} onChange={(e) => setForm({ ...form, media_url: e.target.value })} placeholder="https://..." /></div>
             <div><Label>Duração (min)</Label><Input type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div>
+            <div>
+              <Label>Imagem (opcional)</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {(imageFile || form.image_url) && (
+                  <div className="relative h-16 w-16 rounded-md overflow-hidden bg-muted shrink-0">
+                    <img
+                      src={imageFile ? URL.createObjectURL(imageFile) : (form.image_url || "")}
+                      alt="preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setForm({ ...form, image_url: "" }); if (imgRef.current) imgRef.current.value = ""; }}
+                      className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"
+                      aria-label="Remover imagem"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={imgRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => imgRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5 mr-1" />
+                  {imageFile || form.image_url ? "Trocar imagem" : "Selecionar imagem"}
+                </Button>
+              </div>
+            </div>
             <div className="flex items-center gap-2"><Checkbox checked={form.mandatory} onCheckedChange={(v) => setForm({ ...form, mandatory: !!v })} /><Label className="!mt-0">Obrigatório</Label></div>
           </div>
           <DialogFooter>
