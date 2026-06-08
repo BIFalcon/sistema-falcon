@@ -52,17 +52,32 @@ export async function fetchLetterHistory(
     .maybeSingle();
   if (!closing?.id) return { current, previous };
 
+  // Descobre a versão mais recente da DRE deste closing
+  const { data: latest } = await supabase
+    .from("dre_parsed_lines")
+    .select("version_number")
+    .eq("closing_id", closing.id)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const top = latest?.version_number;
+  if (top == null) return { current, previous };
+
+  // Busca apenas as linhas de série da última versão (evita o limite default
+  // de 1000 linhas do PostgREST com DREs grandes, que estava deixando os
+  // gráficos da Carta vazios).
   const { data: lines } = await supabase
     .from("dre_parsed_lines")
     .select("line_label, line_value, version_number")
     .eq("closing_id", closing.id)
+    .eq("version_number", top)
     .eq("line_type", "indicator")
-    .order("version_number", { ascending: false });
+    .like("line_label", "[series_%")
+    .limit(2000);
   if (!lines || lines.length === 0) return { current, previous };
-  const top = lines[0].version_number;
 
   const rx = /^\[series_(cur|prev)_(\w+)_(\d{1,2})\]$/;
-  for (const r of lines.filter((l) => l.version_number === top)) {
+  for (const r of lines) {
     const m = rx.exec(r.line_label);
     if (!m) continue;
     const scope = m[1] as "cur" | "prev";
