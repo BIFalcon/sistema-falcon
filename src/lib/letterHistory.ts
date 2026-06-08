@@ -98,14 +98,22 @@ export async function fetchLetterHistory(
  *  rede de segurança para a tabela DRE da Carta.
  */
 export async function fetchDreLines(closingId: string): Promise<{ label: string; value: number | null }[]> {
-  const { data } = await supabase
+  const { data: latest } = await supabase
     .from("dre_parsed_lines")
-    .select("line_label, line_value, line_type, version_number")
+    .select("version_number")
     .eq("closing_id", closingId)
-    .order("version_number", { ascending: false });
-  if (!data || data.length === 0) return [];
-  const top = data[0].version_number;
-  const topRows = data.filter((r) => r.version_number === top);
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const top = latest?.version_number;
+  if (top == null) return [];
+  const { data: topRows } = await supabase
+    .from("dre_parsed_lines")
+    .select("line_label, line_value, line_type")
+    .eq("closing_id", closingId)
+    .eq("version_number", top)
+    .limit(5000);
+  if (!topRows || topRows.length === 0) return [];
   const out: { label: string; value: number | null }[] = topRows
     .filter((r) => r.line_type === "line")
     .map((r) => ({ label: r.line_label, value: r.line_value }));
