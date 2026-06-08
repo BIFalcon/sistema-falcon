@@ -24,6 +24,7 @@ import {
   Network,
   GraduationCap,
   FileText,
+  Inbox,
 } from "lucide-react";
 import {
   Sidebar,
@@ -171,6 +172,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, requireMaster: true },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel, requireMaster: true },
       { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail, requireMaster: true },
+      { title: "Monitor de E-mails", url: "/configuracoes/emails", icon: Inbox, requireMaster: true },
     ],
   },
 ];
