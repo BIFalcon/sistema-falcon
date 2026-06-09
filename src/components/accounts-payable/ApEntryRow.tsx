@@ -362,9 +362,9 @@ function ApprovalBadge({ status }: { status: string }) {
 
 const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string; tooltip: string; Icon: typeof Banknote }> = {
   em_aprovacao: {
-    label: "Não aprovado pelo GG",
+    label: "Em Aprovação",
     className: "border-amber-500/40 text-amber-700 dark:text-amber-400",
-    tooltip: "Aguardando aprovação do Gerente Geral",
+    tooltip: "GG aprovou no OMIE — aguardando autorização do financeiro",
     Icon: CircleDashed,
   },
   autorizado: {
@@ -393,7 +393,21 @@ const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string;
   },
 };
 
-export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
+export function PaymentStatusBadge({
+  status,
+  isDistribution = false,
+}: {
+  status: ApPaymentStatus;
+  isDistribution?: boolean;
+}) {
+  // Distribuição de Lucros não tem fluxo de aprovação pelo GG.
+  if (isDistribution && status === "em_aprovacao") {
+    return (
+      <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400">
+        <Clock className="h-3 w-3" /> Pendente
+      </Badge>
+    );
+  }
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.em_aprovacao;
   const Icon = cfg.Icon;
   const badge = (
