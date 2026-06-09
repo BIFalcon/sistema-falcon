@@ -976,7 +976,7 @@ export default function ContasPagarPage() {
 
               {(() => {
                 const STATUS_OPTIONS: { value: string; label: string }[] = [
-                  { value: "em_aprovacao", label: "Não aprovado pelo GG" },
+                  { value: "em_aprovacao", label: "Em Aprovação" },
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
@@ -1614,6 +1614,7 @@ export default function ContasPagarPage() {
                     entry={e}
                     sourceSystem="omie"
                     showApproval={false}
+                    isDistribution
                     selectable={canMarkInsertedAgendado || canMarkPaid}
                     selected={selectedIds.has(e.id)}
                     onToggleSelected={(v) => toggleSelected(e.id, v)}

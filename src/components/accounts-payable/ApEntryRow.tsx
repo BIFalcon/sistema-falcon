@@ -38,6 +38,8 @@ interface EntryRowProps {
   showOriginalAmount?: boolean;
   showPaidAmount?: boolean;
   showPaidInterest?: boolean;
+  /** Linha de Distribuição de Lucros — não exibe status de aprovação GG. */
+  isDistribution?: boolean;
 }
 
 export function ApEntryRow({
@@ -57,6 +59,7 @@ export function ApEntryRow({
   showOriginalAmount = true,
   showPaidAmount = true,
   showPaidInterest = true,
+  isDistribution = false,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -221,7 +224,7 @@ export function ApEntryRow({
       {!compact && (
         <TableCell className="px-2 py-1.5">
           <div className="flex items-center gap-1">
-            <PaymentStatusBadge status={entry.payment_status} />
+            <PaymentStatusBadge status={entry.payment_status} isDistribution={isDistribution} />
             {canEditObservation && (
               <ObservationButton entryId={entry.id} hotelId={entry.hotel_id} initial={entry.observation ?? ""} />
             )}
@@ -359,9 +362,9 @@ function ApprovalBadge({ status }: { status: string }) {
 
 const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string; tooltip: string; Icon: typeof Banknote }> = {
   em_aprovacao: {
-    label: "Não aprovado pelo GG",
+    label: "Em Aprovação",
     className: "border-amber-500/40 text-amber-700 dark:text-amber-400",
-    tooltip: "Aguardando aprovação do Gerente Geral",
+    tooltip: "GG aprovou no OMIE — aguardando autorização do financeiro",
     Icon: CircleDashed,
   },
   autorizado: {
@@ -390,7 +393,21 @@ const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string;
   },
 };
 
-export function PaymentStatusBadge({ status }: { status: ApPaymentStatus }) {
+export function PaymentStatusBadge({
+  status,
+  isDistribution = false,
+}: {
+  status: ApPaymentStatus;
+  isDistribution?: boolean;
+}) {
+  // Distribuição de Lucros não tem fluxo de aprovação pelo GG.
+  if (isDistribution && status === "em_aprovacao") {
+    return (
+      <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400">
+        <Clock className="h-3 w-3" /> Pendente
+      </Badge>
+    );
+  }
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.em_aprovacao;
   const Icon = cfg.Icon;
   const badge = (
