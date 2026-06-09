@@ -580,7 +580,7 @@ function DayBreakdown({
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
               <TableHead className="text-right">Dias pendente</TableHead>
-              <TableHead>Confirmação GG</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
