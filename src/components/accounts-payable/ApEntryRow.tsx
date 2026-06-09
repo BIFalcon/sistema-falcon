@@ -38,6 +38,8 @@ interface EntryRowProps {
   showOriginalAmount?: boolean;
   showPaidAmount?: boolean;
   showPaidInterest?: boolean;
+  /** Linha de Distribuição de Lucros — não exibe status de aprovação GG. */
+  isDistribution?: boolean;
 }
 
 export function ApEntryRow({
@@ -57,6 +59,7 @@ export function ApEntryRow({
   showOriginalAmount = true,
   showPaidAmount = true,
   showPaidInterest = true,
+  isDistribution = false,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -221,7 +224,7 @@ export function ApEntryRow({
       {!compact && (
         <TableCell className="px-2 py-1.5">
           <div className="flex items-center gap-1">
-            <PaymentStatusBadge status={entry.payment_status} />
+            <PaymentStatusBadge status={entry.payment_status} isDistribution={isDistribution} />
             {canEditObservation && (
               <ObservationButton entryId={entry.id} hotelId={entry.hotel_id} initial={entry.observation ?? ""} />
             )}
