@@ -102,39 +102,11 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Financeiro",
         url: "/financeiro",
         icon: Wallet,
-        allowedRoles: ["financeiro","viewer"] as AppRole[],
+        allowedRoles: ["financeiro","gg","adm","gop","viewer"] as AppRole[],
         children: [
-          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true },
-          { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle },
-          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle },
-        ],
-      },
-      {
-        title: "Financeiro",
-        url: "/financeiro",
-        icon: Wallet,
-        allowedRoles: ["gg"] as AppRole[],
-        children: [
-          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true },
-          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle },
-        ],
-      },
-      {
-        title: "Financeiro",
-        url: "/financeiro",
-        icon: Wallet,
-        allowedRoles: ["adm"] as AppRole[],
-        children: [
-          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, end: true },
-        ],
-      },
-      {
-        title: "Financeiro",
-        url: "/financeiro",
-        icon: Wallet,
-        allowedRoles: ["gop"] as AppRole[],
-        children: [
-          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, end: true },
+          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, allowedRoles: ["financeiro","gg","viewer"] as AppRole[] },
+          { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, allowedRoles: ["financeiro","viewer"] as AppRole[] },
+          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, allowedRoles: ["financeiro","gg","adm","gop","viewer"] as AppRole[] },
         ],
       },
       // Adiciona "Clientes" também no menu do financeiro.
