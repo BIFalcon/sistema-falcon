@@ -1614,6 +1614,7 @@ export default function ContasPagarPage() {
                     entry={e}
                     sourceSystem="omie"
                     showApproval={false}
+                    isDistribution
                     selectable={canMarkInsertedAgendado || canMarkPaid}
                     selected={selectedIds.has(e.id)}
                     onToggleSelected={(v) => toggleSelected(e.id, v)}
