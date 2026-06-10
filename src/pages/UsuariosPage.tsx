@@ -482,7 +482,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   }, [open, editing?.user_id]);
 
   const needsHotelSelection =
-    !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg");
+    !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg" || primaryRole === "adm");
   const hasGlobalAccess =
     isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
 
@@ -494,6 +494,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
     isMasterFlag ||
     hasGlobalAccess ||
     (primaryRole === "gg" && hotelIds.length === 1) ||
+    (primaryRole === "adm" && hotelIds.length === 1) ||
     (primaryRole === "gop" && hotelIds.length >= 1);
 
   async function handleSubmit() {
