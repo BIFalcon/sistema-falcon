@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
         await admin.from("user_hotels").delete().eq("user_id", userId);
         const hotelsScope = payload.is_master
           ? []
-          : payload.primary_role === "gop" || payload.primary_role === "gg"
+          : payload.primary_role === "gop" || payload.primary_role === "gg" || payload.primary_role === "adm"
             ? payload.hotel_ids ?? []
             : []; // controladoria/financeiro/ri = acesso global via is_master?? não — eles têm acesso a todos via aplicação; sem vínculos explícitos.
 
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
         await admin.from("user_hotels").delete().eq("user_id", targetId);
         const hotelsScope = payload.is_master
           ? []
-          : payload.primary_role === "gop" || payload.primary_role === "gg"
+          : payload.primary_role === "gop" || payload.primary_role === "gg" || payload.primary_role === "adm"
             ? payload.hotel_ids ?? []
             : [];
         if (hotelsScope.length) {

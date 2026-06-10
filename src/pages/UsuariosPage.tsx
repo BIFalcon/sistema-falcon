@@ -482,7 +482,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   }, [open, editing?.user_id]);
 
   const needsHotelSelection =
-    !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg");
+    !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg" || primaryRole === "adm");
   const hasGlobalAccess =
     isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
 
@@ -494,6 +494,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
     isMasterFlag ||
     hasGlobalAccess ||
     (primaryRole === "gg" && hotelIds.length === 1) ||
+    (primaryRole === "adm" && hotelIds.length === 1) ||
     (primaryRole === "gop" && hotelIds.length >= 1);
 
   async function handleSubmit() {
@@ -720,6 +721,8 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                   <Label>
                     {primaryRole === "gg"
                       ? "Selecione 1 hotel"
+                      : primaryRole === "adm"
+                      ? "Selecione 1 hotel"
                       : "Selecione os hotéis da cartela"}
                   </Label>
                   <div className="border rounded-lg max-h-72 overflow-auto divide-y">
@@ -733,7 +736,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(v) => {
-                              if (primaryRole === "gg") {
+                              if (primaryRole === "gg" || primaryRole === "adm") {
                                 setHotelIds(v ? [h.id] : []);
                               } else {
                                 setHotelIds(
