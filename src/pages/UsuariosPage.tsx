@@ -721,6 +721,8 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                   <Label>
                     {primaryRole === "gg"
                       ? "Selecione 1 hotel"
+                      : primaryRole === "adm"
+                      ? "Selecione 1 hotel"
                       : "Selecione os hotéis da cartela"}
                   </Label>
                   <div className="border rounded-lg max-h-72 overflow-auto divide-y">
@@ -734,7 +736,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(v) => {
-                              if (primaryRole === "gg") {
+                              if (primaryRole === "gg" || primaryRole === "adm") {
                                 setHotelIds(v ? [h.id] : []);
                               } else {
                                 setHotelIds(
