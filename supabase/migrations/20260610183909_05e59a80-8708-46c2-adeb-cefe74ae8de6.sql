@@ -1,0 +1,1 @@
+REVOKE SELECT (cnpj, bank_accounts) ON public.hotels FROM anon, authenticated, PUBLIC;
