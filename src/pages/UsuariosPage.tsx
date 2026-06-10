@@ -77,6 +77,7 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
   { value: "gop", label: "Gerente de Operações (GOP)", scope: "Acesso à cartela de hotéis definida" },
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
+  { value: "adm", label: "Administrativo do Hotel (Adm)", scope: "Acesso apenas ao próprio hotel" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
   { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
   { value: "viewer", label: "Visualizador / Generalista", scope: "Somente leitura em todos os módulos" },
