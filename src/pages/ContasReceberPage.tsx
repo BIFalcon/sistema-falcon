@@ -175,10 +175,10 @@ function exportToInvoiceToExcel(
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster, userHotels, isFinanceiroCoordenadora, isFernando } = useAuth();
+  const { hasRole, isMaster, isPatronos, userHotels, isFernando } = useAuth();
   const isManager = !isFernando && (isMaster || hasRole("financeiro"));
-  // Quem pode importar relatórios AR: master ou coordenadora (equipe e GG não importam)
-  const canImportAr = isMaster || isFinanceiroCoordenadora;
+  // Quem pode importar relatórios AR: apenas Master ou Patronos.
+  const canImportAr = isMaster || isPatronos;
   // Quem vê todos os hotéis: master, financeiro, controladoria, ri
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
@@ -2173,7 +2173,7 @@ function UploadCard({
       </div>
       {!isManager && (
         <p className="text-[11px] text-muted-foreground mt-2">
-          Apenas usuários com perfil <strong>Financeiro</strong> ou <strong>Master</strong> podem fazer upload.
+          Apenas usuários <strong>Patronos</strong> ou <strong>Master</strong> podem fazer upload.
         </p>
       )}
       {unmapped.length > 0 && (
