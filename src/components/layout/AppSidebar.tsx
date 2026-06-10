@@ -91,8 +91,8 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "operacoes", "viewer"] as AppRole[] },
-      { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "operacoes", "viewer"] as AppRole[] },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer"] as AppRole[] },
+      { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer"] as AppRole[] },
     ],
   },
   {
