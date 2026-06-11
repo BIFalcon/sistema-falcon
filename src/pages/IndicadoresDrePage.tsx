@@ -502,7 +502,13 @@ export default function IndicadoresDrePage() {
     }
     return numeric.toLocaleString("pt-BR");
   };
-  const selectLine = (id: string) => setSelectedId((prev) => (prev === id ? null : id));
+  const selectLine = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const monthsWindow = useMemo(
     () => periodMonths(month, periodCfg.months),
