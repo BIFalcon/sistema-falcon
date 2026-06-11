@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon, LineChart as LineIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -817,7 +817,7 @@ export default function IndicadoresDrePage() {
                   variant="outline"
                 >
                   <ToggleGroupItem value="chart" aria-label="Gráfico">
-                    <LineIcon className="h-4 w-4 mr-1.5" /> Gráfico
+                    <LineChartIcon className="h-4 w-4 mr-1.5" /> Gráfico
                   </ToggleGroupItem>
                   <ToggleGroupItem value="table" aria-label="Tabela">
                     <TableIcon className="h-4 w-4 mr-1.5" /> Tabela
