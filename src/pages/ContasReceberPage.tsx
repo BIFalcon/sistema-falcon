@@ -341,6 +341,18 @@ function ToInvoiceSection({
 
   const finalEntries = useMemo(() => {
     let arr = filteredToInvoice;
+    // Aplica filtro de datas do header (dateFrom/dateTo ou specificDates)
+    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+    if (specificDates && specificDates.length > 0) {
+      const set = new Set(specificDates.filter((d) => isoDay.test(d)));
+      if (set.size > 0) {
+        arr = arr.filter((e) => e.transaction_date && set.has(e.transaction_date));
+      }
+    } else if (dateFrom && dateTo && isoDay.test(dateFrom) && isoDay.test(dateTo)) {
+      arr = arr.filter(
+        (e) => e.transaction_date && e.transaction_date >= dateFrom && e.transaction_date <= dateTo,
+      );
+    }
     if (faturamentoFilter !== "todos") {
       if (faturamentoFilter === "pago") {
         arr = arr.filter((e) => !!e.paid_date);
@@ -357,7 +369,7 @@ function ToInvoiceSection({
       );
     }
     return arr;
-  }, [filteredToInvoice, faturamentoFilter, clientSearch]);
+  }, [filteredToInvoice, faturamentoFilter, clientSearch, dateFrom, dateTo, specificDates]);
 
   return (
     <div className="space-y-5">
