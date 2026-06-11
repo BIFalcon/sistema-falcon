@@ -538,12 +538,15 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           });
         }
         if (res.email_queued) {
-          toast.success("Convite criado e enviado por e-mail");
+          toast.success("Convite criado e enviado por e-mail", {
+            description:
+              "E-mails para domínios corporativos (ex.: @accor.com) podem cair em spam/quarentena. Copie o link abaixo e envie por WhatsApp como garantia.",
+          });
         } else {
           toast.success("Convite criado");
         }
         onOpenChange(false);
-        if (!res.email_queued && res.invite_link) setLinkDialog(res.invite_link);
+        if (res.invite_link) setLinkDialog(res.invite_link);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
