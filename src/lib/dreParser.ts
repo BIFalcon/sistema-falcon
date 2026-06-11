@@ -1101,6 +1101,8 @@ export async function parseDreExcel(
   // Chaves de interesse para os gráficos:
   const SERIES_KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
   const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows);
+  // Linhas detalhadas do realizado — série anual completa (analoga a prev/budget).
+  const currentLines = readSheetLines(rows, targetYear, displayRows);
 
   // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
@@ -1193,6 +1195,7 @@ export async function parseDreExcel(
     budgetIndicators,
     budgetLines,
     prevLines,
+    currentLines,
   };
 }
 
