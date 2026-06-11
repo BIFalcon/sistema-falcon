@@ -100,7 +100,7 @@ export function detectFormat(headers: string[]): RhFormat {
   const flat = headers.map((h) => toAscii(normalize(h))).join("|");
   if (flat.includes("assensus")) return "ASSENSUS";
   if (flat.includes("rcastro") || flat.includes("r castro") || flat.includes("r. castro")) return "RCASTRO";
-  if (flat.includes("pousada")) return "POUSADA";
+  if (flat.includes("pousada") || flat.includes("ativos") || flat.includes("demitidos") || flat.includes("inativos")) return "POUSADA";
   // heurística por colunas
   if (flat.includes("matricula") && flat.includes("admissao")) {
     if (flat.includes("centro de custo")) return "ASSENSUS";
@@ -115,6 +115,18 @@ export function detectFormat(headers: string[]): RhFormat {
 function mapRow(row: unknown[], cols: Record<string, number>): ParsedRhEmployee | null {
   const name = normalize(pick(row, cols.name));
   if (!name) return null;
+  // Descarta linhas lixo: nomes que são apenas dígitos/pontuação,
+  // cabeçalhos repetidos ou rótulos como "TOTAL", "ATIVOS", etc.
+  if (!/[A-Za-zÀ-ÿ]{2,}/.test(name)) return null;
+  const upper = toAscii(name).toUpperCase();
+  if (
+    upper === "NOME" ||
+    upper === "TOTAL" ||
+    upper.startsWith("FUNCIONARIO") ||
+    upper.startsWith("ATIVOS") ||
+    upper.startsWith("INATIVOS") ||
+    upper.startsWith("DEMITIDOS")
+  ) return null;
   const dismissal = parseDate(pick(row, cols.dismissal));
   const key = normalize(pick(row, cols.matricula)) ||
               cleanCpf(pick(row, cols.cpf)) ||
@@ -197,9 +209,37 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
     }
   }
 
-  if (!employees.length) {
+  // Mescla duplicatas (ex.: formato POUSADA com abas separadas ATIVOS/DEMITIDOS).
+  // Mesma pessoa aparece como ativa em uma aba e demitida em outra: combinamos
+  // os campos preservando admissão da aba ATIVOS e demissão da aba DEMITIDOS.
+  const merged = new Map<string, ParsedRhEmployee>();
+  for (const e of employees) {
+    const key = e.cpf || e.employee_key;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...e, employee_key: key });
+      continue;
+    }
+    merged.set(key, {
+      ...existing,
+      employee_key: key,
+      cpf: existing.cpf || e.cpf,
+      role: existing.role || e.role,
+      department: existing.department || e.department,
+      admission_date: existing.admission_date || e.admission_date,
+      dismissal_date: existing.dismissal_date || e.dismissal_date,
+      birth_date: existing.birth_date || e.birth_date,
+      gender_raw: existing.gender_raw || e.gender_raw,
+      salary: existing.salary ?? e.salary,
+      cost_center: existing.cost_center || e.cost_center,
+      status: (existing.dismissal_date || e.dismissal_date) ? "inativo" : "ativo",
+    });
+  }
+  const finalEmployees = Array.from(merged.values());
+
+  if (!finalEmployees.length) {
     warnings.push("Nenhum colaborador identificado na planilha.");
   }
 
-  return { format: detected, employees, warnings };
+  return { format: detected, employees: finalEmployees, warnings };
 }
