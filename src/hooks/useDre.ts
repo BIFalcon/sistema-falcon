@@ -212,9 +212,29 @@ export function useUploadDre() {
             });
           }
         }
+        // Linhas detalhadas do REALIZADO — série anual (Jan-Dez por linha).
+        // Permite que qualquer mês do ano seja reconstruído a partir da
+        // versão mais recente do ano (que carrega o acumulado atualizado).
+        const currentLineRows: typeof otherRows = [];
+        for (const cl of parsed.currentLines ?? []) {
+          const cat = getDreLineCategorization(cl.label);
+          for (const [monthStr, val] of Object.entries(cl.values)) {
+            if (val == null) continue;
+            currentLineRows.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[cline_${monthStr}] ${cl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: cl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
         if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length || budgetLineRows.length || prevLineRows2.length) {
           await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2,
+            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2, ...currentLineRows,
           ]);
         }
 
