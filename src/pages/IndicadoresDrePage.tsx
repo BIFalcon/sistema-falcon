@@ -302,7 +302,7 @@ function VariationPill({ value }: { value: number | null }) {
   return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
 }
 
-function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId: string | null; select: (id: string) => void }) {
+function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedIds: Set<string>; select: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
   const isSelectable = !(node.level === 1 && /^(topline|receitas|despesas)$/i.test(node.label));
@@ -319,13 +319,13 @@ function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId:
           {hasChildren ? open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" /> : <span />}
         </Button>
         {isSelectable ? (
-          <Checkbox checked={selectedId === node.id} onCheckedChange={() => select(node.id)} />
+          <Checkbox checked={selectedIds.has(node.id)} onCheckedChange={() => select(node.id)} />
         ) : (
           <span className="h-4 w-4 shrink-0" />
         )}
         <span className={fontClass}>{node.label}</span>
       </div>
-      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedId={selectedId} select={select} />)}
+      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedIds={selectedIds} select={select} />)}
     </div>
   );
 }
