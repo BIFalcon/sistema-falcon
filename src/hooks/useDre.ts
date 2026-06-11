@@ -367,19 +367,124 @@ async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Prom
   return result;
 }
 
+/**
+ * Busca as linhas da DRE mais recente do ano (a planilha mais recente
+ * enviada por qualquer fechamento daquele hotel/ano serve como fonte
+ * única de verdade — cada nova DRE traz o acumulado atualizado dos
+ * meses anteriores).
+ */
+async function fetchYearLatestDreLines(
+  hotelId: string,
+  year: number,
+): Promise<DreParsedLineRecord[]> {
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .rpc("get_year_latest_dre_lines", { _hotel_id: hotelId, _year: year })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as DreParsedLineRecord[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
+}
+
 export function useDreIndicators(closingId: string | null | undefined) {
   return useQuery({
     enabled: !!closingId,
     queryKey: ["dre-indicators", closingId],
     queryFn: async (): Promise<DreIndicatorRow[]> => {
       if (!closingId) return [];
-      // Filtra também as linhas de séries mensais (que poluiriam o painel),
-      // mantendo apenas indicadores do mês corrente ([key]) e do ano
-      // anterior ([prev_key]). Cada linha de série tem prefixo [series_…].
-      const data = await fetchLatestDreParsedLines(closingId);
-      return (data
-        .filter((r) => r.line_type === "indicator")
-        .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
+      const { data: closing, error: closingErr } = await supabase
+        .from("closings")
+        .select("hotel_id, month, year")
+        .eq("id", closingId)
+        .maybeSingle();
+      if (closingErr) throw closingErr;
+      if (!closing) return [];
+      // Fonte preferida: última DRE do ano (planilha mais recente carrega
+      // valores atualizados de todos os meses anteriores).
+      const yearLines = await fetchYearLatestDreLines(closing.hotel_id, closing.year);
+      // Fallback: linhas do próprio closing (caso ainda não exista série
+      // [series_…] persistida ou outro motivo).
+      const closingLines = await fetchLatestDreParsedLines(closingId);
+      const targetMonth = closing.month;
+      const out: DreIndicatorRow[] = [];
+      const seenKeys = new Set<string>(); // current
+      const seenPrev = new Set<string>();
+      const seenBudget = new Set<string>();
+      // 1) Reconstroi indicadores do mês a partir das séries da última DRE.
+      const matchSeries = (
+        rows: DreParsedLineRecord[],
+        prefix: "cur" | "prev" | "budget",
+      ) => {
+        for (const r of rows) {
+          const m = r.line_label.match(new RegExp(`^\\[series_${prefix}_(.+)_(\\d+)\\]$`));
+          if (!m) continue;
+          const key = m[1];
+          const monthIdx = parseInt(m[2], 10);
+          if (monthIdx !== targetMonth) continue;
+          if (prefix === "cur") {
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+            const label = INDICATOR_LABELS[key as IndicatorKey] ?? key;
+            out.push({
+              line_label: `[${key}] ${label}`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          } else if (prefix === "prev") {
+            if (seenPrev.has(key)) continue;
+            seenPrev.add(key);
+            out.push({
+              line_label: `[prev_${key}]`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          } else {
+            if (seenBudget.has(key)) continue;
+            seenBudget.add(key);
+            out.push({
+              line_label: `[budget_${key}]`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          }
+        }
+      };
+      matchSeries(yearLines, "cur");
+      matchSeries(yearLines, "prev");
+      matchSeries(yearLines, "budget");
+      // 2) Fallback para indicadores antigos (apenas chaves ainda não cobertas).
+      for (const r of closingLines) {
+        if (r.line_type !== "indicator") continue;
+        const lbl = r.line_label;
+        if (lbl.startsWith("[series_")) continue;
+        const cur = lbl.match(/^\[([^\]\s]+)\]/);
+        if (cur) {
+          const k = cur[1];
+          if (k.startsWith("prev_")) {
+            const key = k.slice(5);
+            if (seenPrev.has(key)) continue;
+            seenPrev.add(key);
+          } else if (k.startsWith("budget_")) {
+            const key = k.slice(7);
+            if (seenBudget.has(key)) continue;
+            seenBudget.add(key);
+          } else {
+            if (seenKeys.has(k)) continue;
+            seenKeys.add(k);
+          }
+        }
+        out.push({
+          line_label: lbl,
+          line_value: r.line_value ?? null,
+          version_number: r.version_number,
+        });
+      }
+      return out;
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
