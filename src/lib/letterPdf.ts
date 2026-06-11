@@ -756,34 +756,59 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Destaques do mês", falconData, brandData);
-  const colW = (SIZE - 30) / 2;
-  const rowH = 75;
-  const startY = HEADER_CONTENT_Y + 2;
-  highlights.slice(0, 6).forEach((h, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const x = 12 + col * (colW + 6);
-    const y = startY + row * (rowH + 6);
-    // título
-    doc.setDrawColor(BORDER);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(x, y, colW, 9, 1.5, 1.5, "S");
-    doc.setTextColor(TEXT);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(h.title, x + colW / 2, y + 6, { align: "center" });
-    // foto
-    const img = hlData[i];
-    if (img) {
-      doc.addImage(img, "JPEG", x, y + 11, colW, rowH - 13, undefined, "FAST");
-    } else {
-      doc.setFillColor("#F3F4F6");
-      doc.rect(x, y + 11, colW, rowH - 13, "F");
-      doc.setTextColor(MUTED);
-      doc.setFontSize(8);
-      doc.text("(sem foto)", x + colW / 2, y + 11 + (rowH - 13) / 2, { align: "center" });
+  {
+    const n = Math.min(highlights.length, 8);
+    if (n > 0) {
+      // Layout dinâmico: ajusta colunas/linhas para caber até 8 destaques
+      // sem cortar nenhuma foto. Usa sempre 1 coluna para 1 item, e 2
+      // colunas a partir de 2 itens.
+      const cols = n === 1 ? 1 : 2;
+      const rows = Math.ceil(n / cols);
+      const gap = 5;
+      const marginX = 12;
+      const availW = SIZE - marginX * 2;
+      const availH = SIZE - HEADER_CONTENT_Y - 8;
+      const colW = (availW - (cols - 1) * gap) / cols;
+      const rowH = (availH - (rows - 1) * gap) / rows;
+      const startY = HEADER_CONTENT_Y + 2;
+      // Altura do título proporcional à célula (mínimo 7mm, máximo 9mm)
+      const titleH = Math.max(7, Math.min(9, rowH * 0.16));
+      const titleGap = 1.5;
+      const titleFontSize = rows >= 4 ? 8 : 9;
+      const emptyFontSize = rows >= 4 ? 7 : 8;
+      for (let i = 0; i < n; i++) {
+        const h = highlights[i];
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = marginX + col * (colW + gap);
+        const y = startY + row * (rowH + gap);
+        // título
+        doc.setDrawColor(BORDER);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(x, y, colW, titleH, 1.5, 1.5, "S");
+        doc.setTextColor(TEXT);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(titleFontSize);
+        doc.text(h.title, x + colW / 2, y + titleH / 2 + titleFontSize * 0.12, {
+          align: "center",
+          maxWidth: colW - 4,
+        });
+        // foto
+        const photoY = y + titleH + titleGap;
+        const photoH = rowH - titleH - titleGap;
+        const img = hlData[i];
+        if (img) {
+          doc.addImage(img, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
+        } else {
+          doc.setFillColor("#F3F4F6");
+          doc.rect(x, photoY, colW, photoH, "F");
+          doc.setTextColor(MUTED);
+          doc.setFontSize(emptyFontSize);
+          doc.text("(sem foto)", x + colW / 2, photoY + photoH / 2, { align: "center" });
+        }
+      }
     }
-  });
+  }
 
   /* ───── 6. DEMONSTRATIVO DE RESULTADOS ───── */
   addPage(doc);
