@@ -721,12 +721,22 @@ export default function IndicadoresDrePage() {
 
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <Card className="p-4 shadow-soft">
-              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedId ? "1 selecionada" : "0 selecionadas"}</span></div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selecionada{selectedIds.size === 1 ? "" : "s"}</span>
+                  {selectedIds.size > 0 && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setSelectedIds(new Set())}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
               <div className="max-h-[620px] overflow-auto pr-1">
                 {dataset?.tree
                   .filter((n) => n.id.startsWith("fixed:"))
                   .map((node) => (
-                    <TreeLine key={node.id} node={node} selectedId={selectedId} select={selectLine} />
+                    <TreeLine key={node.id} node={node} selectedIds={selectedIds} select={selectLine} />
                   ))}
               </div>
             </Card>
