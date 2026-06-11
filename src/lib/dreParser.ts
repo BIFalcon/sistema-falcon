@@ -1097,9 +1097,10 @@ export async function parseDreExcel(
   if (!indicators.lucro_liquido) warnings.push("Lucro Líquido não localizado.");
   warnings.push(`[DEBUG] firstMonthCol=${firstMonthCol}, monthCol=${monthCol}, template=${template}, sheet=${sheetName}, totalRows=${rows.length}`);
 
-  // ─── Séries mensais Jan-Dez para gráficos da Carta ───
-  // Chaves de interesse para os gráficos:
-  const SERIES_KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
+  // ─── Séries mensais Jan-Dez (todos os indicadores) ───
+  // Cobre todos os indicadores para que qualquer mês do ano possa ser
+  // reconstruído a partir da última DRE enviada (fonte de verdade).
+  const SERIES_KEYS: IndicatorKey[] = INDICATORS.map((i) => i.key);
   const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows);
   // Linhas detalhadas do realizado — série anual completa (analoga a prev/budget).
   const currentLines = readSheetLines(rows, targetYear, displayRows);
