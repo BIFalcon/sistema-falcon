@@ -517,22 +517,25 @@ function useDreAnalyticsImpl(input: {
         { length: input.month - startMonth + 1 },
         (_, i) => startMonth + i,
       );
-      const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
-      const { data: allClosings, error: closingsError } = await supabase
-        .from("closings")
-        .select("id, month, hotel_id")
-        .in("hotel_id", input.hotelIds)
-        .eq("year", input.year)
-        .in("month", fullYearRange);
-      if (closingsError) throw closingsError;
-      const linesByClosingId = await fetchLatestDreParsedLinesByClosingIds((allClosings ?? []).map((c) => c.id));
+      // Carrega, por hotel, as linhas da DRE mais recente do ano. Essa
+      // planilha carrega o acumulado atualizado (Jan-mês atual), então
+      // serve de fonte única de verdade para todos os meses.
+      const yearLatestByHotel = new Map<string, DreParsedLineRecord[]>();
+      await Promise.all(
+        input.hotelIds.map(async (hid) => {
+          try {
+            const lines = await fetchYearLatestDreLines(hid, input.year);
+            yearLatestByHotel.set(hid, lines);
+          } catch {
+            yearLatestByHotel.set(hid, []);
+          }
+        }),
+      );
 
       const results = await Promise.all(
         input.hotelIds.map(async (hotelId): Promise<DreAnalyticsDataset | null> => {
-          const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
-          const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
-
-          if (!currentClosings?.length && !allYearClosings?.length) return null;
+          const yearLines = yearLatestByHotel.get(hotelId) ?? [];
+          if (!yearLines.length) return null;
 
         type LineRow = {
           line_label: string;
@@ -544,37 +547,14 @@ function useDreAnalyticsImpl(input: {
           line_category?: string | null;
           line_segment?: string | null;
         };
-        // Linhas do período atual → alimentam série "current"
-        const currentLines: LineRow[] = [];
-        for (const closing of currentClosings ?? []) {
-          const closingLines = linesByClosingId.get(closing.id) ?? [];
-          if (!closingLines?.length) continue;
-          currentLines.push(
-            ...closingLines
-              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
-          );
-        }
-
-        // Linhas de todos os meses → alimentam séries "budget" e "previous"
-        const allYearLines: LineRow[] = [];
-        for (const closing of allYearClosings ?? []) {
-          const alreadyRead = currentClosings?.some((c) => c.id === closing.id);
-          if (alreadyRead) {
-            allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
-            continue;
-          }
-          const closingLines = linesByClosingId.get(closing.id) ?? [];
-          if (!closingLines?.length) continue;
-          allYearLines.push(
-            ...closingLines
-              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
-          );
-        }
-
-        // Combina: current usa currentLines, budget/previous usam allYearLines
-        const allLines: LineRow[] = [...new Map(
-          [...currentLines, ...allYearLines].map((l) => [`${l._month}:${l.line_label}`, l])
-        ).values()];
+        // Todas as séries (cur/prev/budget e linhas detalhadas) vêm da
+        // mesma fonte: a DRE mais recente do ano para o hotel.
+        const currentLines: LineRow[] = yearLines.map((l) => ({
+          ...l,
+          _month: input.month,
+        }));
+        const allYearLines: LineRow[] = currentLines;
+        const allLines: LineRow[] = currentLines;
         if (!allLines.length) return null;
 
         const seriesCur: Record<string, (number | null)[]> = {};
@@ -592,7 +572,9 @@ function useDreAnalyticsImpl(input: {
             const [, key, mStr] = curMatch;
             const m = parseInt(mStr, 10) - 1;
             if (!seriesCur[key]) seriesCur[key] = Array(12).fill(null);
-            seriesCur[key][m] = val ?? null;
+            // Só popula o range corrente — fora dele permanece null para
+            // que o gráfico não desenhe meses fora do período em análise.
+            if (currentMonthRange.includes(m + 1)) seriesCur[key][m] = val ?? null;
             continue;
           }
 
@@ -670,14 +652,31 @@ function useDreAnalyticsImpl(input: {
           }
         }
 
-        // Mapas de séries anuais para linhas detalhadas de orçamento e ano anterior
-        // Formato no banco: "[bline_3] Salários" = valor de março do orçamento
+        // Mapas de séries anuais para linhas detalhadas — realizado, orçamento e ano anterior.
+        // Formato no banco:
+        //   "[cline_3] Salários" = valor de março do realizado
+        //   "[bline_3] Salários" = valor de março do orçamento
+        //   "[pline_3] Salários" = valor de março do ano anterior
+        const currentDetailSeries = new Map<string, (number | null)[]>();
         const budgetDetailSeries = new Map<string, (number | null)[]>();
         const prevDetailSeries = new Map<string, (number | null)[]>();
 
         for (const line of allLines) {
           const lbl = line.line_label;
           const val = line.line_value;
+
+          const cMatch = lbl.match(/^\[cline_(\d+)\]\s(.+)$/);
+          if (cMatch) {
+            const m = parseInt(cMatch[1], 10) - 1;
+            const label = cMatch[2];
+            if (!currentDetailSeries.has(label)) currentDetailSeries.set(label, Array(12).fill(null));
+            // Mesma máscara de período aplicada às séries dos indicadores:
+            // só popula meses dentro do range visualizado.
+            if (currentMonthRange.includes(m + 1)) {
+              currentDetailSeries.get(label)![m] = val ?? null;
+            }
+            continue;
+          }
 
           const bMatch = lbl.match(/^\[bline_(\d+)\]\s(.+)$/);
           if (bMatch) {
@@ -809,11 +808,18 @@ function useDreAnalyticsImpl(input: {
 
         // Busca série de um label nos dados do banco
         const findSeriesForLabel = (label: string): (number | null)[] => {
-          const norm = normLabel(label);
+          // 1) Preferir a série anual completa do realizado vinda da
+          //    última DRE do ano ([cline_M] LABEL).
+          for (const [lbl, series] of currentDetailSeries) {
+            if (looseLabelMatch(lbl, label)) return series;
+          }
+          // 2) Fallback: mapa por mês oriundo de fechamentos antigos.
           for (const [lbl, data] of linesByLabel) {
             if (looseLabelMatch(lbl, label)) {
               const series: (number | null)[] = Array(12).fill(null);
-              for (const [m, v] of data.values) series[m - 1] = v;
+              for (const [m, v] of data.values) {
+                if (currentMonthRange.includes(m)) series[m - 1] = v;
+              }
               return series;
             }
           }
