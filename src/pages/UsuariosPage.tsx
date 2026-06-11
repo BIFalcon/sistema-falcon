@@ -246,10 +246,14 @@ function UserRow({
     try {
       const res = await resend.mutateAsync(user.user_id);
       if (res.email_queued) {
-        toast.success("Convite reenviado por e-mail");
-      } else if (res.invite_link) {
+        toast.success("Convite reenviado por e-mail", {
+          description:
+            "E-mails para domínios corporativos (ex.: @accor.com) podem cair em spam/quarentena. Use o link abaixo como garantia.",
+        });
+      }
+      if (res.invite_link) {
         setLinkDialog(res.invite_link);
-      } else {
+      } else if (!res.email_queued) {
         toast.success("Convite reenviado");
       }
     } catch (e) {
