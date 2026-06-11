@@ -21,6 +21,8 @@ export interface RhEmployee {
   salary: number | null;
   status: string;
   source_format: string | null;
+  reference_month: number | null;
+  reference_year: number | null;
   upload_id: string | null;
   raw: Record<string, unknown>;
   created_at: string;
