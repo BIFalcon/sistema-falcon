@@ -541,6 +541,12 @@ export interface ParsedDre {
     level: number;
     values: Record<number, number | null>;
   }>;
+  /** Linhas detalhadas da aba DRE (realizado) — série anual completa Jan-Dez. */
+  currentLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>;
+  }>;
 }
 
 /**
