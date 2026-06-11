@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
@@ -300,6 +301,71 @@ function divideSeries(values: DreMonthValue[], divisor?: DreLineNode, key?: DreS
 function VariationPill({ value }: { value: number | null }) {
   if (value == null) return <span className="text-muted-foreground">—</span>;
   return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
+}
+
+function isPctLineLabel(label: string) {
+  return /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(label);
+}
+
+function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]): number | null {
+  const agg = getAggType(node.label);
+  const baseAgg: "sum" | "avg" = agg === "sum" ? "sum" : "avg";
+  const v = aggregateSeries(node.series[key], months, baseAgg);
+  if (v == null) return null;
+  if (isPctLineLabel(node.label)) return Math.abs(v) <= 1 ? v * 100 : v;
+  return v;
+}
+
+function fmtNodeValue(node: DreLineNode, v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (isPctLineLabel(node.label)) return `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  return fmtBRL(v);
+}
+
+function DreComparativeRow({
+  node,
+  depth,
+  months,
+  expanded,
+  toggle,
+}: {
+  node: DreLineNode;
+  depth: number;
+  months: number[];
+  expanded: Set<string>;
+  toggle: (id: string) => void;
+}) {
+  const cur = computeNodeValue(node, "current", months);
+  const bud = computeNodeValue(node, "budget", months);
+  const prev = computeNodeValue(node, "previous", months);
+  const hasChildren = node.children.length > 0;
+  const isOpen = expanded.has(node.id);
+  return (
+    <>
+      <TableRow>
+        <TableCell className="py-2">
+          <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
+            {hasChildren ? (
+              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => toggle(node.id)}>
+                {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </Button>
+            ) : (
+              <span className="inline-block w-5 shrink-0" />
+            )}
+            <span className={depth === 0 ? "text-sm font-medium" : "text-sm text-foreground/80"}>{node.label}</span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, cur)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, bud)}</TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, bud)} /></TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, prev)}</TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, prev)} /></TableCell>
+      </TableRow>
+      {isOpen && hasChildren && node.children.map((child) => (
+        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} />
+      ))}
+    </>
+  );
 }
 
 function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedIds: Set<string>; select: (id: string) => void }) {
