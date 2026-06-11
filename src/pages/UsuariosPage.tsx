@@ -246,10 +246,14 @@ function UserRow({
     try {
       const res = await resend.mutateAsync(user.user_id);
       if (res.email_queued) {
-        toast.success("Convite reenviado por e-mail");
-      } else if (res.invite_link) {
+        toast.success("Convite reenviado por e-mail", {
+          description:
+            "E-mails para domínios corporativos (ex.: @accor.com) podem cair em spam/quarentena. Use o link abaixo como garantia.",
+        });
+      }
+      if (res.invite_link) {
         setLinkDialog(res.invite_link);
-      } else {
+      } else if (!res.email_queued) {
         toast.success("Convite reenviado");
       }
     } catch (e) {
@@ -534,12 +538,15 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
           });
         }
         if (res.email_queued) {
-          toast.success("Convite criado e enviado por e-mail");
+          toast.success("Convite criado e enviado por e-mail", {
+            description:
+              "E-mails para domínios corporativos (ex.: @accor.com) podem cair em spam/quarentena. Copie o link abaixo e envie por WhatsApp como garantia.",
+          });
         } else {
           toast.success("Convite criado");
         }
         onOpenChange(false);
-        if (!res.email_queued && res.invite_link) setLinkDialog(res.invite_link);
+        if (res.invite_link) setLinkDialog(res.invite_link);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
@@ -873,10 +880,13 @@ function InviteLinkDialog({ link, onClose }: { link: string | null; onClose: () 
     <Dialog open={!!link} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Link de convite</DialogTitle>
+          <DialogTitle>Link de convite — garantia de entrega</DialogTitle>
           <DialogDescription>
-            Copie e envie este link manualmente ao usuário. Ele permite criar a senha de acesso.
-            Quando o domínio de e-mail estiver configurado, os convites serão enviados automaticamente.
+            O e-mail de convite é disparado automaticamente, mas servidores corporativos
+            (ex.: @accor.com) frequentemente bloqueiam ou colocam em spam mensagens de
+            remetentes externos. <strong>Copie este link e envie pelo WhatsApp ou
+            e-mail pessoal do usuário</strong> para garantir o acesso. O link expira em 72h
+            e permite criar a senha.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2">
