@@ -45,7 +45,7 @@ export default function TurnoverPage() {
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
 
-  const { data: allEmployees = [], isLoading } = useRhEmployees();
+  const { data: allEmployees = [], isLoading } = useRhEmployees(undefined, month, year);
   const upload = useUploadRhFile();
 
   const scopedEmployees = useMemo(
@@ -71,11 +71,11 @@ export default function TurnoverPage() {
     return allowedHotels
       .map((h) => {
         const emps = allEmployees.filter((e) => e.hotel_id === h.id);
-        const m = calcMetrics(emps);
-        return { hotel: h, pctRotatividade: m.pctRotatividade, total: emps.length };
+        const m = calcMetrics(emps, month, year);
+        return { hotel: h, pctRotatividade: m.pctRotatividade, total: m.total };
       })
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
-  }, [allowedHotels, allEmployees]);
+  }, [allowedHotels, allEmployees, month, year]);
 
   const handleFile = async (file: File) => {
     if (!hotelId) {
@@ -83,9 +83,9 @@ export default function TurnoverPage() {
       return;
     }
     try {
-      const res = await upload.mutateAsync({ file, hotelId });
+      const res = await upload.mutateAsync({ file, hotelId, referenceMonth: month, referenceYear: year });
       toast.success(
-        `Importação concluída — formato ${res.parsed.format}, ${res.parsed.employees.length} colaborador(es).`,
+        `Importação concluída — ${String(month).padStart(2, "0")}/${year}, formato ${res.parsed.format}, ${res.parsed.employees.length} colaborador(es).`,
       );
     } catch (e: any) {
       toast.error("Erro ao processar planilha: " + (e?.message ?? "desconhecido"));
