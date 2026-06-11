@@ -156,11 +156,11 @@ const App = () => (
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","viewer"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
-              <Route path="/rh/turnover" element={<TurnoverPage />} />
-              <Route path="/rh/calendario" element={<CalendarioPage />} />
-              <Route path="/rh/organograma" element={<OrganogramaPage />} />
-              <Route path="/rh/treinamentos" element={<TreinamentosPage />} />
-              <Route path="/rh/politicas" element={<PoliticasPage />} />
+              <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
+              <Route path="/rh/calendario" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><CalendarioPage /></RoleGuard>} />
+              <Route path="/rh/organograma" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><OrganogramaPage /></RoleGuard>} />
+              <Route path="/rh/treinamentos" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><TreinamentosPage /></RoleGuard>} />
+              <Route path="/rh/politicas" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><PoliticasPage /></RoleGuard>} />
               <Route path="/controladoria" element={<EmBreve />} />
               <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConciliacaoPage /></RoleGuard>} />
 
