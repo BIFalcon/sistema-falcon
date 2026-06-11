@@ -880,10 +880,13 @@ function InviteLinkDialog({ link, onClose }: { link: string | null; onClose: () 
     <Dialog open={!!link} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Link de convite</DialogTitle>
+          <DialogTitle>Link de convite — garantia de entrega</DialogTitle>
           <DialogDescription>
-            Copie e envie este link manualmente ao usuário. Ele permite criar a senha de acesso.
-            Quando o domínio de e-mail estiver configurado, os convites serão enviados automaticamente.
+            O e-mail de convite é disparado automaticamente, mas servidores corporativos
+            (ex.: @accor.com) frequentemente bloqueiam ou colocam em spam mensagens de
+            remetentes externos. <strong>Copie este link e envie pelo WhatsApp ou
+            e-mail pessoal do usuário</strong> para garantir o acesso. O link expira em 72h
+            e permite criar a senha.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2">
