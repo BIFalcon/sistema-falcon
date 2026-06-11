@@ -353,7 +353,9 @@ export default function IndicadoresDrePage() {
   const [retroUpToMonth, setRetroUpToMonth] = useState<number>(12);
   const [retroFile, setRetroFile] = useState<File | null>(null);
   const [retroSubmitting, setRetroSubmitting] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   
   const [divider, setDivider] = useState("none");
@@ -373,16 +375,23 @@ export default function IndicadoresDrePage() {
     periodMonths: periodCfg.months,
   });
 
+  const selectedNodes = useMemo(() => {
+    if (!dataset || selectedIds.size === 0) return [] as DreLineNode[];
+    return dataset.flat.filter((n) => selectedIds.has(n.id));
+  }, [dataset, selectedIds]);
+  // Linhas usadas no gráfico (mantém comportamento anterior: expande para folhas se a linha é apenas um agrupador)
   const selectedLines = useMemo(() => {
-    if (!dataset) return [];
-    const node = selectedId ? dataset.flat.find((n) => n.id === selectedId) : undefined;
-    if (!node) return [];
-    const hasSeries = node.series.current.some((v) => v != null);
-    if (hasSeries || node.children.length === 0) return [node];
+    if (selectedNodes.length === 0) return [] as DreLineNode[];
     const leaves = (n: DreLineNode): DreLineNode[] =>
       n.children.length === 0 ? [n] : n.children.flatMap(leaves);
-    return leaves(node);
-  }, [dataset, selectedId]);
+    const out: DreLineNode[] = [];
+    for (const node of selectedNodes) {
+      const hasSeries = node.series.current.some((v) => v != null);
+      if (hasSeries || node.children.length === 0) out.push(node);
+      else out.push(...leaves(node));
+    }
+    return out;
+  }, [selectedNodes]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
