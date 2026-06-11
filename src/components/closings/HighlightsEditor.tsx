@@ -29,6 +29,10 @@ export function HighlightsEditor({ letterId, closingId, userId, highlights, canE
   const remove = useDeleteHighlight();
 
   async function addNew() {
+    if (highlights.length >= 8) {
+      toast.error("Máximo de 8 destaques por carta");
+      return;
+    }
     const next = (highlights[highlights.length - 1]?.sort_order ?? -1) + 1;
     try {
       await create.mutateAsync({
@@ -47,8 +51,14 @@ export function HighlightsEditor({ letterId, closingId, userId, highlights, canE
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold">Destaques do mês</h4>
-        <Button size="sm" variant="outline" onClick={addNew} disabled={!canEdit || create.isPending} className="gap-2">
-          <Plus className="h-4 w-4" /> Adicionar destaque
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={addNew}
+          disabled={!canEdit || create.isPending || highlights.length >= 8}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" /> Adicionar destaque {highlights.length > 0 ? `(${highlights.length}/8)` : ""}
         </Button>
       </div>
       {highlights.length === 0 && (
