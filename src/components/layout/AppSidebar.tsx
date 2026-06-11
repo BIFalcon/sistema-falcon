@@ -128,6 +128,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "RH & People",
         url: "/rh",
         icon: Users,
+        allowedRoles: ["processos","fernando","controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
           { title: "Calendário", url: "/rh/calendario", icon: CalendarDays },
