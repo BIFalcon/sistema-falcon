@@ -288,13 +288,34 @@ export function calcMetrics(
   filterMonth?: number,
   filterYear?: number,
 ): RhMetrics {
-  const referenceDate = new Date();
-  const total = employees.length;
-  const ativos = employees.filter((e) => e.status === "ativo").length;
+  // Data de referência = último dia do mês/ano filtrados (ou hoje se não houver filtro).
+  // Garante que ativos/sexo/faixa etária/tempo de casa reflitam o período escolhido,
+  // e não apenas o momento atual.
+  const now = new Date();
+  const targetMonth = filterMonth ?? now.getMonth() + 1;
+  const targetYear = filterYear ?? now.getFullYear();
+  const referenceDate = new Date(targetYear, targetMonth, 0, 23, 59, 59); // último dia do mês
+  const refTs = referenceDate.getTime();
+
+  const isActiveAtRef = (e: RhEmployee): boolean => {
+    const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
+    if (Number.isNaN(adm) || adm > refTs) return false;
+    if (!e.termination_date) return true;
+    const term = new Date(e.termination_date).getTime();
+    if (Number.isNaN(term)) return true;
+    return term > refTs;
+  };
+
+  // Considera somente colaboradores que existiam até a data de referência.
+  const knownAtRef = employees.filter((e) => {
+    const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
+    return !Number.isNaN(adm) && adm <= refTs;
+  });
+  const total = knownAtRef.length;
+  const ativos = knownAtRef.filter(isActiveAtRef).length;
   const inativos = total - ativos;
 
   const ninetyMs = 90 * 86400000;
-  const refTs = referenceDate.getTime();
 
   let novos = 0;
   let admissoes = 0;
@@ -305,14 +326,17 @@ export function calcMetrics(
   let tempoCasaSum = 0;
   let tempoCasaCount = 0;
 
-  for (const e of employees) {
+  for (const e of knownAtRef) {
+    const activeAtRef = isActiveAtRef(e);
     // sexo
     const g = (e.gender || "N").toUpperCase();
-    if (g === "M" || g === "F") porSexo[g]++;
-    else porSexo.N++;
+    if (activeAtRef) {
+      if (g === "M" || g === "F") porSexo[g]++;
+      else porSexo.N++;
+    }
 
     // faixa etária (somente ativos)
-    if (e.status === "ativo") {
+    if (activeAtRef) {
       const age = ageYears(e.birth_date, referenceDate);
       if (age === null) porFaixaEtaria["desconhecida"]++;
       else {
@@ -330,12 +354,10 @@ export function calcMetrics(
     // experiência: admitidos há menos de 90 dias
     if (e.admission_date) {
       const adm = new Date(e.admission_date).getTime();
-      if (!Number.isNaN(adm) && refTs - adm < ninetyMs) novos++;
+      if (!Number.isNaN(adm) && refTs - adm < ninetyMs && refTs - adm >= 0 && activeAtRef) novos++;
     }
 
     // movimentações do mês/ano filtrados
-    const targetMonth = filterMonth ?? (new Date().getMonth() + 1);
-    const targetYear = filterYear ?? new Date().getFullYear();
     if (e.admission_date) {
       const adm = new Date(e.admission_date);
       if (adm.getFullYear() === targetYear && adm.getMonth() + 1 === targetMonth) {
