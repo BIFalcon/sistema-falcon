@@ -808,6 +808,25 @@ export default function IndicadoresDrePage() {
             </Card>
 
             <Card className="p-4 shadow-soft space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <ToggleGroup
+                  type="single"
+                  value={viewMode}
+                  onValueChange={(v) => v && setViewMode(v as "chart" | "table")}
+                  size="sm"
+                  variant="outline"
+                >
+                  <ToggleGroupItem value="chart" aria-label="Gráfico">
+                    <LineIcon className="h-4 w-4 mr-1.5" /> Gráfico
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="table" aria-label="Tabela">
+                    <TableIcon className="h-4 w-4 mr-1.5" /> Tabela
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              {viewMode === "chart" ? (
+                <>
               <div className="flex flex-wrap items-center gap-3">
                 {(["current", "budget", "previous"] as DreSeriesKey[]).map((key) => (
                   <Button key={key} size="sm" variant={visible[key] ? "default" : "outline"} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}>{chartConfig[key].label}</Button>
@@ -869,6 +888,51 @@ export default function IndicadoresDrePage() {
                   {visible.previous && <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="3 3" />}
                 </LineChart>
               </ChartContainer>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {selectedNodes.length === 0
+                      ? "Selecione uma ou mais linhas da DRE para visualizar a tabela comparativa."
+                      : `${periodLabel} · ${selectedNodes.length} linha${selectedNodes.length === 1 ? "" : "s"}`}
+                  </p>
+                  {selectedNodes.length > 0 && (
+                    <div className="rounded-md border overflow-auto max-h-[520px]">
+                      <Table>
+                        <TableHeader className="bg-muted/40 sticky top-0">
+                          <TableRow>
+                            <TableHead className="w-[40%]">Linha</TableHead>
+                            <TableHead className="text-right">Realizado</TableHead>
+                            <TableHead className="text-right">Orçado</TableHead>
+                            <TableHead className="text-right">vs Orç.</TableHead>
+                            <TableHead className="text-right">Ano Anterior</TableHead>
+                            <TableHead className="text-right">vs Ano Ant.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedNodes.map((node) => (
+                            <DreComparativeRow
+                              key={node.id}
+                              node={node}
+                              depth={0}
+                              months={monthsWindow}
+                              expanded={expandedRows}
+                              toggle={(id) =>
+                                setExpandedRows((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(id)) next.delete(id);
+                                  else next.add(id);
+                                  return next;
+                                })
+                              }
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
         </>
