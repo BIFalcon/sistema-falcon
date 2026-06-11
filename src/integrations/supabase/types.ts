@@ -1869,6 +1869,8 @@ export type Database = {
           name: string
           position: string | null
           raw: Json
+          reference_month: number | null
+          reference_year: number | null
           salary: number | null
           source_format: string | null
           status: string
@@ -1890,6 +1892,8 @@ export type Database = {
           name: string
           position?: string | null
           raw?: Json
+          reference_month?: number | null
+          reference_year?: number | null
           salary?: number | null
           source_format?: string | null
           status?: string
@@ -1911,6 +1915,8 @@ export type Database = {
           name?: string
           position?: string | null
           raw?: Json
+          reference_month?: number | null
+          reference_year?: number | null
           salary?: number | null
           source_format?: string | null
           status?: string
@@ -2095,6 +2101,8 @@ export type Database = {
           metadata: Json
           parse_error: string | null
           parsed_count: number | null
+          reference_month: number | null
+          reference_year: number | null
           uploaded_at: string
           uploaded_by: string
         }
@@ -2108,6 +2116,8 @@ export type Database = {
           metadata?: Json
           parse_error?: string | null
           parsed_count?: number | null
+          reference_month?: number | null
+          reference_year?: number | null
           uploaded_at?: string
           uploaded_by: string
         }
@@ -2121,6 +2131,8 @@ export type Database = {
           metadata?: Json
           parse_error?: string | null
           parsed_count?: number | null
+          reference_month?: number | null
+          reference_year?: number | null
           uploaded_at?: string
           uploaded_by?: string
         }

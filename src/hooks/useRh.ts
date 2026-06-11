@@ -21,6 +21,8 @@ export interface RhEmployee {
   salary: number | null;
   status: string;
   source_format: string | null;
+  reference_month: number | null;
+  reference_year: number | null;
   upload_id: string | null;
   raw: Record<string, unknown>;
   created_at: string;
@@ -76,12 +78,14 @@ export interface RhPolicy {
 
 // ---------- queries ----------
 
-export function useRhEmployees(hotelId?: string) {
+export function useRhEmployees(hotelId?: string, referenceMonth?: number, referenceYear?: number) {
   return useQuery({
-    queryKey: ["rh", "employees", hotelId ?? "all"],
+    queryKey: ["rh", "employees", hotelId ?? "all", referenceYear ?? "all-years", referenceMonth ?? "all-months"],
     queryFn: async () => {
       let q = supabase.from("rh_employees").select("*").order("name");
       if (hotelId) q = q.eq("hotel_id", hotelId);
+      if (referenceMonth) q = q.eq("reference_month", referenceMonth);
+      if (referenceYear) q = q.eq("reference_year", referenceYear);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as RhEmployee[];
@@ -150,7 +154,7 @@ export function useRhPolicies() {
 export function useUploadRhFile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
+    mutationFn: async ({ file, hotelId, referenceMonth, referenceYear }: { file: File; hotelId: string; referenceMonth: number; referenceYear: number }) => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) throw new Error("Não autenticado");
@@ -168,7 +172,9 @@ export function useUploadRhFile() {
           detected_format: parsed.format,
           parsed_count: parsed.employees.length,
           parse_error: parsed.warnings.length ? parsed.warnings.join(" | ") : null,
-          metadata: { warnings: parsed.warnings } as never,
+          reference_month: referenceMonth,
+          reference_year: referenceYear,
+          metadata: { warnings: parsed.warnings, reference_month: referenceMonth, reference_year: referenceYear } as never,
         })
         .select()
         .single();
@@ -190,11 +196,13 @@ export function useUploadRhFile() {
           salary: e.salary,
           status: e.status,
           source_format: parsed.format,
+          reference_month: referenceMonth,
+          reference_year: referenceYear,
           raw: e.raw as never,
         }));
         const { error: empErr } = await supabase
           .from("rh_employees")
-          .upsert(rows, { onConflict: "hotel_id,employee_key" });
+          .upsert(rows, { onConflict: "hotel_id,employee_key,reference_year,reference_month" });
         if (empErr) throw empErr;
       }
 
