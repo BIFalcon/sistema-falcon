@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2 } from "lucide-react";
+import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
@@ -301,7 +303,72 @@ function VariationPill({ value }: { value: number | null }) {
   return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
 }
 
-function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId: string | null; select: (id: string) => void }) {
+function isPctLineLabel(label: string) {
+  return /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(label);
+}
+
+function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]): number | null {
+  const agg = getAggType(node.label);
+  const baseAgg: "sum" | "avg" = agg === "sum" ? "sum" : "avg";
+  const v = aggregateSeries(node.series[key], months, baseAgg);
+  if (v == null) return null;
+  if (isPctLineLabel(node.label)) return Math.abs(v) <= 1 ? v * 100 : v;
+  return v;
+}
+
+function fmtNodeValue(node: DreLineNode, v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (isPctLineLabel(node.label)) return `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  return fmtBRL(v);
+}
+
+function DreComparativeRow({
+  node,
+  depth,
+  months,
+  expanded,
+  toggle,
+}: {
+  node: DreLineNode;
+  depth: number;
+  months: number[];
+  expanded: Set<string>;
+  toggle: (id: string) => void;
+}) {
+  const cur = computeNodeValue(node, "current", months);
+  const bud = computeNodeValue(node, "budget", months);
+  const prev = computeNodeValue(node, "previous", months);
+  const hasChildren = node.children.length > 0;
+  const isOpen = expanded.has(node.id);
+  return (
+    <>
+      <TableRow>
+        <TableCell className="py-2">
+          <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
+            {hasChildren ? (
+              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => toggle(node.id)}>
+                {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </Button>
+            ) : (
+              <span className="inline-block w-5 shrink-0" />
+            )}
+            <span className={depth === 0 ? "text-sm font-medium" : "text-sm text-foreground/80"}>{node.label}</span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, cur)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, bud)}</TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, bud)} /></TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, prev)}</TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, prev)} /></TableCell>
+      </TableRow>
+      {isOpen && hasChildren && node.children.map((child) => (
+        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} />
+      ))}
+    </>
+  );
+}
+
+function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedIds: Set<string>; select: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
   const isSelectable = !(node.level === 1 && /^(topline|receitas|despesas)$/i.test(node.label));
@@ -318,13 +385,13 @@ function TreeLine({ node, selectedId, select }: { node: DreLineNode; selectedId:
           {hasChildren ? open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" /> : <span />}
         </Button>
         {isSelectable ? (
-          <Checkbox checked={selectedId === node.id} onCheckedChange={() => select(node.id)} />
+          <Checkbox checked={selectedIds.has(node.id)} onCheckedChange={() => select(node.id)} />
         ) : (
           <span className="h-4 w-4 shrink-0" />
         )}
         <span className={fontClass}>{node.label}</span>
       </div>
-      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedId={selectedId} select={select} />)}
+      {open && node.children.map((child) => <TreeLine key={child.id} node={child} selectedIds={selectedIds} select={select} />)}
     </div>
   );
 }
@@ -352,7 +419,9 @@ export default function IndicadoresDrePage() {
   const [retroUpToMonth, setRetroUpToMonth] = useState<number>(12);
   const [retroFile, setRetroFile] = useState<File | null>(null);
   const [retroSubmitting, setRetroSubmitting] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   
   const [divider, setDivider] = useState("none");
@@ -372,16 +441,23 @@ export default function IndicadoresDrePage() {
     periodMonths: periodCfg.months,
   });
 
+  const selectedNodes = useMemo(() => {
+    if (!dataset || selectedIds.size === 0) return [] as DreLineNode[];
+    return dataset.flat.filter((n) => selectedIds.has(n.id));
+  }, [dataset, selectedIds]);
+  // Linhas usadas no gráfico (mantém comportamento anterior: expande para folhas se a linha é apenas um agrupador)
   const selectedLines = useMemo(() => {
-    if (!dataset) return [];
-    const node = selectedId ? dataset.flat.find((n) => n.id === selectedId) : undefined;
-    if (!node) return [];
-    const hasSeries = node.series.current.some((v) => v != null);
-    if (hasSeries || node.children.length === 0) return [node];
+    if (selectedNodes.length === 0) return [] as DreLineNode[];
     const leaves = (n: DreLineNode): DreLineNode[] =>
       n.children.length === 0 ? [n] : n.children.flatMap(leaves);
-    return leaves(node);
-  }, [dataset, selectedId]);
+    const out: DreLineNode[] = [];
+    for (const node of selectedNodes) {
+      const hasSeries = node.series.current.some((v) => v != null);
+      if (hasSeries || node.children.length === 0) out.push(node);
+      else out.push(...leaves(node));
+    }
+    return out;
+  }, [selectedNodes]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
@@ -492,7 +568,13 @@ export default function IndicadoresDrePage() {
     }
     return numeric.toLocaleString("pt-BR");
   };
-  const selectLine = (id: string) => setSelectedId((prev) => (prev === id ? null : id));
+  const selectLine = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const monthsWindow = useMemo(
     () => periodMonths(month, periodCfg.months),
@@ -705,17 +787,46 @@ export default function IndicadoresDrePage() {
 
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <Card className="p-4 shadow-soft">
-              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3><span className="text-xs text-muted-foreground">{selectedId ? "1 selecionada" : "0 selecionadas"}</span></div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Linhas da DRE</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selecionada{selectedIds.size === 1 ? "" : "s"}</span>
+                  {selectedIds.size > 0 && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setSelectedIds(new Set())}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
               <div className="max-h-[620px] overflow-auto pr-1">
                 {dataset?.tree
                   .filter((n) => n.id.startsWith("fixed:"))
                   .map((node) => (
-                    <TreeLine key={node.id} node={node} selectedId={selectedId} select={selectLine} />
+                    <TreeLine key={node.id} node={node} selectedIds={selectedIds} select={selectLine} />
                   ))}
               </div>
             </Card>
 
             <Card className="p-4 shadow-soft space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <ToggleGroup
+                  type="single"
+                  value={viewMode}
+                  onValueChange={(v) => v && setViewMode(v as "chart" | "table")}
+                  size="sm"
+                  variant="outline"
+                >
+                  <ToggleGroupItem value="chart" aria-label="Gráfico">
+                    <LineChartIcon className="h-4 w-4 mr-1.5" /> Gráfico
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="table" aria-label="Tabela">
+                    <TableIcon className="h-4 w-4 mr-1.5" /> Tabela
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              {viewMode === "chart" ? (
+                <>
               <div className="flex flex-wrap items-center gap-3">
                 {(["current", "budget", "previous"] as DreSeriesKey[]).map((key) => (
                   <Button key={key} size="sm" variant={visible[key] ? "default" : "outline"} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}>{chartConfig[key].label}</Button>
@@ -777,6 +888,51 @@ export default function IndicadoresDrePage() {
                   {visible.previous && <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="3 3" />}
                 </LineChart>
               </ChartContainer>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {selectedNodes.length === 0
+                      ? "Selecione uma ou mais linhas da DRE para visualizar a tabela comparativa."
+                      : `${periodLabel} · ${selectedNodes.length} linha${selectedNodes.length === 1 ? "" : "s"}`}
+                  </p>
+                  {selectedNodes.length > 0 && (
+                    <div className="rounded-md border overflow-auto max-h-[520px]">
+                      <Table>
+                        <TableHeader className="bg-muted/40 sticky top-0">
+                          <TableRow>
+                            <TableHead className="w-[40%]">Linha</TableHead>
+                            <TableHead className="text-right">Realizado</TableHead>
+                            <TableHead className="text-right">Orçado</TableHead>
+                            <TableHead className="text-right">vs Orç.</TableHead>
+                            <TableHead className="text-right">Ano Anterior</TableHead>
+                            <TableHead className="text-right">vs Ano Ant.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedNodes.map((node) => (
+                            <DreComparativeRow
+                              key={node.id}
+                              node={node}
+                              depth={0}
+                              months={monthsWindow}
+                              expanded={expandedRows}
+                              toggle={(id) =>
+                                setExpandedRows((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(id)) next.delete(id);
+                                  else next.add(id);
+                                  return next;
+                                })
+                              }
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
         </>
