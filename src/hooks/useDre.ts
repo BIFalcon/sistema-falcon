@@ -212,9 +212,29 @@ export function useUploadDre() {
             });
           }
         }
+        // Linhas detalhadas do REALIZADO — série anual (Jan-Dez por linha).
+        // Permite que qualquer mês do ano seja reconstruído a partir da
+        // versão mais recente do ano (que carrega o acumulado atualizado).
+        const currentLineRows: typeof otherRows = [];
+        for (const cl of parsed.currentLines ?? []) {
+          const cat = getDreLineCategorization(cl.label);
+          for (const [monthStr, val] of Object.entries(cl.values)) {
+            if (val == null) continue;
+            currentLineRows.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[cline_${monthStr}] ${cl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: cl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
         if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length || budgetLineRows.length || prevLineRows2.length) {
           await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2,
+            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2, ...currentLineRows,
           ]);
         }
 
@@ -347,19 +367,124 @@ async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Prom
   return result;
 }
 
+/**
+ * Busca as linhas da DRE mais recente do ano (a planilha mais recente
+ * enviada por qualquer fechamento daquele hotel/ano serve como fonte
+ * única de verdade — cada nova DRE traz o acumulado atualizado dos
+ * meses anteriores).
+ */
+async function fetchYearLatestDreLines(
+  hotelId: string,
+  year: number,
+): Promise<DreParsedLineRecord[]> {
+  const rows: DreParsedLineRecord[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .rpc("get_year_latest_dre_lines", { _hotel_id: hotelId, _year: year })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as DreParsedLineRecord[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
+}
+
 export function useDreIndicators(closingId: string | null | undefined) {
   return useQuery({
     enabled: !!closingId,
     queryKey: ["dre-indicators", closingId],
     queryFn: async (): Promise<DreIndicatorRow[]> => {
       if (!closingId) return [];
-      // Filtra também as linhas de séries mensais (que poluiriam o painel),
-      // mantendo apenas indicadores do mês corrente ([key]) e do ano
-      // anterior ([prev_key]). Cada linha de série tem prefixo [series_…].
-      const data = await fetchLatestDreParsedLines(closingId);
-      return (data
-        .filter((r) => r.line_type === "indicator")
-        .filter((r) => !r.line_label.startsWith("[series_"))) as DreIndicatorRow[];
+      const { data: closing, error: closingErr } = await supabase
+        .from("closings")
+        .select("hotel_id, month, year")
+        .eq("id", closingId)
+        .maybeSingle();
+      if (closingErr) throw closingErr;
+      if (!closing) return [];
+      // Fonte preferida: última DRE do ano (planilha mais recente carrega
+      // valores atualizados de todos os meses anteriores).
+      const yearLines = await fetchYearLatestDreLines(closing.hotel_id, closing.year);
+      // Fallback: linhas do próprio closing (caso ainda não exista série
+      // [series_…] persistida ou outro motivo).
+      const closingLines = await fetchLatestDreParsedLines(closingId);
+      const targetMonth = closing.month;
+      const out: DreIndicatorRow[] = [];
+      const seenKeys = new Set<string>(); // current
+      const seenPrev = new Set<string>();
+      const seenBudget = new Set<string>();
+      // 1) Reconstroi indicadores do mês a partir das séries da última DRE.
+      const matchSeries = (
+        rows: DreParsedLineRecord[],
+        prefix: "cur" | "prev" | "budget",
+      ) => {
+        for (const r of rows) {
+          const m = r.line_label.match(new RegExp(`^\\[series_${prefix}_(.+)_(\\d+)\\]$`));
+          if (!m) continue;
+          const key = m[1];
+          const monthIdx = parseInt(m[2], 10);
+          if (monthIdx !== targetMonth) continue;
+          if (prefix === "cur") {
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+            const label = INDICATOR_LABELS[key as IndicatorKey] ?? key;
+            out.push({
+              line_label: `[${key}] ${label}`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          } else if (prefix === "prev") {
+            if (seenPrev.has(key)) continue;
+            seenPrev.add(key);
+            out.push({
+              line_label: `[prev_${key}]`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          } else {
+            if (seenBudget.has(key)) continue;
+            seenBudget.add(key);
+            out.push({
+              line_label: `[budget_${key}]`,
+              line_value: r.line_value ?? null,
+              version_number: r.version_number,
+            });
+          }
+        }
+      };
+      matchSeries(yearLines, "cur");
+      matchSeries(yearLines, "prev");
+      matchSeries(yearLines, "budget");
+      // 2) Fallback para indicadores antigos (apenas chaves ainda não cobertas).
+      for (const r of closingLines) {
+        if (r.line_type !== "indicator") continue;
+        const lbl = r.line_label;
+        if (lbl.startsWith("[series_")) continue;
+        const cur = lbl.match(/^\[([^\]\s]+)\]/);
+        if (cur) {
+          const k = cur[1];
+          if (k.startsWith("prev_")) {
+            const key = k.slice(5);
+            if (seenPrev.has(key)) continue;
+            seenPrev.add(key);
+          } else if (k.startsWith("budget_")) {
+            const key = k.slice(7);
+            if (seenBudget.has(key)) continue;
+            seenBudget.add(key);
+          } else {
+            if (seenKeys.has(k)) continue;
+            seenKeys.add(k);
+          }
+        }
+        out.push({
+          line_label: lbl,
+          line_value: r.line_value ?? null,
+          version_number: r.version_number,
+        });
+      }
+      return out;
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -392,22 +517,25 @@ function useDreAnalyticsImpl(input: {
         { length: input.month - startMonth + 1 },
         (_, i) => startMonth + i,
       );
-      const fullYearRange = Array.from({ length: 12 }, (_, i) => i + 1);
-      const { data: allClosings, error: closingsError } = await supabase
-        .from("closings")
-        .select("id, month, hotel_id")
-        .in("hotel_id", input.hotelIds)
-        .eq("year", input.year)
-        .in("month", fullYearRange);
-      if (closingsError) throw closingsError;
-      const linesByClosingId = await fetchLatestDreParsedLinesByClosingIds((allClosings ?? []).map((c) => c.id));
+      // Carrega, por hotel, as linhas da DRE mais recente do ano. Essa
+      // planilha carrega o acumulado atualizado (Jan-mês atual), então
+      // serve de fonte única de verdade para todos os meses.
+      const yearLatestByHotel = new Map<string, DreParsedLineRecord[]>();
+      await Promise.all(
+        input.hotelIds.map(async (hid) => {
+          try {
+            const lines = await fetchYearLatestDreLines(hid, input.year);
+            yearLatestByHotel.set(hid, lines);
+          } catch {
+            yearLatestByHotel.set(hid, []);
+          }
+        }),
+      );
 
       const results = await Promise.all(
         input.hotelIds.map(async (hotelId): Promise<DreAnalyticsDataset | null> => {
-          const allYearClosings = (allClosings ?? []).filter((c) => c.hotel_id === hotelId);
-          const currentClosings = allYearClosings.filter((c) => currentMonthRange.includes(c.month));
-
-          if (!currentClosings?.length && !allYearClosings?.length) return null;
+          const yearLines = yearLatestByHotel.get(hotelId) ?? [];
+          if (!yearLines.length) return null;
 
         type LineRow = {
           line_label: string;
@@ -419,37 +547,14 @@ function useDreAnalyticsImpl(input: {
           line_category?: string | null;
           line_segment?: string | null;
         };
-        // Linhas do período atual → alimentam série "current"
-        const currentLines: LineRow[] = [];
-        for (const closing of currentClosings ?? []) {
-          const closingLines = linesByClosingId.get(closing.id) ?? [];
-          if (!closingLines?.length) continue;
-          currentLines.push(
-            ...closingLines
-              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
-          );
-        }
-
-        // Linhas de todos os meses → alimentam séries "budget" e "previous"
-        const allYearLines: LineRow[] = [];
-        for (const closing of allYearClosings ?? []) {
-          const alreadyRead = currentClosings?.some((c) => c.id === closing.id);
-          if (alreadyRead) {
-            allYearLines.push(...currentLines.filter((l) => l._month === closing.month));
-            continue;
-          }
-          const closingLines = linesByClosingId.get(closing.id) ?? [];
-          if (!closingLines?.length) continue;
-          allYearLines.push(
-            ...closingLines
-              .map((l) => ({ ...l, _month: closing.month })) as LineRow[]
-          );
-        }
-
-        // Combina: current usa currentLines, budget/previous usam allYearLines
-        const allLines: LineRow[] = [...new Map(
-          [...currentLines, ...allYearLines].map((l) => [`${l._month}:${l.line_label}`, l])
-        ).values()];
+        // Todas as séries (cur/prev/budget e linhas detalhadas) vêm da
+        // mesma fonte: a DRE mais recente do ano para o hotel.
+        const currentLines: LineRow[] = yearLines.map((l) => ({
+          ...l,
+          _month: input.month,
+        }));
+        const allYearLines: LineRow[] = currentLines;
+        const allLines: LineRow[] = currentLines;
         if (!allLines.length) return null;
 
         const seriesCur: Record<string, (number | null)[]> = {};
@@ -467,7 +572,9 @@ function useDreAnalyticsImpl(input: {
             const [, key, mStr] = curMatch;
             const m = parseInt(mStr, 10) - 1;
             if (!seriesCur[key]) seriesCur[key] = Array(12).fill(null);
-            seriesCur[key][m] = val ?? null;
+            // Só popula o range corrente — fora dele permanece null para
+            // que o gráfico não desenhe meses fora do período em análise.
+            if (currentMonthRange.includes(m + 1)) seriesCur[key][m] = val ?? null;
             continue;
           }
 
@@ -545,14 +652,31 @@ function useDreAnalyticsImpl(input: {
           }
         }
 
-        // Mapas de séries anuais para linhas detalhadas de orçamento e ano anterior
-        // Formato no banco: "[bline_3] Salários" = valor de março do orçamento
+        // Mapas de séries anuais para linhas detalhadas — realizado, orçamento e ano anterior.
+        // Formato no banco:
+        //   "[cline_3] Salários" = valor de março do realizado
+        //   "[bline_3] Salários" = valor de março do orçamento
+        //   "[pline_3] Salários" = valor de março do ano anterior
+        const currentDetailSeries = new Map<string, (number | null)[]>();
         const budgetDetailSeries = new Map<string, (number | null)[]>();
         const prevDetailSeries = new Map<string, (number | null)[]>();
 
         for (const line of allLines) {
           const lbl = line.line_label;
           const val = line.line_value;
+
+          const cMatch = lbl.match(/^\[cline_(\d+)\]\s(.+)$/);
+          if (cMatch) {
+            const m = parseInt(cMatch[1], 10) - 1;
+            const label = cMatch[2];
+            if (!currentDetailSeries.has(label)) currentDetailSeries.set(label, Array(12).fill(null));
+            // Mesma máscara de período aplicada às séries dos indicadores:
+            // só popula meses dentro do range visualizado.
+            if (currentMonthRange.includes(m + 1)) {
+              currentDetailSeries.get(label)![m] = val ?? null;
+            }
+            continue;
+          }
 
           const bMatch = lbl.match(/^\[bline_(\d+)\]\s(.+)$/);
           if (bMatch) {
@@ -684,11 +808,18 @@ function useDreAnalyticsImpl(input: {
 
         // Busca série de um label nos dados do banco
         const findSeriesForLabel = (label: string): (number | null)[] => {
-          const norm = normLabel(label);
+          // 1) Preferir a série anual completa do realizado vinda da
+          //    última DRE do ano ([cline_M] LABEL).
+          for (const [lbl, series] of currentDetailSeries) {
+            if (looseLabelMatch(lbl, label)) return series;
+          }
+          // 2) Fallback: mapa por mês oriundo de fechamentos antigos.
           for (const [lbl, data] of linesByLabel) {
             if (looseLabelMatch(lbl, label)) {
               const series: (number | null)[] = Array(12).fill(null);
-              for (const [m, v] of data.values) series[m - 1] = v;
+              for (const [m, v] of data.values) {
+                if (currentMonthRange.includes(m)) series[m - 1] = v;
+              }
               return series;
             }
           }

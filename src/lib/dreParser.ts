@@ -541,6 +541,12 @@ export interface ParsedDre {
     level: number;
     values: Record<number, number | null>;
   }>;
+  /** Linhas detalhadas da aba DRE (realizado) — série anual completa Jan-Dez. */
+  currentLines: Array<{
+    label: string;
+    level: number;
+    values: Record<number, number | null>;
+  }>;
 }
 
 /**
@@ -1091,10 +1097,13 @@ export async function parseDreExcel(
   if (!indicators.lucro_liquido) warnings.push("Lucro Líquido não localizado.");
   warnings.push(`[DEBUG] firstMonthCol=${firstMonthCol}, monthCol=${monthCol}, template=${template}, sheet=${sheetName}, totalRows=${rows.length}`);
 
-  // ─── Séries mensais Jan-Dez para gráficos da Carta ───
-  // Chaves de interesse para os gráficos:
-  const SERIES_KEYS: IndicatorKey[] = ["ocupacao", "adr", "receita_bruta_total"];
+  // ─── Séries mensais Jan-Dez (todos os indicadores) ───
+  // Cobre todos os indicadores para que qualquer mês do ano possa ser
+  // reconstruído a partir da última DRE enviada (fonte de verdade).
+  const SERIES_KEYS: IndicatorKey[] = INDICATORS.map((i) => i.key);
   const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows);
+  // Linhas detalhadas do realizado — série anual completa (analoga a prev/budget).
+  const currentLines = readSheetLines(rows, targetYear, displayRows);
 
   // Aba "ANO ANTERIOR" (presente nos modelos DEFAULT/MERCURE/MANHATTAN)
   const prevSheetName = wb.SheetNames.find((n) => /ano\s*anterior/i.test(n));
@@ -1187,6 +1196,7 @@ export async function parseDreExcel(
     budgetIndicators,
     budgetLines,
     prevLines,
+    currentLines,
   };
 }
 
