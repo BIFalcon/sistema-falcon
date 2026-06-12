@@ -482,7 +482,9 @@ function drawLineChart(
   ctx.textAlign = "center";
   ctx.fillText(title, canvas.width / 2, 8 * px);
 
-  const padL = 8 * px, padR = 8 * px, padT = 16 * px, padB = 14 * px;
+  // padB maior: separa rótulos de valor (acima/abaixo da linha) da faixa
+  // dos rótulos de mês + legenda no rodapé.
+  const padL = 8 * px, padR = 8 * px, padT = 18 * px, padB = 22 * px;
   const w = canvas.width - padL - padR;
   const h = canvas.height - padT - padB;
   const x0 = padL, y0 = padT;
@@ -490,13 +492,29 @@ function drawLineChart(
   const all: number[] = [];
   current.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
   previous.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
-  const max = all.length > 0 ? Math.max(...all) * 1.15 : 1;
-  const min = all.length > 0 ? Math.min(...all) * 0.85 : 0;
+
+  // Cap superior robusto: um único outlier (ex.: R$ 4.049.509 isolado entre
+ // valores ~R$ 300k) achatava toda a série na linha de base. Usamos a
+  // mediana × 2,5 como limite superior, garantindo no mínimo o maior valor
+  // "normal" + 15% de respiro. Outliers acima do cap são clipados ao topo
+  // do gráfico (a linha sobe e sai), mas o rótulo permanece visível.
+  const sorted = [...all].sort((a, b) => a - b);
+  const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+  const rawMax = sorted.length ? sorted[sorted.length - 1] : 1;
+  const rawMin = sorted.length ? sorted[0] : 0;
+  const cappedMax = median > 0
+    ? Math.min(rawMax, Math.max(median * 2.5, rawMax * 0.35))
+    : rawMax;
+  const max = Math.max(1, cappedMax) * 1.15;
+  const min = Math.max(0, rawMin * 0.85);
   const span = Math.max(1, max - min);
 
   const n = current.length;
   const stepX = w / (n - 1);
-  const yFor = (v: number) => y0 + h - ((v - min) / span) * h;
+  const yFor = (v: number) => {
+    const clamped = Math.min(Math.max(v, min), max);
+    return y0 + h - ((clamped - min) / span) * h;
+  };
 
   // baseline X
   ctx.strokeStyle = BORDER;
@@ -543,36 +561,72 @@ function drawLineChart(
     ctx.fillStyle = NAVY;
     ctx.beginPath(); ctx.arc(x, y, 1.6 * px, 0, Math.PI * 2); ctx.fill();
   });
-  // Rótulos posicionados dinamicamente por mês
+  // Rótulos posicionados dinamicamente por mês.
+  //  - Quando as duas séries têm valores próximos (Δy < 4px), empilhamos:
+  //    o maior fica acima e o menor abaixo, evitando sobreposição.
+  //  - Quando o rótulo "abaixo" colidiria com o eixo X (faixa dos meses),
+  //    forçamos o rótulo para cima.
+  //  - Pequeno offset horizontal entre séries quando ambas vão pro mesmo
+  //    lado, para não empilhar texto sobre texto.
+  const baselineY = y0 + h;
+  const labelOffset = 2.6 * px;
+  const labelMinClearance = 3.2 * px; // distância mínima do eixo X para
+                                       // permitir rótulo "abaixo" do ponto
   for (let i = 0; i < current.length; i++) {
     const cv = current[i][field] as number | null;
     const pv = previous[i]?.[field] as number | null | undefined;
     const x = x0 + i * stepX;
-    if (cv != null) {
-      const y = yFor(cv);
-      const above = pv == null ? true : cv >= pv;
+    const cy = cv != null ? yFor(cv) : null;
+    const py = pv != null ? yFor(pv) : null;
+
+    // Decide posição (above/below) para cada série
+    let cAbove = true;
+    let pAbove = true;
+    if (cv != null && pv != null && cy != null && py != null) {
+      const close = Math.abs(cy - py) < 4 * px;
+      if (close) {
+        // empilha: realizado em cima, anterior embaixo (mas validando clearance)
+        cAbove = true;
+        pAbove = false;
+      } else {
+        cAbove = cv >= pv;
+        pAbove = !cAbove;
+      }
+    }
+    // Validação de clearance: se "abaixo" cairia em cima dos meses, força acima
+    if (cy != null && !cAbove && baselineY - cy < labelMinClearance) cAbove = true;
+    if (py != null && !pAbove && baselineY - py < labelMinClearance) pAbove = true;
+
+    // Se ambos acabaram do mesmo lado e estão próximos, separa horizontalmente
+    let cDx = 0;
+    let pDx = 0;
+    if (cv != null && pv != null && cy != null && py != null && cAbove === pAbove && Math.abs(cy - py) < 5 * px) {
+      cDx = -6 * px;
+      pDx = 6 * px;
+    }
+
+    if (cv != null && cy != null) {
       ctx.fillStyle = NAVY;
       ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
-      ctx.textBaseline = above ? "bottom" : "top";
-      ctx.fillText(formatter(cv), x, above ? y - 2.4 * px : y + 2.4 * px);
+      ctx.textBaseline = cAbove ? "bottom" : "top";
+      ctx.fillText(formatter(cv), x + cDx, cAbove ? cy - labelOffset : cy + labelOffset);
     }
-    if (pv != null) {
-      const y = yFor(pv);
-      const above = cv == null ? true : pv > cv;
+    if (pv != null && py != null) {
       ctx.fillStyle = "#6B7280";
       ctx.font = `${3 * px}px Helvetica, Arial`;
-      ctx.textBaseline = above ? "bottom" : "top";
-      ctx.fillText(formatter(pv), x, above ? y - 2.4 * px : y + 2.4 * px);
+      ctx.textBaseline = pAbove ? "bottom" : "top";
+      ctx.fillText(formatter(pv), x + pDx, pAbove ? py - labelOffset : py + labelOffset);
     }
   }
   ctx.textBaseline = "alphabetic";
 
-  // labels mês (3 letras p/ Jan-Dez)
+  // labels mês (3 letras p/ Jan-Dez) — bem abaixo da baseline,
+  // dentro do padB ampliado, para não colidir com rótulos de valor.
   ctx.fillStyle = TEXT;
   ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 5 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, baselineY + 8 * px);
   });
 
   // legenda
