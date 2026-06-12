@@ -286,7 +286,9 @@ async function exportTable(
     return errorResponse(500, "query_failed", error.message, ctx.requestId);
   }
 
-  const rows = (data ?? []).map((r) => stripSensitive(table, r as Record<string, unknown>));
+  const rows = (data ?? []).map((r) =>
+    stripSensitive(table, r as Record<string, unknown>, ctx.includeSensitive),
+  );
   let nextCursor: string | null = null;
   if (rows.length === limit && data && data.length > 0) {
     const last = data[data.length - 1] as Record<string, unknown>;
