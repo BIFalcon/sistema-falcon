@@ -134,6 +134,45 @@ function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
 }
 
 /**
+ * Recorta uma foto para preencher uma célula com `cellRatio = w/h`
+ * usando object-fit: cover (preserva proporção, centraliza, corta sobras).
+ * Resolve o problema de fotos retrato/paisagem ficarem com grandes faixas
+ * vazias quando a célula tem proporção muito diferente da foto.
+ */
+function cropImageToCover(
+  img: HTMLImageElement,
+  cellRatio: number,
+  maxWidth = 1200,
+): string {
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const imgRatio = iw / ih;
+  // src crop rect (no espaço da imagem original)
+  let sw = iw;
+  let sh = ih;
+  if (imgRatio > cellRatio) {
+    // imagem mais larga que a célula → corta laterais
+    sw = ih * cellRatio;
+  } else {
+    // imagem mais alta que a célula → corta topo/fundo
+    sh = iw / cellRatio;
+  }
+  const sx = (iw - sw) / 2;
+  const sy = (ih - sh) / 2;
+  // canvas de saída na proporção da célula
+  const outW = Math.min(maxWidth, Math.round(sw));
+  const outH = Math.round(outW / cellRatio);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, outW);
+  canvas.height = Math.max(1, outH);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+/**
  * Extrai apenas o ÍCONE DO PÁSSARO da logo Falcon institucional.
  *
  * A logo padrão tem o pássaro na parte superior e o wordmark "FALCON HOTÉIS"
