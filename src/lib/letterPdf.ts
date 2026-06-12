@@ -345,6 +345,14 @@ function fmtIntK(v: number | null | undefined): string {
   return Math.round(v).toLocaleString("pt-BR");
 }
 
+function fmtChartValue(field: keyof MonthDatum, value: number): string {
+  if (field === "receita_bruta_total") {
+    if (Math.abs(value) >= 1_000_000) return `R$ ${(value / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
+    if (Math.abs(value) >= 1_000) return `R$ ${Math.round(value / 1_000).toLocaleString("pt-BR")} mil`;
+  }
+  return field === "adr" ? `R$ ${Math.round(value).toLocaleString("pt-BR")}` : String(value);
+}
+
 /* ───────────────── Helpers de página ───────────────── */
 
 function addPage(doc: jsPDF) {
