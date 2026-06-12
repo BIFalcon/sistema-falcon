@@ -3,7 +3,7 @@
 // Only SELECT operations. Returns JSON. Paginated, max 1000 rows.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
-const SCHEMA_VERSION = "falcon-lovable-export-v1";
+const SCHEMA_VERSION = "falcon-lovable-export-v2";
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 500;
 
@@ -56,7 +56,6 @@ const TABLE_ALLOWLIST = [
   "ap_uploads",
   "approvals",
   "ar_client_contracts",
-  "ar_clients",
   "ar_open_folio_date_history",
   "ar_open_folio_entries",
   "ar_open_folio_notes",
@@ -111,6 +110,8 @@ const CURSOR_CANDIDATES = ["updated_at", "created_at", "uploaded_at", "sent_at",
 interface RequestContext {
   requestId: string;
   supabase: ReturnType<typeof createClient>;
+  scope: "standard" | "privileged";
+  includeSensitive: boolean;
 }
 
 function newRequestId(): string {
@@ -147,7 +148,12 @@ function isSensitiveColumn(table: string, column: string): boolean {
   return false;
 }
 
-function stripSensitive<T extends Record<string, unknown>>(table: string, row: T): T {
+function stripSensitive<T extends Record<string, unknown>>(
+  table: string,
+  row: T,
+  includeSensitive: boolean,
+): T {
+  if (includeSensitive) return row;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
     if (isSensitiveColumn(table, k)) continue;
@@ -280,7 +286,9 @@ async function exportTable(
     return errorResponse(500, "query_failed", error.message, ctx.requestId);
   }
 
-  const rows = (data ?? []).map((r) => stripSensitive(table, r as Record<string, unknown>));
+  const rows = (data ?? []).map((r) =>
+    stripSensitive(table, r as Record<string, unknown>, ctx.includeSensitive),
+  );
   let nextCursor: string | null = null;
   if (rows.length === limit && data && data.length > 0) {
     const last = data[data.length - 1] as Record<string, unknown>;
@@ -297,6 +305,8 @@ async function exportTable(
     count: rows.length,
     next_cursor: nextCursor,
     has_more: nextCursor !== null,
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     rows,
   }, 200, ctx.requestId);
 }
@@ -317,24 +327,28 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
   for (const t of TABLE_ALLOWLIST) {
     let cols: string[] = [];
     try { cols = await getTableColumns(ctx.supabase, t); } catch { cols = []; }
-    const visible = cols.filter((c) => !isSensitiveColumn(t, c));
+    const sensitive = cols.filter((c) => isSensitiveColumn(t, c));
+    const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await approxRowCount(ctx.supabase, t);
-    const blocked = cols.filter((c) => isSensitiveColumn(t, c));
+    // In privileged + include_sensitive mode, no columns are blocked from the
+    // payload, but the manifest still flags them as sensitive for auditing.
+    const blocked = ctx.includeSensitive ? [] : sensitive;
     tables.push({
       table: t,
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
+      sensitive_columns: sensitive,
       row_count: rowCount,
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
       supports_cursor: true,
       supports_updated_since: incrementalCol !== null,
       non_paginated: false,
-      contains_sensitive: blocked.length > 0,
-      contains_sensitive_data: blocked.length > 0,
+      contains_sensitive: sensitive.length > 0,
+      contains_sensitive_data: sensitive.length > 0,
     });
   }
   const derived = [
@@ -348,6 +362,8 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
     generated_at: new Date().toISOString(),
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     tables,
     derived_resources: DERIVED_RESOURCES,
     derived: derived,
@@ -360,6 +376,8 @@ async function handleHealth(ctx: RequestContext): Promise<Response> {
     generated_at: new Date().toISOString(),
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     resources: {
       tables: TABLE_ALLOWLIST,
       derived: DERIVED_RESOURCES,
@@ -537,12 +555,22 @@ Deno.serve(async (req) => {
 
   // Custom token auth.
   const expected = Deno.env.get("BE_EIGHT_EXPORT_TOKEN");
+  const privilegedExpected = Deno.env.get("BE_EIGHT_EXPORT_PRIVILEGED_TOKEN");
   if (!expected) {
     return errorResponse(500, "server_misconfigured", "Export token not configured", requestId);
   }
   const auth = req.headers.get("Authorization") ?? "";
   const m = /^Bearer\s+(.+)$/i.exec(auth);
-  if (!m || m[1] !== expected) {
+  if (!m) {
+    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
+  }
+  const presented = m[1];
+  let scope: "standard" | "privileged";
+  if (privilegedExpected && presented === privilegedExpected) {
+    scope = "privileged";
+  } else if (presented === expected) {
+    scope = "standard";
+  } else {
     return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
   }
 
@@ -551,9 +579,34 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
-  const ctx: RequestContext = { requestId, supabase };
-
   const url = new URL(req.url);
+  const includeSensitiveParam = (url.searchParams.get("include_sensitive") ?? "").toLowerCase();
+  const wantsSensitive = includeSensitiveParam === "true" || includeSensitiveParam === "1";
+  if (wantsSensitive && scope !== "privileged") {
+    return errorResponse(
+      403,
+      "forbidden_scope",
+      "include_sensitive requires the privileged bearer token",
+      requestId,
+    );
+  }
+  const includeSensitive = wantsSensitive && scope === "privileged";
+  const ctx: RequestContext = { requestId, supabase, scope, includeSensitive };
+
+  // Audit log (per request_id). Never logs the token value.
+  const auditEntry = {
+    kind: "be_eight_export_audit",
+    request_id: requestId,
+    scope,
+    include_sensitive: includeSensitive,
+    method: req.method,
+    path: url.pathname,
+    params: Object.fromEntries(url.searchParams.entries()),
+    user_agent: req.headers.get("user-agent") ?? null,
+    at: new Date().toISOString(),
+  };
+  console.log(JSON.stringify(auditEntry));
+
   // Strip the function base prefix to get the action.
   const path = url.pathname.replace(/^.*\/be-eight-export/, "") || "/";
 
