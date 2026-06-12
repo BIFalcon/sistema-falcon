@@ -110,6 +110,8 @@ const CURSOR_CANDIDATES = ["updated_at", "created_at", "uploaded_at", "sent_at",
 interface RequestContext {
   requestId: string;
   supabase: ReturnType<typeof createClient>;
+  scope: "standard" | "privileged";
+  includeSensitive: boolean;
 }
 
 function newRequestId(): string {
