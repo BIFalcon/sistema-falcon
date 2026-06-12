@@ -893,12 +893,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         const photoH = rowH - titleH - titleGap;
         const img = hlImgs[i];
         if (img) {
-          // object-fit: cover — preenche a célula sem distorcer, cortando
-          // sobras de forma centralizada. O canvas de saída já tem a
-          // proporção exata da célula, então addImage não estica.
-          const cellRatio = colW / photoH;
-          const cropped = cropImageToCover(img, cellRatio, 1200);
-          doc.addImage(cropped, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
+          drawContainedPhoto(doc, img, x, photoY, colW, photoH);
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
