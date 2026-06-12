@@ -648,7 +648,7 @@ function drawLineChart(
   ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, baselineY + 8 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 8 * px);
   });
 
   // legenda
