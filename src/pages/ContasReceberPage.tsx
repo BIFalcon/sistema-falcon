@@ -602,6 +602,8 @@ function DayBreakdown({
     hasRole("controladoria");
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
+  const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
+  const canShowActions = canConfirm || canAdmOrGg;
   const setStatus = useSetToInvoiceGgStatus();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -693,8 +695,9 @@ function DayBreakdown({
                         Não pago: "{e.paid_note}"
                       </div>
                     )}
-                    {canConfirm && !isEditing && (
+                    {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
+                        {canConfirm && (
                         <Button
                           size="sm"
                           variant={e.gg_status === "faturado" ? "default" : "outline"}
@@ -703,6 +706,8 @@ function DayBreakdown({
                         >
                           Faturado
                         </Button>
+                        )}
+                        {canConfirm && (
                         <Button
                           size="sm"
                           variant={e.gg_status === "nao_faturado" ? "default" : "outline"}
@@ -714,6 +719,7 @@ function DayBreakdown({
                         >
                           Não faturado
                         </Button>
+                        )}
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
