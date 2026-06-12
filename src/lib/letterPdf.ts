@@ -675,7 +675,17 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const falconData = logoFromImage(falconLogoImg);
   // Marca d'água: extrai apenas o pássaro da logo Falcon (sem o wordmark).
   const birdWatermark = extractBirdWatermark(falconLogoImg);
-  const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
+  // Mantemos as dimensões intrínsecas para preservar o aspect-ratio no PDF
+  // (object-fit: contain). Sem isso, fotos eram esticadas para a largura cheia
+  // da célula, deixando-as visualmente "achatadas".
+  const hlData = highlightImgs.map((img) => {
+    if (!img) return null;
+    return {
+      data: imageToDataUrl(img, 1200, "jpeg"),
+      w: img.naturalWidth,
+      h: img.naturalHeight,
+    };
+  });
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
