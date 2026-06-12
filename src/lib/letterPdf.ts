@@ -877,7 +877,24 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         const photoH = rowH - titleH - titleGap;
         const img = hlData[i];
         if (img) {
-          doc.addImage(img, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
+          // object-fit: contain — preserva aspect-ratio para não esticar.
+          const ratio = img.w / img.h;
+          const boxRatio = colW / photoH;
+          let drawW: number;
+          let drawH: number;
+          if (ratio >= boxRatio) {
+            drawW = colW;
+            drawH = colW / ratio;
+          } else {
+            drawH = photoH;
+            drawW = photoH * ratio;
+          }
+          const offX = x + (colW - drawW) / 2;
+          const offY = photoY + (photoH - drawH) / 2;
+          // fundo neutro para áreas vazias quando a foto não preenche tudo
+          doc.setFillColor("#F3F4F6");
+          doc.rect(x, photoY, colW, photoH, "F");
+          doc.addImage(img.data, "JPEG", offX, offY, drawW, drawH, undefined, "FAST");
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
