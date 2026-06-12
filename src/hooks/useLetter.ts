@@ -215,6 +215,26 @@ export async function getHighlightPhotoUrl(path: string): Promise<string | null>
   return data?.signedUrl ?? null;
 }
 
+/**
+ * Baixa a foto do destaque como DataURL via SDK (evita problemas de CORS/cache
+ * que ocorrem ao carregar a signed URL diretamente em <img crossOrigin>).
+ * Retorna null em caso de erro, para o gerador de PDF continuar sem quebrar.
+ */
+export async function getHighlightPhotoDataUrl(path: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage.from("letter-highlights").download(path);
+    if (error || !data) return null;
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(data);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /* ─────────── Versões IA ─────────── */
 
 export function useLetterVersions(letterId: string | null | undefined) {
