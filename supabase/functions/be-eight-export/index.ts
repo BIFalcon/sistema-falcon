@@ -3,7 +3,7 @@
 // Only SELECT operations. Returns JSON. Paginated, max 1000 rows.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
-const SCHEMA_VERSION = "falcon-lovable-export-v1";
+const SCHEMA_VERSION = "falcon-lovable-export-v2";
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 500;
 
