@@ -20,7 +20,7 @@ import { MONTHS_PT } from "@/lib/constants";
 import type { IndicatorKey } from "@/lib/dreParser";
 import type { LetterHistory, MonthDatum } from "@/lib/letterHistory";
 import { fetchLetterHistory, fetchDreLines } from "@/lib/letterHistory";
-import { getHighlightPhotoUrl } from "@/hooks/useLetter";
+import { getHighlightPhotoUrl, getHighlightPhotoDataUrl } from "@/hooks/useLetter";
 
 const SIZE = 210; // mm
 const NAVY = "#0E2A47";
@@ -76,6 +76,20 @@ async function loadImage(url: string | null): Promise<HTMLImageElement | null> {
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = url;
+  });
+}
+
+/**
+ * Carrega imagem a partir de uma DataURL (sem CORS).
+ * Usado para fotos baixadas via Supabase SDK como blob.
+ */
+async function loadImageFromDataUrl(dataUrl: string | null): Promise<HTMLImageElement | null> {
+  if (!dataUrl) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
   });
 }
 
@@ -586,9 +600,10 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     previousIndicators = {},
   } = input;
 
-  // resolve URLs assinadas das fotos dos destaques (se vierem como path)
-  const highlightPhotoUrls = await Promise.all(
-    highlights.map(async (h) => h.photo_url ? (await getHighlightPhotoUrl(h.photo_url)) : null),
+  // Baixa as fotos dos destaques como DataURL via SDK do Supabase.
+  // Evita falhas intermitentes de CORS ao carregar a signed URL em <img>.
+  const highlightDataUrls = await Promise.all(
+    highlights.map((h) => h.photo_url ? getHighlightPhotoDataUrl(h.photo_url) : Promise.resolve(null)),
   );
 
   // Carrega imagens
@@ -596,7 +611,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     loadImage(hotelCoverUrl),
     loadImage(brandLogoUrl),
     loadImage(falconLogoUrl),
-    ...highlightPhotoUrls.map((u) => loadImage(u)),
+    ...highlightDataUrls.map((d) => loadImageFromDataUrl(d)),
   ]);
 
   const coverData = coverImg ? imageToDataUrl(coverImg, 1800, "jpeg") : null;
