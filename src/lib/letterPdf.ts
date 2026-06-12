@@ -133,43 +133,21 @@ function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
   return { data, w: img.naturalWidth, h: img.naturalHeight };
 }
 
-/**
- * Recorta uma foto para preencher uma célula com `cellRatio = w/h`
- * usando object-fit: cover (preserva proporção, centraliza, corta sobras).
- * Resolve o problema de fotos retrato/paisagem ficarem com grandes faixas
- * vazias quando a célula tem proporção muito diferente da foto.
- */
-function cropImageToCover(
-  img: HTMLImageElement,
-  cellRatio: number,
-  maxWidth = 1200,
-): string {
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const imgRatio = iw / ih;
-  // src crop rect (no espaço da imagem original)
-  let sw = iw;
-  let sh = ih;
-  if (imgRatio > cellRatio) {
-    // imagem mais larga que a célula → corta laterais
-    sw = ih * cellRatio;
-  } else {
-    // imagem mais alta que a célula → corta topo/fundo
-    sh = iw / cellRatio;
-  }
-  const sx = (iw - sw) / 2;
-  const sy = (ih - sh) / 2;
-  // canvas de saída na proporção da célula
-  const outW = Math.min(maxWidth, Math.round(sw));
-  const outH = Math.round(outW / cellRatio);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, outW);
-  canvas.height = Math.max(1, outH);
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85);
+/** Desenha foto sem distorcer nem cortar: object-fit contain, centralizada. */
+function drawContainedPhoto(doc: jsPDF, img: HTMLImageElement, boxX: number, boxY: number, boxW: number, boxH: number) {
+  const ratio = img.naturalWidth / img.naturalHeight;
+  const boxRatio = boxW / boxH;
+  const drawW = ratio >= boxRatio ? boxW : boxH * ratio;
+  const drawH = ratio >= boxRatio ? boxW / ratio : boxH;
+  const x = boxX + (boxW - drawW) / 2;
+  const y = boxY + (boxH - drawH) / 2;
+
+  doc.setFillColor("#FFFFFF");
+  doc.rect(boxX, boxY, boxW, boxH, "F");
+  doc.addImage(imageToDataUrl(img, 1200, "jpeg"), "JPEG", x, y, drawW, drawH, undefined, "FAST");
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.25);
+  doc.rect(boxX, boxY, boxW, boxH, "S");
 }
 
 /**
@@ -367,6 +345,14 @@ function fmtIntK(v: number | null | undefined): string {
   return Math.round(v).toLocaleString("pt-BR");
 }
 
+function fmtChartValue(field: keyof MonthDatum, value: number): string {
+  if (field === "receita_bruta_total") {
+    if (Math.abs(value) >= 1_000_000) return `R$ ${(value / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
+    if (Math.abs(value) >= 1_000) return `R$ ${Math.round(value / 1_000).toLocaleString("pt-BR")} mil`;
+  }
+  return field === "adr" ? `R$ ${Math.round(value).toLocaleString("pt-BR")}` : String(value);
+}
+
 /* ───────────────── Helpers de página ───────────────── */
 
 function addPage(doc: jsPDF) {
@@ -521,11 +507,7 @@ function drawLineChart(
   ctx.textAlign = "center";
   ctx.fillText(title, canvas.width / 2, 8 * px);
 
-  // padB maior: separa rótulos de valor (acima/abaixo da linha) da faixa
-  // dos rótulos de mês + legenda no rodapé.
-  // padT amplo p/ caber rótulos sempre acima (empilhados quando há 2 séries).
-  // padB mantém os rótulos de mês bem afastados da linha base.
-  const padL = 10 * px, padR = 10 * px, padT = 26 * px, padB = 22 * px;
+  const padL = 18 * px, padR = 11 * px, padT = 19 * px, padB = 20 * px;
   const w = canvas.width - padL - padR;
   const h = canvas.height - padT - padB;
   const x0 = padL, y0 = padT;
@@ -534,11 +516,6 @@ function drawLineChart(
   current.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
   previous.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
 
-  // Cap superior robusto: um único outlier (ex.: R$ 4.049.509 isolado entre
- // valores ~R$ 300k) achatava toda a série na linha de base. Usamos a
-  // mediana × 2,5 como limite superior, garantindo no mínimo o maior valor
-  // "normal" + 15% de respiro. Outliers acima do cap são clipados ao topo
-  // do gráfico (a linha sobe e sai), mas o rótulo permanece visível.
   const sorted = [...all].sort((a, b) => a - b);
   const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
   const rawMax = sorted.length ? sorted[sorted.length - 1] : 1;
@@ -551,16 +528,28 @@ function drawLineChart(
   const span = Math.max(1, max - min);
 
   const n = current.length;
-  const stepX = w / (n - 1);
+  const stepX = n > 1 ? w / (n - 1) : 0;
   const yFor = (v: number) => {
     const clamped = Math.min(Math.max(v, min), max);
     return y0 + h - ((clamped - min) / span) * h;
   };
 
-  // baseline X
-  ctx.strokeStyle = BORDER;
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0 + h); ctx.lineTo(x0 + w, y0 + h); ctx.stroke();
+  const labelFor = (v: number) => field === "receita_bruta_total" ? fmtChartValue(field, v) : formatter(v);
+
+  // grade leve + eixo Y resumido; substitui a necessidade de rotular todos os pontos.
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.font = `${2.7 * px}px Helvetica, Arial`;
+  for (let t = 0; t <= 3; t++) {
+    const value = min + (span * t) / 3;
+    const y = y0 + h - (h * t) / 3;
+    ctx.strokeStyle = t === 0 ? BORDER : "#E5E7EB";
+    ctx.lineWidth = t === 0 ? 1 : 0.7;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke();
+    ctx.fillStyle = MUTED;
+    ctx.fillText(labelFor(value), x0 - 2 * px, y);
+  }
+  ctx.textBaseline = "alphabetic";
 
   // série anterior (cinza)
   ctx.strokeStyle = "#9CA3AF";
@@ -590,11 +579,7 @@ function drawLineChart(
   });
   ctx.stroke();
 
-  // pontos + valores
-  // Posicionamento dinâmico: o maior valor do mês fica acima da linha,
-  // o menor abaixo. Vale para ambas as séries.
-  ctx.textAlign = "center";
-  // Desenha pontos atuais
+  // pontos
   current.forEach((d, i) => {
     const v = d[field] as number | null;
     if (v == null) return;
@@ -602,53 +587,59 @@ function drawLineChart(
     ctx.fillStyle = NAVY;
     ctx.beginPath(); ctx.arc(x, y, 1.6 * px, 0, Math.PI * 2); ctx.fill();
   });
-  // Rótulos posicionados dinamicamente por mês.
-  //  - Quando as duas séries têm valores próximos (Δy < 4px), empilhamos:
-  //    o maior fica acima e o menor abaixo, evitando sobreposição.
-  //  - Quando o rótulo "abaixo" colidiria com o eixo X (faixa dos meses),
-  //    forçamos o rótulo para cima.
-  //  - Pequeno offset horizontal entre séries quando ambas vão pro mesmo
-  //    lado, para não empilhar texto sobre texto.
-  const baselineY = y0 + h;
-  const labelOffset = 2.8 * px;        // gap ponto → 1º rótulo
-  const labelLineHeight = 4.2 * px;    // empilhamento entre rótulos
-  for (let i = 0; i < current.length; i++) {
-    const cv = current[i][field] as number | null;
-    const pv = previous[i]?.[field] as number | null | undefined;
-    const x = x0 + i * stepX;
-    const cy = cv != null ? yFor(cv) : null;
-    const py = pv != null ? yFor(pv) : null;
+  previous.forEach((d, i) => {
+    const v = d[field] as number | null;
+    if (v == null) return;
+    const x = x0 + i * stepX, y = yFor(v);
+    ctx.fillStyle = "#9CA3AF";
+    ctx.beginPath(); ctx.arc(x, y, 1.25 * px, 0, Math.PI * 2); ctx.fill();
+  });
 
-    // Rótulos SEMPRE acima dos pontos — nunca cruzam a faixa dos meses.
-    // Quando há duas séries na mesma coluna, empilhamos verticalmente:
-    // o ponto mais alto recebe o rótulo mais acima, separado por
-    // `labelLineHeight`. Como ambos saem acima do ponto mais alto, eles
-    // ficam sempre visíveis e nunca se sobrepõem.
-    ctx.textBaseline = "bottom";
-    if (cv != null && cy != null && pv != null && py != null) {
-      const topPointY = Math.min(cy, py);
-      const upperY = topPointY - labelOffset - labelLineHeight;
-      const lowerY = topPointY - labelOffset;
-      const cIsUpper = cy <= py;
-      ctx.fillStyle = NAVY;
-      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(cv), x, cIsUpper ? upperY : lowerY);
-      ctx.fillStyle = "#6B7280";
-      ctx.font = `${3 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(pv), x, cIsUpper ? lowerY : upperY);
-    } else if (cv != null && cy != null) {
-      ctx.fillStyle = NAVY;
-      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(cv), x, cy - labelOffset);
-    } else if (pv != null && py != null) {
-      ctx.fillStyle = "#6B7280";
-      ctx.font = `${3 * px}px Helvetica, Arial`;
-      ctx.fillText(formatter(pv), x, py - labelOffset);
-    }
-    // Acaba aqui — sem rótulo "abaixo" nunca; baselineY/labelMinClearance
-    // não são mais necessários porque nunca posicionamos abaixo do ponto.
-    void baselineY;
-  }
+  // Rótulos seletivos e com colisão: mostra últimos valores + min/max, sem poluir.
+  type Candidate = { value: number; x: number; y: number; color: string; bold: boolean; priority: number };
+  const candidates: Candidate[] = [];
+  const addKeyPoints = (series: MonthDatum[], color: string, bold: boolean, basePriority: number) => {
+    const points = series
+      .map((d, i) => ({ i, value: d[field] as number | null }))
+      .filter((p): p is { i: number; value: number } => p.value != null && Number.isFinite(p.value));
+    if (!points.length) return;
+    const last = points[points.length - 1];
+    const maxPoint = points.reduce((a, b) => b.value > a.value ? b : a, points[0]);
+    const minPoint = points.reduce((a, b) => b.value < a.value ? b : a, points[0]);
+    [last, maxPoint, minPoint].forEach((p, order) => {
+      candidates.push({ value: p.value, x: x0 + p.i * stepX, y: yFor(p.value), color, bold, priority: basePriority - order });
+    });
+  };
+  addKeyPoints(current, NAVY, true, 100);
+  addKeyPoints(previous, "#6B7280", false, 70);
+  const placed: { x: number; y: number; w: number; h: number }[] = [];
+  const overlaps = (a: { x: number; y: number; w: number; h: number }) =>
+    placed.some((b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  candidates
+    .sort((a, b) => b.priority - a.priority)
+    .forEach((c) => {
+      const text = labelFor(c.value);
+      ctx.font = `${c.bold ? "bold " : ""}${3 * px}px Helvetica, Arial`;
+      const tw = ctx.measureText(text).width;
+      const th = 4.4 * px;
+      const tries = [
+        { x: c.x, y: c.y - 5.2 * px },
+        { x: c.x, y: c.y + 5.2 * px },
+        { x: c.x - 8 * px, y: c.y - 2 * px },
+        { x: c.x + 8 * px, y: c.y - 2 * px },
+      ];
+      for (const t of tries) {
+        const box = { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th };
+        if (box.x < x0 || box.x + box.w > x0 + w || box.y < y0 || box.y + box.h > y0 + h) continue;
+        if (overlaps(box)) continue;
+        ctx.fillStyle = c.color;
+        ctx.fillText(text, t.x, t.y);
+        placed.push(box);
+        break;
+      }
+    });
   ctx.textBaseline = "alphabetic";
 
   // labels mês (3 letras p/ Jan-Dez) — bem abaixo da baseline,
@@ -657,7 +648,7 @@ function drawLineChart(
   ctx.font = `bold ${3.4 * px}px Helvetica, Arial`;
   current.forEach((d, i) => {
     const x = x0 + i * stepX;
-    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, baselineY + 8 * px);
+    ctx.fillText(MONTHS_PT[d.month - 1].slice(0, 3), x, y0 + h + 8 * px);
   });
 
   // legenda
@@ -902,12 +893,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         const photoH = rowH - titleH - titleGap;
         const img = hlImgs[i];
         if (img) {
-          // object-fit: cover — preenche a célula sem distorcer, cortando
-          // sobras de forma centralizada. O canvas de saída já tem a
-          // proporção exata da célula, então addImage não estica.
-          const cellRatio = colW / photoH;
-          const cropped = cropImageToCover(img, cellRatio, 1200);
-          doc.addImage(cropped, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
+          drawContainedPhoto(doc, img, x, photoY, colW, photoH);
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
