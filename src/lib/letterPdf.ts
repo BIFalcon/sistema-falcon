@@ -133,43 +133,21 @@ function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
   return { data, w: img.naturalWidth, h: img.naturalHeight };
 }
 
-/**
- * Recorta uma foto para preencher uma célula com `cellRatio = w/h`
- * usando object-fit: cover (preserva proporção, centraliza, corta sobras).
- * Resolve o problema de fotos retrato/paisagem ficarem com grandes faixas
- * vazias quando a célula tem proporção muito diferente da foto.
- */
-function cropImageToCover(
-  img: HTMLImageElement,
-  cellRatio: number,
-  maxWidth = 1200,
-): string {
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const imgRatio = iw / ih;
-  // src crop rect (no espaço da imagem original)
-  let sw = iw;
-  let sh = ih;
-  if (imgRatio > cellRatio) {
-    // imagem mais larga que a célula → corta laterais
-    sw = ih * cellRatio;
-  } else {
-    // imagem mais alta que a célula → corta topo/fundo
-    sh = iw / cellRatio;
-  }
-  const sx = (iw - sw) / 2;
-  const sy = (ih - sh) / 2;
-  // canvas de saída na proporção da célula
-  const outW = Math.min(maxWidth, Math.round(sw));
-  const outH = Math.round(outW / cellRatio);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, outW);
-  canvas.height = Math.max(1, outH);
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85);
+/** Desenha foto sem distorcer nem cortar: object-fit contain, centralizada. */
+function drawContainedPhoto(doc: jsPDF, img: HTMLImageElement, boxX: number, boxY: number, boxW: number, boxH: number) {
+  const ratio = img.naturalWidth / img.naturalHeight;
+  const boxRatio = boxW / boxH;
+  const drawW = ratio >= boxRatio ? boxW : boxH * ratio;
+  const drawH = ratio >= boxRatio ? boxW / ratio : boxH;
+  const x = boxX + (boxW - drawW) / 2;
+  const y = boxY + (boxH - drawH) / 2;
+
+  doc.setFillColor("#FFFFFF");
+  doc.rect(boxX, boxY, boxW, boxH, "F");
+  doc.addImage(imageToDataUrl(img, 1200, "jpeg"), "JPEG", x, y, drawW, drawH, undefined, "FAST");
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.25);
+  doc.rect(boxX, boxY, boxW, boxH, "S");
 }
 
 /**
