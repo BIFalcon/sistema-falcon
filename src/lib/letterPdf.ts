@@ -675,7 +675,17 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const falconData = logoFromImage(falconLogoImg);
   // Marca d'água: extrai apenas o pássaro da logo Falcon (sem o wordmark).
   const birdWatermark = extractBirdWatermark(falconLogoImg);
-  const hlData = highlightImgs.map((img) => img ? imageToDataUrl(img, 1200, "jpeg") : null);
+  // Mantemos as dimensões intrínsecas para preservar o aspect-ratio no PDF
+  // (object-fit: contain). Sem isso, fotos eram esticadas para a largura cheia
+  // da célula, deixando-as visualmente "achatadas".
+  const hlData = highlightImgs.map((img) => {
+    if (!img) return null;
+    return {
+      data: imageToDataUrl(img, 1200, "jpeg"),
+      w: img.naturalWidth,
+      h: img.naturalHeight,
+    };
+  });
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
@@ -867,7 +877,24 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         const photoH = rowH - titleH - titleGap;
         const img = hlData[i];
         if (img) {
-          doc.addImage(img, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
+          // object-fit: contain — preserva aspect-ratio para não esticar.
+          const ratio = img.w / img.h;
+          const boxRatio = colW / photoH;
+          let drawW: number;
+          let drawH: number;
+          if (ratio >= boxRatio) {
+            drawW = colW;
+            drawH = colW / ratio;
+          } else {
+            drawH = photoH;
+            drawW = photoH * ratio;
+          }
+          const offX = x + (colW - drawW) / 2;
+          const offY = photoY + (photoH - drawH) / 2;
+          // fundo neutro para áreas vazias quando a foto não preenche tudo
+          doc.setFillColor("#F3F4F6");
+          doc.rect(x, photoY, colW, photoH, "F");
+          doc.addImage(img.data, "JPEG", offX, offY, drawW, drawH, undefined, "FAST");
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
