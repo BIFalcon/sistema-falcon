@@ -327,24 +327,28 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
   for (const t of TABLE_ALLOWLIST) {
     let cols: string[] = [];
     try { cols = await getTableColumns(ctx.supabase, t); } catch { cols = []; }
-    const visible = cols.filter((c) => !isSensitiveColumn(t, c));
+    const sensitive = cols.filter((c) => isSensitiveColumn(t, c));
+    const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await approxRowCount(ctx.supabase, t);
-    const blocked = cols.filter((c) => isSensitiveColumn(t, c));
+    // In privileged + include_sensitive mode, no columns are blocked from the
+    // payload, but the manifest still flags them as sensitive for auditing.
+    const blocked = ctx.includeSensitive ? [] : sensitive;
     tables.push({
       table: t,
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
+      sensitive_columns: sensitive,
       row_count: rowCount,
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
       supports_cursor: true,
       supports_updated_since: incrementalCol !== null,
       non_paginated: false,
-      contains_sensitive: blocked.length > 0,
-      contains_sensitive_data: blocked.length > 0,
+      contains_sensitive: sensitive.length > 0,
+      contains_sensitive_data: sensitive.length > 0,
     });
   }
   const derived = [
@@ -358,6 +362,8 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
     generated_at: new Date().toISOString(),
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     tables,
     derived_resources: DERIVED_RESOURCES,
     derived: derived,
@@ -370,6 +376,8 @@ async function handleHealth(ctx: RequestContext): Promise<Response> {
     generated_at: new Date().toISOString(),
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     resources: {
       tables: TABLE_ALLOWLIST,
       derived: DERIVED_RESOURCES,
