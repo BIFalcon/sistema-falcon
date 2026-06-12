@@ -134,6 +134,45 @@ function logoFromImage(img: HTMLImageElement | null): LogoAsset | null {
 }
 
 /**
+ * Recorta uma foto para preencher uma célula com `cellRatio = w/h`
+ * usando object-fit: cover (preserva proporção, centraliza, corta sobras).
+ * Resolve o problema de fotos retrato/paisagem ficarem com grandes faixas
+ * vazias quando a célula tem proporção muito diferente da foto.
+ */
+function cropImageToCover(
+  img: HTMLImageElement,
+  cellRatio: number,
+  maxWidth = 1200,
+): string {
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const imgRatio = iw / ih;
+  // src crop rect (no espaço da imagem original)
+  let sw = iw;
+  let sh = ih;
+  if (imgRatio > cellRatio) {
+    // imagem mais larga que a célula → corta laterais
+    sw = ih * cellRatio;
+  } else {
+    // imagem mais alta que a célula → corta topo/fundo
+    sh = iw / cellRatio;
+  }
+  const sx = (iw - sw) / 2;
+  const sy = (ih - sh) / 2;
+  // canvas de saída na proporção da célula
+  const outW = Math.min(maxWidth, Math.round(sw));
+  const outH = Math.round(outW / cellRatio);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, outW);
+  canvas.height = Math.max(1, outH);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+/**
  * Extrai apenas o ÍCONE DO PÁSSARO da logo Falcon institucional.
  *
  * A logo padrão tem o pássaro na parte superior e o wordmark "FALCON HOTÉIS"
@@ -484,7 +523,9 @@ function drawLineChart(
 
   // padB maior: separa rótulos de valor (acima/abaixo da linha) da faixa
   // dos rótulos de mês + legenda no rodapé.
-  const padL = 8 * px, padR = 8 * px, padT = 18 * px, padB = 22 * px;
+  // padT amplo p/ caber rótulos sempre acima (empilhados quando há 2 séries).
+  // padB mantém os rótulos de mês bem afastados da linha base.
+  const padL = 10 * px, padR = 10 * px, padT = 26 * px, padB = 22 * px;
   const w = canvas.width - padL - padR;
   const h = canvas.height - padT - padB;
   const x0 = padL, y0 = padT;
@@ -569,9 +610,8 @@ function drawLineChart(
   //  - Pequeno offset horizontal entre séries quando ambas vão pro mesmo
   //    lado, para não empilhar texto sobre texto.
   const baselineY = y0 + h;
-  const labelOffset = 2.6 * px;
-  const labelMinClearance = 3.2 * px; // distância mínima do eixo X para
-                                       // permitir rótulo "abaixo" do ponto
+  const labelOffset = 2.8 * px;        // gap ponto → 1º rótulo
+  const labelLineHeight = 4.2 * px;    // empilhamento entre rótulos
   for (let i = 0; i < current.length; i++) {
     const cv = current[i][field] as number | null;
     const pv = previous[i]?.[field] as number | null | undefined;
@@ -579,44 +619,35 @@ function drawLineChart(
     const cy = cv != null ? yFor(cv) : null;
     const py = pv != null ? yFor(pv) : null;
 
-    // Decide posição (above/below) para cada série
-    let cAbove = true;
-    let pAbove = true;
-    if (cv != null && pv != null && cy != null && py != null) {
-      const close = Math.abs(cy - py) < 4 * px;
-      if (close) {
-        // empilha: realizado em cima, anterior embaixo (mas validando clearance)
-        cAbove = true;
-        pAbove = false;
-      } else {
-        cAbove = cv >= pv;
-        pAbove = !cAbove;
-      }
-    }
-    // Validação de clearance: se "abaixo" cairia em cima dos meses, força acima
-    if (cy != null && !cAbove && baselineY - cy < labelMinClearance) cAbove = true;
-    if (py != null && !pAbove && baselineY - py < labelMinClearance) pAbove = true;
-
-    // Se ambos acabaram do mesmo lado e estão próximos, separa horizontalmente
-    let cDx = 0;
-    let pDx = 0;
-    if (cv != null && pv != null && cy != null && py != null && cAbove === pAbove && Math.abs(cy - py) < 5 * px) {
-      cDx = -6 * px;
-      pDx = 6 * px;
-    }
-
-    if (cv != null && cy != null) {
+    // Rótulos SEMPRE acima dos pontos — nunca cruzam a faixa dos meses.
+    // Quando há duas séries na mesma coluna, empilhamos verticalmente:
+    // o ponto mais alto recebe o rótulo mais acima, separado por
+    // `labelLineHeight`. Como ambos saem acima do ponto mais alto, eles
+    // ficam sempre visíveis e nunca se sobrepõem.
+    ctx.textBaseline = "bottom";
+    if (cv != null && cy != null && pv != null && py != null) {
+      const topPointY = Math.min(cy, py);
+      const upperY = topPointY - labelOffset - labelLineHeight;
+      const lowerY = topPointY - labelOffset;
+      const cIsUpper = cy <= py;
       ctx.fillStyle = NAVY;
       ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
-      ctx.textBaseline = cAbove ? "bottom" : "top";
-      ctx.fillText(formatter(cv), x + cDx, cAbove ? cy - labelOffset : cy + labelOffset);
-    }
-    if (pv != null && py != null) {
+      ctx.fillText(formatter(cv), x, cIsUpper ? upperY : lowerY);
       ctx.fillStyle = "#6B7280";
       ctx.font = `${3 * px}px Helvetica, Arial`;
-      ctx.textBaseline = pAbove ? "bottom" : "top";
-      ctx.fillText(formatter(pv), x + pDx, pAbove ? py - labelOffset : py + labelOffset);
+      ctx.fillText(formatter(pv), x, cIsUpper ? lowerY : upperY);
+    } else if (cv != null && cy != null) {
+      ctx.fillStyle = NAVY;
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(cv), x, cy - labelOffset);
+    } else if (pv != null && py != null) {
+      ctx.fillStyle = "#6B7280";
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(pv), x, py - labelOffset);
     }
+    // Acaba aqui — sem rótulo "abaixo" nunca; baselineY/labelMinClearance
+    // não são mais necessários porque nunca posicionamos abaixo do ponto.
+    void baselineY;
   }
   ctx.textBaseline = "alphabetic";
 
@@ -675,17 +706,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const falconData = logoFromImage(falconLogoImg);
   // Marca d'água: extrai apenas o pássaro da logo Falcon (sem o wordmark).
   const birdWatermark = extractBirdWatermark(falconLogoImg);
-  // Mantemos as dimensões intrínsecas para preservar o aspect-ratio no PDF
-  // (object-fit: contain). Sem isso, fotos eram esticadas para a largura cheia
-  // da célula, deixando-as visualmente "achatadas".
-  const hlData = highlightImgs.map((img) => {
-    if (!img) return null;
-    return {
-      data: imageToDataUrl(img, 1200, "jpeg"),
-      w: img.naturalWidth,
-      h: img.naturalHeight,
-    };
-  });
+  // Mantemos o HTMLImageElement original para gerar o crop com a proporção
+  // exata da célula no momento do desenho (object-fit: cover). Isso evita
+  // tanto o "esticado" (sem preservar proporção) quanto as grandes faixas
+  // vazias do "contain" quando a célula tem proporção diferente da foto.
+  const hlImgs = highlightImgs;
 
   // Histórico de 6 meses para os gráficos
   const history: LetterHistory = await fetchLetterHistory(closing.hotel_id, closing.year, closing.month);
@@ -838,13 +863,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   {
     const n = Math.min(highlights.length, 8);
     if (n > 0) {
-      // Layout dinâmico: ajusta colunas/linhas para caber até 8 destaques
-      // sem cortar nenhuma foto. Usa sempre 1 coluna para 1 item, e 2
-      // colunas a partir de 2 itens.
-      const cols = n === 1 ? 1 : 2;
+      // Layout: 1 col p/ 1 item; 2 cols p/ 2-4 itens (2x2); 3 cols p/ 5-8 (3x3).
+      // Proporções de célula mais próximas de 4:3 para evitar fotos
+      // "panorâmicas" e crop excessivo.
+      const cols = n === 1 ? 1 : n <= 4 ? 2 : 3;
       const rows = Math.ceil(n / cols);
       const gap = 5;
-      const marginX = 12;
+      const marginX = 14;
       const availW = SIZE - marginX * 2;
       const availH = SIZE - HEADER_CONTENT_Y - 8;
       const colW = (availW - (cols - 1) * gap) / cols;
@@ -853,8 +878,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       // Altura do título proporcional à célula (mínimo 7mm, máximo 9mm)
       const titleH = Math.max(7, Math.min(9, rowH * 0.16));
       const titleGap = 1.5;
-      const titleFontSize = rows >= 4 ? 8 : 9;
-      const emptyFontSize = rows >= 4 ? 7 : 8;
+      const titleFontSize = rows >= 3 ? 8 : 9;
+      const emptyFontSize = rows >= 3 ? 7 : 8;
       for (let i = 0; i < n; i++) {
         const h = highlights[i];
         const col = i % cols;
@@ -875,26 +900,14 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         // foto
         const photoY = y + titleH + titleGap;
         const photoH = rowH - titleH - titleGap;
-        const img = hlData[i];
+        const img = hlImgs[i];
         if (img) {
-          // object-fit: contain — preserva aspect-ratio para não esticar.
-          const ratio = img.w / img.h;
-          const boxRatio = colW / photoH;
-          let drawW: number;
-          let drawH: number;
-          if (ratio >= boxRatio) {
-            drawW = colW;
-            drawH = colW / ratio;
-          } else {
-            drawH = photoH;
-            drawW = photoH * ratio;
-          }
-          const offX = x + (colW - drawW) / 2;
-          const offY = photoY + (photoH - drawH) / 2;
-          // fundo neutro para áreas vazias quando a foto não preenche tudo
-          doc.setFillColor("#F3F4F6");
-          doc.rect(x, photoY, colW, photoH, "F");
-          doc.addImage(img.data, "JPEG", offX, offY, drawW, drawH, undefined, "FAST");
+          // object-fit: cover — preenche a célula sem distorcer, cortando
+          // sobras de forma centralizada. O canvas de saída já tem a
+          // proporção exata da célula, então addImage não estica.
+          const cellRatio = colW / photoH;
+          const cropped = cropImageToCover(img, cellRatio, 1200);
+          doc.addImage(cropped, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
