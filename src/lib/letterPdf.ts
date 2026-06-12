@@ -20,7 +20,7 @@ import { MONTHS_PT } from "@/lib/constants";
 import type { IndicatorKey } from "@/lib/dreParser";
 import type { LetterHistory, MonthDatum } from "@/lib/letterHistory";
 import { fetchLetterHistory, fetchDreLines } from "@/lib/letterHistory";
-import { getHighlightPhotoUrl, getHighlightPhotoDataUrl } from "@/hooks/useLetter";
+import { getHighlightPhotoDataUrl } from "@/hooks/useLetter";
 
 const SIZE = 210; // mm
 const NAVY = "#0E2A47";
