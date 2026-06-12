@@ -148,7 +148,12 @@ function isSensitiveColumn(table: string, column: string): boolean {
   return false;
 }
 
-function stripSensitive<T extends Record<string, unknown>>(table: string, row: T): T {
+function stripSensitive<T extends Record<string, unknown>>(
+  table: string,
+  row: T,
+  includeSensitive: boolean,
+): T {
+  if (includeSensitive) return row;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
     if (isSensitiveColumn(table, k)) continue;
