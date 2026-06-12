@@ -545,12 +545,22 @@ Deno.serve(async (req) => {
 
   // Custom token auth.
   const expected = Deno.env.get("BE_EIGHT_EXPORT_TOKEN");
+  const privilegedExpected = Deno.env.get("BE_EIGHT_EXPORT_PRIVILEGED_TOKEN");
   if (!expected) {
     return errorResponse(500, "server_misconfigured", "Export token not configured", requestId);
   }
   const auth = req.headers.get("Authorization") ?? "";
   const m = /^Bearer\s+(.+)$/i.exec(auth);
-  if (!m || m[1] !== expected) {
+  if (!m) {
+    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
+  }
+  const presented = m[1];
+  let scope: "standard" | "privileged";
+  if (privilegedExpected && presented === privilegedExpected) {
+    scope = "privileged";
+  } else if (presented === expected) {
+    scope = "standard";
+  } else {
     return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
   }
 
@@ -559,9 +569,34 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
-  const ctx: RequestContext = { requestId, supabase };
-
   const url = new URL(req.url);
+  const includeSensitiveParam = (url.searchParams.get("include_sensitive") ?? "").toLowerCase();
+  const wantsSensitive = includeSensitiveParam === "true" || includeSensitiveParam === "1";
+  if (wantsSensitive && scope !== "privileged") {
+    return errorResponse(
+      403,
+      "forbidden_scope",
+      "include_sensitive requires the privileged bearer token",
+      requestId,
+    );
+  }
+  const includeSensitive = wantsSensitive && scope === "privileged";
+  const ctx: RequestContext = { requestId, supabase, scope, includeSensitive };
+
+  // Audit log (per request_id). Never logs the token value.
+  const auditEntry = {
+    kind: "be_eight_export_audit",
+    request_id: requestId,
+    scope,
+    include_sensitive: includeSensitive,
+    method: req.method,
+    path: url.pathname,
+    params: Object.fromEntries(url.searchParams.entries()),
+    user_agent: req.headers.get("user-agent") ?? null,
+    at: new Date().toISOString(),
+  };
+  console.log(JSON.stringify(auditEntry));
+
   // Strip the function base prefix to get the action.
   const path = url.pathname.replace(/^.*\/be-eight-export/, "") || "/";
 
