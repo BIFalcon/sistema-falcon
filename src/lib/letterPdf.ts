@@ -523,7 +523,9 @@ function drawLineChart(
 
   // padB maior: separa rótulos de valor (acima/abaixo da linha) da faixa
   // dos rótulos de mês + legenda no rodapé.
-  const padL = 8 * px, padR = 8 * px, padT = 18 * px, padB = 22 * px;
+  // padT amplo p/ caber rótulos sempre acima (empilhados quando há 2 séries).
+  // padB mantém os rótulos de mês bem afastados da linha base.
+  const padL = 10 * px, padR = 10 * px, padT = 26 * px, padB = 22 * px;
   const w = canvas.width - padL - padR;
   const h = canvas.height - padT - padB;
   const x0 = padL, y0 = padT;
@@ -608,9 +610,8 @@ function drawLineChart(
   //  - Pequeno offset horizontal entre séries quando ambas vão pro mesmo
   //    lado, para não empilhar texto sobre texto.
   const baselineY = y0 + h;
-  const labelOffset = 2.6 * px;
-  const labelMinClearance = 3.2 * px; // distância mínima do eixo X para
-                                       // permitir rótulo "abaixo" do ponto
+  const labelOffset = 2.8 * px;        // gap ponto → 1º rótulo
+  const labelLineHeight = 4.2 * px;    // empilhamento entre rótulos
   for (let i = 0; i < current.length; i++) {
     const cv = current[i][field] as number | null;
     const pv = previous[i]?.[field] as number | null | undefined;
@@ -618,44 +619,35 @@ function drawLineChart(
     const cy = cv != null ? yFor(cv) : null;
     const py = pv != null ? yFor(pv) : null;
 
-    // Decide posição (above/below) para cada série
-    let cAbove = true;
-    let pAbove = true;
-    if (cv != null && pv != null && cy != null && py != null) {
-      const close = Math.abs(cy - py) < 4 * px;
-      if (close) {
-        // empilha: realizado em cima, anterior embaixo (mas validando clearance)
-        cAbove = true;
-        pAbove = false;
-      } else {
-        cAbove = cv >= pv;
-        pAbove = !cAbove;
-      }
-    }
-    // Validação de clearance: se "abaixo" cairia em cima dos meses, força acima
-    if (cy != null && !cAbove && baselineY - cy < labelMinClearance) cAbove = true;
-    if (py != null && !pAbove && baselineY - py < labelMinClearance) pAbove = true;
-
-    // Se ambos acabaram do mesmo lado e estão próximos, separa horizontalmente
-    let cDx = 0;
-    let pDx = 0;
-    if (cv != null && pv != null && cy != null && py != null && cAbove === pAbove && Math.abs(cy - py) < 5 * px) {
-      cDx = -6 * px;
-      pDx = 6 * px;
-    }
-
-    if (cv != null && cy != null) {
+    // Rótulos SEMPRE acima dos pontos — nunca cruzam a faixa dos meses.
+    // Quando há duas séries na mesma coluna, empilhamos verticalmente:
+    // o ponto mais alto recebe o rótulo mais acima, separado por
+    // `labelLineHeight`. Como ambos saem acima do ponto mais alto, eles
+    // ficam sempre visíveis e nunca se sobrepõem.
+    ctx.textBaseline = "bottom";
+    if (cv != null && cy != null && pv != null && py != null) {
+      const topPointY = Math.min(cy, py);
+      const upperY = topPointY - labelOffset - labelLineHeight;
+      const lowerY = topPointY - labelOffset;
+      const cIsUpper = cy <= py;
       ctx.fillStyle = NAVY;
       ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
-      ctx.textBaseline = cAbove ? "bottom" : "top";
-      ctx.fillText(formatter(cv), x + cDx, cAbove ? cy - labelOffset : cy + labelOffset);
-    }
-    if (pv != null && py != null) {
+      ctx.fillText(formatter(cv), x, cIsUpper ? upperY : lowerY);
       ctx.fillStyle = "#6B7280";
       ctx.font = `${3 * px}px Helvetica, Arial`;
-      ctx.textBaseline = pAbove ? "bottom" : "top";
-      ctx.fillText(formatter(pv), x + pDx, pAbove ? py - labelOffset : py + labelOffset);
+      ctx.fillText(formatter(pv), x, cIsUpper ? lowerY : upperY);
+    } else if (cv != null && cy != null) {
+      ctx.fillStyle = NAVY;
+      ctx.font = `bold ${3.2 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(cv), x, cy - labelOffset);
+    } else if (pv != null && py != null) {
+      ctx.fillStyle = "#6B7280";
+      ctx.font = `${3 * px}px Helvetica, Arial`;
+      ctx.fillText(formatter(pv), x, py - labelOffset);
     }
+    // Acaba aqui — sem rótulo "abaixo" nunca; baselineY/labelMinClearance
+    // não são mais necessários porque nunca posicionamos abaixo do ponto.
+    void baselineY;
   }
   ctx.textBaseline = "alphabetic";
 
