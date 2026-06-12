@@ -871,13 +871,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   {
     const n = Math.min(highlights.length, 8);
     if (n > 0) {
-      // Layout dinâmico: ajusta colunas/linhas para caber até 8 destaques
-      // sem cortar nenhuma foto. Usa sempre 1 coluna para 1 item, e 2
-      // colunas a partir de 2 itens.
-      const cols = n === 1 ? 1 : 2;
+      // Layout: 1 col p/ 1 item; 2 cols p/ 2-4 itens (2x2); 3 cols p/ 5-8 (3x3).
+      // Proporções de célula mais próximas de 4:3 para evitar fotos
+      // "panorâmicas" e crop excessivo.
+      const cols = n === 1 ? 1 : n <= 4 ? 2 : 3;
       const rows = Math.ceil(n / cols);
       const gap = 5;
-      const marginX = 12;
+      const marginX = 14;
       const availW = SIZE - marginX * 2;
       const availH = SIZE - HEADER_CONTENT_Y - 8;
       const colW = (availW - (cols - 1) * gap) / cols;
@@ -886,8 +886,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       // Altura do título proporcional à célula (mínimo 7mm, máximo 9mm)
       const titleH = Math.max(7, Math.min(9, rowH * 0.16));
       const titleGap = 1.5;
-      const titleFontSize = rows >= 4 ? 8 : 9;
-      const emptyFontSize = rows >= 4 ? 7 : 8;
+      const titleFontSize = rows >= 3 ? 8 : 9;
+      const emptyFontSize = rows >= 3 ? 7 : 8;
       for (let i = 0; i < n; i++) {
         const h = highlights[i];
         const col = i % cols;
@@ -908,26 +908,14 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         // foto
         const photoY = y + titleH + titleGap;
         const photoH = rowH - titleH - titleGap;
-        const img = hlData[i];
+        const img = hlImgs[i];
         if (img) {
-          // object-fit: contain — preserva aspect-ratio para não esticar.
-          const ratio = img.w / img.h;
-          const boxRatio = colW / photoH;
-          let drawW: number;
-          let drawH: number;
-          if (ratio >= boxRatio) {
-            drawW = colW;
-            drawH = colW / ratio;
-          } else {
-            drawH = photoH;
-            drawW = photoH * ratio;
-          }
-          const offX = x + (colW - drawW) / 2;
-          const offY = photoY + (photoH - drawH) / 2;
-          // fundo neutro para áreas vazias quando a foto não preenche tudo
-          doc.setFillColor("#F3F4F6");
-          doc.rect(x, photoY, colW, photoH, "F");
-          doc.addImage(img.data, "JPEG", offX, offY, drawW, drawH, undefined, "FAST");
+          // object-fit: cover — preenche a célula sem distorcer, cortando
+          // sobras de forma centralizada. O canvas de saída já tem a
+          // proporção exata da célula, então addImage não estica.
+          const cellRatio = colW / photoH;
+          const cropped = cropImageToCover(img, cellRatio, 1200);
+          doc.addImage(cropped, "JPEG", x, photoY, colW, photoH, undefined, "FAST");
         } else {
           doc.setFillColor("#F3F4F6");
           doc.rect(x, photoY, colW, photoH, "F");
