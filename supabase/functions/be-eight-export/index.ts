@@ -56,7 +56,6 @@ const TABLE_ALLOWLIST = [
   "ap_uploads",
   "approvals",
   "ar_client_contracts",
-  "ar_clients",
   "ar_open_folio_date_history",
   "ar_open_folio_entries",
   "ar_open_folio_notes",
