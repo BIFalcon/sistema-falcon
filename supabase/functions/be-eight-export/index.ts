@@ -305,6 +305,8 @@ async function exportTable(
     count: rows.length,
     next_cursor: nextCursor,
     has_more: nextCursor !== null,
+    scope: ctx.scope,
+    include_sensitive: ctx.includeSensitive,
     rows,
   }, 200, ctx.requestId);
 }
