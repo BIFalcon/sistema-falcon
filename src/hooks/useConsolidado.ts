@@ -153,6 +153,8 @@ export function useConsolidadoData(input: {
             "line_label.ilike.%rendimento%",
             "line_label.ilike.%lucro%distribu%",
             "line_label.ilike.%resultado%exerc%",
+            "line_label.ilike.%preju%distribu%",
+            "line_label.ilike.%resultado%distribu%",
             "line_label.ilike.%taxa%administ%gop%",
           ].join(","));
 
