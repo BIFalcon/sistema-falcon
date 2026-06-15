@@ -60,7 +60,9 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     isMaster ||
     (!isCarta && currentStatus === "aguardando_comentarios" &&
       (roles.includes("gg" as AppRole) || roles.includes("gop" as AppRole))) ||
-    (requiredRole !== null && roles.includes(requiredRole));
+    (requiredRole !== null && roles.includes(requiredRole)) ||
+    // Patronos atuam como Controladoria em todos os estágios que exigem essa role.
+    (requiredRole === "controladoria" && roles.includes("patronos" as AppRole));
 
   const nextStatus = NEXT[currentStatus];
   const prevStatus = PREV[currentStatus];
