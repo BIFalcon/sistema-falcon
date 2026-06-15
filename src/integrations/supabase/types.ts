@@ -2523,6 +2523,10 @@ export type Database = {
         | "ap_pendencies_to_gg"
         | "open_folio_pendencies_to_gg"
         | "open_folio_overdue"
+        | "ar_hotel_action_to_controladoria"
+        | "ar_controladoria_action_to_hotel"
+        | "ar_open_folio_upload_to_hotel"
+        | "ar_to_invoice_upload_to_hotel"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -2719,6 +2723,10 @@ export const Constants = {
         "ap_pendencies_to_gg",
         "open_folio_pendencies_to_gg",
         "open_folio_overdue",
+        "ar_hotel_action_to_controladoria",
+        "ar_controladoria_action_to_hotel",
+        "ar_open_folio_upload_to_hotel",
+        "ar_to_invoice_upload_to_hotel",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
