@@ -180,6 +180,12 @@ export function AppSidebar() {
   const location = useLocation();
   const { profile, roles, isMaster, hasRole, canViewPerformanceSla } = useAuth();
 
+  // Marketing-only users see ONLY the Marketing area.
+  const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
+  const visibleGroups = isMarketingOnly
+    ? navGroups.filter((g) => g.label === "Marketing")
+    : navGroups;
+
   // Mostra TODOS os roles do usuário, com prefixo "Master" quando aplicável.
   const roleNames = roles.map((r) => ROLE_LABELS[r] ?? r);
   const roleLabel = roles.length === 0
@@ -214,7 +220,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-2">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <SidebarGroup key={group.label}>
             {!collapsed && (
               <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] font-semibold tracking-[0.14em] uppercase">
