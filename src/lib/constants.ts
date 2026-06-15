@@ -148,21 +148,24 @@ export const DRE_PREV_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
 };
 
 // ====== Workflow da Carta ao Investidor ======
-// Fluxo: GG redige/edita -> aprova -> Fernando revisa -> aprovado
+// Fluxo: GG redige/edita -> GG aprova -> GOP revisa/aprova -> Fernando revisa/aprova -> aprovado
 export const CARTA_NEXT_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
   nao_iniciado: "aguardando_gg",
-  aguardando_gg: "aguardando_fernando",
+  aguardando_gg: "aguardando_gop",
+  aguardando_gop: "aguardando_fernando",
   aguardando_fernando: "aprovado",
   devolvido: "aguardando_gg",
 };
 
 export const CARTA_PREV_STATUS: Partial<Record<ClosingStatus, ClosingStatus>> = {
-  aguardando_fernando: "aguardando_gg",
+  aguardando_gop: "aguardando_gg",
+  aguardando_fernando: "aguardando_gop",
   aprovado: "aguardando_fernando",
 };
 
 export const CARTA_STAGE_APPROVER: Record<ClosingStatus, AppRole | null> = {
   aguardando_gg: "gg",
+  aguardando_gop: "gop",
   aguardando_fernando: "fernando",
   nao_iniciado: null,
   em_andamento: null,
@@ -171,7 +174,6 @@ export const CARTA_STAGE_APPROVER: Record<ClosingStatus, AppRole | null> = {
   devolvido: null,
   aguardando_comentarios: null,
   aguardando_controladoria: null,
-  aguardando_gop: null,
   nao_aplicavel: null,
   sem_distribuicao: null,
 };
