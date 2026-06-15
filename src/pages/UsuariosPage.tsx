@@ -306,7 +306,7 @@ function UserRow({
           </div>
         </TableCell>
         <TableCell>
-          {user.is_master || ["controladoria", "patronos", "ri"].includes(user.roles[0] ?? "") ? (
+          {user.is_master || ["controladoria", "patronos", "ri", "marketing"].includes(user.roles[0] ?? "") ? (
             <span className="text-xs text-muted-foreground italic">Todos</span>
           ) : hotelNames.length === 0 ? (
             <span className="text-xs text-muted-foreground">—</span>
@@ -489,7 +489,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const needsHotelSelection =
     !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg" || primaryRole === "adm");
   const hasGlobalAccess =
-    isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "operacoes", "viewer"].includes(primaryRole);
+    isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer"].includes(primaryRole);
 
   // Validações por etapa
   const canAdvanceStep1 =
@@ -654,7 +654,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um role" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[min(60vh,420px)]" position="popper" sideOffset={4}>
+                    <SelectContent className="max-h-[70vh] overflow-y-auto" position="item-aligned">
                       {SELECTABLE_ROLES.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
                           <div className="flex flex-col py-0.5">
