@@ -1,56 +1,46 @@
-# Ampliar reconhecimento da linha "a Distribuir" no Consolidado
-
 ## Objetivo
 
-Garantir que a coluna **Distrib. Total** do Consolidado (Fechamento) sempre puxe a linha "a Distribuir" da DRE quando ela existir, cobrindo todas as variações de rótulo usadas pelos hotéis. Hoje hotéis como Ibis Cuiabá caem para "Lucro Líquido / Prejuízo do Exercício" porque o rótulo da planilha não bate com o regex atual.
+Permitir abrir a Carta ao Investidor e a DRE diretamente no sistema, sem precisar baixar os arquivos.
 
-## Variações que o sistema passará a reconhecer
+## Onde aparece
 
-1. "Lucro / Prejuízo a Distribuir do Período"
-2. "Lucro / Prejuízo a Distribuir no Período"
-3. "Lucro/Prejuízo a Distribuir do Período" (com ou sem espaços ao redor da barra)
-4. "Lucro Prejuízo a Distribuir" (sem a barra)
-5. "Lucro a Distribuir" sozinho
-6. "Prejuízo a Distribuir" sozinho
-7. "Resultado a Distribuir"
+- **Carta ao Investidor** (`/fechamento/carta`): ao lado do botão "Baixar PDF v{n}", adicionar um botão **"Visualizar"** que abre um modal com o PDF inline. Só aparece quando existe `letter.pdf_url`.
+- **DRE** (`/fechamento/dre`): na tabela de versões, **somente a versão mais recente** ganha um botão **"Visualizar"** ao lado de "Baixar". As versões antigas continuam só com download.
 
-## Mudanças
+## Como vai funcionar
 
-### 1. Regex de matching (`src/hooks/useConsolidado.ts`)
+### Carta (PDF)
+- Modal grande (cerca de 90% da viewport).
+- Gera uma signed URL temporária do bucket `investor-letters` para o `pdf_url` da carta.
+- Renderiza o PDF em um `<iframe>` apontando para essa URL (navegadores modernos têm visualizador nativo).
+- Botões no rodapé do modal: "Baixar PDF" (reaproveita o fluxo atual) e "Fechar".
 
-Substituir o array atual `LUCRO_A_DISTRIBUIR_PATTERNS` por um conjunto que cubra as 7 variações acima, na seguinte ordem de prioridade (a mais específica primeiro, para evitar capturar uma linha intermediária quando existir a linha "do/no período"):
+### DRE (Excel renderizado completo)
+- Modal grande com a planilha renderizada como tabela HTML.
+- Baixa o arquivo da versão atual do bucket `closings` via signed URL, lê como ArrayBuffer no cliente e usa **SheetJS** (`xlsx`) para converter cada aba em HTML.
+- Abas (`Tabs`) no topo do modal — uma para cada planilha do arquivo (`SheetNames`).
+- A tabela é scrollável horizontal e verticalmente, mantém mesclagens de células (`sheet_to_html` já cuida disso) e preserva os textos como estão na planilha.
+- Estado de carregamento enquanto baixa/parsa e mensagem de erro amigável se algo falhar.
+- Botões no rodapé: "Baixar planilha" (mesmo fluxo atual) e "Fechar".
+- Limite de segurança: se o arquivo passar de um tamanho razoável (ex.: 10 MB), mostrar aviso "Arquivo grande, pode demorar alguns segundos" antes de renderizar.
 
-```text
-1. /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir\s+(do|no)\s+per[íi]odo/i
-2. /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i
-3. /^\s*lucro\s+a\s+distribuir/i
-4. /^\s*preju[íi]zo\s+a\s+distribuir/i
-5. /resultado\s+a\s+distribuir/i
-```
+## Permissão de acesso
 
-O matching continua usando `findLineByPattern`, que já ignora valores nulos/zero e percorre na ordem dos padrões.
+Não há mudança de permissão: a visualização usa as mesmas signed URLs que o download já usa hoje, então quem pode baixar pode visualizar.
 
-### 2. Filtro `ilike` da query (mesma função, bloco `extraLines`)
+## Detalhes técnicos
 
-Adicionar cláusulas para que o Postgres entregue ao cliente também as linhas que hoje não chegam (ex.: "Prejuízo a Distribuir" sem a palavra "lucro"):
-
-- `line_label.ilike.%preju%distribu%`
-- `line_label.ilike.%resultado%distribu%`
-
-A cláusula existente `%lucro%distribu%` continua e já cobre os casos 1–5.
-
-### 3. Comportamento de fallback (sem mudança)
-
-- Se nenhuma das 5 regex casar, `distribuicaoTotal` continua vindo de `closings.final_distribution ?? closings.estimated_distribution` (comportamento atual).
-- `distribuicaoPorUh` continua derivando de `distribuicaoTotal` quando a linha "Por UH" não existir e o hotel não estiver na `NO_DISTRIB_UH_HOTELS`.
-
-## Validação
-
-1. Recarregar a página Consolidado para o mês/ano usado pelo Ibis Cuiabá e conferir que a coluna **Distrib. Total** agora corresponde à linha "a Distribuir" da DRE (e não ao Lucro Líquido).
-2. Conferir que hotéis que já estavam corretos continuam batendo (sem regressão).
-3. Conferir que hotéis sem essa linha continuam mostrando o valor salvo em `final_distribution` / `estimated_distribution`.
+- Nova dependência: `xlsx` (SheetJS community) — apenas para parsear o Excel no cliente.
+- Componentes novos:
+  - `src/components/closings/CartaPdfViewerDialog.tsx` — modal com `<iframe>` do PDF + botões.
+  - `src/components/closings/DreExcelViewerDialog.tsx` — modal com Tabs por aba, tabela renderizada e botões.
+- Páginas alteradas:
+  - `src/pages/CartaPage.tsx` — adicionar botão "Visualizar" ao lado de "Baixar PDF" e estado de abertura do modal.
+  - `src/pages/DrePage.tsx` — identificar a versão de maior `version_number` e renderizar "Visualizar" só nessa linha.
+- Não muda nada no banco, RLS, edge functions ou storage policies.
 
 ## Fora de escopo
 
-- Não altera o estimador (`dreEstimator.ts`) nem o valor salvo em `closings.estimated_distribution`. A correção é só na leitura do Consolidado, conforme combinado anteriormente.
-- Não muda a página Financeiro, Envio ou a Carta ao Investidor.
+- Editar a planilha pelo viewer (somente leitura).
+- Pré-visualizar versões antigas da DRE.
+- Anotações/comentários sobre células da DRE.
