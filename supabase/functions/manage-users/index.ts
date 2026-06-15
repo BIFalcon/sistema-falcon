@@ -76,7 +76,9 @@ type AppRole =
   | "gop"
   | "ri"
   | "gg"
+  | "adm"
   | "rh"
+  | "marketing"
   | "operacoes"
   | "viewer";
 
