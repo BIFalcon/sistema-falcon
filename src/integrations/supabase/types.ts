@@ -1073,6 +1073,7 @@ export type Database = {
         Row: {
           categoria: string | null
           company_name: string | null
+          created_at: string
           credit: number | null
           debit: number | null
           guest_first_name: string | null
@@ -1088,6 +1089,7 @@ export type Database = {
         Insert: {
           categoria?: string | null
           company_name?: string | null
+          created_at?: string
           credit?: number | null
           debit?: number | null
           guest_first_name?: string | null
@@ -1103,6 +1105,7 @@ export type Database = {
         Update: {
           categoria?: string | null
           company_name?: string | null
+          created_at?: string
           credit?: number | null
           debit?: number | null
           guest_first_name?: string | null
@@ -1127,6 +1130,7 @@ export type Database = {
       }
       conciliation_razao_lines: {
         Row: {
+          created_at: string
           descricao: string
           documento: string | null
           historico: string | null
@@ -1139,6 +1143,7 @@ export type Database = {
           valor_debito: number | null
         }
         Insert: {
+          created_at?: string
           descricao: string
           documento?: string | null
           historico?: string | null
@@ -1151,6 +1156,7 @@ export type Database = {
           valor_debito?: number | null
         }
         Update: {
+          created_at?: string
           descricao?: string
           documento?: string | null
           historico?: string | null
@@ -2305,6 +2311,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      be_eight_list_tables: {
+        Args: never
+        Returns: {
+          columns: string[]
+          table_name: string
+        }[]
+      }
       can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
       delete_email: {
