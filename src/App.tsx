@@ -28,7 +28,6 @@ import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
-import CalendarioPage from "./pages/rh/CalendarioPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
 import TreinamentosPage from "./pages/rh/TreinamentosPage";
 import PoliticasPage from "./pages/rh/PoliticasPage";
