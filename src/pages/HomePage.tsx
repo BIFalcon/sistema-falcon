@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import {
   ClipboardList, TrendingUp, Wallet, ArrowDownCircle,
   ArrowUpCircle, Send, Users, Target,
@@ -131,10 +131,12 @@ function ModuleGrid({ modules }: { modules: ModuleCard[] }) {
 
 export default function HomePage() {
   const {
-    profile, isMaster, isGg,
+    profile, isMaster, isGg, roles,
     hasRole,
     allowedHotels,
   } = useAuth();
+  const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
+  if (isMarketingOnly) return <Navigate to="/marketing/calendario" replace />;
   const { hotelId, month, year } = useModuleFilters("global");
   const today = todayIso();
 
@@ -369,7 +371,7 @@ export default function HomePage() {
 
       {upcomingDates.length > 0 && (
         <NavLink
-          to="/rh/calendario"
+          to="/marketing/calendario"
           className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:border-accent hover:shadow-soft transition-all"
         >
           <div className="h-8 w-8 rounded-md bg-accent/10 text-accent flex items-center justify-center shrink-0">

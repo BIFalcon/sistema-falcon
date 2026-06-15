@@ -25,6 +25,8 @@ import {
   GraduationCap,
   FileText,
   Inbox,
+  Megaphone,
+  Palette,
 } from "lucide-react";
 import {
   Sidebar,
@@ -128,13 +130,27 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "RH & People",
         url: "/rh",
         icon: Users,
-        allowedRoles: ["processos","fernando","controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"] as AppRole[],
+        allowedRoles: ["processos","fernando","controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
-          { title: "Calendário", url: "/rh/calendario", icon: CalendarDays },
           { title: "Organograma", url: "/rh/organograma", icon: Network },
           { title: "Treinamentos", url: "/rh/treinamentos", icon: GraduationCap },
           { title: "Políticas", url: "/rh/politicas", icon: FileText },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      {
+        title: "Marketing",
+        url: "/marketing",
+        icon: Megaphone,
+        allowedRoles: ["processos","fernando","controladoria","patronos","marketing","gop","gg","ri","operacoes","rh","viewer"] as AppRole[],
+        children: [
+          { title: "Calendário", url: "/marketing/calendario", icon: CalendarDays },
+          { title: "Padronização da Marca", url: "/marketing/padroes-marca", icon: Palette },
         ],
       },
     ],
@@ -163,6 +179,12 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { profile, roles, isMaster, hasRole, canViewPerformanceSla } = useAuth();
+
+  // Marketing-only users see ONLY the Marketing area.
+  const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
+  const visibleGroups = isMarketingOnly
+    ? navGroups.filter((g) => g.label === "Marketing")
+    : navGroups;
 
   // Mostra TODOS os roles do usuário, com prefixo "Master" quando aplicável.
   const roleNames = roles.map((r) => ROLE_LABELS[r] ?? r);
@@ -198,7 +220,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-2">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <SidebarGroup key={group.label}>
             {!collapsed && (
               <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] font-semibold tracking-[0.14em] uppercase">

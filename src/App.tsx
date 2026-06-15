@@ -28,10 +28,11 @@ import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
-import CalendarioPage from "./pages/rh/CalendarioPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
 import TreinamentosPage from "./pages/rh/TreinamentosPage";
 import PoliticasPage from "./pages/rh/PoliticasPage";
+import MarketingCalendarioPage from "./pages/marketing/CalendarioPage";
+import PadroesMarcaPage from "./pages/marketing/PadroesMarcaPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -156,11 +157,15 @@ const App = () => (
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","viewer"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
-              <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
-              <Route path="/rh/calendario" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><CalendarioPage /></RoleGuard>} />
-              <Route path="/rh/organograma" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><OrganogramaPage /></RoleGuard>} />
-              <Route path="/rh/treinamentos" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><TreinamentosPage /></RoleGuard>} />
-              <Route path="/rh/politicas" element={<RoleGuard roles={["controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"]}><PoliticasPage /></RoleGuard>} />
+              <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
+              <Route path="/rh/calendario" element={<Navigate to="/marketing/calendario" replace />} />
+              <Route path="/rh/organograma" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><OrganogramaPage /></RoleGuard>} />
+              <Route path="/rh/treinamentos" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TreinamentosPage /></RoleGuard>} />
+              <Route path="/rh/politicas" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><PoliticasPage /></RoleGuard>} />
+              {/* Marketing */}
+              <Route path="/marketing" element={<Navigate to="/marketing/calendario" replace />} />
+              <Route path="/marketing/calendario" element={<RoleGuard roles={["controladoria","patronos","marketing","gop","gg","ri","fernando","operacoes","rh","viewer"]}><MarketingCalendarioPage /></RoleGuard>} />
+              <Route path="/marketing/padroes-marca" element={<RoleGuard roles={["controladoria","patronos","marketing","gop","gg","ri","fernando","operacoes","rh","viewer"]}><PadroesMarcaPage /></RoleGuard>} />
               <Route path="/controladoria" element={<EmBreve />} />
               <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConciliacaoPage /></RoleGuard>} />
 
