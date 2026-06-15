@@ -371,7 +371,7 @@ export default function HomePage() {
 
       {upcomingDates.length > 0 && (
         <NavLink
-          to="/rh/calendario"
+          to="/marketing/calendario"
           className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:border-accent hover:shadow-soft transition-all"
         >
           <div className="h-8 w-8 rounded-md bg-accent/10 text-accent flex items-center justify-center shrink-0">
