@@ -207,20 +207,20 @@ export default function MarketingCalendarioPage() {
               </DialogHeader>
               <Tabs defaultValue="endo">
                 <TabsList className="w-full">
-                  {(["endo", "hospedes"] as PostKind[]).map((k) => {
+                  {(["endo", "hospedes", "hotel"] as PostKind[]).map((k) => {
                     const M = KIND_META[k];
                     const Icon = M.icon;
                     return (
                       <TabsTrigger key={k} value={k} className="flex-1">
-                        <Icon className={`h-3.5 w-3.5 mr-2 ${M.accent}`} /> {M.label}
+                        <Icon className={`h-3.5 w-3.5 mr-2 ${M.accent}`} /> {M.short}
                       </TabsTrigger>
                     );
                   })}
                 </TabsList>
 
-                {(["endo", "hospedes"] as PostKind[]).map((kind) => {
+                {(["endo", "hospedes", "hotel"] as PostKind[]).map((kind) => {
                   const M = KIND_META[kind];
-                  const filterStatus = kind === "endo" ? "ideia" : "acao";
+                  const filterStatus = KIND_TO_STATUS[kind];
                   const filtered = (posts.data ?? []).filter((p: any) => p.status === filterStatus);
                   return (
                     <TabsContent key={kind} value={kind} className="space-y-4 mt-4">
@@ -233,7 +233,7 @@ export default function MarketingCalendarioPage() {
                           {filtered.map((p: any) => (
                             <div key={p.id} className={`pl-3 py-2 pr-2 rounded-md bg-muted/30 ${M.ring}`}>
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.label}</Badge>
+                                <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.short}</Badge>
                                 <p className="text-sm font-medium">{p.title}</p>
                               </div>
                               {p.content && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{p.content}</p>}
@@ -259,10 +259,10 @@ export default function MarketingCalendarioPage() {
                         </div>
                       )}
 
-                      {(kind === "endo" ? canPostEndo : canPostHospedes) && (
+                      {canPost[kind] && (
                         <Card className={`p-3 bg-muted/30 space-y-2 ${M.ring}`}>
                           <Label className={`text-xs flex items-center gap-1.5 ${M.accent}`}>
-                            <M.icon className="h-3 w-3" /> Postar {M.label}
+                            <M.icon className="h-3 w-3" /> {kind === "hotel" ? "Registrar ação do hotel" : `Postar ${M.short}`}
                           </Label>
                           <Input
                             placeholder="Título"
