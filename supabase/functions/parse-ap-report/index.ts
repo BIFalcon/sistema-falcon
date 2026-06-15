@@ -678,6 +678,10 @@ Deno.serve(async (req) => {
       entries: parsed.length,
       documents_extracted: docsCreated,
       skipped,
+      updated: updates.length,
+      inserted: inserts.length,
+      archived_paid: toArchivePaid.length,
+      omie_removed: toArchiveOther.length,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("parse-ap-report error", err);
