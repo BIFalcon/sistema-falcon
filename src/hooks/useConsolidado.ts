@@ -80,6 +80,8 @@ const DISTRIBUICAO_POR_UH_PATTERNS = [
 const LUCRO_A_DISTRIBUIR_PATTERNS = [
   /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir\s+(do|no)\s+per[íi]odo/i,
   /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i,
+  /^\s*lucro\s+a\s+distribuir/i,
+  /^\s*preju[íi]zo\s+a\s+distribuir/i,
   /resultado\s+a\s+distribuir/i,
 ];
 
