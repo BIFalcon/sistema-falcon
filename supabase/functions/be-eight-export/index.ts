@@ -77,11 +77,13 @@ const INCREMENTAL_CANDIDATES = [
   "uploaded_at",
   "sent_at",
   "received_at",
+  "created_at",
+  // Conditional event timestamps (may be NULL on unaffected rows). Used only
+  // when no row-level creation/update timestamp exists.
   "unsubscribed_at",
   "suppressed_at",
   "approved_at",
   "paid_at",
-  "created_at",
 ];
 const CURSOR_CANDIDATES = [...INCREMENTAL_CANDIDATES, "id"];
 
