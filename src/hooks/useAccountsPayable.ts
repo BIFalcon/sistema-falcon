@@ -439,6 +439,46 @@ export function useApPaidEntries(hotelId: string | null, enabled = false) {
   });
 }
 
+/** Lançamentos arquivados por sumirem da nova remessa do OMIE (e não foram pagos). */
+export function useApOmieRemovedEntries(hotelId: string | null, enabled = false) {
+  return useQuery({
+    enabled: enabled && !!hotelId,
+    queryKey: ["ap-omie-removed", hotelId],
+    queryFn: async (): Promise<(ApEntry & { archived_upload?: { file_name: string | null; uploaded_at: string | null } | null })[]> => {
+      if (!hotelId) return [];
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("*, archived_upload:ap_uploads!ap_entries_archived_upload_id_fkey(file_name, uploaded_at)")
+        .eq("hotel_id", hotelId)
+        .not("archived_at", "is", null)
+        .eq("archived_reason", "omie_removed")
+        .order("archived_at", { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+}
+
+/** Restaura para ativos um lançamento removido do OMIE. */
+export function useRestoreApEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; hotelId: string }) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ archived_at: null, archived_reason: null, archived_upload_id: null } as never)
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-omie-removed", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
 /** Busca lançamentos AP de todos os hotéis acessíveis ao usuário (RLS aplica). */
 export function useAllApEntries(enabled = true) {
   return useQuery({
