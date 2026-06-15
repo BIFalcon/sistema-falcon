@@ -26,8 +26,9 @@ import { CommentsThread } from "@/components/closings/CommentsThread";
 import { StatusBadge } from "@/components/closings/StatusBadge";
 import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
 import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
+import { CartaPdfViewerDialog } from "@/components/closings/CartaPdfViewerDialog";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
-import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle, RefreshCw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,6 +111,7 @@ export default function CartaPage() {
     hasRole("financeiro") &&
     closing?.status_carta === "aguardando_gg";
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const hasDreData = indicators.length > 0;
 
   const missingAssets: string[] = [];
@@ -417,9 +419,14 @@ export default function CartaPage() {
                   {generatingPdf ? "Gerando PDF…" : "Gerar PDF"}
                 </Button>
                 {letter?.pdf_url && (
-                  <Button size="sm" variant="ghost" onClick={handleDownloadPdf} className="gap-2">
-                    <FileDown className="h-4 w-4" /> Baixar PDF v{letter.pdf_version}
-                  </Button>
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => setPdfViewerOpen(true)} className="gap-2">
+                      <Eye className="h-4 w-4" /> Visualizar PDF v{letter.pdf_version}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={handleDownloadPdf} className="gap-2">
+                      <FileDown className="h-4 w-4" /> Baixar PDF v{letter.pdf_version}
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
