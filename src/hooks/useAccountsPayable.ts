@@ -61,6 +61,8 @@ export interface ApEntry {
   original_amount: number | null;
   is_group?: boolean | null;
   grouped_ids?: string[] | null;
+  archived_reason?: string | null;
+  archived_upload_id?: string | null;
 }
 
 export interface ApBankBalance {
