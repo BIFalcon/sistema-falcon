@@ -337,8 +337,14 @@ export default function ContasPagarPage() {
   // Soma da seleção em lote
   const selectedTotal = useMemo(() => {
     let sum = 0;
-    for (const e of entries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
-    for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += Number(e.amount ?? 0);
+    const effective = (e: { amount: number | null; paid_amount?: number | null; paid_interest?: number | null }) => {
+      const hasInterest = e.paid_interest != null && Number(e.paid_interest) !== 0;
+      return hasInterest && e.paid_amount != null
+        ? Number(e.paid_amount)
+        : Number(e.amount ?? 0);
+    };
+    for (const e of entries) if (selectedIds.has(e.id)) sum += effective(e);
+    for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += effective(e);
     return sum;
   }, [selectedIds, entries, distributionEntries]);
 
