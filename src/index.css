@@ -132,3 +132,21 @@
   scrollbar-width: thin;
   scrollbar-color: hsla(0, 0%, 100%, 0.15) transparent;
 }
+
+/* DRE Excel viewer (SheetJS sheet_to_html) */
+.dre-excel-viewer table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: hsl(var(--foreground));
+}
+.dre-excel-viewer td,
+.dre-excel-viewer th {
+  border: 1px solid hsl(var(--border));
+  padding: 4px 8px;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.dre-excel-viewer tr:nth-child(even) td {
+  background: hsl(var(--muted) / 0.4);
+}
