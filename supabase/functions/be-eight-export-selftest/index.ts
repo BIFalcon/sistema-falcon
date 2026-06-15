@@ -49,15 +49,14 @@ Deno.serve(async (req) => {
   // Probe each exportable table with a far-future updated_since: expect 200 + 0 rows.
   {
     const tables = Object.keys((out.table_to_incremental as Record<string, string | null>) ?? {});
-    const results: Array<{ table: string; status: number; count: number | null; error?: string }> = [];
-    for (const t of tables) {
+    const results = await Promise.all(tables.map(async (t) => {
       const r = await fetch(
         `${base}/export-table?table=${encodeURIComponent(t)}&updated_since=2099-01-01T00:00:00Z&include_sensitive=true&limit=1`,
         { headers: hdrs(priv) },
       );
-      const body = await r.json();
-      results.push({ table: t, status: r.status, count: body.count ?? null, error: body.error_code });
-    }
+      const body = await r.json().catch(() => ({}));
+      return { table: t, status: r.status, count: body.count ?? null, error: body.error_code };
+    }));
     out.future_probe_results = results;
     out.future_probe_failures = results.filter((r) => r.status !== 200 || (r.count ?? -1) !== 0);
   }
