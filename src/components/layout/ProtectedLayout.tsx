@@ -6,6 +6,7 @@ import { AppHeader } from "./AppHeader";
 import { FilterProvider } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppRole } from "@/lib/constants";
+import { GlobalLoadingBar } from "@/components/ui/GlobalLoadingBar";
 
 function FullScreenLoader() {
   return (
@@ -44,6 +45,7 @@ export function ProtectedLayout({ requireRoles, children }: Props) {
   return (
     <FilterProvider>
       <SidebarProvider defaultOpen={false}>
+        <GlobalLoadingBar />
         <div className="min-h-screen flex w-full bg-background">
           <AppSidebar />
           <div className="flex-1 flex flex-col min-w-0">
