@@ -165,7 +165,9 @@ export default function ContasPagarPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [hideTrivial, setHideTrivial] = useState(true);
-  const [groupNd, setGroupNd] = useState(true);
+  // Agrupamento automático de lançamentos N/D foi removido a pedido do time —
+  // mantemos o flag em `false` para preservar a assinatura do hook derivado.
+  const groupNd = false;
   const [searchText, setSearchText] = useState<string>("");
   const [scheduledFrom, setScheduledFrom] = useState<string>("");
   const [scheduledTo, setScheduledTo] = useState<string>("");
@@ -1225,10 +1227,6 @@ export default function ContasPagarPage() {
                 <Checkbox checked={hideTrivial} onCheckedChange={(c) => setHideTrivial(!!c)} />
                 Ocultar lançamentos abaixo de R$ 1,00
               </label>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <Checkbox checked={groupNd} onCheckedChange={(c) => setGroupNd(!!c)} />
-                Agrupar lançamentos N/D do mesmo fornecedor e data
-              </label>
             </div>
 
             {(() => {
@@ -1239,7 +1237,7 @@ export default function ContasPagarPage() {
                 searchText !== "",
                 !hideTrivial,
               ].filter(Boolean).length;
-              const hasActiveFilters = activeFilterCount > 0 || !groupNd;
+              const hasActiveFilters = activeFilterCount > 0;
               if (!hasActiveFilters) return null;
               return (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-sm">
@@ -1263,7 +1261,6 @@ export default function ContasPagarPage() {
                       setSelectedCategories([]);
                       setSearchText("");
                       setHideTrivial(true);
-                      setGroupNd(true);
                     }}
                   >
                     Limpar filtros
