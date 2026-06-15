@@ -40,14 +40,35 @@ export default function FinanceiroVisaoGeralPage() {
   const { data: allHotels = [] } = useAllHotels();
   void allHotels;
 
-  // Filtros globais (header)
-  const { hotelId, dateFrom, dateTo } = useModuleFilters("fechamento");
+  // Filtros globais (header) — compartilhados com Contas a Pagar
+  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
   const hotelFilter = hotelId ?? "all";
 
   // Dados
   const { data: apEntries = [] } = useAllApEntries();
   const { data: toInvoice = [] } = useToInvoiceEntries({ hotelId: null });
   const { data: openFolio = [] } = useOpenFolioEntries();
+
+  // Juros pagos: lançamentos pagos ficam arquivados, então precisam ser
+  // buscados separadamente para somar os juros do período.
+  const { data: paidEntries = [] } = useQuery({
+    queryKey: ["ap-paid-all-juros"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("hotel_id,payment_status,payment_paid_at,paid_interest")
+        .eq("payment_status", "pago")
+        .not("paid_interest", "is", null)
+        .limit(20000);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        hotel_id: string | null;
+        payment_status: string;
+        payment_paid_at: string | null;
+        paid_interest: number | null;
+      }>;
+    },
+  });
 
   // Filtro por hotel/aplicação de RLS no front
   const filterByScope = <T extends { hotel_id: string | null }>(arr: T[]) => {
@@ -74,6 +95,10 @@ export default function FinanceiroVisaoGeralPage() {
     () => filterByScope(openFolio),
     [openFolio, hotelFilter, seesAllHotels, restrictedHotelIds],
   );
+  const paidScoped = useMemo(
+    () => filterByScope(paidEntries),
+    [paidEntries, hotelFilter, seesAllHotels, restrictedHotelIds],
+  );
 
   // ===== Cards superiores (usam date range) =====
   const totalDuePeriod = useMemo(
@@ -90,17 +115,21 @@ export default function FinanceiroVisaoGeralPage() {
     [apScoped, dateFrom, dateTo],
   );
 
+  // Em atraso: ignora o filtro de período — sempre tudo que venceu até ontem
+  // (espelha o filtro "vencidos" do Contas a Pagar).
+  const todayIso = new Date().toISOString().slice(0, 10);
   const totalOverdue = useMemo(
     () =>
       apScoped
         .filter(
           (e) =>
             e.due_date &&
-            e.due_date < dateFrom &&
-            e.gg_approval !== "rejected",
+            e.due_date < todayIso &&
+            e.gg_approval !== "rejected" &&
+            e.payment_status !== "pago",
         )
         .reduce((s, e) => s + Number(e.amount ?? 0), 0),
-    [apScoped, dateFrom],
+    [apScoped, todayIso],
   );
 
   const totalOpenFolio = useMemo(
@@ -108,16 +137,15 @@ export default function FinanceiroVisaoGeralPage() {
     [ofScoped],
   );
 
-  // TODO: quando contratos estiverem cadastrados, filtrar por
-  // transaction_date + prazo_dias_contrato ao invés de transaction_date diretamente.
+  // A faturar no período: usa Vencimento Estimado (definido no módulo de Faturamento).
   const totalToInvoicePeriod = useMemo(
     () =>
       tiScoped
         .filter(
           (e) =>
-            e.transaction_date &&
-            e.transaction_date >= dateFrom &&
-            e.transaction_date <= dateTo,
+            e.estimated_due_date &&
+            e.estimated_due_date >= dateFrom &&
+            e.estimated_due_date <= dateTo,
         )
         .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0),
     [tiScoped, dateFrom, dateTo],
@@ -126,19 +154,17 @@ export default function FinanceiroVisaoGeralPage() {
   const saldoLiquido = totalOpenFolio - totalDuePeriod;
 
   // ===== Encargos financeiros =====
-  // Juros pagos no período (apenas lançamentos pagos com juros)
+  // Juros pagos no período (data efetiva do pagamento dentro do range).
   const jurosPagos = useMemo(
     () =>
-      apScoped
-        .filter(
-          (e) =>
-            e.payment_status === "pago" &&
-            e.due_date &&
-            e.due_date >= dateFrom &&
-            e.due_date <= dateTo,
-        )
+      paidScoped
+        .filter((e) => {
+          if (!e.payment_paid_at) return false;
+          const d = e.payment_paid_at.slice(0, 10);
+          return d >= dateFrom && d <= dateTo;
+        })
         .reduce((s, e) => s + Number(e.paid_interest ?? 0), 0),
-    [apScoped, dateFrom, dateTo],
+    [paidScoped, dateFrom, dateTo],
   );
 
   // Antecipação: deriva mês/ano de dateFrom
