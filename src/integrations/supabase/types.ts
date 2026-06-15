@@ -1663,6 +1663,36 @@ export type Database = {
           },
         ]
       }
+      marketing_brand_assets: {
+        Row: {
+          attachments: Json
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_queue: {
         Row: {
           body_md: string
@@ -2275,6 +2305,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -2365,6 +2396,7 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      is_marketing_audience: { Args: { _user_id: string }; Returns: boolean }
       is_master: { Args: { _user_id: string }; Returns: boolean }
       is_patronos: { Args: { _user_id: string }; Returns: boolean }
       is_protected_user: { Args: { _user_id: string }; Returns: boolean }
