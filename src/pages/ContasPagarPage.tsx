@@ -873,23 +873,46 @@ export default function ContasPagarPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-wider">
-                  {showPaid ? "Lançamentos pagos (arquivados)" : "Lançamentos"}
+                  {showOmieRemoved
+                    ? "Removidos do OMIE (arquivados)"
+                    : showPaid
+                      ? "Lançamentos pagos (arquivados)"
+                      : "Lançamentos"}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {showPaid
-                    ? `${paidEntries.length} lançamento(s) pago(s)`
-                    : `${filtered.length} ${filtered.length === 1 ? "lançamento" : "lançamentos"} · total ${entries.length}`}
+                  {showOmieRemoved
+                    ? `${omieRemovedEntries.length} lançamento(s) sumiram da remessa do OMIE sem terem sido pagos`
+                    : showPaid
+                      ? `${paidEntries.length} lançamento(s) pago(s)`
+                      : `${filtered.length} ${filtered.length === 1 ? "lançamento" : "lançamentos"} · total ${entries.length}`}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {hotelId && (
-                  <Button
-                    variant={showPaid ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => { setShowPaid((p) => !p); setSelectedIds(new Set()); }}
-                  >
-                    {showPaid ? "Ver ativos" : "Ver pagos"}
-                  </Button>
+                  <>
+                    <Button
+                      variant={showPaid ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowPaid((p) => !p);
+                        setShowOmieRemoved(false);
+                        setSelectedIds(new Set());
+                      }}
+                    >
+                      {showPaid ? "Ver ativos" : "Ver pagos"}
+                    </Button>
+                    <Button
+                      variant={showOmieRemoved ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowOmieRemoved((p) => !p);
+                        setShowPaid(false);
+                        setSelectedIds(new Set());
+                      }}
+                    >
+                      {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
+                    </Button>
+                  </>
                 )}
                 {lastUpload && (
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
