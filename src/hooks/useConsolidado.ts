@@ -72,6 +72,17 @@ const DISTRIBUICAO_POR_UH_PATTERNS = [
   /dividendo\s+efetivamente\s+distribu[íi]do\s+\(por\s+apartamento\)/i,
 ];
 
+// Linha "Lucro / Prejuízo a Distribuir do período" (e variantes).
+// Quando presente na DRE, ela tem prioridade sobre o Lucro Líquido /
+// Prejuízo do Exercício (que ainda fica acima dela na DRE, antes das
+// deduções de taxas pós-GOP). É essa linha que deve alimentar a coluna
+// "Distrib. Total" do Consolidado.
+const LUCRO_A_DISTRIBUIR_PATTERNS = [
+  /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir\s+(do|no)\s+per[íi]odo/i,
+  /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i,
+  /resultado\s+a\s+distribuir/i,
+];
+
 export function useConsolidadoData(input: {
   hotelIds: string[];
   year: number;
@@ -172,6 +183,12 @@ export function useConsolidadoData(input: {
           null;
         const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
         const incentiveFee = findLineByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        // Prioriza a linha explícita da DRE; só cai para o valor salvo no
+        // closing (que vem do lucro_liquido do estimador) quando a linha
+        // não existir.
+        const lucroADistribuir = findLineByPattern(lines, LUCRO_A_DISTRIBUIR_PATTERNS);
+        const distribuicaoTotalFinal =
+          lucroADistribuir != null ? lucroADistribuir : distribuicaoTotal;
         const distribuicaoPorUh = NO_DISTRIB_UH_HOTELS.has(hotelId)
           ? null
           : (() => {
@@ -179,8 +196,8 @@ export function useConsolidadoData(input: {
               if (fromDre != null) return Math.abs(fromDre);
               // Block 12: usa nº fixo de apartamentos do hotel (não UHs do mês).
               const numApartments = numApartmentsByHotel.get(hotelId) ?? null;
-              return distribuicaoTotal != null && numApartments && numApartments > 0
-                ? distribuicaoTotal / numApartments
+              return distribuicaoTotalFinal != null && numApartments && numApartments > 0
+                ? distribuicaoTotalFinal / numApartments
                 : null;
             })();
         return {
@@ -192,7 +209,7 @@ export function useConsolidadoData(input: {
           receitaBruta,
           taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
           incentiveFee: incentiveFee != null ? Math.abs(incentiveFee) : null,
-          distribuicaoTotal,
+          distribuicaoTotal: distribuicaoTotalFinal,
           uhsDisponiveis,
           distribuicaoPorUh,
           gop,
