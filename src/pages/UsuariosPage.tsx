@@ -79,7 +79,7 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
   { value: "adm", label: "Administrativo do Hotel (Adm)", scope: "Acesso apenas ao próprio hotel" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
-  { value: "marketing", label: "Marketing", scope: "Acesso apenas ao módulo de Marketing" },
+  { value: "marketing", label: "Marketing", scope: "Acesso ao módulo de Marketing em todos os hotéis" },
   { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
   { value: "viewer", label: "Visualizador / Generalista", scope: "Somente leitura em todos os módulos" },
 ];
@@ -654,7 +654,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um role" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[60vh]">
+                    <SelectContent className="max-h-[min(60vh,420px)]" position="popper" sideOffset={4}>
                       {SELECTABLE_ROLES.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
                           <div className="flex flex-col py-0.5">
