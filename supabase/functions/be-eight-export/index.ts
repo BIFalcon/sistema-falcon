@@ -338,10 +338,16 @@ async function approxRowCount(
 }
 
 async function handleManifest(ctx: RequestContext): Promise<Response> {
+  let discovered: Map<string, string[]>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch (e) {
+    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  }
+  const tableNames = Array.from(discovered.keys()).sort();
   const tables = [];
-  for (const t of TABLE_ALLOWLIST) {
-    let cols: string[] = [];
-    try { cols = await getTableColumns(ctx.supabase, t); } catch { cols = []; }
+  for (const t of tableNames) {
+    const cols: string[] = discovered.get(t) ?? [];
     const sensitive = cols.filter((c) => isSensitiveColumn(t, c));
     const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
@@ -379,6 +385,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     generated_at: new Date().toISOString(),
     scope: ctx.scope,
     include_sensitive: ctx.includeSensitive,
+    denylist: Array.from(TABLE_DENYLIST).sort(),
     tables,
     derived_resources: DERIVED_RESOURCES,
     derived: derived,
@@ -386,6 +393,11 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
 }
 
 async function handleHealth(ctx: RequestContext): Promise<Response> {
+  let tableNames: string[] = [];
+  try {
+    const discovered = await getDiscovery(ctx);
+    tableNames = Array.from(discovered.keys()).sort();
+  } catch { /* fall through with empty list */ }
   return json({
     ok: true,
     generated_at: new Date().toISOString(),
@@ -393,8 +405,9 @@ async function handleHealth(ctx: RequestContext): Promise<Response> {
     request_id: ctx.requestId,
     scope: ctx.scope,
     include_sensitive: ctx.includeSensitive,
+    denylist: Array.from(TABLE_DENYLIST).sort(),
     resources: {
-      tables: TABLE_ALLOWLIST,
+      tables: tableNames,
       derived: DERIVED_RESOURCES,
     },
   }, 200, ctx.requestId);
