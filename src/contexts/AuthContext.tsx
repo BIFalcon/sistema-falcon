@@ -167,6 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ((r as string) === "financeiro") {
       return roles.includes("controladoria" as AppRole) || roles.includes("patronos" as AppRole);
     }
+    // Todo patrono é controladoria por definição do time.
+    if ((r as string) === "controladoria") {
+      return roles.includes("controladoria" as AppRole) || roles.includes("patronos" as AppRole);
+    }
     return roles.includes(r);
   };
 
