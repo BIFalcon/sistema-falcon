@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import {
   ClipboardList, TrendingUp, Wallet, ArrowDownCircle,
   ArrowUpCircle, Send, Users, Target,
@@ -135,13 +135,8 @@ export default function HomePage() {
     hasRole,
     allowedHotels,
   } = useAuth();
-  const navigate = useNavigate();
   const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
-  if (isMarketingOnly) {
-    // Marketing users only have access to the Marketing area.
-    setTimeout(() => navigate("/marketing/calendario", { replace: true }), 0);
-    return null;
-  }
+  if (isMarketingOnly) return <Navigate to="/marketing/calendario" replace />;
   const { hotelId, month, year } = useModuleFilters("global");
   const today = todayIso();
 
