@@ -14,8 +14,9 @@ import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { DreStageStepper } from "@/components/closings/DreStageStepper";
 import { StatusBadge } from "@/components/closings/StatusBadge";
 import { DreIndicatorsPanel } from "@/components/closings/DreIndicatorsPanel";
+import { DreExcelViewerDialog } from "@/components/closings/DreExcelViewerDialog";
 import { MONTHS_PT, STATUS_LABELS } from "@/lib/constants";
-import { ArrowLeft, Download, FileSpreadsheet, Upload } from "lucide-react";
+import { ArrowLeft, Download, Eye, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DrePage() {
@@ -55,6 +56,14 @@ export default function DrePage() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const canUpload = isMaster || hasRole("controladoria") || hasRole("gop");
+
+  const latestVersionId = useMemo(() => {
+    if (!versions.length) return null;
+    return versions.reduce((acc, v) => (v.version_number > acc.version_number ? v : acc), versions[0]).id;
+  }, [versions]);
+
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerTarget, setViewerTarget] = useState<{ path: string; name: string; version: number } | null>(null);
 
   const hotel = useMemo(
     () => allowedHotels.find((h) => h.id === closing?.hotel_id),
@@ -194,9 +203,24 @@ export default function DrePage() {
                         {new Date(v.created_at).toLocaleString("pt-BR")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadVersion(v.file_url, v.file_name)}>
-                          <Download className="h-3.5 w-3.5" /> Baixar
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          {v.id === latestVersionId && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1"
+                              onClick={() => {
+                                setViewerTarget({ path: v.file_url, name: v.file_name, version: v.version_number });
+                                setViewerOpen(true);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" /> Visualizar
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadVersion(v.file_url, v.file_name)}>
+                            <Download className="h-3.5 w-3.5" /> Baixar
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
