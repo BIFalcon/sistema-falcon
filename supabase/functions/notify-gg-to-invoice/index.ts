@@ -48,7 +48,12 @@ Deno.serve(async (req) => {
         .select("role")
         .eq("user_id", userRes.user.id);
       const roleSet = new Set((roleRows ?? []).map((r: any) => r.role));
-      const isAllowed = roleSet.has("processos") || roleSet.has("fernando") || roleSet.has("financeiro");
+      const isAllowed =
+        roleSet.has("processos") ||
+        roleSet.has("fernando") ||
+        roleSet.has("financeiro") ||
+        roleSet.has("controladoria") ||
+        roleSet.has("patronos");
       if (!isAllowed) {
         return new Response(
           JSON.stringify({ error: "forbidden" }),

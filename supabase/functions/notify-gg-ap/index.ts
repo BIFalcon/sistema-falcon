@@ -1,6 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
-import { sendLovableEmail } from "npm:@lovable.dev/email-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,21 +15,6 @@ const fmtDate = (s: string | null) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 };
-
-function buildEmailHtml(md: string, baseUrl: string): string {
-  // Conversão simples de markdown para HTML.
-  const html = md
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[(.+?)\]\((\/[^)]+)\)/g, `<a href="${baseUrl}$2">$1</a>`)
-    .replace(/\[(.+?)\]\((.+?)\)/g, `<a href="$2">$1</a>`)
-    .replace(/\n/g, "<br/>");
-  return `<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;line-height:1.5;max-width:640px;margin:0 auto;padding:24px;">
-  <div style="font-size:14px;">${html}</div>
-  <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
-  <p style="font-size:12px;color:#777;">Sistema Falcon Hotels</p>
-</body></html>`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -108,11 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const ggRecipients = (ggs ?? []) as { user_id: string; email: string; display_name: string | null }[];
-    const recipients = [
-      ...ggRecipients,
-      ...extraEmails.map((email) => ({ user_id: null as unknown as string, email, display_name: null })),
-    ];
-    if (recipients.length === 0) {
+    if (ggRecipients.length === 0 && extraEmails.length === 0) {
       return new Response(JSON.stringify({ ok: true, sent: 0, recipients: 0, warning: "no_gg_for_hotel" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -146,25 +126,58 @@ Deno.serve(async (req) => {
 
     const linkUrl = `/financeiro/contas-pagar`;
 
-    // Envia e-mail diretamente para cada destinatário (sem depender de closing_id)
-    const APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://sistema-falcon.lovable.app";
-    let sent = 0;
-    for (const r of recipients) {
-      try {
-        await sendLovableEmail({
-          from: "Sistema Falcon <notificacoes@notify.falconhoteis.com.br>",
-          to: r.email,
+    // Enfileira na notification_queue (que é processada por process-notifications
+    // e tem retries/DLQ/visibilidade no painel de e-mails). Para os destinatários
+    // "extras" (sem user_id no sistema) usamos o próprio user_id do solicitante
+    // no campo recipient_user_id (campo NOT NULL) — o e-mail efetivamente enviado
+    // continua sendo o do destino informado em recipient_email.
+    const rows = [
+      ...ggRecipients
+        .filter((g) => g.user_id && g.email)
+        .map((g) => ({
+          event: "ap_pendencies_to_gg",
+          closing_id: "00000000-0000-0000-0000-000000000000",
+          hotel_id: hotelId,
+          recipient_user_id: g.user_id,
+          recipient_email: g.email,
+          recipient_role: "gg",
           subject,
-          html: buildEmailHtml(bodyMd, APP_URL),
-        });
-        sent++;
-      } catch (err) {
-        console.error("[notify-gg-ap] falha ao enviar para", r.email, err);
-      }
+          body_md: bodyMd,
+          link_url: linkUrl,
+          payload: { manual: true, entry_count: entries.length, total },
+        })),
+      ...extraEmails.map((email) => ({
+        event: "ap_pendencies_to_gg" as const,
+        closing_id: "00000000-0000-0000-0000-000000000000",
+        hotel_id: hotelId,
+        recipient_user_id: userId,
+        recipient_email: email,
+        recipient_role: "extra",
+        subject,
+        body_md: bodyMd,
+        link_url: linkUrl,
+        payload: { manual: true, extra: true, requested_by: userId },
+      })),
+    ];
+
+    if (rows.length === 0) {
+      return new Response(JSON.stringify({ ok: true, sent: 0, recipients: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { error: enqErr } = await admin.from("notification_queue").insert(rows);
+    if (enqErr) throw enqErr;
+
+    // Dispara o processador imediatamente (best-effort) para não esperar o cron.
+    try {
+      await admin.functions.invoke("process-notifications", { body: {} });
+    } catch (err) {
+      console.warn("[notify-gg-ap] process-notifications invoke falhou (segue no cron):", err);
     }
 
     return new Response(
-      JSON.stringify({ ok: true, sent, recipients: recipients.length, link_url: linkUrl }),
+      JSON.stringify({ ok: true, sent: rows.length, recipients: rows.length, link_url: linkUrl }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
