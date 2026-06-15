@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Heart, Users as UsersIcon, Loader2, Paperclip, X, FileText } from "lucide-react";
+import { Plus, Heart, Users as UsersIcon, Building2, Loader2, Paperclip, X, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRhCalendarDates, useAddCalendarPost, type RhCalendarDate } from "@/hooks/useRh";
@@ -48,30 +48,51 @@ function useCalendarPosts(dateId: string | null, year: number) {
   });
 }
 
-/** endo = Endomarketing (rosa/violeta); hospedes = Ação com Hóspedes (azul/cyan) */
-type PostKind = "endo" | "hospedes";
-const KIND_META: Record<PostKind, { label: string; icon: any; chip: string; ring: string; accent: string }> = {
+/**
+ * endo     = material de Endomarketing (postado pelo Marketing)
+ * hospedes = material para Ação com Hóspedes (postado pelo Marketing)
+ * hotel    = ações realizadas pelo hotel (postado pelo GG)
+ */
+type PostKind = "endo" | "hospedes" | "hotel";
+const KIND_META: Record<PostKind, { label: string; short: string; icon: any; chip: string; ring: string; accent: string }> = {
   endo: {
-    label: "Endomarketing",
+    label: "Material — Endomarketing",
+    short: "Endomarketing",
     icon: Heart,
     chip: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/40",
     ring: "border-l-4 border-pink-500",
     accent: "text-pink-600 dark:text-pink-400",
   },
   hospedes: {
-    label: "Ação com Hóspedes",
+    label: "Material — Ação com Hóspedes",
+    short: "Ação com Hóspedes",
     icon: UsersIcon,
     chip: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/40",
     ring: "border-l-4 border-sky-500",
     accent: "text-sky-600 dark:text-sky-400",
   },
+  hotel: {
+    label: "Ação realizada pelo hotel",
+    short: "Ação do Hotel",
+    icon: Building2,
+    chip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
+    ring: "border-l-4 border-emerald-500",
+    accent: "text-emerald-600 dark:text-emerald-400",
+  },
 };
+
+const KIND_TO_STATUS: Record<PostKind, string> = { endo: "ideia", hospedes: "acao", hotel: "hotel_acao" };
+const STATUS_TO_KIND: Record<string, PostKind> = { ideia: "endo", acao: "hospedes", hotel_acao: "hotel" };
 
 export default function MarketingCalendarioPage() {
   const { data: dates = [] } = useRhCalendarDates();
   const { hasRole, isMaster } = useAuth();
-  const canPostEndo = isMaster || hasRole("marketing");
-  const canPostHospedes = canPostEndo || hasRole("gg") || hasRole("gop");
+  const isMarketing = isMaster || hasRole("marketing");
+  const canPost: Record<PostKind, boolean> = {
+    endo: isMarketing,
+    hospedes: isMarketing,
+    hotel: isMarketing || hasRole("gg") || hasRole("gop"),
+  };
   const [open, setOpen] = useState<RhCalendarDate | null>(null);
   const year = new Date().getFullYear();
   const addPost = useAddCalendarPost();
@@ -112,8 +133,7 @@ export default function MarketingCalendarioPage() {
     if (!open) return;
     if (!form.title.trim()) { toast.error("Informe um título."); return; }
     try {
-      // Use existing status values to preserve compat: endo => "ideia", hospedes => "acao"
-      const status = kind === "endo" ? "ideia" : "acao";
+      const status = KIND_TO_STATUS[kind];
       await addPost.mutateAsync({
         date_id: open.id, year, title: form.title, content: form.content || undefined, status, attachments,
       });
@@ -187,20 +207,20 @@ export default function MarketingCalendarioPage() {
               </DialogHeader>
               <Tabs defaultValue="endo">
                 <TabsList className="w-full">
-                  {(["endo", "hospedes"] as PostKind[]).map((k) => {
+                  {(["endo", "hospedes", "hotel"] as PostKind[]).map((k) => {
                     const M = KIND_META[k];
                     const Icon = M.icon;
                     return (
                       <TabsTrigger key={k} value={k} className="flex-1">
-                        <Icon className={`h-3.5 w-3.5 mr-2 ${M.accent}`} /> {M.label}
+                        <Icon className={`h-3.5 w-3.5 mr-2 ${M.accent}`} /> {M.short}
                       </TabsTrigger>
                     );
                   })}
                 </TabsList>
 
-                {(["endo", "hospedes"] as PostKind[]).map((kind) => {
+                {(["endo", "hospedes", "hotel"] as PostKind[]).map((kind) => {
                   const M = KIND_META[kind];
-                  const filterStatus = kind === "endo" ? "ideia" : "acao";
+                  const filterStatus = KIND_TO_STATUS[kind];
                   const filtered = (posts.data ?? []).filter((p: any) => p.status === filterStatus);
                   return (
                     <TabsContent key={kind} value={kind} className="space-y-4 mt-4">
@@ -213,7 +233,7 @@ export default function MarketingCalendarioPage() {
                           {filtered.map((p: any) => (
                             <div key={p.id} className={`pl-3 py-2 pr-2 rounded-md bg-muted/30 ${M.ring}`}>
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.label}</Badge>
+                                <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.short}</Badge>
                                 <p className="text-sm font-medium">{p.title}</p>
                               </div>
                               {p.content && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{p.content}</p>}
@@ -239,10 +259,10 @@ export default function MarketingCalendarioPage() {
                         </div>
                       )}
 
-                      {(kind === "endo" ? canPostEndo : canPostHospedes) && (
+                      {canPost[kind] && (
                         <Card className={`p-3 bg-muted/30 space-y-2 ${M.ring}`}>
                           <Label className={`text-xs flex items-center gap-1.5 ${M.accent}`}>
-                            <M.icon className="h-3 w-3" /> Postar {M.label}
+                            <M.icon className="h-3 w-3" /> {kind === "hotel" ? "Registrar ação do hotel" : `Postar ${M.short}`}
                           </Label>
                           <Input
                             placeholder="Título"

@@ -52,6 +52,7 @@ export function AppHeader() {
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
   const isHomePage = pathname === "/" || pathname === "/home";
+  const isMarketing = pathname.startsWith("/marketing");
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
@@ -98,7 +99,7 @@ export function AppHeader() {
   return (
     <header className="h-16 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-30">
       <div className="flex items-center gap-2 flex-1">
-        {!isHomePage && (
+        {!isHomePage && !isMarketing && (
         <>
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden md:inline">
           Filtros
