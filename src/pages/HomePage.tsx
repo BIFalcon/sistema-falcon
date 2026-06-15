@@ -131,10 +131,17 @@ function ModuleGrid({ modules }: { modules: ModuleCard[] }) {
 
 export default function HomePage() {
   const {
-    profile, isMaster, isGg,
+    profile, isMaster, isGg, roles,
     hasRole,
     allowedHotels,
   } = useAuth();
+  const navigate = useNavigate();
+  const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
+  if (isMarketingOnly) {
+    // Marketing users only have access to the Marketing area.
+    setTimeout(() => navigate("/marketing/calendario", { replace: true }), 0);
+    return null;
+  }
   const { hotelId, month, year } = useModuleFilters("global");
   const today = todayIso();
 
