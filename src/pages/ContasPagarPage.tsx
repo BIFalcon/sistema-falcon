@@ -1514,6 +1514,8 @@ export default function ContasPagarPage() {
                 </div>
               </details>
             )}
+            </>
+            )}
           </Card>
         </>
       )}
