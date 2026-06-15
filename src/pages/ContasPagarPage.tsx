@@ -56,6 +56,8 @@ import {
   useApEntries,
   useAllApEntries,
   useApPaidEntries,
+  useApOmieRemovedEntries,
+  useRestoreApEntry,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useTodayBankBalance,
