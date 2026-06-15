@@ -56,6 +56,8 @@ import {
   useApEntries,
   useAllApEntries,
   useApPaidEntries,
+  useApOmieRemovedEntries,
+  useRestoreApEntry,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useTodayBankBalance,
@@ -182,6 +184,11 @@ export default function ContasPagarPage() {
   // Toggle "Ver pagos" (Bloco 7)
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
+
+  // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
+  const [showOmieRemoved, setShowOmieRemoved] = useState(false);
+  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(hotelId, showOmieRemoved);
+  const restoreApEntry = useRestoreApEntry();
 
   // Edição inline de cartão a receber (Bloco 11)
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -866,23 +873,46 @@ export default function ContasPagarPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-wider">
-                  {showPaid ? "Lançamentos pagos (arquivados)" : "Lançamentos"}
+                  {showOmieRemoved
+                    ? "Removidos do OMIE (arquivados)"
+                    : showPaid
+                      ? "Lançamentos pagos (arquivados)"
+                      : "Lançamentos"}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {showPaid
-                    ? `${paidEntries.length} lançamento(s) pago(s)`
-                    : `${filtered.length} ${filtered.length === 1 ? "lançamento" : "lançamentos"} · total ${entries.length}`}
+                  {showOmieRemoved
+                    ? `${omieRemovedEntries.length} lançamento(s) sumiram da remessa do OMIE sem terem sido pagos`
+                    : showPaid
+                      ? `${paidEntries.length} lançamento(s) pago(s)`
+                      : `${filtered.length} ${filtered.length === 1 ? "lançamento" : "lançamentos"} · total ${entries.length}`}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {hotelId && (
-                  <Button
-                    variant={showPaid ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => { setShowPaid((p) => !p); setSelectedIds(new Set()); }}
-                  >
-                    {showPaid ? "Ver ativos" : "Ver pagos"}
-                  </Button>
+                  <>
+                    <Button
+                      variant={showPaid ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowPaid((p) => !p);
+                        setShowOmieRemoved(false);
+                        setSelectedIds(new Set());
+                      }}
+                    >
+                      {showPaid ? "Ver ativos" : "Ver pagos"}
+                    </Button>
+                    <Button
+                      variant={showOmieRemoved ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowOmieRemoved((p) => !p);
+                        setShowPaid(false);
+                        setSelectedIds(new Set());
+                      }}
+                    >
+                      {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
+                    </Button>
+                  </>
                 )}
                 {lastUpload && (
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
@@ -952,6 +982,85 @@ export default function ContasPagarPage() {
               </div>
             </div>
 
+            {showOmieRemoved && hotelId && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Estes lançamentos estavam ativos e <strong>sumiram</strong> em uma remessa do OMIE sem serem marcados como pagos.
+                  Use "Restaurar" se quiser reincluí-los na lista de ativos.
+                </p>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fornecedor</TableHead>
+                        <TableHead>Nº Doc</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead>Status anterior</TableHead>
+                        <TableHead>Removido em</TableHead>
+                        <TableHead>Remessa</TableHead>
+                        <TableHead className="text-right">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {omieRemovedEntries.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground text-sm py-6">
+                            Nenhum lançamento removido do OMIE.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {omieRemovedEntries.map((e) => {
+                        const upload = (e as { archived_upload?: { file_name: string | null; uploaded_at: string | null } | null }).archived_upload;
+                        return (
+                          <TableRow key={e.id}>
+                            <TableCell>
+                              <div className="font-medium">{e.supplier}</div>
+                              {e.cnpj && <div className="text-[11px] text-muted-foreground">{e.cnpj}</div>}
+                            </TableCell>
+                            <TableCell className="text-xs">{e.document_number ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{e.due_date ? fmtDate(e.due_date) : "—"}</TableCell>
+                            <TableCell className="text-right text-xs">{fmtBRL(Number(e.amount))}</TableCell>
+                            <TableCell><PaymentStatusBadge status={e.payment_status} /></TableCell>
+                            <TableCell className="text-xs">{e.archived_at ? fmtDateTime(e.archived_at) : "—"}</TableCell>
+                            <TableCell className="text-xs">
+                              {upload?.file_name ?? "—"}
+                              {upload?.uploaded_at && (
+                                <div className="text-[11px] text-muted-foreground">{fmtDateTime(upload.uploaded_at)}</div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {canManage ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={restoreApEntry.isPending}
+                                  onClick={async () => {
+                                    try {
+                                      await restoreApEntry.mutateAsync({ id: e.id, hotelId });
+                                      toast.success("Lançamento restaurado para ativos");
+                                    } catch (err: any) {
+                                      toast.error(err?.message ?? "Falha ao restaurar");
+                                    }
+                                  }}
+                                >
+                                  Restaurar
+                                </Button>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">sem permissão</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {!showOmieRemoved && (
+            <>
             {/* Filtros (sticky) */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-5 px-5 pt-2 pb-3 border-b space-y-3">
             <div className="relative">
@@ -1404,6 +1513,8 @@ export default function ContasPagarPage() {
                   ))}
                 </div>
               </details>
+            )}
+            </>
             )}
           </Card>
         </>

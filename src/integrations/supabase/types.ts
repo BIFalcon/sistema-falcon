@@ -221,6 +221,7 @@ export type Database = {
           amount: number
           archived_at: string | null
           archived_reason: string | null
+          archived_upload_id: string | null
           bank_account: string | null
           category: string | null
           cnpj: string | null
@@ -263,6 +264,7 @@ export type Database = {
           amount: number
           archived_at?: string | null
           archived_reason?: string | null
+          archived_upload_id?: string | null
           bank_account?: string | null
           category?: string | null
           cnpj?: string | null
@@ -305,6 +307,7 @@ export type Database = {
           amount?: number
           archived_at?: string | null
           archived_reason?: string | null
+          archived_upload_id?: string | null
           bank_account?: string | null
           category?: string | null
           cnpj?: string | null
@@ -344,6 +347,13 @@ export type Database = {
           upload_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_entries_archived_upload_id_fkey"
+            columns: ["archived_upload_id"]
+            isOneToOne: false
+            referencedRelation: "ap_uploads"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_entries_hotel_id_fkey"
             columns: ["hotel_id"]

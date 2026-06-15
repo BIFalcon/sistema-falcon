@@ -640,7 +640,14 @@ Deno.serve(async (req) => {
     }
     for (let i = 0; i < toArchiveOther.length; i += archiveChunk) {
       const chunk = toArchiveOther.slice(i, i + archiveChunk);
-      await admin.from("ap_entries").update({ archived_at: nowIso }).in("id", chunk);
+      await admin
+        .from("ap_entries")
+        .update({
+          archived_at: nowIso,
+          archived_reason: "omie_removed",
+          archived_upload_id: uploadRow.id,
+        })
+        .in("id", chunk);
     }
 
     // 5. ZIP OMIE: salva docs extraídos
@@ -671,6 +678,10 @@ Deno.serve(async (req) => {
       entries: parsed.length,
       documents_extracted: docsCreated,
       skipped,
+      updated: updates.length,
+      inserted: inserts.length,
+      archived_paid: toArchivePaid.length,
+      omie_removed: toArchiveOther.length,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("parse-ap-report error", err);
