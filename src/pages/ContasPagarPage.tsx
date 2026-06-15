@@ -185,6 +185,11 @@ export default function ContasPagarPage() {
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
 
+  // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
+  const [showOmieRemoved, setShowOmieRemoved] = useState(false);
+  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(hotelId, showOmieRemoved);
+  const restoreApEntry = useRestoreApEntry();
+
   // Edição inline de cartão a receber (Bloco 11)
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editCardAmount, setEditCardAmount] = useState("");
