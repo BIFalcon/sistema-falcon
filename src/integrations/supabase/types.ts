@@ -1702,7 +1702,7 @@ export type Database = {
       notification_queue: {
         Row: {
           body_md: string
-          closing_id: string
+          closing_id: string | null
           created_at: string
           dispatched_at: string | null
           error_message: string | null
@@ -1720,7 +1720,7 @@ export type Database = {
         }
         Insert: {
           body_md: string
-          closing_id: string
+          closing_id?: string | null
           created_at?: string
           dispatched_at?: string | null
           error_message?: string | null
@@ -1738,7 +1738,7 @@ export type Database = {
         }
         Update: {
           body_md?: string
-          closing_id?: string
+          closing_id?: string | null
           created_at?: string
           dispatched_at?: string | null
           error_message?: string | null
@@ -2323,6 +2323,19 @@ export type Database = {
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
+      }
+      enqueue_ar_notification: {
+        Args: {
+          _body_md: string
+          _event: Database["public"]["Enums"]["notification_event"]
+          _hotel_id: string
+          _link_url: string
+          _payload?: Json
+          _roles_for_hotel: Database["public"]["Enums"]["app_role"][]
+          _roles_global: Database["public"]["Enums"]["app_role"][]
+          _subject: string
+        }
+        Returns: number
       }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
