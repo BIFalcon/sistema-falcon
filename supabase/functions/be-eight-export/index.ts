@@ -531,7 +531,13 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   if (resource === "table_counts") {
     const parsed = parseCursor(cursorParam);
     const startToken = parsed?.value ? String(parsed.value) : "";
-    const remaining = TABLE_ALLOWLIST.filter((t) => t > startToken);
+    let allTables: string[];
+    try {
+      allTables = Array.from((await getDiscovery(ctx)).keys()).sort();
+    } catch (e) {
+      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    }
+    const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; row_count: number | null }> = [];
     for (const t of page) {
@@ -549,12 +555,19 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   if (resource === "latest_updates") {
     const parsed = parseCursor(cursorParam);
     const startToken = parsed?.value ? String(parsed.value) : "";
-    const remaining = TABLE_ALLOWLIST.filter((t) => t > startToken);
+    let discovered: Map<string, string[]>;
+    try {
+      discovered = await getDiscovery(ctx);
+    } catch (e) {
+      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    }
+    const allTables = Array.from(discovered.keys()).sort();
+    const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; column: string | null; latest: string | null }> = [];
     for (const t of page) {
-      let col: string | null = null;
-      try { col = await pickColumn(ctx.supabase, t, INCREMENTAL_CANDIDATES); } catch { col = null; }
+      const cols = discovered.get(t) ?? [];
+      const col = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
       if (!col) { rows.push({ table: t, column: null, latest: null }); continue; }
       const { data, error } = await ctx.supabase
         .from(t).select(col).order(col, { ascending: false }).limit(1);
