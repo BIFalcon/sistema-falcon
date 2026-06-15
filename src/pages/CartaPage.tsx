@@ -91,7 +91,16 @@ export default function CartaPage() {
   );
 
   const skip = hotelSkipsCarta(closing?.hotel_id);
-  const canEdit = isMaster || hasRole("gop") || hasRole("controladoria") || hasRole("gg");
+  // Carta só pode ser editada quando estiver no estágio certo do fluxo:
+  // - GG: somente em "aguardando_gg" (libera após GOP+Fernando aprovarem a DRE)
+  // - GOP: somente em "aguardando_fernando" (revisão antes do Fernando)
+  // - Master/Controladoria: sempre podem editar (backoffice)
+  const stage = closing?.status_carta;
+  const canEdit =
+    isMaster ||
+    hasRole("controladoria") ||
+    (hasRole("gg") && stage === "aguardando_gg") ||
+    (hasRole("gop") && stage === "aguardando_fernando");
   const canEditReserveFund =
     !canEdit &&
     hasRole("financeiro") &&
