@@ -206,8 +206,19 @@ async function exportTable(
   table: string,
   url: URL,
 ): Promise<Response> {
-  if (!TABLE_ALLOWLIST.includes(table)) {
-    return errorResponse(400, "table_not_allowed", `Table "${table}" is not in the allowlist`, ctx.requestId);
+  let discovered: Map<string, string[]>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch (e) {
+    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  }
+  if (!discovered.has(table)) {
+    return errorResponse(
+      400,
+      "table_not_allowed",
+      `Table "${table}" is not exportable (missing or denied)`,
+      ctx.requestId,
+    );
   }
 
   const limit = Math.min(
@@ -222,11 +233,15 @@ async function exportTable(
   const year = url.searchParams.get("year");
   const month = url.searchParams.get("month");
 
-  let cols: string[];
-  try {
-    cols = await getTableColumns(ctx.supabase, table);
-  } catch (e) {
-    return errorResponse(500, "introspection_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  // Prefer the authoritative column list from pg_catalog so that empty
+  // tables also work. Fall back to a 1-row sample if discovery is empty.
+  let cols: string[] = discovered.get(table) ?? [];
+  if (cols.length === 0) {
+    try {
+      cols = await getTableColumns(ctx.supabase, table);
+    } catch (e) {
+      return errorResponse(500, "introspection_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    }
   }
 
   const hasCol = (c: string) => cols.includes(c);
