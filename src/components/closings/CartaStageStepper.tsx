@@ -4,6 +4,7 @@ import type { ClosingStatus } from "@/lib/constants";
 const STAGES: { status: ClosingStatus; label: string }[] = [
   { status: "nao_iniciado", label: "Não iniciado" },
   { status: "aguardando_gg", label: "Aguardando GG" },
+  { status: "aguardando_gop", label: "Aguardando GOP" },
   { status: "aguardando_fernando", label: "Aguardando Fernando" },
   { status: "aprovado", label: "Aprovado" },
 ];
