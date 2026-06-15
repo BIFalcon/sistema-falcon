@@ -25,6 +25,8 @@ import {
   GraduationCap,
   FileText,
   Inbox,
+  Megaphone,
+  Palette,
 } from "lucide-react";
 import {
   Sidebar,
@@ -128,13 +130,27 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "RH & People",
         url: "/rh",
         icon: Users,
-        allowedRoles: ["processos","fernando","controladoria","patronos","rh","marketing","gop","gg","ri","operacoes","viewer"] as AppRole[],
+        allowedRoles: ["processos","fernando","controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
-          { title: "Calendário", url: "/rh/calendario", icon: CalendarDays },
           { title: "Organograma", url: "/rh/organograma", icon: Network },
           { title: "Treinamentos", url: "/rh/treinamentos", icon: GraduationCap },
           { title: "Políticas", url: "/rh/politicas", icon: FileText },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      {
+        title: "Marketing",
+        url: "/marketing",
+        icon: Megaphone,
+        allowedRoles: ["processos","fernando","controladoria","patronos","marketing","gop","gg","ri","operacoes","rh","viewer"] as AppRole[],
+        children: [
+          { title: "Calendário", url: "/marketing/calendario", icon: CalendarDays },
+          { title: "Padronização da Marca", url: "/marketing/padroes-marca", icon: Palette },
         ],
       },
     ],
