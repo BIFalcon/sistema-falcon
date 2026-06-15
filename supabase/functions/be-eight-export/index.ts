@@ -90,6 +90,7 @@ interface RequestContext {
   supabase: ReturnType<typeof createClient>;
   scope: "standard" | "privileged";
   includeSensitive: boolean;
+  discovery?: Promise<Map<string, string[]>>;
 }
 
 function newRequestId(): string {
@@ -150,6 +151,27 @@ async function getTableColumns(
   if (error) throw error;
   if (!data || data.length === 0) return [];
   return Object.keys(data[0] as Record<string, unknown>);
+}
+
+// Discover all exportable public-schema base tables via a service_role-only
+// RPC. Tables in TABLE_DENYLIST are filtered out. Returns a map of
+// table_name -> column list. Cached per request via ctx.discovery.
+async function discoverTables(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Map<string, string[]>> {
+  const { data, error } = await supabase.rpc("be_eight_list_tables");
+  if (error) throw new Error(`discovery_failed: ${error.message}`);
+  const map = new Map<string, string[]>();
+  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[] }>) {
+    if (TABLE_DENYLIST.has(row.table_name)) continue;
+    map.set(row.table_name, row.columns ?? []);
+  }
+  return map;
+}
+
+async function getDiscovery(ctx: RequestContext): Promise<Map<string, string[]>> {
+  if (!ctx.discovery) ctx.discovery = discoverTables(ctx.supabase);
+  return await ctx.discovery;
 }
 
 async function pickColumn(
