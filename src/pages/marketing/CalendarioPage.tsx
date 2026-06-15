@@ -70,7 +70,8 @@ const KIND_META: Record<PostKind, { label: string; icon: any; chip: string; ring
 export default function MarketingCalendarioPage() {
   const { data: dates = [] } = useRhCalendarDates();
   const { hasRole, isMaster } = useAuth();
-  const canPost = isMaster || hasRole("marketing");
+  const canPostEndo = isMaster || hasRole("marketing");
+  const canPostHospedes = canPostEndo || hasRole("gg") || hasRole("gop");
   const [open, setOpen] = useState<RhCalendarDate | null>(null);
   const year = new Date().getFullYear();
   const addPost = useAddCalendarPost();
@@ -238,7 +239,7 @@ export default function MarketingCalendarioPage() {
                         </div>
                       )}
 
-                      {canPost && (
+                      {(kind === "endo" ? canPostEndo : canPostHospedes) && (
                         <Card className={`p-3 bg-muted/30 space-y-2 ${M.ring}`}>
                           <Label className={`text-xs flex items-center gap-1.5 ${M.accent}`}>
                             <M.icon className="h-3 w-3" /> Postar {M.label}
