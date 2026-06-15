@@ -247,6 +247,14 @@ export default function DrePage() {
           <CommentsThread closingId={closing.id} stage="dre" />
         </div>
       </div>
+      <DreExcelViewerDialog
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        filePath={viewerTarget?.path}
+        fileName={viewerTarget?.name}
+        versionLabel={viewerTarget ? `v${viewerTarget.version}` : undefined}
+        onDownload={viewerTarget ? () => downloadVersion(viewerTarget.path, viewerTarget.name) : undefined}
+      />
     </div>
   );
 }
