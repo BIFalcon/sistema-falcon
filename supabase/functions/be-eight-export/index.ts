@@ -3,7 +3,7 @@
 // Only SELECT operations. Returns JSON. Paginated, max 1000 rows.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
-const SCHEMA_VERSION = "falcon-lovable-export-v2";
+const SCHEMA_VERSION = "falcon-lovable-export-v3";
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 500;
 
@@ -13,9 +13,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-// Per-table column blocklist to avoid exposing secrets/credentials/tokens.
+// Per-table column blocklist to avoid exposing secrets/credentials/tokens when
+// `include_sensitive` is NOT enabled. Privileged callers with
+// `include_sensitive=true` receive every column.
 const COLUMN_BLOCKLIST: Record<string, string[]> = {
-  email_unsubscribe_tokens: ["token", "token_hash"],
   profiles: [],
   user_permissions: [],
   system_settings: [],
@@ -45,54 +46,17 @@ const GLOBAL_SENSITIVE_PATTERNS = [
   /cnpj/i,
 ];
 
-// Allowlist of exportable tables.
-const TABLE_ALLOWLIST = [
-  "ap_anticipation",
-  "ap_bank_balance",
-  "ap_card_receivable",
-  "ap_documents",
-  "ap_entries",
-  "ap_notification_log",
-  "ap_uploads",
-  "approvals",
-  "ar_client_contracts",
-  "ar_open_folio_date_history",
-  "ar_open_folio_entries",
-  "ar_open_folio_notes",
-  "ar_to_invoice_entries",
-  "ar_uploads",
-  "closing_status_log",
-  "closings",
-  "comments",
-  "conciliation_journal_lines",
-  "conciliation_razao_lines",
-  "conciliation_uploads",
-  "dre_parsed_lines",
-  "dre_versions",
-  "email_send_log",
-  "email_send_state",
+// Minimal denylist: tables that should NEVER be exported (technical /
+// security artifacts, raw tokens, credentials, internal migrations). Business
+// tables — even those carrying sensitive data — are NOT denied here; their
+// sensitivity is handled per-column via COLUMN_BLOCKLIST /
+// GLOBAL_SENSITIVE_PATTERNS and the `include_sensitive` privileged flag.
+const TABLE_DENYLIST = new Set<string>([
+  // Raw unsubscribe token store — contains opaque security tokens, not
+  // business data. Bounce / unsubscribe behaviour is still exportable via
+  // `notification_unsubscribes` and `suppressed_emails`.
   "email_unsubscribe_tokens",
-  "hotels",
-  "investor_letters",
-  "letter_highlights",
-  "letter_versions",
-  "notification_queue",
-  "notification_unsubscribes",
-  "profiles",
-  "rh_calendar_dates",
-  "rh_calendar_posts",
-  "rh_employees",
-  "rh_org_nodes",
-  "rh_org_responsibilities",
-  "rh_policies",
-  "rh_trainings",
-  "rh_uploads",
-  "suppressed_emails",
-  "system_settings",
-  "user_hotels",
-  "user_permissions",
-  "user_roles",
-];
+]);
 
 // Derived resources exposed via /export?resource=...
 const DERIVED_RESOURCES = [
@@ -103,9 +67,23 @@ const DERIVED_RESOURCES = [
   "latest_updates",
 ];
 
-// Candidate columns used to choose cursor / incremental column.
-const INCREMENTAL_CANDIDATES = ["updated_at", "created_at", "uploaded_at", "sent_at"];
-const CURSOR_CANDIDATES = ["updated_at", "created_at", "uploaded_at", "sent_at", "id"];
+// Candidate columns used to choose cursor / incremental column, in priority
+// order. `updated_at` is preferred when present; otherwise we fall back to
+// append-only timestamps. Every public business table now has at least one of
+// these columns (a migration backfilled `created_at` on the few that didn't).
+const INCREMENTAL_CANDIDATES = [
+  "updated_at",
+  "changed_at",
+  "uploaded_at",
+  "sent_at",
+  "received_at",
+  "unsubscribed_at",
+  "suppressed_at",
+  "approved_at",
+  "paid_at",
+  "created_at",
+];
+const CURSOR_CANDIDATES = [...INCREMENTAL_CANDIDATES, "id"];
 
 interface RequestContext {
   requestId: string;
