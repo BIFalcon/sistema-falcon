@@ -80,6 +80,8 @@ const DISTRIBUICAO_POR_UH_PATTERNS = [
 const LUCRO_A_DISTRIBUIR_PATTERNS = [
   /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir\s+(do|no)\s+per[íi]odo/i,
   /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i,
+  /^\s*lucro\s+a\s+distribuir/i,
+  /^\s*preju[íi]zo\s+a\s+distribuir/i,
   /resultado\s+a\s+distribuir/i,
 ];
 
@@ -151,6 +153,8 @@ export function useConsolidadoData(input: {
             "line_label.ilike.%rendimento%",
             "line_label.ilike.%lucro%distribu%",
             "line_label.ilike.%resultado%exerc%",
+            "line_label.ilike.%preju%distribu%",
+            "line_label.ilike.%resultado%distribu%",
             "line_label.ilike.%taxa%administ%gop%",
           ].join(","));
 
