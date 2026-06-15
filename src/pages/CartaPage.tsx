@@ -483,6 +483,13 @@ export default function CartaPage() {
           </div>
         </div>
       )}
+      <CartaPdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        pdfPath={letter?.pdf_url}
+        versionLabel={letter?.pdf_version ? `v${letter.pdf_version}` : undefined}
+        onDownload={handleDownloadPdf}
+      />
     </div>
   );
 }
