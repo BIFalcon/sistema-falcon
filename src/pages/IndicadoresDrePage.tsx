@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis, LabelList } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,16 +26,6 @@ const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "S
 const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
 
 const CATEGORY_ORDER = ["Topline", "Receitas", "Despesas", "Despesas Específicas"];
-
-// Categorias da árvore fixa que são despesas (valores negativos) — eixo Y invertido
-const EXPENSE_TREE_NODES = new Set([
-  "despesas",
-  "despesas fixas totais",
-  "despesas variaveis total",
-  "despesas totais fixas variaveis",
-  "deducoes da receita total",
-  "deducoes pos gop",
-]);
 
 /**
  * agg = "sum" para receitas/GOP (acumular no período)
@@ -542,19 +532,6 @@ export default function IndicadoresDrePage() {
       };
     });
   }, [selectedLines, divisorLine, periodCfg, dataset, year]);
-  const isExpenseLine = selectedLines.some((l) => {
-    const norm = l.label
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/\s*\(.*?\)/g, "")
-      .trim();
-    if (EXPENSE_TREE_NODES.has(norm)) return true;
-    if (/despesa|dedu[çc]|custo|encargo|imposto|taxa.*adm|aluguel|(-)\s/i.test(l.label)) return true;
-    const negs = l.series.current.filter((v) => v != null && v < 0).length;
-    const pos = l.series.current.filter((v) => v != null && v > 0).length;
-    return negs > 0 && negs >= pos;
-  });
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
@@ -860,17 +837,6 @@ export default function IndicadoresDrePage() {
                 <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    reversed={isExpenseLine}
-                    tickFormatter={(v) => {
-                      const abs = Math.abs(Number(v));
-                      if (showAsPct) return `${(abs * 100).toFixed(1)}%`;
-                      if (chartValueIsPct) return `${(abs * (abs <= 1 ? 100 : 1)).toFixed(1)}%`;
-                      return abs.toLocaleString("pt-BR", { notation: "compact" });
-                    }}
-                  />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
@@ -883,9 +849,24 @@ export default function IndicadoresDrePage() {
                       />
                     }
                   />
-                  {visible.current  && <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={false} connectNulls={false} />}
-                  {visible.budget   && <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="5 3" />}
-                  {visible.previous && <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="3 3" />}
+                  {visible.current  && (
+                    <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false}>
+                      <LabelList dataKey="current" position="top" offset={10} formatter={formatChartValue}
+                        style={{ fontSize: 11, fontWeight: 600, fill: "#1D4ED8" }} />
+                    </Line>
+                  )}
+                  {visible.budget   && (
+                    <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3">
+                      <LabelList dataKey="budget" position="bottom" offset={10} formatter={formatChartValue}
+                        style={{ fontSize: 10, fill: "#16A34A" }} />
+                    </Line>
+                  )}
+                  {visible.previous && (
+                    <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3">
+                      <LabelList dataKey="previous" position="top" offset={22} formatter={formatChartValue}
+                        style={{ fontSize: 10, fill: "#6B7280" }} />
+                    </Line>
+                  )}
                 </LineChart>
               </ChartContainer>
                 </>
