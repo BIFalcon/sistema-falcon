@@ -1,0 +1,1 @@
+UPDATE auth.users SET email_confirmed_at = COALESCE(email_confirmed_at, now()) WHERE email ILIKE '%livia%' OR email ILIKE '%wesley%' OR email ILIKE '%murilo%';
