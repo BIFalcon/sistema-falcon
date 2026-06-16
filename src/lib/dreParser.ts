@@ -1168,19 +1168,19 @@ export async function parseDreExcel(
       previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows, hotelId);
       prevLines = readSheetLines(prevRows, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
       // Detecta meses em que o hotel ainda não estava operando no ano anterior
-      // (ex.: Arcoverde abriu em ago/2025 — Jan-Jul ficam com fórmulas zeradas
-      // na aba "ANO ANTERIOR" e contaminam os gráficos comparativos da carta).
-      // Critério: sem UHs disponíveis E sem room nights → mês inexistente; anula
-      // todos os indicadores naquele slot.
+      // (ex.: Arcoverde abriu em ago/2025 — meses anteriores ficam com fórmulas
+      // zeradas ou com valores residuais/aleatórios na aba "ANO ANTERIOR" e
+      // contaminam os gráficos comparativos e tabela da carta).
+      // Critério: sem UHs disponíveis E sem room nights → mês inexistente.
+      // Receita é ignorada no critério porque pode trazer lixo residual de
+      // fórmulas mesmo quando o hotel não operou.
       const inactiveMonths = new Set<number>();
       for (let m = 0; m < 12; m++) {
         const uhs = previousSeries.uhs_disponiveis?.[m];
         const rn = previousSeries.roomnights?.[m];
-        const rb = previousSeries.receita_bruta_total?.[m];
         const uhsEmpty = uhs == null || uhs === 0;
         const rnEmpty = rn == null || rn === 0;
-        const rbEmpty = rb == null || rb === 0;
-        if (uhsEmpty && rnEmpty && rbEmpty) inactiveMonths.add(m);
+        if (uhsEmpty && rnEmpty) inactiveMonths.add(m);
       }
       if (inactiveMonths.size > 0) {
         for (const key of Object.keys(previousSeries) as IndicatorKey[]) {
