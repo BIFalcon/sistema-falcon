@@ -1228,6 +1228,7 @@ function extractMonthlySeries(
   keys: IndicatorKey[],
   targetYear?: number,
   displayRows?: unknown[][],
+  hotelId?: string,
 ): Partial<Record<IndicatorKey, (number | null)[]>> {
   // Mapeia mês (1..12) → colIndex
   const monthCols = new Map<number, number>();
@@ -1238,7 +1239,7 @@ function extractMonthlySeries(
   if (monthCols.size === 0) return {};
   const out: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   for (const key of keys) {
-    const rxs = INDICATORS.find((i) => i.key === key)?.rx ?? [];
+    const rxs = getIndicatorRxs(key, hotelId);
     if (!rxs.length) continue;
     // Acha 1ª linha com label que bata o regex
     let hitRow: unknown[] | null = null;
