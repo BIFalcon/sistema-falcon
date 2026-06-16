@@ -1109,6 +1109,7 @@ function drawDynamicTextBlock(
   // Busca binária pelo maior tamanho de fonte que cabe na altura
   let lo = minSize, hi = maxSize, best = minSize;
   let bestLines: string[] = [];
+  let bestLhf = lineHeightFactor;
   while (lo <= hi) {
     const mid = (lo + hi) / 2;
     doc.setFontSize(mid);
@@ -1123,6 +1124,41 @@ function drawDynamicTextBlock(
       hi = mid - 0.25;
     }
     if (hi - lo < 0.2) break;
+  }
+
+  // Se mesmo no minSize não couber, comprime ainda mais o tamanho da fonte e
+  // o entrelinhas até caber tudo (garante que o último parágrafo apareça).
+  if (bestLines.length === 0) {
+    let size = minSize;
+    let lhf = lineHeightFactor;
+    while (size > 4) {
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(text, width) as string[];
+      const lineH = (size * lhf) / doc.internal.scaleFactor;
+      if (lines.length * lineH <= height) {
+        best = size;
+        bestLines = lines;
+        bestLhf = lhf;
+        break;
+      }
+      // Primeiro tenta apertar o entrelinhas até 1.2; depois reduz fonte.
+      if (lhf > 1.2) lhf = Math.max(1.2, lhf - 0.05);
+      else size -= 0.25;
+    }
+    if (bestLines.length === 0) {
+      // Fallback derradeiro: minSize absoluto, e truncamento controlado.
+      doc.setFontSize(4);
+      bestLines = doc.splitTextToSize(text, width) as string[];
+      best = 4;
+      bestLhf = 1.1;
+    }
+    doc.setFontSize(best);
+    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+      lineHeightFactor: bestLhf,
+      align: "justify",
+      maxWidth: width,
+    });
+    return;
   }
 
   // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
