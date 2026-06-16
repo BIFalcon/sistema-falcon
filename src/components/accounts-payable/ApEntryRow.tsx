@@ -363,6 +363,12 @@ function ApprovalBadge({ status }: { status: string }) {
 }
 
 const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string; tooltip: string; Icon: typeof Banknote }> = {
+  nao_aprovado_gg: {
+    label: "Não aprovado pelo GG",
+    className: "border-rose-500/40 text-rose-700 dark:text-rose-400",
+    tooltip: "OMIE não indica aprovação do GG (a vencer, vence hoje, vencido, etc.)",
+    Icon: AlertTriangle,
+  },
   em_aprovacao: {
     label: "Em Aprovação",
     className: "border-amber-500/40 text-amber-700 dark:text-amber-400",
