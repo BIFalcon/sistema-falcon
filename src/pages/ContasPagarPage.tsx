@@ -1642,6 +1642,28 @@ export default function ContasPagarPage() {
                     <CalendarClock className="h-3.5 w-3.5" /> Agendado
                   </Button>
                 )}
+                {canMarkInsertedAgendado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-400"
+                    disabled={selectedIds.size === 0 || unscheduleEntries.isPending}
+                    onClick={handleBulkUnschedule}
+                  >
+                    <CalendarX className="h-3.5 w-3.5" /> Desagendar
+                  </Button>
+                )}
+                {selectedIds.size > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    disabled={setPending.isPending}
+                    onClick={handleBulkPending}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Pendente
+                  </Button>
+                )}
                 {canMarkPaid && (
                   <Button
                     size="sm"
