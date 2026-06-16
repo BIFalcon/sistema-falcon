@@ -756,13 +756,25 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   //  - Série Realizado é truncada após o mês corrente (linha/barra para no último valor).
   //  - Série Ano Anterior mantém todos os meses no intervalo visível.
   const visibleMonths = Math.max(6, closing.month);
-  const trimmedCurrent = history.current.slice(0, visibleMonths).map((d) => ({
+  // Hotéis sem ano anterior comparável (ex.: Arcoverde abriu em ago/2025) —
+  // remove o mês de fechamento corrente dos gráficos para não exibir uma
+  // coluna/ponto solitário sem comparativo do ano anterior.
+  const hotelNameLower = (hotel?.name ?? "").toLowerCase();
+  const stripCurrentMonthFromChart = hotelNameLower.includes("arcoverde");
+  const baseCurrent = history.current.slice(0, visibleMonths);
+  const baseCurrentFiltered = stripCurrentMonthFromChart
+    ? baseCurrent.filter((d) => d.month !== closing.month)
+    : baseCurrent;
+  const trimmedCurrent = baseCurrentFiltered.map((d) => ({
     ...d,
     ocupacao: d.month <= closing.month ? d.ocupacao : null,
     adr: d.month <= closing.month ? d.adr : null,
     receita_bruta_total: d.month <= closing.month ? d.receita_bruta_total : null,
   }));
-  const trimmedPrevious = history.previous.slice(0, visibleMonths);
+  const basePrevious = history.previous.slice(0, visibleMonths);
+  const trimmedPrevious = stripCurrentMonthFromChart
+    ? basePrevious.filter((d) => d.month !== closing.month)
+    : basePrevious;
 
   // Linhas DRE para a tabela
   const dreLines = await fetchDreLines(closing.id);
@@ -877,9 +889,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const blocks: string[] = [];
   const push = (s?: string | null) => { if (s && s.trim()) blocks.push(s.trim()); };
   push(letter.ai_intro);
+  push(letter.ai_market_context);
   push(letter.ai_operational);
   push(letter.ai_financial);
   push(letter.ai_outlook);
+  push(letter.ai_closing);
   const body = blocks.join("\n\n") || "—";
   drawDynamicTextBlock(doc, body, {
     x: 16,
