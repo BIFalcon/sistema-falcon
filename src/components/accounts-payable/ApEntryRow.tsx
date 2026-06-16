@@ -2,7 +2,7 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
 import { useState } from "react";
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, ShieldCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, ShieldCheck, Unlink, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -246,12 +246,13 @@ function UngroupButton({ entry }: { entry: ApEntry }) {
   const ungroup = useUngroupEntries();
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
-      className="h-6 px-2 text-[10px]"
+      className="h-6 px-2 text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
       disabled={ungroup.isPending}
+      title="Desagrupar este lançamento e restaurar os originais"
       onClick={async () => {
-        if (!confirm("Desagrupar este lançamento?")) return;
+        if (!confirm(`Desagrupar este lançamento? Os ${entry.grouped_ids?.length ?? 0} lançamentos originais serão restaurados.`)) return;
         try {
           await ungroup.mutateAsync({ groupId: entry.id, hotelId: entry.hotel_id });
           toast.success("Lançamentos desagrupados.");
@@ -260,7 +261,8 @@ function UngroupButton({ entry }: { entry: ApEntry }) {
         }
       }}
     >
-      Desagrupar
+      <Unlink className="h-3 w-3" />
+      {ungroup.isPending ? "Desagrupando..." : "Desagrupar"}
     </Button>
   );
 }
