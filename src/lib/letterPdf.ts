@@ -1194,16 +1194,11 @@ function drawDynamicTextBlock(
       }
       const lines = doc.splitTextToSize(para, opts.width) as string[];
       for (let i = 0; i < lines.length; i++) {
-        const isLast = i === lines.length - 1;
         const line = lines[i];
-        // Critério estético: justifica apenas quando o texto natural já
-        // preenche boa parte da largura disponível. Se ocupar menos que
-        // ~82% da largura, o justify abriria buracos grandes entre as
-        // palavras — nesses casos deixamos a linha alinhada à esquerda.
-        // A última linha de cada parágrafo nunca é justificada.
-        const naturalWidth = doc.getTextWidth(line.trim());
-        const fillRatio = naturalWidth / opts.width;
-        const shouldJustify = !isLast && fillRatio >= 0.82;
+        // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
+        // palavras ou menos (evita buracos enormes entre poucas palavras).
+        const wordCount = line.trim().split(/\s+/).filter(Boolean).length;
+        const shouldJustify = wordCount > 5;
         doc.text(line, opts.x, cursorY, shouldJustify
           ? { align: "justify", maxWidth: opts.width }
           : undefined);
