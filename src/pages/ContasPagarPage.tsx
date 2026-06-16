@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CheckCircle2, ChevronDown, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,6 +60,8 @@ import {
   useRestoreApEntry,
   useLatestApUpload,
   useSetEntryPaymentStatus,
+  useUnscheduleEntries,
+  useSetEntryPending,
   useTodayBankBalance,
   useUpsertBankBalance,
   useApNotificationLog,
@@ -150,6 +152,8 @@ export default function ContasPagarPage() {
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
+  const unscheduleEntries = useUnscheduleEntries();
+  const setPending = useSetEntryPending();
   const upsertCard = useUpsertCardReceivable();
   const updateCard = useUpdateCardReceivable();
   const deleteCard = useDeleteCardReceivable();
@@ -494,7 +498,55 @@ export default function ContasPagarPage() {
       ? "Agendado"
       : s === "autorizado"
       ? "Autorizado"
+      : s === "em_aprovacao"
+      ? "Em Aprovação"
       : "Não aprovado pelo GG";
+  }
+
+  // ── Desagendar em lote ────────────────────────────────────────────────
+  async function handleBulkUnschedule() {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const scheduledIds = ids.filter((id) =>
+      allEntries.find((e) => e.id === id)?.payment_status === "agendado",
+    );
+    if (scheduledIds.length === 0) {
+      toast.info("Nenhum lançamento agendado selecionado");
+      return;
+    }
+    try {
+      await unscheduleEntries.mutateAsync({ hotelId, entryIds: scheduledIds });
+      setSelectedIds(new Set());
+      toast.success(`${scheduledIds.length} lançamento(s) desagendados`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao desagendar");
+    }
+  }
+
+  // ── Marcar/desmarcar Pendente em lote ─────────────────────────────────
+  async function handleBulkPending() {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const selectedEntries = ids
+      .map((id) => allEntries.find((e) => e.id === id))
+      .filter((e): e is ApEntry => !!e);
+    // Se todos já estão pendentes, desmarca; caso contrário, marca todos.
+    const allPending = selectedEntries.length > 0 && selectedEntries.every((e) => !!e.is_pending);
+    const next = !allPending;
+    try {
+      await setPending.mutateAsync({ hotelId, entryIds: ids, pending: next });
+      setSelectedIds(new Set());
+      toast.success(
+        next
+          ? `${ids.length} lançamento(s) marcados como pendente`
+          : `${ids.length} lançamento(s) tiveram a marcação 'pendente' removida`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+    }
   }
 
   // Block 8 — Marca categoria "Salários RH" em lote
@@ -1096,11 +1148,13 @@ export default function ContasPagarPage() {
 
               {(() => {
                 const STATUS_OPTIONS: { value: string; label: string }[] = [
+                  { value: "nao_aprovado_gg", label: "Não aprovado pelo GG" },
                   { value: "em_aprovacao", label: "Em Aprovação" },
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
+                  { value: "pendente", label: "Pendente (flag)" },
                 ];
                 return (
                   <DropdownMenu>
@@ -1319,7 +1373,29 @@ export default function ContasPagarPage() {
                         >
                           <CalendarClock className="h-3.5 w-3.5" /> Agendado
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 h-8 border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-400"
+                          disabled={selectedIds.size === 0 || unscheduleEntries.isPending}
+                          onClick={handleBulkUnschedule}
+                          title="Voltar agendados para 'Em Aprovação' e limpar a data agendada"
+                        >
+                          <CalendarX className="h-3.5 w-3.5" /> Desagendar
+                        </Button>
                       </>
+                    )}
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                        disabled={setPending.isPending}
+                        onClick={handleBulkPending}
+                        title="Marcar/desmarcar como Pendente (paralelo ao status atual)"
+                      >
+                        <Clock className="h-3.5 w-3.5" /> Pendente
+                      </Button>
                     )}
                     {canMarkPaid && (
                       <Button
@@ -1566,6 +1642,28 @@ export default function ContasPagarPage() {
                     <CalendarClock className="h-3.5 w-3.5" /> Agendado
                   </Button>
                 )}
+                {canMarkInsertedAgendado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-400"
+                    disabled={selectedIds.size === 0 || unscheduleEntries.isPending}
+                    onClick={handleBulkUnschedule}
+                  >
+                    <CalendarX className="h-3.5 w-3.5" /> Desagendar
+                  </Button>
+                )}
+                {selectedIds.size > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    disabled={setPending.isPending}
+                    onClick={handleBulkPending}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Pendente
+                  </Button>
+                )}
                 {canMarkPaid && (
                   <Button
                     size="sm"
@@ -1673,6 +1771,28 @@ export default function ContasPagarPage() {
                     onClick={() => handleBulkPaymentStatus("agendado")}
                   >
                     <CalendarClock className="h-3.5 w-3.5" /> Agendado
+                  </Button>
+                )}
+                {canMarkInsertedAgendado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-400"
+                    disabled={selectedIds.size === 0 || unscheduleEntries.isPending}
+                    onClick={handleBulkUnschedule}
+                  >
+                    <CalendarX className="h-3.5 w-3.5" /> Desagendar
+                  </Button>
+                )}
+                {selectedIds.size > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 h-8 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    disabled={setPending.isPending}
+                    onClick={handleBulkPending}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Pendente
                   </Button>
                 )}
                 {canMarkPaid && (

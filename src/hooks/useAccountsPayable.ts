@@ -9,7 +9,8 @@ export type ApPaymentStatus =
   | "autorizado"   // coordenadora autorizou para pagamento
   | "agendado"     // agendado (unifica antigo "inserido")
   | "pago"         // pago
-  | "pago_parcialmente"; // pago parcialmente (OMIE)
+  | "pago_parcialmente" // pago parcialmente (OMIE)
+  | "nao_aprovado_gg"; // OMIE indica que GG ainda não aprovou (a vencer/vencido/etc.)
 
 export interface ApUpload {
   id: string;
@@ -59,6 +60,8 @@ export interface ApEntry {
   paid_interest: number | null;
   paid_amount: number | null;
   original_amount: number | null;
+  /** Flag paralelo "Pendente" — coexiste com payment_status. */
+  is_pending?: boolean | null;
   is_group?: boolean | null;
   grouped_ids?: string[] | null;
   archived_reason?: string | null;
@@ -630,6 +633,52 @@ export function useSetEntryPaymentStatus() {
       const { error } = await supabase
         .from("ap_entries")
         .update(update as never)
+        .in("id", input.entryIds);
+      if (error) throw error;
+      return input.entryIds.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+/**
+ * Desagenda em lote: volta para "Em Aprovação" e limpa a data agendada.
+ * Só atua sobre os ids que estavam realmente agendados.
+ */
+export function useUnscheduleEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryIds: string[] }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ payment_status: "em_aprovacao", scheduled_date: null } as never)
+        .in("id", input.entryIds)
+        .eq("payment_status", "agendado");
+      if (error) throw error;
+      return input.entryIds.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+/**
+ * Marca/desmarca em lote o flag "Pendente" (paralelo ao status).
+ */
+export function useSetEntryPending() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryIds: string[]; pending: boolean }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ is_pending: input.pending } as never)
         .in("id", input.entryIds);
       if (error) throw error;
       return input.entryIds.length;

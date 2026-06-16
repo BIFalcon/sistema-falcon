@@ -209,20 +209,18 @@ type ApPaymentStatus =
   | "autorizado"
   | "agendado"
   | "pago"
-  | "pago_parcialmente";
+  | "pago_parcialmente"
+  | "nao_aprovado_gg";
 function omieStatusToFalcon(situacao: string | null | undefined): ApPaymentStatus {
-  if (!situacao) return "em_aprovacao";
+  if (!situacao) return "nao_aprovado_gg";
   const s = toAscii(situacao).toLowerCase();
   if (s.includes("agendado")) return "agendado";
   if (s.includes("pago parcialmente")) return "pago_parcialmente";
   if (s.includes("pago") || s.includes("liquidado")) return "pago";
-  if (
-    s.includes("em aprovacao") ||
-    s.includes("previsto") ||
-    s.includes("aprovado")
-  ) return "em_aprovacao";
-  // "a vencer", "vence hoje", "atrasado" = não aprovado pelo GG
-  return "em_aprovacao";
+  // SOMENTE "Em Aprovação" no OMIE entra como "Em Aprovação" no sistema.
+  if (s.includes("em aprovacao")) return "em_aprovacao";
+  // "a vencer", "vence hoje", "vencido", "atrasado", etc. = Não aprovado pelo GG
+  return "nao_aprovado_gg";
 }
 
 // Normaliza a conta corrente para "itau" | "santander" | null

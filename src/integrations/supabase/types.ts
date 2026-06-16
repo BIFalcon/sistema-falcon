@@ -241,6 +241,7 @@ export type Database = {
           interest_fees: number | null
           is_distribution: boolean
           is_group: boolean
+          is_pending: boolean
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
@@ -284,6 +285,7 @@ export type Database = {
           interest_fees?: number | null
           is_distribution?: boolean
           is_group?: boolean
+          is_pending?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
@@ -327,6 +329,7 @@ export type Database = {
           interest_fees?: number | null
           is_distribution?: boolean
           is_group?: boolean
+          is_pending?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
@@ -2509,6 +2512,7 @@ export type Database = {
         | "em_aprovacao"
         | "autorizado"
         | "pago_parcialmente"
+        | "nao_aprovado_gg"
       app_role:
         | "processos"
         | "fernando"
@@ -2705,6 +2709,7 @@ export const Constants = {
         "em_aprovacao",
         "autorizado",
         "pago_parcialmente",
+        "nao_aprovado_gg",
       ],
       app_role: [
         "processos",
