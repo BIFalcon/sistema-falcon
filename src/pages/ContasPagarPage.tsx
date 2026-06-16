@@ -1148,11 +1148,13 @@ export default function ContasPagarPage() {
 
               {(() => {
                 const STATUS_OPTIONS: { value: string; label: string }[] = [
+                  { value: "nao_aprovado_gg", label: "Não aprovado pelo GG" },
                   { value: "em_aprovacao", label: "Em Aprovação" },
                   { value: "autorizado", label: "Autorizado" },
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
+                  { value: "pendente", label: "Pendente (flag)" },
                 ];
                 return (
                   <DropdownMenu>
