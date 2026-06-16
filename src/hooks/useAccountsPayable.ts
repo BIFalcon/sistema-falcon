@@ -9,7 +9,8 @@ export type ApPaymentStatus =
   | "autorizado"   // coordenadora autorizou para pagamento
   | "agendado"     // agendado (unifica antigo "inserido")
   | "pago"         // pago
-  | "pago_parcialmente"; // pago parcialmente (OMIE)
+  | "pago_parcialmente" // pago parcialmente (OMIE)
+  | "nao_aprovado_gg"; // OMIE indica que GG ainda não aprovou (a vencer/vencido/etc.)
 
 export interface ApUpload {
   id: string;
@@ -59,6 +60,8 @@ export interface ApEntry {
   paid_interest: number | null;
   paid_amount: number | null;
   original_amount: number | null;
+  /** Flag paralelo "Pendente" — coexiste com payment_status. */
+  is_pending?: boolean | null;
   is_group?: boolean | null;
   grouped_ids?: string[] | null;
   archived_reason?: string | null;
