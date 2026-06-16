@@ -583,20 +583,31 @@ function drawLineChart(
     ctx.beginPath(); ctx.arc(x, y, 1.25 * px, 0, Math.PI * 2); ctx.fill();
   });
 
-  // Rótulo em TODOS os pontos (formato original), com anti-colisão para que
-  // ano-anterior não sobreponha realizado quando os valores estão próximos.
+  // Rótulo nos pontos, com anti-colisão. Quando Realizado e Ano anterior são
+  // iguais ou visualmente muito próximos no mesmo mês, mostramos apenas um
+  // rótulo (priorizando o Realizado) para evitar sobreposição ilegível.
   type Candidate = { value: number; x: number; y: number; color: string; bold: boolean; priority: number };
   const candidates: Candidate[] = [];
-  current.forEach((d, i) => {
-    const v = d[field] as number | null;
-    if (v == null || !Number.isFinite(v)) return;
-    candidates.push({ value: v, x: x0 + i * stepX, y: yFor(v), color: NAVY, bold: true, priority: 100 });
-  });
-  previous.forEach((d, i) => {
-    const v = d[field] as number | null;
-    if (v == null || !Number.isFinite(v)) return;
-    candidates.push({ value: v, x: x0 + i * stepX, y: yFor(v), color: "#6B7280", bold: false, priority: 50 });
-  });
+  const valueAt = (series: MonthDatum[], index: number) => {
+    const v = series[index]?.[field] as number | null | undefined;
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  };
+  for (let i = 0; i < n; i++) {
+    const cv = valueAt(current, i);
+    const pv = valueAt(previous, i);
+    const x = x0 + i * stepX;
+    if (cv != null && pv != null) {
+      const relativeDiff = Math.abs(cv - pv) / Math.max(Math.abs(cv), Math.abs(pv), 1);
+      const visuallyClose = Math.abs(yFor(cv) - yFor(pv)) <= 5.5 * px;
+      const sameDisplayedLabel = labelFor(cv) === labelFor(pv);
+      if (sameDisplayedLabel || (visuallyClose && relativeDiff <= 0.03)) {
+        candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 120 });
+        continue;
+      }
+    }
+    if (cv != null) candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 100 });
+    if (pv != null) candidates.push({ value: pv, x, y: yFor(pv), color: "#6B7280", bold: false, priority: 50 });
+  }
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const overlaps = (a: { x: number; y: number; w: number; h: number }) =>
     placed.some((b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
@@ -614,7 +625,10 @@ function drawLineChart(
       const halfW = tw / 2 + 1.2 * px;
       const minX = x0 + halfW;
       const maxX = x0 + w - halfW;
-      const clampX = (x: number) => Math.min(Math.max(x, minX), maxX);
+      const minY = y0 + th / 2;
+      const maxY = y0 + h - th / 2;
+      const clampX = (x: number) => minX <= maxX ? Math.min(Math.max(x, minX), maxX) : x0 + w / 2;
+      const clampY = (y: number) => minY <= maxY ? Math.min(Math.max(y, minY), maxY) : y0 + h / 2;
       const tries = [
         { x: clampX(c.x),           y: c.y - 5.2 * px },
         { x: clampX(c.x),           y: c.y + 5.2 * px },
@@ -648,6 +662,13 @@ function drawLineChart(
           chosen = { t, box };
           break;
         }
+      }
+      // 3ª passada definitiva: se por algum motivo todas as tentativas ficaram
+      // fora da área útil (ponto no topo/rodapé), clampa também o Y. Assim todo
+      // mês com dado tem pelo menos um rótulo visível no gráfico.
+      if (!chosen) {
+        const t = { x: clampX(c.x), y: clampY(c.y - 5.2 * px) };
+        chosen = { t, box: { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th } };
       }
       if (chosen) {
         ctx.fillStyle = c.color;
