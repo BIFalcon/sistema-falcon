@@ -912,13 +912,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       const rowH = (availH - (rows - 1) * gap) / rows;
       const startY = HEADER_CONTENT_Y + 2;
       const titleGap = 1.5;
-      const titleFontSize = rows >= 3 ? 8 : 9;
+      const titleFontSize = cols === 3 ? 7.2 : rows >= 3 ? 8 : 9;
       const emptyFontSize = rows >= 3 ? 7 : 8;
       // Pré-calcula o nº máximo de linhas do título para evitar que o texto
       // ultrapasse o balãozinho. Define titleH proporcional ao maior título.
       doc.setFont("helvetica", "normal");
       doc.setFontSize(titleFontSize);
-      const titleLineH = (titleFontSize * 1.15) / doc.internal.scaleFactor;
+      const titleLineH = (titleFontSize * 1.22) / doc.internal.scaleFactor;
       let maxTitleLines = 1;
       const wrappedTitles: string[][] = [];
       for (let i = 0; i < n; i++) {
@@ -926,7 +926,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         wrappedTitles.push(lines);
         if (lines.length > maxTitleLines) maxTitleLines = lines.length;
       }
-      const titleH = Math.max(7, Math.min(rowH * 0.32, maxTitleLines * titleLineH + 3));
+      const titleH = Math.max(8.5, Math.min(rowH * 0.32, maxTitleLines * titleLineH + 5));
       for (let i = 0; i < n; i++) {
         const h = highlights[i];
         const col = i % cols;
@@ -942,7 +942,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         doc.setFontSize(titleFontSize);
         const lines = wrappedTitles[i];
         const blockH = lines.length * titleLineH;
-        const firstBaseline = y + (titleH - blockH) / 2 + titleLineH * 0.78;
+        const firstBaseline = y + (titleH - blockH) / 2 + titleLineH * 0.72;
         for (let li = 0; li < lines.length; li++) {
           doc.text(lines[li], x + colW / 2, firstBaseline + li * titleLineH, {
             align: "center",
