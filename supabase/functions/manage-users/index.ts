@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
       const { error: updateErr } = await admin.auth.admin.updateUserById(result.data.user_id, {
         password: payload.password,
         email_confirm: true,
-      } as any);
+      });
       if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
 
       await admin.from("profiles").update({ status: "active" }).eq("user_id", result.data.user_id);
