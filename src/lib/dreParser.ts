@@ -806,8 +806,37 @@ function findMonthColumn(
   targetYear?: number,
   displayRows?: unknown[][],
 ): { headerRow: number; colIndex: number; label: string } | null {
+  // Para evitar que uma célula de DATA solta no meio da planilha (ex.: uma
+  // data 20/06/2026 em uma coluna "TOTAL") seja confundida com cabeçalho de
+  // mês — bug clássico que fazia a Receita Bruta de "Junho" cair na coluna
+  // anual e exibir R$ 7 milhões em vez de ~R$ 500 mil —, só aceitamos como
+  // linha de cabeçalho rows que contenham pelo menos 3 meses DISTINTOS
+  // referenciados (por nome textual ou data). Isso casa com planilhas reais
+  // (JANEIRO/FEVEREIRO/...) e descarta rows com data isolada.
+  const validHeaderRows = new Set<number>();
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const row = rows[r] ?? [];
+    const displayRow = displayRows?.[r] ?? [];
+    const width = Math.max(row.length, displayRow.length);
+    const months = new Set<number>();
+    for (let c = 0; c < width; c++) {
+      for (const cell of [row[c], displayRow[c]]) {
+        const date = parseHeaderDate(cell);
+        if (date?.month) { months.add(date.month); continue; }
+        if (typeof cell !== "string") continue;
+        const norm = cell.trim().toLowerCase();
+        if (!norm) continue;
+        for (let m = 1; m <= 12; m++) {
+          if (matchMonth(norm, m)) { months.add(m); break; }
+        }
+      }
+    }
+    if (months.size >= 3) validHeaderRows.add(r);
+  }
+
   const candidates: Array<{ headerRow: number; colIndex: number; label: string; year: number | null; dataCount: number }> = [];
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    if (!validHeaderRows.has(r)) continue;
     const row = rows[r] ?? [];
     const displayRow = displayRows?.[r] ?? [];
     const width = Math.max(row.length, displayRow.length);
