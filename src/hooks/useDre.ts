@@ -898,6 +898,38 @@ function useDreAnalyticsImpl(input: {
           ns.flatMap((n) => [n, ...flattenNodes(n.children)]);
         const allFlat = [...nodes, ...flattenNodes(fixedRootNodes)];
 
+          // Anti-outlier: o parser ocasionalmente confunde a coluna mensal
+          // de algumas abas (sobretudo "ANO ANTERIOR" e "ORÇAMENTO") com a
+          // coluna "Acumulado/Total/Média", o que faz um único mês aparecer
+          // 8-12x maior que os demais (ex.: Receita Bruta de Fev de R$ 6M
+          // contra ~R$ 500K nos outros meses). Aqui anulamos qualquer ponto
+          // > 5× a mediana dos demais valores não-zero da mesma série, em
+          // todas as séries (current/budget/previous) de TODOS os nós. Isso
+          // protege os indicadores e os gráficos sem depender de reimport.
+          const scrubSeries = (series: (number | null)[]): (number | null)[] => {
+            const finite: { i: number; v: number }[] = [];
+            for (let i = 0; i < series.length; i++) {
+              const v = series[i];
+              if (v != null && Number.isFinite(v) && v !== 0) finite.push({ i, v });
+            }
+            if (finite.length < 4) return series;
+            const absSorted = finite.map((p) => Math.abs(p.v)).sort((a, b) => a - b);
+            const median = absSorted[Math.floor(absSorted.length / 2)];
+            if (median <= 0) return series;
+            const out = [...series];
+            for (const p of finite) {
+              if (Math.abs(p.v) > median * 5) out[p.i] = null;
+            }
+            return out;
+          };
+          const scrubNode = (n: DreLineNode) => {
+            n.series.current = scrubSeries(n.series.current);
+            n.series.budget = scrubSeries(n.series.budget);
+            n.series.previous = scrubSeries(n.series.previous);
+            for (const c of n.children) scrubNode(c);
+          };
+          for (const n of [...nodes, ...fixedRootNodes]) scrubNode(n);
+
           if (nodes.length || fixedRootNodes.length) {
             return {
               tree: [...nodes, ...fixedRootNodes],
