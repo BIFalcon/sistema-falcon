@@ -912,13 +912,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       const rowH = (availH - (rows - 1) * gap) / rows;
       const startY = HEADER_CONTENT_Y + 2;
       const titleGap = 1.5;
-      const titleFontSize = rows >= 3 ? 8 : 9;
+      const titleFontSize = cols === 3 ? 7.2 : rows >= 3 ? 8 : 9;
       const emptyFontSize = rows >= 3 ? 7 : 8;
       // Pré-calcula o nº máximo de linhas do título para evitar que o texto
       // ultrapasse o balãozinho. Define titleH proporcional ao maior título.
       doc.setFont("helvetica", "normal");
       doc.setFontSize(titleFontSize);
-      const titleLineH = (titleFontSize * 1.15) / doc.internal.scaleFactor;
+      const titleLineH = (titleFontSize * 1.22) / doc.internal.scaleFactor;
       let maxTitleLines = 1;
       const wrappedTitles: string[][] = [];
       for (let i = 0; i < n; i++) {
@@ -926,7 +926,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         wrappedTitles.push(lines);
         if (lines.length > maxTitleLines) maxTitleLines = lines.length;
       }
-      const titleH = Math.max(7, Math.min(rowH * 0.32, maxTitleLines * titleLineH + 3));
+      const titleH = Math.max(8.5, Math.min(rowH * 0.32, maxTitleLines * titleLineH + 5));
       for (let i = 0; i < n; i++) {
         const h = highlights[i];
         const col = i % cols;
@@ -942,7 +942,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         doc.setFontSize(titleFontSize);
         const lines = wrappedTitles[i];
         const blockH = lines.length * titleLineH;
-        const firstBaseline = y + (titleH - blockH) / 2 + titleLineH * 0.78;
+        const firstBaseline = y + (titleH - blockH) / 2 + titleLineH * 0.72;
         for (let li = 0; li < lines.length; li++) {
           doc.text(lines[li], x + colW / 2, firstBaseline + li * titleLineH, {
             align: "center",
@@ -1162,6 +1162,32 @@ function drawGoldDollarIcon(doc: jsPDF, cx: number, cy: number) {
  * para que ocupe pelo menos `minFillRatio` da altura disponível, sem
  * ultrapassar a área. Texto justificado.
  */
+function drawJustifiedTextLine(doc: jsPDF, line: string, x: number, y: number, width: number) {
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    doc.text(line, x, y);
+    return;
+  }
+
+  const wordsWidth = words.reduce((sum, word) => sum + doc.getTextWidth(word), 0);
+  const extraSpace = (width - wordsWidth) / (words.length - 1);
+  if (!Number.isFinite(extraSpace) || extraSpace <= 0) {
+    doc.text(line, x, y);
+    return;
+  }
+
+  let cursorX = x;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (i === words.length - 1) {
+      doc.text(word, x + width - doc.getTextWidth(word), y);
+    } else {
+      doc.text(word, cursorX, y);
+      cursorX += doc.getTextWidth(word) + extraSpace;
+    }
+  }
+}
+
 function drawDynamicTextBlock(
   doc: jsPDF,
   text: string,
@@ -1196,12 +1222,12 @@ function drawDynamicTextBlock(
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
-        // palavras ou menos (evita buracos enormes entre poucas palavras).
-        const wordCount = line.trim().split(/\s+/).filter(Boolean).length;
+        // palavras ou menos. Artigos isolados de 1 letra não contam para
+        // evitar linhas curtas como "firmando a tendência..." muito abertas.
+        const wordCount = line.trim().split(/\s+/).filter((word) => word.length > 1).length;
         const shouldJustify = wordCount > 5;
-        doc.text(line, opts.x, cursorY, shouldJustify
-          ? { align: "justify", maxWidth: opts.width }
-          : undefined);
+        if (shouldJustify) drawJustifiedTextLine(doc, line, opts.x, cursorY, opts.width);
+        else doc.text(line, opts.x, cursorY);
         cursorY += lineH;
       }
       if (p < paragraphs.length - 1) cursorY += lineH * 0.6;
