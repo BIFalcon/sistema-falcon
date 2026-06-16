@@ -542,19 +542,6 @@ export default function IndicadoresDrePage() {
       };
     });
   }, [selectedLines, divisorLine, periodCfg, dataset, year]);
-  const isExpenseLine = selectedLines.some((l) => {
-    const norm = l.label
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/\s*\(.*?\)/g, "")
-      .trim();
-    if (EXPENSE_TREE_NODES.has(norm)) return true;
-    if (/despesa|dedu[çc]|custo|encargo|imposto|taxa.*adm|aluguel|(-)\s/i.test(l.label)) return true;
-    const negs = l.series.current.filter((v) => v != null && v < 0).length;
-    const pos = l.series.current.filter((v) => v != null && v > 0).length;
-    return negs > 0 && negs >= pos;
-  });
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
