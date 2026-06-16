@@ -317,6 +317,7 @@ export function useApPageDerived(opts: {
         if (selectedStatuses.length > 0) {
           const ok = selectedStatuses.some((s) => {
             if (s === "issues") return e.gg_approval !== "approved";
+            if (s === "pendente") return !!e.is_pending;
             return e.payment_status === s;
           });
           if (!ok) return false;
