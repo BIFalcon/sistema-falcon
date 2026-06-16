@@ -15,11 +15,24 @@ export default function ResetPasswordPage() {
   const [initializing, setInitializing] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const init = async () => {
       try {
+        const search = new URLSearchParams(window.location.search);
+        const customSetupToken = search.get("setup_token");
+        if (customSetupToken) {
+          const { data, error } = await supabase.functions.invoke("manage-users", {
+            body: { action: "validate_password_setup", setup_token: customSetupToken },
+          });
+          if (error || data?.error) throw new Error(data?.error ?? error?.message);
+          setSetupToken(customSetupToken);
+          setSessionReady(true);
+          return;
+        }
+
         // 1) Hash tokens (#access_token=...&refresh_token=...&type=recovery)
         const hash = window.location.hash.startsWith("#")
           ? window.location.hash.substring(1)
@@ -41,7 +54,6 @@ export default function ResetPasswordPage() {
         }
 
         // 2) Query params (PKCE / verifyOtp): ?token_hash=...&type=recovery
-        const search = new URLSearchParams(window.location.search);
         const token_hash = search.get("token_hash");
         const type = search.get("type");
         if (token_hash && type) {
@@ -97,7 +109,11 @@ export default function ResetPasswordPage() {
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = setupToken
+      ? await supabase.functions.invoke("manage-users", {
+          body: { action: "complete_password_setup", setup_token: setupToken, password },
+        }).then(({ data, error: fnError }) => ({ error: fnError || (data?.error ? new Error(data.error) : null) }))
+      : await supabase.auth.updateUser({ password });
     setSubmitting(false);
     if (error) {
       toast.error("Erro", { description: error.message });

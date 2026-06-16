@@ -87,7 +87,10 @@ type Action =
   | "update"
   | "set_status"
   | "resend_invite"
-  | "delete_user";
+  | "delete_user"
+  | "validate_password_setup"
+  | "complete_password_setup"
+  | "request_password_setup";
 
 interface Payload {
   action: Action;
@@ -100,6 +103,68 @@ interface Payload {
   hotel_ids?: string[];
   // set_status
   status?: "active" | "banned";
+  // password setup / reset
+  setup_token?: string;
+  password?: string;
+}
+
+const PASSWORD_SETUP_TTL_HOURS = 24 * 7;
+const PASSWORD_SETUP_TTL_LABEL = "7 dias";
+
+function isPasswordStrong(value: string) {
+  return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
+}
+
+function makeToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function sha256Hex(value: string) {
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function createPasswordSetupLink(
+  admin: ReturnType<typeof createClient>,
+  args: { userId: string; email: string; origin: string },
+) {
+  const token = makeToken();
+  const tokenHash = await sha256Hex(token);
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + PASSWORD_SETUP_TTL_HOURS * 60 * 60 * 1000).toISOString();
+
+  await admin
+    .from("password_setup_tokens")
+    .update({ used_at: now })
+    .eq("user_id", args.userId)
+    .is("used_at", null);
+
+  const { error } = await admin.from("password_setup_tokens").insert({
+    user_id: args.userId,
+    email: args.email,
+    token_hash: tokenHash,
+    expires_at: expiresAt,
+  });
+  if (error) throw error;
+
+  return `${args.origin}/reset-password?setup_token=${encodeURIComponent(token)}`;
+}
+
+async function getValidPasswordSetupToken(admin: ReturnType<typeof createClient>, token?: string) {
+  if (!token) return { error: "missing_token" as const };
+  const tokenHash = await sha256Hex(token);
+  const { data, error } = await admin
+    .from("password_setup_tokens")
+    .select("id, user_id, email, expires_at, used_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data || data.used_at) return { error: "invalid_or_used" as const };
+  if (new Date(data.expires_at).getTime() < Date.now()) return { error: "expired" as const };
+  return { data };
 }
 
 function json(body: unknown, status = 200) {
@@ -115,6 +180,70 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const payload = (await req.json()) as Payload;
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    if (payload.action === "validate_password_setup") {
+      const result = await getValidPasswordSetupToken(admin, payload.setup_token);
+      if (result.error) return json({ ok: false, error: result.error }, 400);
+      return json({ ok: true, email: result.data.email, expires_at: result.data.expires_at });
+    }
+
+    if (payload.action === "complete_password_setup") {
+      if (!payload.password || !isPasswordStrong(payload.password)) {
+        return json({ ok: false, error: "weak_password" }, 400);
+      }
+      const result = await getValidPasswordSetupToken(admin, payload.setup_token);
+      if (result.error) return json({ ok: false, error: result.error }, 400);
+
+      const { error: updateErr } = await admin.auth.admin.updateUserById(result.data.user_id, {
+        password: payload.password,
+        email_confirm: true,
+      });
+      if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
+
+      await admin.from("profiles").update({ status: "active" }).eq("user_id", result.data.user_id);
+      await admin
+        .from("password_setup_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("id", result.data.id);
+
+      return json({ ok: true });
+    }
+
+    if (payload.action === "request_password_setup") {
+      if (payload.email) {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("user_id, email, status")
+          .eq("email", payload.email)
+          .maybeSingle();
+        if (prof?.email && prof.status !== "banned") {
+          const origin = req.headers.get("origin") ?? "";
+          const actionLink = await createPasswordSetupLink(admin, {
+            userId: prof.user_id,
+            email: prof.email,
+            origin,
+          });
+          await enqueueInviteEmail(admin, {
+            to: prof.email,
+            subject: "Redefinir senha — Sistema Falcon Hotels",
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
+                <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 16px;">Redefinir senha</h1>
+                <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px; color: #333;">Clique no botão abaixo para criar uma nova senha no Sistema Falcon.</p>
+                <p style="margin: 0 0 32px;"><a href="${actionLink}" style="display: inline-block; background: #0a0a0a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 15px; font-weight: 500;">Redefinir senha</a></p>
+                <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">Este link é válido por ${PASSWORD_SETUP_TTL_LABEL}. Se você não solicitou este acesso, ignore este e-mail.</p>
+              </div>
+            `,
+            text: `Redefina sua senha no Sistema Falcon Hotels:\n\n${actionLink}\n\nO link é válido por ${PASSWORD_SETUP_TTL_LABEL}.`,
+            label: "password_reset",
+          });
+        }
+      }
+      return json({ ok: true });
+    }
+
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) {
       return json({ error: "unauthorized" }, 401);
@@ -129,7 +258,6 @@ Deno.serve(async (req) => {
     const callerId = userRes.user.id;
 
     // Verifica se caller é processos ou master
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: callerRoles } = await admin
       .from("user_roles")
       .select("role")
@@ -142,8 +270,6 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
-    const payload = (await req.json()) as Payload;
-
     switch (payload.action) {
       case "invite": {
         if (!payload.email) return json({ error: "email_required" }, 400);
@@ -151,8 +277,7 @@ Deno.serve(async (req) => {
           return json({ error: "only_processos_can_create_master" }, 403);
         }
 
-        const redirectTo =
-          (req.headers.get("origin") ?? "") + "/reset-password";
+        const origin = req.headers.get("origin") ?? "";
 
         // 1) Verifica se o usuário já existe.
         const { data: existingProfile } = await admin
@@ -228,21 +353,13 @@ Deno.serve(async (req) => {
           );
         }
 
-        // 5) Gera UM único link de convite. Esse link dispara o email via
-        //    auth-email-hook E retorna o action_link para o processos copiar
-        //    se quiser repassar manualmente. Como é o único token gerado,
-        //    nada o invalida.
-        const linkType = existingProfile ? "recovery" : "invite";
-        const { data: linkData, error: linkErr } =
-          await admin.auth.admin.generateLink({
-            type: linkType,
-            email: payload.email,
-            options: { redirectTo },
-          });
-        if (linkErr) {
-          return json({ error: linkErr.message }, 400);
-        }
-        actionLink = linkData?.properties?.action_link ?? null;
+        // 5) Gera um link próprio, com expiração controlada pelo sistema.
+        //    Isso evita a expiração curta/variável dos links internos de Auth.
+        actionLink = await createPasswordSetupLink(admin, {
+          userId,
+          email: payload.email,
+          origin,
+        });
 
         if (actionLink) {
           const html = `
@@ -258,12 +375,12 @@ Deno.serve(async (req) => {
                 </a>
               </p>
               <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
-                Este link é válido por 72 horas. Se você não esperava este
+                Este link é válido por ${PASSWORD_SETUP_TTL_LABEL}. Se você não esperava este
                 convite, ignore este e-mail.
               </p>
             </div>
           `;
-          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por ${PASSWORD_SETUP_TTL_LABEL}.`;
           const emailQueued = await enqueueInviteEmail(admin, {
             to: payload.email,
             subject: "Convite — Sistema Falcon Hotels",
@@ -404,39 +521,11 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!prof?.email) return json({ error: "user_not_found" }, 404);
 
-        const redirectTo =
-          (req.headers.get("origin") ?? "") + "/reset-password";
-
-        // Usuários pendentes (e-mail não confirmado) não conseguem receber
-        // magiclink/recovery — precisam de um novo convite. Já usuários ativos
-        // recebem um link de recovery (redefinir senha) que sempre funciona.
-        // Faz fallback automático em caso de erro do Supabase Auth.
-        const tryGenerate = async (
-          type: "recovery" | "invite" | "magiclink",
-        ) =>
-          admin.auth.admin.generateLink({
-            type,
-            email: prof.email!,
-            options: { redirectTo },
-          });
-
-        const primaryType: "recovery" | "invite" =
-          prof.status === "pending" ? "invite" : "recovery";
-        let { data: linkData, error: linkErr } = await tryGenerate(primaryType);
-        if (linkErr) {
-          console.warn("[resend_invite] primary generateLink failed", {
-            primaryType,
-            error: linkErr.message,
-          });
-          const fallbackType: "recovery" | "invite" =
-            primaryType === "recovery" ? "invite" : "recovery";
-          ({ data: linkData, error: linkErr } = await tryGenerate(fallbackType));
-        }
-        if (linkErr) {
-          console.error("[resend_invite] generateLink failed", linkErr);
-          return json({ error: linkErr.message }, 400);
-        }
-        const actionLink = linkData?.properties?.action_link ?? null;
+        const actionLink = await createPasswordSetupLink(admin, {
+          userId: payload.user_id,
+          email: prof.email,
+          origin: req.headers.get("origin") ?? "",
+        });
 
         if (actionLink) {
           const html = `
@@ -452,12 +541,12 @@ Deno.serve(async (req) => {
                 </a>
               </p>
               <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
-                Este link é válido por 72 horas. Se você não solicitou este
+                Este link é válido por ${PASSWORD_SETUP_TTL_LABEL}. Se você não solicitou este
                 acesso, ignore este e-mail.
               </p>
             </div>
           `;
-          const text = `Seu link de acesso ao Sistema Falcon foi renovado.\n\nAcesse:\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const text = `Seu link de acesso ao Sistema Falcon foi renovado.\n\nAcesse:\n${actionLink}\n\nO link é válido por ${PASSWORD_SETUP_TTL_LABEL}.`;
           const emailQueued = await enqueueInviteEmail(admin, {
             to: prof.email,
             subject: "Novo acesso — Sistema Falcon Hotels",
