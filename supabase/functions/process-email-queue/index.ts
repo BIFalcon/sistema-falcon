@@ -76,6 +76,23 @@ async function moveToDlq(
   if (error) {
     console.error('Failed to move message to DLQ', { queue, msg_id: msg.msg_id, reason, error })
   }
+
+  // Registra alerta para visibilidade no painel Master
+  try {
+    await supabase.from('system_alerts').insert({
+      type: 'email_dlq',
+      message: `E-mail para ${payload.to ?? '—'} falhou: ${reason}`,
+      payload: {
+        to: payload.to,
+        subject: payload.subject,
+        template: payload.label ?? queue,
+        queue,
+        reason,
+      },
+    })
+  } catch (alertErr) {
+    console.error('Failed to log system alert for DLQ', alertErr)
+  }
 }
 
 Deno.serve(async (req) => {
