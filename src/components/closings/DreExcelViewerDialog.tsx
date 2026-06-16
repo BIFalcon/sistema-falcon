@@ -46,10 +46,17 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
         const blob = await res.blob();
         if (blob.size >= SIZE_WARN_BYTES) setWarnLarge(true);
         const buf = await blob.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
+        const wb = XLSX.read(buf, {
+          type: "array",
+          cellStyles: true,
+          cellHTML: true,
+        });
         const out: SheetHtml[] = wb.SheetNames.map((name) => ({
           name,
-          html: XLSX.utils.sheet_to_html(wb.Sheets[name], { editable: false }),
+          html: XLSX.utils.sheet_to_html(wb.Sheets[name], {
+            editable: false,
+            id: `sheet-${name.replace(/\s+/g, "-")}`,
+          }),
         }));
         if (cancelled) return;
         setSheets(out);
@@ -72,6 +79,9 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
             DRE{versionLabel ? ` — ${versionLabel}` : ""}
             {fileName && <span className="ml-2 text-xs font-normal text-muted-foreground">{fileName}</span>}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Visualização de dados e formatação. Imagens e gráficos do arquivo original não são exibidos neste modo.
+          </p>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col">
