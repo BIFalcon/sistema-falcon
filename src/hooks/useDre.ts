@@ -86,7 +86,17 @@ export function useUploadDre() {
       let parseWarnings: string[] = [];
       let template = "DEFAULT";
       try {
-        const parsed = await parseDreExcel(file, { targetMonth: month });
+        // Busca hotel_id do fechamento para aplicar overrides de parser por hotel
+        // (ex.: ibis-budget-recife usa "Resultado Operacional Líquido" como lucro líquido).
+        const { data: closingRow } = await supabase
+          .from("closings")
+          .select("hotel_id")
+          .eq("id", closingId)
+          .maybeSingle();
+        const parsed = await parseDreExcel(file, {
+          targetMonth: month,
+          hotelId: closingRow?.hotel_id ?? undefined,
+        });
         template = parsed.template;
         parseWarnings = parsed.warnings;
         // Persist key indicators + raw lines (limita a 200 linhas para não estourar)

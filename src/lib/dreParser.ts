@@ -572,6 +572,22 @@ export const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
 ];
 
 /**
+ * Override de indicadores por hotel.
+ *
+ * `ibis-budget-recife` (Ibis Budget Recife Jaboatão): a linha de
+ * "Distribuição Total" / lucro a distribuir da DRE corresponde, por
+ * particularidade contábil, ao "Resultado Operacional Líquido". Portanto,
+ * para esse hotel o indicador `lucro_liquido` deve ler primeiro essa linha.
+ */
+export function getIndicatorRxs(key: IndicatorKey, hotelId?: string): RegExp[] {
+  const base = INDICATORS.find((i) => i.key === key)?.rx ?? [];
+  if (hotelId === "ibis-budget-recife" && key === "lucro_liquido") {
+    return [/^resultado\s+operacional\s+l[íi]quido/i, ...base];
+  }
+  return base;
+}
+
+/**
  * Identifica o template a partir das abas existentes.
  * Mapeamento validado com planilhas reais (Modelo_-_Demais, Modelo_Mercure,
  * Modelo_Manhattan, Modelo_Confins).
@@ -969,7 +985,7 @@ function readSheetLines(
 
 export async function parseDreExcel(
   file: File,
-  opts: { targetMonth?: number; targetYear?: number } = {},
+  opts: { targetMonth?: number; targetYear?: number; hotelId?: string } = {},
 ): Promise<ParsedDre> {
   const buf = await file.arrayBuffer();
   // cellDates: true para que CONFINS (datas no header) gere objetos Date
@@ -999,6 +1015,7 @@ export async function parseDreExcel(
   // Localiza a coluna do mês alvo. Se não informado, último mês com dado é usado (fallback).
   const targetMonth = opts.targetMonth;
   const targetYear = opts.targetYear;
+  const hotelId = opts.hotelId;
   const monthInfo = targetMonth ? findMonthColumn(rows, targetMonth, targetYear, displayRows) : null;
   const monthCol = monthInfo?.colIndex ?? null;
   if (targetMonth && !monthInfo) {
@@ -1085,7 +1102,8 @@ export async function parseDreExcel(
     lines.push({ row: idx + 1, label: finalLabel, value, level });
     for (const ind of INDICATORS) {
       if (indicators[ind.key]) continue;
-      if (ind.rx.some((rx) => rx.test(finalLabel))) {
+      const rxs = getIndicatorRxs(ind.key, hotelId);
+      if (rxs.some((rx) => rx.test(finalLabel))) {
         indicators[ind.key] = { key: ind.key, label: finalLabel, value, row: idx + 1, sheet: sheetName };
       }
     }
@@ -1101,7 +1119,7 @@ export async function parseDreExcel(
   // Cobre todos os indicadores para que qualquer mês do ano possa ser
   // reconstruído a partir da última DRE enviada (fonte de verdade).
   const SERIES_KEYS: IndicatorKey[] = INDICATORS.map((i) => i.key);
-  const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows);
+  const currentSeries = extractMonthlySeries(rows, SERIES_KEYS, targetYear, displayRows, hotelId);
   // Linhas detalhadas do realizado — série anual completa (analoga a prev/budget).
   const currentLines = readSheetLines(rows, targetYear, displayRows);
 
@@ -1119,7 +1137,7 @@ export async function parseDreExcel(
       const prevDisplayRows: unknown[][] = XLSX.utils.sheet_to_json(prevWs, {
         header: 1, blankrows: false, defval: null, raw: false,
       });
-      previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
+      previousSeries = extractMonthlySeries(prevRows, SERIES_KEYS, targetYear ? targetYear - 1 : undefined, prevDisplayRows, hotelId);
       prevLines = readSheetLines(prevRows, targetYear ? targetYear - 1 : undefined, prevDisplayRows);
       // Para a tabela de "Indicadores extraídos" precisamos do MESMO mês
       // do ano anterior — em todas as métricas (não só as 3 dos gráficos).
@@ -1128,7 +1146,7 @@ export async function parseDreExcel(
         const prevMonthCol = prevMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
-          const rxs = INDICATORS.find((i) => i.key === k)?.rx ?? [];
+          const rxs = getIndicatorRxs(k, hotelId);
           for (const row of prevRows) {
             const lbl = rowLabel(row ?? []);
             if (!lbl) continue;
@@ -1159,14 +1177,14 @@ export async function parseDreExcel(
       const budgetDisplayRows: unknown[][] = XLSX.utils.sheet_to_json(budgetWs, {
         header: 1, blankrows: false, defval: null, raw: false,
       });
-      budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS, targetYear, budgetDisplayRows);
+      budgetSeries = extractMonthlySeries(budgetRows, SERIES_KEYS, targetYear, budgetDisplayRows, hotelId);
       budgetLines = readSheetLines(budgetRows, targetYear, budgetDisplayRows);
       if (targetMonth) {
         const budgetMonthInfo = findMonthColumn(budgetRows, targetMonth, targetYear, budgetDisplayRows);
         const budgetMonthCol = budgetMonthInfo?.colIndex ?? null;
         const allKeys: IndicatorKey[] = INDICATORS.map((i) => i.key);
         for (const k of allKeys) {
-          const rxs = INDICATORS.find((i) => i.key === k)?.rx ?? [];
+          const rxs = getIndicatorRxs(k, hotelId);
           for (const row of budgetRows) {
             const lbl = rowLabel(row ?? []);
             if (!lbl) continue;
@@ -1210,6 +1228,7 @@ function extractMonthlySeries(
   keys: IndicatorKey[],
   targetYear?: number,
   displayRows?: unknown[][],
+  hotelId?: string,
 ): Partial<Record<IndicatorKey, (number | null)[]>> {
   // Mapeia mês (1..12) → colIndex
   const monthCols = new Map<number, number>();
@@ -1220,7 +1239,7 @@ function extractMonthlySeries(
   if (monthCols.size === 0) return {};
   const out: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   for (const key of keys) {
-    const rxs = INDICATORS.find((i) => i.key === key)?.rx ?? [];
+    const rxs = getIndicatorRxs(key, hotelId);
     if (!rxs.length) continue;
     // Acha 1ª linha com label que bata o regex
     let hitRow: unknown[] | null = null;
