@@ -152,6 +152,8 @@ export default function ContasPagarPage() {
   // ── Mutations ──────────────────────────────────────────────────────────
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
+  const unscheduleEntries = useUnscheduleEntries();
+  const setPending = useSetEntryPending();
   const upsertCard = useUpsertCardReceivable();
   const updateCard = useUpdateCardReceivable();
   const deleteCard = useDeleteCardReceivable();
