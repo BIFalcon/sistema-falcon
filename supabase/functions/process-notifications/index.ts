@@ -115,6 +115,22 @@ Deno.serve(async (req) => {
 
   for (const item of pending) {
     try {
+      // Defensivo: aceita recipient_email com múltiplos endereços (separados
+      // por ; , espaço ou contendo nome). Cada destinatário vira um job
+      // independente — falha de um endereço inválido não derruba os demais.
+      const recipients = extractEmails(item.recipient_email);
+      if (recipients.length === 0) {
+        await supabase
+          .from("notification_queue")
+          .update({
+            status: "failed",
+            error_message: `Endereço inválido: "${item.recipient_email ?? ""}"`,
+          })
+          .eq("id", item.id);
+        failed++;
+        continue;
+      }
+
       // Re-aponta links relativos para a URL absoluta da app.
       const linkHref = item.link_url
         ? (String(item.link_url).startsWith("http") ? String(item.link_url) : `${APP_BASE_URL}${item.link_url}`)
@@ -138,29 +154,32 @@ Deno.serve(async (req) => {
         .replace(/\*\*(.+?)\*\*/g, "$1")
         .replace(/\[(.+?)\]\((.+?)\)/g, "$1 ($2)")}\n\n---\nSistema Falcon Hotels\nGerenciar notificações: ${APP_BASE_URL}/notificacoes`;
 
-      const messageId = `notif-${item.id}`;
-      const unsubscribeToken = await getUnsubscribeToken(item.recipient_email);
-      const payload = {
-        message_id: messageId,
-        idempotency_key: messageId,
-        purpose: "transactional",
-        label: `workflow:${item.event ?? "notification"}`,
-        to: item.recipient_email,
-        from: FROM_ADDRESS,
-        sender_domain: SENDER_DOMAIN,
-        subject: item.subject,
-        html,
-        text,
-        unsubscribe_token: unsubscribeToken,
-        queued_at: new Date().toISOString(),
-        link_url: linkHref,
-      };
-
-      const { error: enqError } = await supabase.rpc("enqueue_email", {
-        queue_name: "transactional_emails",
-        payload,
-      });
-      if (enqError) throw enqError;
+      // Enfileira um job por destinatário (sufixo no message_id quando >1).
+      for (let i = 0; i < recipients.length; i++) {
+        const to = recipients[i];
+        const messageId = recipients.length > 1 ? `notif-${item.id}-${i}` : `notif-${item.id}`;
+        const unsubscribeToken = await getUnsubscribeToken(to);
+        const payload = {
+          message_id: messageId,
+          idempotency_key: messageId,
+          purpose: "transactional",
+          label: `workflow:${item.event ?? "notification"}`,
+          to,
+          from: FROM_ADDRESS,
+          sender_domain: SENDER_DOMAIN,
+          subject: item.subject,
+          html,
+          text,
+          unsubscribe_token: unsubscribeToken,
+          queued_at: new Date().toISOString(),
+          link_url: linkHref,
+        };
+        const { error: enqError } = await supabase.rpc("enqueue_email", {
+          queue_name: "transactional_emails",
+          payload,
+        });
+        if (enqError) throw enqError;
+      }
 
       await supabase
         .from("notification_queue")
