@@ -828,7 +828,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
     height: SIZE - (HEADER_CONTENT_Y + 2) - 14, // até ~14mm da base
-    minSize: 9,
+    minSize: 6.5,
     maxSize: 22,
     lineHeightFactor: 1.5,
     minFillRatio: 0.85,
