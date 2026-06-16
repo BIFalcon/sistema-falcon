@@ -60,6 +60,8 @@ import {
   useRestoreApEntry,
   useLatestApUpload,
   useSetEntryPaymentStatus,
+  useUnscheduleEntries,
+  useSetEntryPending,
   useTodayBankBalance,
   useUpsertBankBalance,
   useApNotificationLog,
