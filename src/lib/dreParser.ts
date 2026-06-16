@@ -572,6 +572,22 @@ export const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
 ];
 
 /**
+ * Override de indicadores por hotel.
+ *
+ * `ibis-budget-recife` (Ibis Budget Recife Jaboatão): a linha de
+ * "Distribuição Total" / lucro a distribuir da DRE corresponde, por
+ * particularidade contábil, ao "Resultado Operacional Líquido". Portanto,
+ * para esse hotel o indicador `lucro_liquido` deve ler primeiro essa linha.
+ */
+export function getIndicatorRxs(key: IndicatorKey, hotelId?: string): RegExp[] {
+  const base = INDICATORS.find((i) => i.key === key)?.rx ?? [];
+  if (hotelId === "ibis-budget-recife" && key === "lucro_liquido") {
+    return [/^resultado\s+operacional\s+l[íi]quido/i, ...base];
+  }
+  return base;
+}
+
+/**
  * Identifica o template a partir das abas existentes.
  * Mapeamento validado com planilhas reais (Modelo_-_Demais, Modelo_Mercure,
  * Modelo_Manhattan, Modelo_Confins).
