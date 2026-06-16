@@ -521,39 +521,11 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!prof?.email) return json({ error: "user_not_found" }, 404);
 
-        const redirectTo =
-          (req.headers.get("origin") ?? "") + "/reset-password";
-
-        // Usuários pendentes (e-mail não confirmado) não conseguem receber
-        // magiclink/recovery — precisam de um novo convite. Já usuários ativos
-        // recebem um link de recovery (redefinir senha) que sempre funciona.
-        // Faz fallback automático em caso de erro do Supabase Auth.
-        const tryGenerate = async (
-          type: "recovery" | "invite" | "magiclink",
-        ) =>
-          admin.auth.admin.generateLink({
-            type,
-            email: prof.email!,
-            options: { redirectTo },
-          });
-
-        const primaryType: "recovery" | "invite" =
-          prof.status === "pending" ? "invite" : "recovery";
-        let { data: linkData, error: linkErr } = await tryGenerate(primaryType);
-        if (linkErr) {
-          console.warn("[resend_invite] primary generateLink failed", {
-            primaryType,
-            error: linkErr.message,
-          });
-          const fallbackType: "recovery" | "invite" =
-            primaryType === "recovery" ? "invite" : "recovery";
-          ({ data: linkData, error: linkErr } = await tryGenerate(fallbackType));
-        }
-        if (linkErr) {
-          console.error("[resend_invite] generateLink failed", linkErr);
-          return json({ error: linkErr.message }, 400);
-        }
-        const actionLink = linkData?.properties?.action_link ?? null;
+        const actionLink = await createPasswordSetupLink(admin, {
+          userId: payload.user_id,
+          email: prof.email,
+          origin: req.headers.get("origin") ?? "",
+        });
 
         if (actionLink) {
           const html = `
@@ -569,12 +541,12 @@ Deno.serve(async (req) => {
                 </a>
               </p>
               <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
-                Este link é válido por 72 horas. Se você não solicitou este
+                Este link é válido por ${PASSWORD_SETUP_TTL_LABEL}. Se você não solicitou este
                 acesso, ignore este e-mail.
               </p>
             </div>
           `;
-          const text = `Seu link de acesso ao Sistema Falcon foi renovado.\n\nAcesse:\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const text = `Seu link de acesso ao Sistema Falcon foi renovado.\n\nAcesse:\n${actionLink}\n\nO link é válido por ${PASSWORD_SETUP_TTL_LABEL}.`;
           const emailQueued = await enqueueInviteEmail(admin, {
             to: prof.email,
             subject: "Novo acesso — Sistema Falcon Hotels",
