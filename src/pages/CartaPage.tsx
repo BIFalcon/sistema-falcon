@@ -34,6 +34,63 @@ import { generateLetterPdf } from "@/lib/letterPdf";
 import { supabase } from "@/integrations/supabase/client";
 import type { IndicatorKey } from "@/lib/dreParser";
 
+/**
+ * Aceita praticamente qualquer formato que o usuário possa digitar:
+ *   "25000", "25000.00", "25.000", "25.000,00", "25,000.00",
+ *   "R$ 25.000,00", "r$25000,5", "25 000,00", "25mil"? (não — só números)
+ * Retorna o número em reais ou NaN se não der para interpretar.
+ */
+function parseBRLLoose(input: string): number {
+  if (input == null) return NaN;
+  let s = String(input).trim();
+  if (!s) return NaN;
+  // remove símbolo de moeda, espaços, caracteres não numéricos exceto . , -
+  s = s.replace(/r\$/gi, "").replace(/\s/g, "");
+  s = s.replace(/[^0-9.,-]/g, "");
+  if (!s) return NaN;
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    // O último separador é o decimal; o outro vira separador de milhar.
+    const lastComma = s.lastIndexOf(",");
+    const lastDot = s.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      // formato BR: 25.000,00
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      // formato US: 25,000.00
+      s = s.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    // só vírgula → decimal BR (se houver mais de uma, todas viram milhar e a última decimal)
+    const parts = s.split(",");
+    if (parts.length > 2) {
+      s = parts.slice(0, -1).join("") + "." + parts[parts.length - 1];
+    } else {
+      s = s.replace(",", ".");
+    }
+  } else if (hasDot) {
+    // só ponto: se houver vários, são milhares ("25.000.000"); se houver um e os dígitos
+    // depois forem !== 2, tratamos como milhar; se forem 2, é decimal ("25.50").
+    const parts = s.split(".");
+    if (parts.length > 2) {
+      s = parts.join("");
+    } else {
+      const dec = parts[1] ?? "";
+      if (dec.length === 3) s = parts.join(""); // 25.000 → 25000
+      // caso contrário mantém como decimal (25.5 / 25.50)
+    }
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+const brlFmt = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  maximumFractionDigits: 2,
+});
+
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -164,12 +221,12 @@ export default function CartaPage() {
   }
 
   function validate(): string | null {
-    const reserve = draft.reserve_fund.replace(",", ".").trim();
-    const rps = draft.rps_score.replace(",", ".").trim();
-    if (!reserve) return "Informe o Fundo de Reserva";
-    if (Number.isNaN(Number(reserve))) return "Fundo de Reserva inválido";
-    if (!rps) return "Informe a Nota RPS";
-    if (Number.isNaN(Number(rps))) return "Nota RPS inválida";
+    const reserve = parseBRLLoose(draft.reserve_fund);
+    const rps = parseBRLLoose(draft.rps_score);
+    if (!draft.reserve_fund.trim()) return "Informe o Fundo de Reserva";
+    if (!Number.isFinite(reserve)) return "Fundo de Reserva inválido";
+    if (!draft.rps_score.trim()) return "Informe a Nota RPS";
+    if (!Number.isFinite(rps)) return "Nota RPS inválida";
     if (highlights.length === 0) return "Adicione pelo menos um destaque do mês";
     const empty = highlights.find((h) => !h.title.trim());
     if (empty) return "Todos os destaques precisam ter um título";
@@ -188,8 +245,8 @@ export default function CartaPage() {
         id: letter.id,
         closingId: resolvedId,
         patch: {
-          reserve_fund: Number(draft.reserve_fund.replace(",", ".")),
-          rps_score: Number(draft.rps_score.replace(",", ".")),
+          reserve_fund: parseBRLLoose(draft.reserve_fund),
+          rps_score: parseBRLLoose(draft.rps_score),
           operational_comment: draft.operational_comment || null,
         },
       });
