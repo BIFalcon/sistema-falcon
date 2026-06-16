@@ -277,8 +277,7 @@ Deno.serve(async (req) => {
           return json({ error: "only_processos_can_create_master" }, 403);
         }
 
-        const redirectTo =
-          (req.headers.get("origin") ?? "") + "/reset-password";
+        const origin = req.headers.get("origin") ?? "";
 
         // 1) Verifica se o usuário já existe.
         const { data: existingProfile } = await admin
@@ -354,21 +353,13 @@ Deno.serve(async (req) => {
           );
         }
 
-        // 5) Gera UM único link de convite. Esse link dispara o email via
-        //    auth-email-hook E retorna o action_link para o processos copiar
-        //    se quiser repassar manualmente. Como é o único token gerado,
-        //    nada o invalida.
-        const linkType = existingProfile ? "recovery" : "invite";
-        const { data: linkData, error: linkErr } =
-          await admin.auth.admin.generateLink({
-            type: linkType,
-            email: payload.email,
-            options: { redirectTo },
-          });
-        if (linkErr) {
-          return json({ error: linkErr.message }, 400);
-        }
-        actionLink = linkData?.properties?.action_link ?? null;
+        // 5) Gera um link próprio, com expiração controlada pelo sistema.
+        //    Isso evita a expiração curta/variável dos links internos de Auth.
+        actionLink = await createPasswordSetupLink(admin, {
+          userId,
+          email: payload.email,
+          origin,
+        });
 
         if (actionLink) {
           const html = `
@@ -384,12 +375,12 @@ Deno.serve(async (req) => {
                 </a>
               </p>
               <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #666;">
-                Este link é válido por 72 horas. Se você não esperava este
+                Este link é válido por ${PASSWORD_SETUP_TTL_LABEL}. Se você não esperava este
                 convite, ignore este e-mail.
               </p>
             </div>
           `;
-          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por 72 horas.`;
+          const text = `Bem-vindo ao Sistema Falcon Hotels.\n\nVocê foi convidado para acessar o sistema. Use o link abaixo para criar sua senha:\n\n${actionLink}\n\nO link é válido por ${PASSWORD_SETUP_TTL_LABEL}.`;
           const emailQueued = await enqueueInviteEmail(admin, {
             to: payload.email,
             subject: "Convite — Sistema Falcon Hotels",
