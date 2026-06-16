@@ -877,9 +877,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const blocks: string[] = [];
   const push = (s?: string | null) => { if (s && s.trim()) blocks.push(s.trim()); };
   push(letter.ai_intro);
+  push(letter.ai_market_context);
   push(letter.ai_operational);
   push(letter.ai_financial);
   push(letter.ai_outlook);
+  push(letter.ai_closing);
   const body = blocks.join("\n\n") || "—";
   drawDynamicTextBlock(doc, body, {
     x: 16,
