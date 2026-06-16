@@ -676,7 +676,7 @@ function drawLineChart(
       // fora da área útil (ponto no topo/rodapé), clampa também o Y. Assim todo
       // mês com dado tem pelo menos um rótulo visível no gráfico.
       if (!chosen) {
-        const t = { x: clampX(c.x), y: clampY(c.y - 5.2 * px) };
+        const t = { x: clampX(c.x), y: clampY(c.y + (c.preferAbove ? -1 : 1) * 5.2 * px) };
         chosen = { t, box: { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th } };
       }
       if (chosen) {
