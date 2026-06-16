@@ -886,10 +886,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
     height: SIZE - (HEADER_CONTENT_Y + 2) - 10, // até ~10mm da base
+    // O tamanho da fonte NÃO é fixo: o algoritmo procura o maior tamanho que
+    // cabe na página, para que o texto sempre ocupe toda a área disponível.
+    // Só reduz a fonte quando o texto é grande demais e não caberia.
     minSize: 4.8,
-    maxSize: 11.2,
-    lineHeightFactor: 1.3,
-    minFillRatio: 0.7,
+    maxSize: 22,
+    lineHeightFactor: 1.45,
+    minFillRatio: 0.92,
   });
 
   /* ───── 5. DESTAQUES ───── */
