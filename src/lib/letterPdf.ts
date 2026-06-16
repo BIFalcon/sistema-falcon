@@ -885,11 +885,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     x: 16,
     y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
-    height: SIZE - (HEADER_CONTENT_Y + 2) - 14, // até ~14mm da base
-    minSize: 6.5,
-    maxSize: 22,
-    lineHeightFactor: 1.5,
-    minFillRatio: 0.85,
+    height: SIZE - (HEADER_CONTENT_Y + 2) - 10, // até ~10mm da base
+    minSize: 4.8,
+    maxSize: 11.2,
+    lineHeightFactor: 1.3,
+    minFillRatio: 0.7,
   });
 
   /* ───── 5. DESTAQUES ───── */
@@ -1031,7 +1031,7 @@ function drawDreTable(
     { kind: "item", label: "Outras Receitas", rx: [/^outras\s+receitas/i] },
     { kind: "total", label: "RECEITA BRUTA TOTAL", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i, /^receita\s+total\s+bruta/i] },
     { kind: "item", label: "(–) Impostos s/ vendas e serviços", rx: [/impostos?\s+s\/?\s*vendas/i, /impostos?\s+sobre\s+(vendas|servi)/i] },
-    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
+    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
     { kind: "total", label: "RECEITA LÍQUIDA TOTAL", rx: [/^receita\s+l[íi]quida\s+total/i, /^receita\s+total\s+l[íi]quida/i, /^\(?=\)?\s*receita\s+l[íi]quida/i] },
 
     { kind: "section", label: "DESPESAS FIXAS" },
@@ -1202,128 +1202,104 @@ function drawDynamicTextBlock(
     minFillRatio: number;
   },
 ) {
-  // Renderiza parágrafos respeitando justificação, mas mantendo a última
-  // linha de cada parágrafo alinhada à esquerda (evita linhas com 1–3
-  // palavras esticadas pela página inteira). Mantém a mesma fonte/lhf que
-  // o algoritmo de auto-fit determinaria para o texto inteiro.
-  const renderParagraphs = (size: number, lhf: number) => {
+  const { x, y, width, height, minSize, maxSize, lineHeightFactor, minFillRatio } = opts;
+  const paragraphs = String(text ?? "").split(/\n{2,}/);
+  doc.setFont("helvetica", "normal");
+
+  const measureLayout = (size: number, lhf: number) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(size);
     const lineH = (size * lhf) / doc.internal.scaleFactor;
-    const paragraphs = String(text ?? "").split(/\n{2,}/);
-    let cursorY = opts.y + size / doc.internal.scaleFactor;
+    const firstBaseline = size / doc.internal.scaleFactor;
+    let cursorOffset = firstBaseline;
+    let linesCount = 0;
+    const lines: Array<{ text: string; y: number }> = [];
+
     for (let p = 0; p < paragraphs.length; p++) {
       const para = paragraphs[p].replace(/\n/g, " ").trim();
       if (!para) {
-        cursorY += lineH * 0.6;
+        cursorOffset += lineH * 0.55;
         continue;
       }
-      const lines = doc.splitTextToSize(para, opts.width) as string[];
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
-        // palavras ou menos. Artigos isolados de 1 letra não contam para
-        // evitar linhas curtas como "firmando a tendência..." muito abertas.
-        const wordCount = line.trim().split(/\s+/).filter((word) => word.length > 1).length;
-        const shouldJustify = wordCount > 5;
-        if (shouldJustify) drawJustifiedTextLine(doc, line, opts.x, cursorY, opts.width);
-        else doc.text(line, opts.x, cursorY);
-        cursorY += lineH;
+      const paraLines = doc.splitTextToSize(para, width) as string[];
+      for (const line of paraLines) {
+        lines.push({ text: line, y: y + cursorOffset });
+        cursorOffset += lineH;
+        linesCount += 1;
       }
-      if (p < paragraphs.length - 1) cursorY += lineH * 0.6;
+      if (p < paragraphs.length - 1) cursorOffset += lineH * 0.55;
+    }
+
+    const bottomPadding = (size / doc.internal.scaleFactor) * 0.35;
+    const totalH = linesCount > 0 ? cursorOffset + bottomPadding : 0;
+    return { lines, totalH, lineH, filledRatio: height > 0 ? totalH / height : 1 };
+  };
+
+  const renderLayout = (size: number, lhf: number) => {
+    const layout = measureLayout(size, lhf);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(size);
+    for (const item of layout.lines) {
+      // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
+      // palavras ou menos. Artigos isolados de 1 letra não contam para
+      // evitar linhas curtas como "firmando a tendência..." muito abertas.
+      const line = item.text;
+      const wordCount = line.trim().split(/\s+/).filter((word) => word.length > 1).length;
+      const shouldJustify = wordCount > 5;
+      if (shouldJustify) drawJustifiedTextLine(doc, line, x, item.y, width);
+      else doc.text(line, x, item.y);
     }
   };
 
-  const { x, y, width, height, minSize, maxSize, lineHeightFactor, minFillRatio } = opts;
-  doc.setFont("helvetica", "normal");
-
-  // Busca binária pelo maior tamanho de fonte que cabe na altura
-  let lo = minSize, hi = maxSize, best = minSize;
-  let bestLines: string[] = [];
+  let bestSize = minSize;
   let bestLhf = lineHeightFactor;
-  while (lo <= hi) {
-    const mid = (lo + hi) / 2;
-    doc.setFontSize(mid);
-    // Mede a altura considerando os parágrafos separados (com um pequeno
-    // espaço entre eles), igual ao que será renderizado.
-    const paragraphs = String(text ?? "").split(/\n{2,}/);
-    let totalLines = 0;
-    for (const p of paragraphs) {
-      const t = p.replace(/\n/g, " ").trim();
-      if (!t) { totalLines += 0.6; continue; }
-      totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+  let bestLayout = measureLayout(bestSize, bestLhf);
+
+  // Procura o maior tamanho que cabe usando exatamente a mesma medição usada
+  // na renderização. Isso evita que o PDF "perca" o último parágrafo por
+  // diferença entre cálculo e desenho.
+  for (let size = maxSize; size >= minSize; size -= 0.1) {
+    const layout = measureLayout(size, lineHeightFactor);
+    if (layout.totalH <= height) {
+      bestSize = size;
+      bestLhf = lineHeightFactor;
+      bestLayout = layout;
+      break;
     }
-    if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
-    const lineH = (mid * lineHeightFactor) / doc.internal.scaleFactor;
-    const totalH = totalLines * lineH;
-    if (totalH <= height) {
-      best = mid;
-      bestLines = [String(text ?? "")];
-      lo = mid + 0.25;
-    } else {
-      hi = mid - 0.25;
-    }
-    if (hi - lo < 0.2) break;
   }
 
-  // Se mesmo no minSize não couber, comprime ainda mais o tamanho da fonte e
-  // o entrelinhas até caber tudo (garante que o último parágrafo apareça).
-  if (bestLines.length === 0) {
-    let size = minSize;
-    let lhf = lineHeightFactor;
-    while (size > 4) {
-      doc.setFontSize(size);
-      const paragraphs = String(text ?? "").split(/\n{2,}/);
-      let totalLines = 0;
-      for (const p of paragraphs) {
-        const t = p.replace(/\n/g, " ").trim();
-        if (!t) { totalLines += 0.6; continue; }
-        totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+  // Se ainda não couber, reduz mais a fonte e aperta levemente o entrelinhas,
+  // priorizando mostrar todo o texto em vez de manter tamanho maior.
+  if (bestLayout.totalH > height) {
+    let found = false;
+    for (let size = minSize; size >= 3.6 && !found; size -= 0.1) {
+      for (let lhf = Math.min(lineHeightFactor, 1.2); lhf >= 1.05; lhf -= 0.05) {
+        const layout = measureLayout(size, lhf);
+        if (layout.totalH <= height) {
+          bestSize = size;
+          bestLhf = lhf;
+          bestLayout = layout;
+          found = true;
+          break;
+        }
       }
-      if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
-      const lineH = (size * lhf) / doc.internal.scaleFactor;
-      if (totalLines * lineH <= height) {
-        best = size;
-        bestLines = [String(text ?? "")];
-        bestLhf = lhf;
-        break;
-      }
-      // Primeiro tenta apertar o entrelinhas até 1.2; depois reduz fonte.
-      if (lhf > 1.2) lhf = Math.max(1.2, lhf - 0.05);
-      else size -= 0.25;
     }
-    if (bestLines.length === 0) {
-      // Fallback derradeiro: minSize absoluto, e truncamento controlado.
-      best = 4;
-      bestLhf = 1.1;
-      bestLines = [String(text ?? "")];
+    if (!found) {
+      bestSize = 3.6;
+      bestLhf = 1.05;
+      bestLayout = measureLayout(bestSize, bestLhf);
     }
-    renderParagraphs(best, bestLhf);
-    return;
   }
 
-  // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
-  // até atingir a altura alvo (mantendo dentro da área).
-  // Conta linhas reais (com quebras de parágrafo) para o preenchimento.
-  doc.setFontSize(best);
-  const paragraphs = String(text ?? "").split(/\n{2,}/);
-  let totalLines = 0;
-  for (const p of paragraphs) {
-    const t = p.replace(/\n/g, " ").trim();
-    if (!t) { totalLines += 0.6; continue; }
-    totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+  // Só aumenta o respiro se houver muita sobra. Nunca ultrapassa o entrelinhas
+  // base, para não recriar o corte no fim da página.
+  if (bestLayout.filledRatio < minFillRatio && bestLayout.lines.length > 0) {
+    const targetLineH = Math.min(height * minFillRatio, height) / bestLayout.lines.length;
+    const targetLhf = (targetLineH * doc.internal.scaleFactor) / bestSize;
+    bestLhf = Math.min(lineHeightFactor, Math.max(bestLhf, targetLhf));
   }
-  if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
-  const lineH = (best * lineHeightFactor) / doc.internal.scaleFactor;
-  const filled = totalLines * lineH;
-  let lhfFinal = lineHeightFactor;
-  if (filled < height * minFillRatio && totalLines > 0) {
-    const targetH = Math.min(height, Math.max(filled, height * minFillRatio));
-    const newLineH = targetH / totalLines;
-    const newLhf = (newLineH * doc.internal.scaleFactor) / best;
-    lhfFinal = Math.min(newLhf, 2.2);
-  }
-  renderParagraphs(best, lhfFinal);
+
+  renderLayout(bestSize, bestLhf);
 }
 
 /**
