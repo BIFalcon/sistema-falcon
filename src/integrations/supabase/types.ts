@@ -2208,6 +2208,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_alerts: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          payload: Json
+          resolved: boolean
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          payload?: Json
+          resolved?: boolean
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          payload?: Json
+          resolved?: boolean
+          type?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           key: string
