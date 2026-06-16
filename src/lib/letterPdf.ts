@@ -609,22 +609,50 @@ function drawLineChart(
       ctx.font = `${c.bold ? "bold " : ""}${2.8 * px}px Helvetica, Arial`;
       const tw = ctx.measureText(text).width;
       const th = 4 * px;
+      // Clampa o X para que rótulos das extremidades (Jan/Jun/Dez) caibam dentro
+      // da área útil do gráfico, em vez de serem descartados pelo guard de borda.
+      const halfW = tw / 2 + 1.2 * px;
+      const minX = x0 + halfW;
+      const maxX = x0 + w - halfW;
+      const clampX = (x: number) => Math.min(Math.max(x, minX), maxX);
       const tries = [
-        { x: c.x, y: c.y - 5.2 * px },
-        { x: c.x, y: c.y + 5.2 * px },
-        { x: c.x, y: c.y - 8.5 * px },
-        { x: c.x, y: c.y + 8.5 * px },
-        { x: c.x - 7 * px, y: c.y - 2 * px },
-        { x: c.x + 7 * px, y: c.y - 2 * px },
+        { x: clampX(c.x),           y: c.y - 5.2 * px },
+        { x: clampX(c.x),           y: c.y + 5.2 * px },
+        { x: clampX(c.x),           y: c.y - 8.5 * px },
+        { x: clampX(c.x),           y: c.y + 8.5 * px },
+        { x: clampX(c.x - 7 * px),  y: c.y - 2 * px  },
+        { x: clampX(c.x + 7 * px),  y: c.y - 2 * px  },
+        { x: clampX(c.x),           y: c.y - 11 * px },
+        { x: clampX(c.x),           y: c.y + 11 * px },
       ];
-      for (const t of tries) {
+      const inBoundsBox = (t: { x: number; y: number }) => {
         const box = { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th };
-        if (box.x < x0 || box.x + box.w > x0 + w || box.y < y0 || box.y + box.h > y0 + h) continue;
-        if (overlaps(box)) continue;
-        ctx.fillStyle = c.color;
-        ctx.fillText(text, t.x, t.y);
-        placed.push(box);
+        const inB = box.x >= x0 && box.x + box.w <= x0 + w && box.y >= y0 && box.y + box.h <= y0 + h;
+        return inB ? box : null;
+      };
+      let chosen: { t: { x: number; y: number }; box: { x: number; y: number; w: number; h: number } } | null = null;
+      // 1ª passada: posição sem sobreposição
+      for (const t of tries) {
+        const box = inBoundsBox(t);
+        if (!box || overlaps(box)) continue;
+        chosen = { t, box };
         break;
+      }
+      // 2ª passada (fallback): garantir que TODOS os rótulos apareçam,
+      // aceitando alguma sobreposição. Sem isso, pontos das extremidades
+      // (ex.: Jan e Jun) ficam sem label.
+      if (!chosen) {
+        for (const t of tries) {
+          const box = inBoundsBox(t);
+          if (!box) continue;
+          chosen = { t, box };
+          break;
+        }
+      }
+      if (chosen) {
+        ctx.fillStyle = c.color;
+        ctx.fillText(text, chosen.t.x, chosen.t.y);
+        placed.push(chosen.box);
       }
     });
   ctx.textBaseline = "alphabetic";
