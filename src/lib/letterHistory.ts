@@ -87,6 +87,29 @@ export async function fetchLetterHistory(
     const target = scope === "cur" ? current : previous;
     (target[mo - 1] as unknown as Record<string, number | null>)[key] = r.line_value;
   }
+  // Guarda contra outliers de parser: alguns templates "ANO ANTERIOR" têm
+  // colunas "Acumulado/Total" alinhadas ao mês, fazendo o parser pegar um
+  // valor 5-10x maior que os demais. Anulamos qualquer mês cujo valor seja
+  // > 4× a mediana dos outros valores não-zero da mesma série, evitando que
+  // o gráfico fique sem escala por causa de um único ponto absurdo.
+  const scrubOutliers = (series: MonthDatum[]) => {
+    for (const key of KEYS) {
+      const values = series
+        .map((d, i) => ({ i, v: (d as unknown as Record<string, number | null>)[key] }))
+        .filter((p): p is { i: number; v: number } => p.v != null && Number.isFinite(p.v) && p.v !== 0);
+      if (values.length < 4) continue;
+      const sorted = [...values].map((p) => p.v).sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      if (median <= 0) continue;
+      for (const p of values) {
+        if (p.v > median * 4) {
+          (series[p.i] as unknown as Record<string, number | null>)[key] = null;
+        }
+      }
+    }
+  };
+  scrubOutliers(current);
+  scrubOutliers(previous);
   return { current, previous };
 }
 

@@ -507,7 +507,8 @@ function drawLineChart(
   ctx.textAlign = "center";
   ctx.fillText(title, canvas.width / 2, 8 * px);
 
-  const padL = 18 * px, padR = 11 * px, padT = 19 * px, padB = 20 * px;
+  // Sem eixo Y — padding lateral pequeno como no formato original.
+  const padL = 6 * px, padR = 6 * px, padT = 19 * px, padB = 20 * px;
   const w = canvas.width - padL - padR;
   const h = canvas.height - padT - padB;
   const x0 = padL, y0 = padT;
@@ -516,15 +517,9 @@ function drawLineChart(
   current.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
   previous.forEach((d) => { const v = d[field] as number | null; if (v != null) all.push(v); });
 
-  const sorted = [...all].sort((a, b) => a - b);
-  const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
-  const rawMax = sorted.length ? sorted[sorted.length - 1] : 1;
-  const rawMin = sorted.length ? sorted[0] : 0;
-  const cappedMax = median > 0
-    ? Math.min(rawMax, Math.max(median * 2.5, rawMax * 0.35))
-    : rawMax;
-  const max = Math.max(1, cappedMax) * 1.15;
-  const min = Math.max(0, rawMin * 0.85);
+  const rawMax = all.length ? Math.max(...all) : 1;
+  const max = Math.max(1, rawMax) * 1.25;
+  const min = 0;
   const span = Math.max(1, max - min);
 
   const n = current.length;
@@ -536,20 +531,13 @@ function drawLineChart(
 
   const labelFor = (v: number) => field === "receita_bruta_total" ? fmtChartValue(field, v) : formatter(v);
 
-  // grade leve + eixo Y resumido; substitui a necessidade de rotular todos os pontos.
-  ctx.textAlign = "right";
-  ctx.textBaseline = "middle";
-  ctx.font = `${2.7 * px}px Helvetica, Arial`;
-  for (let t = 0; t <= 3; t++) {
-    const value = min + (span * t) / 3;
-    const y = y0 + h - (h * t) / 3;
-    ctx.strokeStyle = t === 0 ? BORDER : "#E5E7EB";
-    ctx.lineWidth = t === 0 ? 1 : 0.7;
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke();
-    ctx.fillStyle = MUTED;
-    ctx.fillText(labelFor(value), x0 - 2 * px, y);
-  }
-  ctx.textBaseline = "alphabetic";
+  // baseline simples — sem eixo Y nem gridlines (formato original).
+  ctx.strokeStyle = BORDER;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0 + h);
+  ctx.lineTo(x0 + w, y0 + h);
+  ctx.stroke();
 
   // série anterior (cinza)
   ctx.strokeStyle = "#9CA3AF";
@@ -595,23 +583,20 @@ function drawLineChart(
     ctx.beginPath(); ctx.arc(x, y, 1.25 * px, 0, Math.PI * 2); ctx.fill();
   });
 
-  // Rótulos seletivos e com colisão: mostra últimos valores + min/max, sem poluir.
+  // Rótulo em TODOS os pontos (formato original), com anti-colisão para que
+  // ano-anterior não sobreponha realizado quando os valores estão próximos.
   type Candidate = { value: number; x: number; y: number; color: string; bold: boolean; priority: number };
   const candidates: Candidate[] = [];
-  const addKeyPoints = (series: MonthDatum[], color: string, bold: boolean, basePriority: number) => {
-    const points = series
-      .map((d, i) => ({ i, value: d[field] as number | null }))
-      .filter((p): p is { i: number; value: number } => p.value != null && Number.isFinite(p.value));
-    if (!points.length) return;
-    const last = points[points.length - 1];
-    const maxPoint = points.reduce((a, b) => b.value > a.value ? b : a, points[0]);
-    const minPoint = points.reduce((a, b) => b.value < a.value ? b : a, points[0]);
-    [last, maxPoint, minPoint].forEach((p, order) => {
-      candidates.push({ value: p.value, x: x0 + p.i * stepX, y: yFor(p.value), color, bold, priority: basePriority - order });
-    });
-  };
-  addKeyPoints(current, NAVY, true, 100);
-  addKeyPoints(previous, "#6B7280", false, 70);
+  current.forEach((d, i) => {
+    const v = d[field] as number | null;
+    if (v == null || !Number.isFinite(v)) return;
+    candidates.push({ value: v, x: x0 + i * stepX, y: yFor(v), color: NAVY, bold: true, priority: 100 });
+  });
+  previous.forEach((d, i) => {
+    const v = d[field] as number | null;
+    if (v == null || !Number.isFinite(v)) return;
+    candidates.push({ value: v, x: x0 + i * stepX, y: yFor(v), color: "#6B7280", bold: false, priority: 50 });
+  });
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const overlaps = (a: { x: number; y: number; w: number; h: number }) =>
     placed.some((b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
@@ -621,14 +606,16 @@ function drawLineChart(
     .sort((a, b) => b.priority - a.priority)
     .forEach((c) => {
       const text = labelFor(c.value);
-      ctx.font = `${c.bold ? "bold " : ""}${3 * px}px Helvetica, Arial`;
+      ctx.font = `${c.bold ? "bold " : ""}${2.8 * px}px Helvetica, Arial`;
       const tw = ctx.measureText(text).width;
-      const th = 4.4 * px;
+      const th = 4 * px;
       const tries = [
         { x: c.x, y: c.y - 5.2 * px },
         { x: c.x, y: c.y + 5.2 * px },
-        { x: c.x - 8 * px, y: c.y - 2 * px },
-        { x: c.x + 8 * px, y: c.y - 2 * px },
+        { x: c.x, y: c.y - 8.5 * px },
+        { x: c.x, y: c.y + 8.5 * px },
+        { x: c.x - 7 * px, y: c.y - 2 * px },
+        { x: c.x + 7 * px, y: c.y - 2 * px },
       ];
       for (const t of tries) {
         const box = { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th };
@@ -841,7 +828,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
     height: SIZE - (HEADER_CONTENT_Y + 2) - 14, // até ~14mm da base
-    minSize: 9,
+    minSize: 6.5,
     maxSize: 22,
     lineHeightFactor: 1.5,
     minFillRatio: 0.85,
@@ -1122,6 +1109,7 @@ function drawDynamicTextBlock(
   // Busca binária pelo maior tamanho de fonte que cabe na altura
   let lo = minSize, hi = maxSize, best = minSize;
   let bestLines: string[] = [];
+  let bestLhf = lineHeightFactor;
   while (lo <= hi) {
     const mid = (lo + hi) / 2;
     doc.setFontSize(mid);
@@ -1136,6 +1124,41 @@ function drawDynamicTextBlock(
       hi = mid - 0.25;
     }
     if (hi - lo < 0.2) break;
+  }
+
+  // Se mesmo no minSize não couber, comprime ainda mais o tamanho da fonte e
+  // o entrelinhas até caber tudo (garante que o último parágrafo apareça).
+  if (bestLines.length === 0) {
+    let size = minSize;
+    let lhf = lineHeightFactor;
+    while (size > 4) {
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(text, width) as string[];
+      const lineH = (size * lhf) / doc.internal.scaleFactor;
+      if (lines.length * lineH <= height) {
+        best = size;
+        bestLines = lines;
+        bestLhf = lhf;
+        break;
+      }
+      // Primeiro tenta apertar o entrelinhas até 1.2; depois reduz fonte.
+      if (lhf > 1.2) lhf = Math.max(1.2, lhf - 0.05);
+      else size -= 0.25;
+    }
+    if (bestLines.length === 0) {
+      // Fallback derradeiro: minSize absoluto, e truncamento controlado.
+      doc.setFontSize(4);
+      bestLines = doc.splitTextToSize(text, width) as string[];
+      best = 4;
+      bestLhf = 1.1;
+    }
+    doc.setFontSize(best);
+    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
+      lineHeightFactor: bestLhf,
+      align: "justify",
+      maxWidth: width,
+    });
+    return;
   }
 
   // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
