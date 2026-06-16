@@ -1031,7 +1031,7 @@ function drawDreTable(
     { kind: "item", label: "Outras Receitas", rx: [/^outras\s+receitas/i] },
     { kind: "total", label: "RECEITA BRUTA TOTAL", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i, /^receita\s+total\s+bruta/i] },
     { kind: "item", label: "(–) Impostos s/ vendas e serviços", rx: [/impostos?\s+s\/?\s*vendas/i, /impostos?\s+sobre\s+(vendas|servi)/i] },
-    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?\-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
+    { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^dedu[çc][õo]es/i] },
     { kind: "total", label: "RECEITA LÍQUIDA TOTAL", rx: [/^receita\s+l[íi]quida\s+total/i, /^receita\s+total\s+l[íi]quida/i, /^\(?=\)?\s*receita\s+l[íi]quida/i] },
 
     { kind: "section", label: "DESPESAS FIXAS" },
