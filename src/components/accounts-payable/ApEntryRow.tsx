@@ -223,8 +223,17 @@ export function ApEntryRow({
       {/* Status de pagamento */}
       {!compact && (
         <TableCell className="px-2 py-1.5">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             <PaymentStatusBadge status={entry.payment_status} isDistribution={isDistribution} />
+            {entry.is_pending && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
+                title="Marcado como pendente"
+              >
+                <Clock className="h-3 w-3" /> Pendente
+              </Badge>
+            )}
             {canEditObservation && (
               <ObservationButton entryId={entry.id} hotelId={entry.hotel_id} initial={entry.observation ?? ""} />
             )}
