@@ -586,7 +586,7 @@ function drawLineChart(
   // Rótulo nos pontos, com anti-colisão. Quando Realizado e Ano anterior são
   // iguais ou visualmente muito próximos no mesmo mês, mostramos apenas um
   // rótulo (priorizando o Realizado) para evitar sobreposição ilegível.
-  type Candidate = { value: number; x: number; y: number; color: string; bold: boolean; priority: number };
+  type Candidate = { value: number; x: number; y: number; color: string; bold: boolean; priority: number; preferAbove: boolean };
   const candidates: Candidate[] = [];
   const valueAt = (series: MonthDatum[], index: number) => {
     const v = series[index]?.[field] as number | null | undefined;
@@ -601,12 +601,17 @@ function drawLineChart(
       const visuallyClose = Math.abs(yFor(cv) - yFor(pv)) <= 5.5 * px;
       const sameDisplayedLabel = labelFor(cv) === labelFor(pv);
       if (sameDisplayedLabel || (visuallyClose && relativeDiff <= 0.03)) {
-        candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 120 });
+        candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 120, preferAbove: true });
         continue;
       }
+      // Regra: maior valor SEMPRE acima do ponto, menor SEMPRE abaixo.
+      const currentAbove = cv >= pv;
+      if (cv != null) candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 100, preferAbove: currentAbove });
+      if (pv != null) candidates.push({ value: pv, x, y: yFor(pv), color: "#6B7280", bold: false, priority: 50, preferAbove: !currentAbove });
+      continue;
     }
-    if (cv != null) candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 100 });
-    if (pv != null) candidates.push({ value: pv, x, y: yFor(pv), color: "#6B7280", bold: false, priority: 50 });
+    if (cv != null) candidates.push({ value: cv, x, y: yFor(cv), color: NAVY, bold: true, priority: 100, preferAbove: true });
+    if (pv != null) candidates.push({ value: pv, x, y: yFor(pv), color: "#6B7280", bold: false, priority: 50, preferAbove: true });
   }
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const overlaps = (a: { x: number; y: number; w: number; h: number }) =>
@@ -629,15 +634,19 @@ function drawLineChart(
       const maxY = y0 + h - th / 2;
       const clampX = (x: number) => minX <= maxX ? Math.min(Math.max(x, minX), maxX) : x0 + w / 2;
       const clampY = (y: number) => minY <= maxY ? Math.min(Math.max(y, minY), maxY) : y0 + h / 2;
+      // Posições preferidas respeitam a regra: maior acima, menor abaixo.
+      // Apenas se nenhuma posição no lado preferido couber, tentamos o lado oposto.
+      const dir = c.preferAbove ? -1 : 1;
       const tries = [
-        { x: clampX(c.x),           y: c.y - 5.2 * px },
-        { x: clampX(c.x),           y: c.y + 5.2 * px },
-        { x: clampX(c.x),           y: c.y - 8.5 * px },
-        { x: clampX(c.x),           y: c.y + 8.5 * px },
-        { x: clampX(c.x - 7 * px),  y: c.y - 2 * px  },
-        { x: clampX(c.x + 7 * px),  y: c.y - 2 * px  },
-        { x: clampX(c.x),           y: c.y - 11 * px },
-        { x: clampX(c.x),           y: c.y + 11 * px },
+        { x: clampX(c.x),           y: c.y + dir * 5.2 * px },
+        { x: clampX(c.x),           y: c.y + dir * 8.5 * px },
+        { x: clampX(c.x),           y: c.y + dir * 11 * px },
+        { x: clampX(c.x - 7 * px),  y: c.y + dir * 4 * px  },
+        { x: clampX(c.x + 7 * px),  y: c.y + dir * 4 * px  },
+        // Fallback lado oposto (último recurso).
+        { x: clampX(c.x),           y: c.y - dir * 5.2 * px },
+        { x: clampX(c.x),           y: c.y - dir * 8.5 * px },
+        { x: clampX(c.x),           y: c.y - dir * 11 * px },
       ];
       const inBoundsBox = (t: { x: number; y: number }) => {
         const box = { x: t.x - tw / 2 - 1.2 * px, y: t.y - th / 2, w: tw + 2.4 * px, h: th };
