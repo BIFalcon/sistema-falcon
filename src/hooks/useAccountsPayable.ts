@@ -645,6 +645,52 @@ export function useSetEntryPaymentStatus() {
 }
 
 /**
+ * Desagenda em lote: volta para "Em Aprovação" e limpa a data agendada.
+ * Só atua sobre os ids que estavam realmente agendados.
+ */
+export function useUnscheduleEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryIds: string[] }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ payment_status: "em_aprovacao", scheduled_date: null } as never)
+        .in("id", input.entryIds)
+        .eq("payment_status", "agendado");
+      if (error) throw error;
+      return input.entryIds.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+/**
+ * Marca/desmarca em lote o flag "Pendente" (paralelo ao status).
+ */
+export function useSetEntryPending() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { hotelId: string; entryIds: string[]; pending: boolean }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ is_pending: input.pending } as never)
+        .in("id", input.entryIds);
+      if (error) throw error;
+      return input.entryIds.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+/**
  * Desagrupa um lançamento agrupado: desarquiva os originais e arquiva o grupo.
  */
 export function useUngroupEntries() {
