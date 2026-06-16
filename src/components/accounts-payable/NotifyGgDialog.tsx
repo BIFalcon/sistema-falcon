@@ -40,7 +40,11 @@ export function NotifyGgDialog({
 
   const total = selectedEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0);
 
-  // Pré-popula a mensagem com a lista detalhada (incluindo observação).
+  // Chave de storage para lembrar os últimos e-mails extras usados
+  // (por usuário + hotel). Evita que o financeiro precise redigitar.
+  const storageKey = user ? `notify-gg-ap:extra-emails:${user.id}:${hotelId}` : null;
+
+  // Pré-popula a mensagem + recupera os últimos e-mails extras salvos.
   useEffect(() => {
     if (!open) return;
     const lines = selectedEntries.map((e) => {
@@ -48,7 +52,15 @@ export function NotifyGgDialog({
       return `• ${e.supplier} — ${fmtBRL(Number(e.amount))} (vence ${fmtDate(e.due_date)})${obs}`;
     });
     setMessage(lines.join("\n"));
-  }, [open, selectedEntries]);
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) setExtraEmails(saved);
+      } catch {
+        // ignora erros de storage (modo privado, etc.)
+      }
+    }
+  }, [open, selectedEntries, storageKey]);
 
   async function handleSend() {
     setSending(true);
@@ -84,6 +96,18 @@ export function NotifyGgDialog({
         }
       }
       toast.success("Notificação enviada ao GG.");
+      // Persiste os e-mails extras (mesmo string crua) para reuso na próxima vez.
+      if (storageKey) {
+        try {
+          if (extraEmails.trim()) {
+            localStorage.setItem(storageKey, extraEmails.trim());
+          } else {
+            localStorage.removeItem(storageKey);
+          }
+        } catch {
+          // ignora erros de storage
+        }
+      }
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao notificar");
