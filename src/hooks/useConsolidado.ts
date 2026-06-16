@@ -85,6 +85,21 @@ const LUCRO_A_DISTRIBUIR_PATTERNS = [
   /resultado\s+a\s+distribuir/i,
 ];
 
+// Override por hotel: no Ibis Budget Recife (Jaboatão) a linha que
+// representa a "Distribuição Total" da DRE é o "Resultado Operacional
+// Líquido" — a linha "Lucro / Prejuízo a Distribuir do período" vem
+// sempre zerada nesse modelo. Mesma particularidade já tratada no
+// dreParser para o indicador `lucro_liquido`.
+const LUCRO_A_DISTRIBUIR_PATTERNS_BY_HOTEL: Record<string, RegExp[]> = {
+  "ibis-budget-recife": [
+    /^resultado\s+operacional\s+l[íi]quido/i,
+    ...[
+      /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir\s+(do|no)\s+per[íi]odo/i,
+      /lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i,
+    ],
+  ],
+};
+
 export function useConsolidadoData(input: {
   hotelIds: string[];
   year: number;
@@ -190,7 +205,9 @@ export function useConsolidadoData(input: {
         // Prioriza a linha explícita da DRE; só cai para o valor salvo no
         // closing (que vem do lucro_liquido do estimador) quando a linha
         // não existir.
-        const lucroADistribuir = findLineByPattern(lines, LUCRO_A_DISTRIBUIR_PATTERNS);
+        const patterns =
+          LUCRO_A_DISTRIBUIR_PATTERNS_BY_HOTEL[hotelId] ?? LUCRO_A_DISTRIBUIR_PATTERNS;
+        const lucroADistribuir = findLineByPattern(lines, patterns);
         const distribuicaoTotalFinal =
           lucroADistribuir != null ? lucroADistribuir : distribuicaoTotal;
         const distribuicaoPorUh = NO_DISTRIB_UH_HOTELS.has(hotelId)
