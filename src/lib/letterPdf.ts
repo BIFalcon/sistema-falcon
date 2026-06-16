@@ -1162,6 +1162,32 @@ function drawGoldDollarIcon(doc: jsPDF, cx: number, cy: number) {
  * para que ocupe pelo menos `minFillRatio` da altura disponível, sem
  * ultrapassar a área. Texto justificado.
  */
+function drawJustifiedTextLine(doc: jsPDF, line: string, x: number, y: number, width: number) {
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    doc.text(line, x, y);
+    return;
+  }
+
+  const wordsWidth = words.reduce((sum, word) => sum + doc.getTextWidth(word), 0);
+  const extraSpace = (width - wordsWidth) / (words.length - 1);
+  if (!Number.isFinite(extraSpace) || extraSpace <= 0) {
+    doc.text(line, x, y);
+    return;
+  }
+
+  let cursorX = x;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (i === words.length - 1) {
+      doc.text(word, x + width - doc.getTextWidth(word), y);
+    } else {
+      doc.text(word, cursorX, y);
+      cursorX += doc.getTextWidth(word) + extraSpace;
+    }
+  }
+}
+
 function drawDynamicTextBlock(
   doc: jsPDF,
   text: string,
@@ -1199,9 +1225,8 @@ function drawDynamicTextBlock(
         // palavras ou menos (evita buracos enormes entre poucas palavras).
         const wordCount = line.trim().split(/\s+/).filter(Boolean).length;
         const shouldJustify = wordCount > 5;
-        doc.text(line, opts.x, cursorY, shouldJustify
-          ? { align: "justify", maxWidth: opts.width }
-          : undefined);
+        if (shouldJustify) drawJustifiedTextLine(doc, line, opts.x, cursorY, opts.width);
+        else doc.text(line, opts.x, cursorY);
         cursorY += lineH;
       }
       if (p < paragraphs.length - 1) cursorY += lineH * 0.6;
