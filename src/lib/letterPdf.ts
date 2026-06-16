@@ -757,13 +757,13 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   //  - Série Ano Anterior mantém todos os meses no intervalo visível.
   const visibleMonths = Math.max(6, closing.month);
   // Hotéis sem ano anterior comparável (ex.: Arcoverde abriu em ago/2025) —
-  // remove o mês de fechamento corrente dos gráficos para não exibir uma
-  // coluna/ponto solitário sem comparativo do ano anterior.
+  // remove junho dos gráficos para não exibir uma coluna/ponto solitário sem
+  // comparativo do ano anterior, preservando maio quando há dados.
   const hotelNameLower = (hotel?.name ?? "").toLowerCase();
-  const stripCurrentMonthFromChart = hotelNameLower.includes("arcoverde");
+  const arcoverdeChartMonthToHide = closing.hotel_id === "ibis-arcoverde" || hotelNameLower.includes("arcoverde") ? 6 : null;
   const baseCurrent = history.current.slice(0, visibleMonths);
-  const baseCurrentFiltered = stripCurrentMonthFromChart
-    ? baseCurrent.filter((d) => d.month !== closing.month)
+  const baseCurrentFiltered = arcoverdeChartMonthToHide
+    ? baseCurrent.filter((d) => d.month !== arcoverdeChartMonthToHide)
     : baseCurrent;
   const trimmedCurrent = baseCurrentFiltered.map((d) => ({
     ...d,
@@ -772,8 +772,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     receita_bruta_total: d.month <= closing.month ? d.receita_bruta_total : null,
   }));
   const basePrevious = history.previous.slice(0, visibleMonths);
-  const trimmedPrevious = stripCurrentMonthFromChart
-    ? basePrevious.filter((d) => d.month !== closing.month)
+  const trimmedPrevious = arcoverdeChartMonthToHide
+    ? basePrevious.filter((d) => d.month !== arcoverdeChartMonthToHide)
     : basePrevious;
 
   // Linhas DRE para a tabela

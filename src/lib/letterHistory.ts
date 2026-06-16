@@ -114,8 +114,8 @@ export async function fetchLetterHistory(
   // ───── Ajustes específicos por hotel ─────
   // Arcoverde (ibis-arcoverde) abriu em ago/2025 — qualquer mês anterior na
   // aba "ANO ANTERIOR" é resíduo de fórmula e contamina os gráficos.
-  // Também removemos o mês de fechamento atual no gráfico, para não exibir
-  // uma coluna sem comparativo do ano anterior.
+  // Também removemos junho no gráfico, para não exibir uma coluna sem
+  // comparativo do ano anterior nesse hotel.
   if (hotelId === "ibis-arcoverde") {
     // Ano anterior: zera Jan..Jul (índices 0..6) — abriu em ago/2025
     for (let i = 0; i < 7; i++) {
@@ -123,13 +123,11 @@ export async function fetchLetterHistory(
       previous[i].adr = null;
       previous[i].receita_bruta_total = null;
     }
-    // Mês de fechamento atual sem comparativo: também zera no ano anterior
-    // (o filtro de "mês solitário" é feito no letterPdf removendo o mês).
-    if (month >= 1 && month <= 12) {
-      previous[month - 1].ocupacao = null;
-      previous[month - 1].adr = null;
-      previous[month - 1].receita_bruta_total = null;
-    }
+    // Junho sem comparativo: também zera no ano anterior
+    // (o filtro de "mês solitário" é feito no letterPdf removendo junho).
+    previous[5].ocupacao = null;
+    previous[5].adr = null;
+    previous[5].receita_bruta_total = null;
   }
 
   return { current, previous };
