@@ -164,51 +164,10 @@ export function useConciliation(
         }
       }
 
-      // Passo 2: match por valor + nome (fallback).
-      const razaoByValue = new Map<number, RazaoLine[]>();
-      for (const r of creditosRazao) {
-        if (usedRazao.has(r.lancamento)) continue;
-        const cents = toCents(r.valorCredito);
-        if (!razaoByValue.has(cents)) razaoByValue.set(cents, []);
-        razaoByValue.get(cents)!.push(r);
-      }
-      const apenasNoJournal: JournalLine[] = [];
-      for (const j of journalReal) {
-        if (usedJournal.has(j.transactionNumber)) continue;
-        const cents = toCents(j.credit);
-        const candidates = razaoByValue.get(cents) ?? [];
-        const idx = candidates.findIndex(
-          (r) =>
-            !usedRazao.has(r.lancamento) &&
-            namesMatch(r.historico, j.guestFullName || j.companyName || ""),
-        );
-        if (idx >= 0) {
-          const r = candidates[idx];
-          usedRazao.add(r.lancamento);
-          emAmbos.push({ journal: j, razao: r });
-        } else {
-          // Passo 3: valor + data + qualquer parte do nome (>=3 chars) no histórico.
-          // Aceita como mesmo lançamento quando documento difere mas tudo o mais bate.
-          const idx2 = candidates.findIndex((r) => {
-            if (usedRazao.has(r.lancamento)) return false;
-            if (!r.date || !j.date || r.date !== j.date) return false;
-            const hist = r.historico
-              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase();
-            const parts = `${j.guestFirstName} ${j.guestLastName} ${j.companyName ?? ""}`
-              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase().split(/\s+/).filter((p) => p.length >= 3);
-            return parts.some((p) => hist.includes(p));
-          });
-          if (idx2 >= 0) {
-            const r = candidates[idx2];
-            usedRazao.add(r.lancamento);
-            emAmbos.push({ journal: j, razao: r });
-          } else {
-            apenasNoJournal.push(j);
-          }
-        }
-      }
+      // Sem Transaction Number = não tem par no Razão
+      const apenasNoJournal: JournalLine[] = journalReal.filter(
+        (j) => !usedJournal.has(j.transactionNumber),
+      );
       const apenasNoRazao = creditosRazao.filter((r) => !usedRazao.has(r.lancamento));
 
       // Divergência = apenas TOTVS interno: débito vs soma de créditos

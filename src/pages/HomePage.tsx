@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 import { useNavigate, Navigate } from "react-router-dom";
 import {
   ClipboardList, TrendingUp, Wallet, ArrowDownCircle,
@@ -147,6 +150,22 @@ export default function HomePage() {
   const { data: ofEntries = [] } = useOpenFolioEntries();
   const { data: pendingNotifs = 0 } = usePendingNotificationCount();
   const { data: calendarDates = [] } = useRhCalendarDates();
+
+  const queryClient = useQueryClient();
+  const { data: systemAlerts = [] } = useQuery({
+    queryKey: ["system-alerts"],
+    enabled: isMaster,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("system_alerts")
+        .select("id, type, message, created_at")
+        .eq("resolved", false)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const upcomingDates = useMemo(() => {
     const now = new Date();
@@ -359,6 +378,32 @@ export default function HomePage() {
           )}
         </p>
       </div>
+
+      {isMaster && systemAlerts.length > 0 && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+          <p className="text-sm font-semibold text-destructive mb-2">
+            ⚠️ {systemAlerts.length} alerta(s) do sistema
+          </p>
+          <div className="space-y-1">
+            {systemAlerts.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-3 text-xs text-destructive/80">
+                <span className="truncate">{a.message}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] shrink-0"
+                  onClick={async () => {
+                    await supabase.from("system_alerts").update({ resolved: true }).eq("id", a.id);
+                    queryClient.invalidateQueries({ queryKey: ["system-alerts"] });
+                  }}
+                >
+                  Resolver
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
