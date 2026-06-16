@@ -65,10 +65,15 @@ export function NotifyGgDialog({
   async function handleSend() {
     setSending(true);
     try {
-      const emails = extraEmails
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      // Aceita e-mails separados por vírgula, ponto-e-vírgula, espaço ou quebra de linha,
+      // e ignora nomes/textos extras (ex.: "Silmara silmara.carlos@accor.com").
+      const emails = Array.from(
+        new Set(
+          (extraEmails.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? []).map((s) =>
+            s.trim().toLowerCase(),
+          ),
+        ),
+      );
       const entryIds = selectedEntries.map((e) => e.id);
       await notifyGgPendencies({
         hotelId,
