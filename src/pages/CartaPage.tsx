@@ -387,8 +387,24 @@ export default function CartaPage() {
                     value={draft.reserve_fund}
                     disabled={!canEdit && !canEditReserveFund}
                     onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: e.target.value }))}
-                    placeholder="Ex.: 25000"
+                    onBlur={() => {
+                      const n = parseBRLLoose(draft.reserve_fund);
+                      if (Number.isFinite(n)) {
+                        setDraft((d) => ({ ...d, reserve_fund: brlFmt.format(n) }));
+                      }
+                    }}
+                    placeholder="Ex.: 25.000,00 ou 25000"
                   />
+                  {draft.reserve_fund.trim() && (() => {
+                    const n = parseBRLLoose(draft.reserve_fund);
+                    return Number.isFinite(n) ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Valor reconhecido: <span className="font-medium text-foreground">{brlFmt.format(n)}</span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-destructive">Não consegui interpretar este valor.</p>
+                    );
+                  })()}
                   {canEditReserveFund && (
                     <Button
                       size="sm"
@@ -396,14 +412,14 @@ export default function CartaPage() {
                       className="mt-1 h-7 text-xs"
                       onClick={async () => {
                         if (!letter) return;
-                        const v = draft.reserve_fund.replace(",", ".").trim();
-                        if (!v || Number.isNaN(Number(v))) {
+                        const n = parseBRLLoose(draft.reserve_fund);
+                        if (!Number.isFinite(n)) {
                           toast.error("Fundo de Reserva inválido");
                           return;
                         }
                         const { error } = await supabase
                           .from("investor_letters")
-                          .update({ reserve_fund: Number(v) })
+                          .update({ reserve_fund: n })
                           .eq("id", letter.id);
                         if (error) toast.error(error.message);
                         else {
