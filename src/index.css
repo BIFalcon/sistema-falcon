@@ -136,17 +136,22 @@
 /* DRE Excel viewer (SheetJS sheet_to_html) */
 .dre-excel-viewer table {
   border-collapse: collapse;
-  font-size: 12px;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-family: Calibri, Arial, sans-serif;
 }
 .dre-excel-viewer td,
 .dre-excel-viewer th {
-  border: 1px solid hsl(var(--border));
-  padding: 4px 8px;
+  border: 1px solid #d0d0d0;
+  padding: 2px 6px;
   white-space: nowrap;
-  vertical-align: top;
+  min-width: 60px;
 }
-.dre-excel-viewer tr:nth-child(even) td {
-  background: hsl(var(--muted) / 0.4);
+/* Preservar cor de fundo das células quando vier inline */
+.dre-excel-viewer td[style],
+.dre-excel-viewer th[style] {
+  /* SheetJS injeta style inline — não sobrescrever */
+}
+/* Linhas zebradas para facilitar leitura quando sem cor */
+.dre-excel-viewer tr:nth-child(even):not([style*="background"]) {
+  background-color: #f9f9f9;
 }
