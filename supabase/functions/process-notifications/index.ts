@@ -87,6 +87,16 @@ Deno.serve(async (req) => {
   let enqueued = 0;
   let failed = 0;
 
+  // Extrai e normaliza endereços de e-mail de uma string que pode conter
+  // múltiplos endereços (separados por ; , espaço, quebra de linha) e até
+  // "Nome <email>" ou "Nome email@x.com". Evita que o provedor receba
+  // algo como "Silmara silmara@x.com;maria@y.com" como destinatário único.
+  function extractEmails(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    const matches = String(raw).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
+    return Array.from(new Set(matches.map((s) => s.trim().toLowerCase())));
+  }
+
   // Generate or fetch an unsubscribe token for a recipient email.
   async function getUnsubscribeToken(email: string): Promise<string> {
     const { data: existing } = await supabase
