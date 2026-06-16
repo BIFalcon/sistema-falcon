@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
         .filter((g) => g.user_id && g.email)
         .map((g) => ({
           event: "ap_pendencies_to_gg",
-          closing_id: "00000000-0000-0000-0000-000000000000",
+          closing_id: null,
           hotel_id: hotelId,
           recipient_user_id: g.user_id,
           recipient_email: g.email,
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
         })),
       ...extraEmails.map((email) => ({
         event: "ap_pendencies_to_gg" as const,
-        closing_id: "00000000-0000-0000-0000-000000000000",
+        closing_id: null,
         hotel_id: hotelId,
         recipient_user_id: userId,
         recipient_email: email,
