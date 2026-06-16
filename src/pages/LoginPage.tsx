@@ -37,12 +37,12 @@ export default function LoginPage() {
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+    const { data, error } = await supabase.functions.invoke("manage-users", {
+      body: { action: "request_password_setup", email },
     });
     setSubmitting(false);
-    if (error) {
-      toast.error("Erro", { description: error.message });
+    if (error || data?.error) {
+      toast.error("Erro", { description: data?.error ?? error?.message });
     } else {
       toast.success("E-mail enviado", {
         description: "Verifique sua caixa de entrada para redefinir a senha.",
