@@ -1222,8 +1222,9 @@ function drawDynamicTextBlock(
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
-        // palavras ou menos (evita buracos enormes entre poucas palavras).
-        const wordCount = line.trim().split(/\s+/).filter(Boolean).length;
+        // palavras ou menos. Artigos isolados de 1 letra não contam para
+        // evitar linhas curtas como "firmando a tendência..." muito abertas.
+        const wordCount = line.trim().split(/\s+/).filter((word) => word.length > 1).length;
         const shouldJustify = wordCount > 5;
         if (shouldJustify) drawJustifiedTextLine(doc, line, opts.x, cursorY, opts.width);
         else doc.text(line, opts.x, cursorY);
