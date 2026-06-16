@@ -498,7 +498,55 @@ export default function ContasPagarPage() {
       ? "Agendado"
       : s === "autorizado"
       ? "Autorizado"
+      : s === "em_aprovacao"
+      ? "Em Aprovação"
       : "Não aprovado pelo GG";
+  }
+
+  // ── Desagendar em lote ────────────────────────────────────────────────
+  async function handleBulkUnschedule() {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const scheduledIds = ids.filter((id) =>
+      allEntries.find((e) => e.id === id)?.payment_status === "agendado",
+    );
+    if (scheduledIds.length === 0) {
+      toast.info("Nenhum lançamento agendado selecionado");
+      return;
+    }
+    try {
+      await unscheduleEntries.mutateAsync({ hotelId, entryIds: scheduledIds });
+      setSelectedIds(new Set());
+      toast.success(`${scheduledIds.length} lançamento(s) desagendados`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao desagendar");
+    }
+  }
+
+  // ── Marcar/desmarcar Pendente em lote ─────────────────────────────────
+  async function handleBulkPending() {
+    if (!hotelId) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const selectedEntries = ids
+      .map((id) => allEntries.find((e) => e.id === id))
+      .filter((e): e is ApEntry => !!e);
+    // Se todos já estão pendentes, desmarca; caso contrário, marca todos.
+    const allPending = selectedEntries.length > 0 && selectedEntries.every((e) => !!e.is_pending);
+    const next = !allPending;
+    try {
+      await setPending.mutateAsync({ hotelId, entryIds: ids, pending: next });
+      setSelectedIds(new Set());
+      toast.success(
+        next
+          ? `${ids.length} lançamento(s) marcados como pendente`
+          : `${ids.length} lançamento(s) tiveram a marcação 'pendente' removida`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+    }
   }
 
   // Block 8 — Marca categoria "Salários RH" em lote
