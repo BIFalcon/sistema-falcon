@@ -38,8 +38,8 @@ export function useDreVersions(closingId: string | null | undefined) {
       if (error) throw error;
       return (data ?? []) as DreVersion[];
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 }
@@ -515,8 +515,8 @@ function useDreAnalyticsImpl(input: {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["dre-analytics", [...input.hotelIds].sort().join(","), input.year, input.month, input.periodMonths ?? 1],
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     queryFn: async (): Promise<DreAnalyticsDataset | null> => {
