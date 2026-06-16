@@ -911,11 +911,22 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       const colW = (availW - (cols - 1) * gap) / cols;
       const rowH = (availH - (rows - 1) * gap) / rows;
       const startY = HEADER_CONTENT_Y + 2;
-      // Altura do título proporcional à célula (mínimo 7mm, máximo 9mm)
-      const titleH = Math.max(7, Math.min(9, rowH * 0.16));
       const titleGap = 1.5;
       const titleFontSize = rows >= 3 ? 8 : 9;
       const emptyFontSize = rows >= 3 ? 7 : 8;
+      // Pré-calcula o nº máximo de linhas do título para evitar que o texto
+      // ultrapasse o balãozinho. Define titleH proporcional ao maior título.
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(titleFontSize);
+      const titleLineH = (titleFontSize * 1.15) / doc.internal.scaleFactor;
+      let maxTitleLines = 1;
+      const wrappedTitles: string[][] = [];
+      for (let i = 0; i < n; i++) {
+        const lines = doc.splitTextToSize(highlights[i].title || "", colW - 4) as string[];
+        wrappedTitles.push(lines);
+        if (lines.length > maxTitleLines) maxTitleLines = lines.length;
+      }
+      const titleH = Math.max(7, Math.min(rowH * 0.32, maxTitleLines * titleLineH + 3));
       for (let i = 0; i < n; i++) {
         const h = highlights[i];
         const col = i % cols;
@@ -929,10 +940,14 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         doc.setTextColor(TEXT);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(titleFontSize);
-        doc.text(h.title, x + colW / 2, y + titleH / 2 + titleFontSize * 0.12, {
-          align: "center",
-          maxWidth: colW - 4,
-        });
+        const lines = wrappedTitles[i];
+        const blockH = lines.length * titleLineH;
+        const firstBaseline = y + (titleH - blockH) / 2 + titleLineH * 0.78;
+        for (let li = 0; li < lines.length; li++) {
+          doc.text(lines[li], x + colW / 2, firstBaseline + li * titleLineH, {
+            align: "center",
+          });
+        }
         // foto
         const photoY = y + titleH + titleGap;
         const photoH = rowH - titleH - titleGap;
@@ -1161,6 +1176,39 @@ function drawDynamicTextBlock(
     minFillRatio: number;
   },
 ) {
+  // Renderiza parágrafos respeitando justificação, mas mantendo a última
+  // linha de cada parágrafo alinhada à esquerda (evita linhas com 1–3
+  // palavras esticadas pela página inteira). Mantém a mesma fonte/lhf que
+  // o algoritmo de auto-fit determinaria para o texto inteiro.
+  const renderParagraphs = (size: number, lhf: number) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(size);
+    const lineH = (size * lhf) / doc.internal.scaleFactor;
+    const paragraphs = String(text ?? "").split(/\n{2,}/);
+    let cursorY = opts.y + size / doc.internal.scaleFactor;
+    for (let p = 0; p < paragraphs.length; p++) {
+      const para = paragraphs[p].replace(/\n/g, " ").trim();
+      if (!para) {
+        cursorY += lineH * 0.6;
+        continue;
+      }
+      const lines = doc.splitTextToSize(para, opts.width) as string[];
+      for (let i = 0; i < lines.length; i++) {
+        const isLast = i === lines.length - 1;
+        const line = lines[i];
+        // Justifica linhas internas com 4+ palavras; a última (ou linhas com
+        // muito pouco texto) fica alinhada à esquerda.
+        const wordCount = line.trim().split(/\s+/).length;
+        const shouldJustify = !isLast && wordCount >= 4;
+        doc.text(line, opts.x, cursorY, shouldJustify
+          ? { align: "justify", maxWidth: opts.width }
+          : undefined);
+        cursorY += lineH;
+      }
+      if (p < paragraphs.length - 1) cursorY += lineH * 0.6;
+    }
+  };
+
   const { x, y, width, height, minSize, maxSize, lineHeightFactor, minFillRatio } = opts;
   doc.setFont("helvetica", "normal");
 
@@ -1171,12 +1219,21 @@ function drawDynamicTextBlock(
   while (lo <= hi) {
     const mid = (lo + hi) / 2;
     doc.setFontSize(mid);
-    const lines = doc.splitTextToSize(text, width) as string[];
+    // Mede a altura considerando os parágrafos separados (com um pequeno
+    // espaço entre eles), igual ao que será renderizado.
+    const paragraphs = String(text ?? "").split(/\n{2,}/);
+    let totalLines = 0;
+    for (const p of paragraphs) {
+      const t = p.replace(/\n/g, " ").trim();
+      if (!t) { totalLines += 0.6; continue; }
+      totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+    }
+    if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
     const lineH = (mid * lineHeightFactor) / doc.internal.scaleFactor;
-    const totalH = lines.length * lineH;
+    const totalH = totalLines * lineH;
     if (totalH <= height) {
       best = mid;
-      bestLines = lines;
+      bestLines = [String(text ?? "")];
       lo = mid + 0.25;
     } else {
       hi = mid - 0.25;
@@ -1191,11 +1248,18 @@ function drawDynamicTextBlock(
     let lhf = lineHeightFactor;
     while (size > 4) {
       doc.setFontSize(size);
-      const lines = doc.splitTextToSize(text, width) as string[];
+      const paragraphs = String(text ?? "").split(/\n{2,}/);
+      let totalLines = 0;
+      for (const p of paragraphs) {
+        const t = p.replace(/\n/g, " ").trim();
+        if (!t) { totalLines += 0.6; continue; }
+        totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+      }
+      if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
       const lineH = (size * lhf) / doc.internal.scaleFactor;
-      if (lines.length * lineH <= height) {
+      if (totalLines * lineH <= height) {
         best = size;
-        bestLines = lines;
+        bestLines = [String(text ?? "")];
         bestLhf = lhf;
         break;
       }
@@ -1205,44 +1269,36 @@ function drawDynamicTextBlock(
     }
     if (bestLines.length === 0) {
       // Fallback derradeiro: minSize absoluto, e truncamento controlado.
-      doc.setFontSize(4);
-      bestLines = doc.splitTextToSize(text, width) as string[];
       best = 4;
       bestLhf = 1.1;
+      bestLines = [String(text ?? "")];
     }
-    doc.setFontSize(best);
-    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
-      lineHeightFactor: bestLhf,
-      align: "justify",
-      maxWidth: width,
-    });
+    renderParagraphs(best, bestLhf);
     return;
   }
 
   // Verifica preenchimento mínimo: se ficou abaixo de minFillRatio, aumenta
   // até atingir a altura alvo (mantendo dentro da área).
-  const lineH = (best * lineHeightFactor) / doc.internal.scaleFactor;
-  const filled = bestLines.length * lineH;
-  if (filled < height * minFillRatio && bestLines.length > 0) {
-    // Aumenta lineHeightFactor (espaçamento) para preencher
-    const targetH = Math.min(height, Math.max(filled, height * minFillRatio));
-    const newLineH = targetH / bestLines.length;
-    const newLhf = (newLineH * doc.internal.scaleFactor) / best;
-    doc.setFontSize(best);
-    doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
-      lineHeightFactor: Math.min(newLhf, 2.2),
-      align: "justify",
-      maxWidth: width,
-    });
-    return;
-  }
-
+  // Conta linhas reais (com quebras de parágrafo) para o preenchimento.
   doc.setFontSize(best);
-  doc.text(bestLines, x, y + best / doc.internal.scaleFactor, {
-    lineHeightFactor,
-    align: "justify",
-    maxWidth: width,
-  });
+  const paragraphs = String(text ?? "").split(/\n{2,}/);
+  let totalLines = 0;
+  for (const p of paragraphs) {
+    const t = p.replace(/\n/g, " ").trim();
+    if (!t) { totalLines += 0.6; continue; }
+    totalLines += (doc.splitTextToSize(t, width) as string[]).length;
+  }
+  if (paragraphs.length > 1) totalLines += 0.6 * (paragraphs.length - 1);
+  const lineH = (best * lineHeightFactor) / doc.internal.scaleFactor;
+  const filled = totalLines * lineH;
+  let lhfFinal = lineHeightFactor;
+  if (filled < height * minFillRatio && totalLines > 0) {
+    const targetH = Math.min(height, Math.max(filled, height * minFillRatio));
+    const newLineH = targetH / totalLines;
+    const newLhf = (newLineH * doc.internal.scaleFactor) / best;
+    lhfFinal = Math.min(newLhf, 2.2);
+  }
+  renderParagraphs(best, lhfFinal);
 }
 
 /**
