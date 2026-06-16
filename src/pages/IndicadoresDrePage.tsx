@@ -27,16 +27,6 @@ const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
 
 const CATEGORY_ORDER = ["Topline", "Receitas", "Despesas", "Despesas Específicas"];
 
-// Categorias da árvore fixa que são despesas (valores negativos) — eixo Y invertido
-const EXPENSE_TREE_NODES = new Set([
-  "despesas",
-  "despesas fixas totais",
-  "despesas variaveis total",
-  "despesas totais fixas variaveis",
-  "deducoes da receita total",
-  "deducoes pos gop",
-]);
-
 /**
  * agg = "sum" para receitas/GOP (acumular no período)
  * agg = "avg" para taxas/médias (Ocupação, ADR, RevPAR)
