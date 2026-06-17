@@ -104,13 +104,9 @@ Deno.serve(async (req) => {
     const lines = entries
       .sort((a: any, b: any) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))
       .map((e: any) => {
-        const issues: string[] = [];
-        // Hotéis OMIE não usam aprovação no Falcon — a correção é feita no OMIE
-        if (!isOmie && e.gg_approval !== "approved") issues.push("sem aprovação");
-        if (!e.primary_document_id) issues.push("sem documento");
-        if (e.omie_situation?.toLowerCase().includes("atras")) issues.push("atrasado");
-        return `- **${e.supplier}** — Doc ${e.document_number ?? "—"} — Venc. ${fmtDate(e.due_date)} — ${fmtBRL(Number(e.amount))}` +
-          (issues.length ? `  \n  _Pendências: ${issues.join(", ")}_` : "");
+        // A descrição das pendências é escrita pela equipe no campo "Mensagem".
+        // O sistema apenas lista o lançamento, sem inferir pendências automaticamente.
+        return `- **${e.supplier}** — Doc ${e.document_number ?? "—"} — Venc. ${fmtDate(e.due_date)} — ${fmtBRL(Number(e.amount))}`;
       });
 
     const subject = `[${hotel?.name ?? "Hotel"}] Contas a Pagar — ${entries.length} pendência(s) aguardando você`;
