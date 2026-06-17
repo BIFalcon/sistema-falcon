@@ -1,0 +1,1 @@
+UPDATE public.ap_entries SET original_amount = amount WHERE id = '9bedaf4c-961e-45c2-8aea-c77029bd7ada';
