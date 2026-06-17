@@ -336,6 +336,8 @@ export default function ContasPagarPage() {
   const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
   const balanceTotal =
     (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
+  const hasAnyBalance = balanceItauAmount !== null || balanceSantanderAmount !== null;
+  const balanceDiffComputed = hasAnyBalance ? balanceTotal - totalToPayPeriod : null;
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
   // Soma da seleção em lote
