@@ -416,7 +416,9 @@ export default function ContasPagarPage() {
     // Agendado → abre modal (data + valor novo opcional)
     if (newStatus === "agendado") {
       setScheduledDate("");
-      setScheduledPaidAmount("");
+      // Pré-preenche com o total selecionado; equipe pode alterar para
+      // refletir juros (valor maior) ou desconto (valor menor).
+      setScheduledPaidAmount(selectedTotal.toFixed(2));
       setSchedulingOpen(true);
       return;
     }
@@ -1470,7 +1472,7 @@ export default function ContasPagarPage() {
                     </TableHead>
                     {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                     {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
-                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
+                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros / Desc.</TableHead>}
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
@@ -1838,7 +1840,7 @@ export default function ContasPagarPage() {
                   <TableHead className="text-right">Valor</TableHead>
                   {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                   {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
-                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
+                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros / Desc.</TableHead>}
                   <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                   <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
@@ -1921,8 +1923,8 @@ export default function ContasPagarPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Data de agendamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Selecione a data prevista de pagamento. Se houver lançamentos vencidos
-              entre os selecionados, informe também o valor novo pago (com juros).
+              Selecione a data prevista de pagamento. Se houver juros ou desconto,
+              ajuste o valor abaixo — o sistema reconhece automaticamente a diferença.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
@@ -1936,26 +1938,38 @@ export default function ContasPagarPage() {
                 onChange={(e) => setScheduledDate(e.target.value)}
               />
             </div>
-            {selectionHasOverdue && (
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
-                  Valor novo pago (com juros)
-                </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder={fmtBRL(selectedTotal)}
-                  value={scheduledPaidAmount}
-                  onChange={(e) => setScheduledPaidAmount(e.target.value)}
-                  onPaste={(e) => handlePasteBRL(e, setScheduledPaidAmount)}
-                />
-                {scheduledPaidAmount && !Number.isNaN(parseFloat(scheduledPaidAmount)) && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Juros calculados: <strong>{fmtBRL(parseFloat(scheduledPaidAmount) - selectedTotal)}</strong>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Valor a pagar (ajuste se houver juros ou desconto)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={fmtBRL(selectedTotal)}
+                value={scheduledPaidAmount}
+                onChange={(e) => setScheduledPaidAmount(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setScheduledPaidAmount)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Valor original: <strong>{fmtBRL(selectedTotal)}</strong>
+              </p>
+              {scheduledPaidAmount && !Number.isNaN(parseFloat(scheduledPaidAmount)) && (() => {
+                const diff = parseFloat(scheduledPaidAmount) - selectedTotal;
+                if (Math.abs(diff) < 0.005) return null;
+                if (diff > 0) {
+                  return (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                      Juros calculados: <strong>{fmtBRL(diff)}</strong>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
+                    Desconto calculado: <strong>{fmtBRL(Math.abs(diff))}</strong>
                   </p>
-                )}
-              </div>
-            )}
+                );
+              })()}
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -1965,10 +1979,14 @@ export default function ContasPagarPage() {
                 setSchedulingOpen(false);
                 const paidNum = scheduledPaidAmount ? parseFloat(scheduledPaidAmount) : NaN;
                 const hasPaid = !Number.isNaN(paidNum);
+                const diff = hasPaid ? paidNum - selectedTotal : 0;
+                // Só persiste paid_amount/paid_interest quando há diferença real
+                // (juros ou desconto). Caso contrário mantém os campos nulos.
+                const hasDelta = hasPaid && Math.abs(diff) >= 0.005;
                 executeStatusChange("agendado", {
                   scheduledDate,
-                  paidAmount: hasPaid ? paidNum : undefined,
-                  paidInterest: hasPaid ? paidNum - selectedTotal : undefined,
+                  paidAmount: hasDelta ? paidNum : undefined,
+                  paidInterest: hasDelta ? diff : undefined,
                 });
               }}
             >

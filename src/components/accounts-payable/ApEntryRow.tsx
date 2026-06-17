@@ -163,12 +163,22 @@ export function ApEntryRow({
         </TableCell>
       )}
 
-      {/* Juros */}
+      {/* Juros / Desconto */}
       {showPaidInterest && (
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
-          {entry.paid_interest != null && Number(entry.paid_interest) !== 0
-            ? fmtBRL(Number(entry.paid_interest))
-            : "—"}
+          {entry.paid_interest != null && Number(entry.paid_interest) !== 0 ? (
+            Number(entry.paid_interest) > 0 ? (
+              <span className="text-amber-700 dark:text-amber-400">
+                {fmtBRL(Number(entry.paid_interest))}
+              </span>
+            ) : (
+              <span className="text-emerald-700 dark:text-emerald-400">
+                -{fmtBRL(Math.abs(Number(entry.paid_interest)))} <span className="text-[10px] uppercase">desc.</span>
+              </span>
+            )
+          ) : (
+            "—"
+          )}
         </TableCell>
       )}
 

@@ -53,6 +53,7 @@ export default function ConsolidadoPage() {
     const distribuicaoTotal = sum("distribuicaoTotal");
     const uhsDisponiveis = sum("uhsDisponiveis");
     const gop = sum("gop");
+    const fundoReserva = sum("fundoReserva");
     // Médias ponderadas por UHs disponíveis quando possível
     const wAvg = (k: keyof ConsolidadoRow) => {
       let num = 0;
@@ -79,6 +80,7 @@ export default function ConsolidadoPage() {
       distribuicaoPorUh:
         distribuicaoTotal && uhsDisponiveis ? distribuicaoTotal / uhsDisponiveis : null,
       gop,
+      fundoReserva,
     };
   }, [rows]);
 
@@ -94,6 +96,7 @@ export default function ConsolidadoPage() {
       "Distrib. Total (R$)",
       "Distrib./UH (R$)",
       "GOP (R$)",
+      "Fundo de Reserva (R$)",
     ];
     const pctVal = (v: number | null) =>
       v == null ? null : Number((v <= 1 ? v * 100 : v).toFixed(2));
@@ -109,6 +112,7 @@ export default function ConsolidadoPage() {
       num(r.distribuicaoTotal),
       num(r.distribuicaoPorUh),
       num(r.gop),
+      num(r.fundoReserva),
     ]);
     const totalRow = [
       "Total Geral",
@@ -121,6 +125,7 @@ export default function ConsolidadoPage() {
       num(totals.distribuicaoTotal),
       num(totals.distribuicaoPorUh),
       num(totals.gop),
+      num(totals.fundoReserva),
     ];
     const sheet = XLSX.utils.aoa_to_sheet([header, ...body, totalRow]);
     sheet["!cols"] = header.map((h, i) => ({ wch: i === 0 ? 30 : 16 }));
@@ -176,6 +181,7 @@ export default function ConsolidadoPage() {
                   <TableHead className="text-xs uppercase tracking-wider text-right">Distrib. Total</TableHead>
                   <TableHead className="text-xs uppercase tracking-wider text-right">Distrib./UH</TableHead>
                   <TableHead className="text-xs uppercase tracking-wider text-right">GOP</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-right">Fundo de Reserva</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -193,6 +199,7 @@ export default function ConsolidadoPage() {
                     <TableCell className="text-right tabular-nums">{fmtBRLOrDash(r.distribuicaoTotal)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRLOrDash(r.distribuicaoPorUh)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRLOrDash(r.gop)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRLOrDash(r.fundoReserva)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -208,6 +215,7 @@ export default function ConsolidadoPage() {
                   <TableCell className="text-right tabular-nums">{fmtBRLOrDash(totals.distribuicaoTotal)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtBRLOrDash(totals.distribuicaoPorUh)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtBRLOrDash(totals.gop)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtBRLOrDash(totals.fundoReserva)}</TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
