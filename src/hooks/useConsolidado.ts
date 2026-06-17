@@ -19,6 +19,7 @@ export interface ConsolidadoRow {
   uhsDisponiveis: number | null;
   distribuicaoPorUh: number | null;
   gop: number | null;
+  fundoReserva: number | null;       // (-) Fundo de Reservas e Reposição Patrimonial
 }
 
 interface ParsedLine {
@@ -56,6 +57,12 @@ const TAXA_SUCESSO_PATTERNS = [
   /taxa\s+(de\s+)?sucesso/i,
   /incentive\s+fee/i,
   /taxa\s+(de\s+)?administra[çc][ãa]o\s+s\/\s*gop/i,
+];
+
+const FUNDO_RESERVA_PATTERNS = [
+  /fundo\s+de\s+reservas?\s+e\s+reposi[çc][ãa]o\s+patrimonial/i,
+  /fundo\s+de\s+reservas?(\s+e\s+reposi[çc][ãa]o)?/i,
+  /reposi[çc][ãa]o\s+patrimonial/i,
 ];
 
 // Hotéis sem distribuição por UH
@@ -171,6 +178,8 @@ export function useConsolidadoData(input: {
             "line_label.ilike.%preju%distribu%",
             "line_label.ilike.%resultado%distribu%",
             "line_label.ilike.%taxa%administ%gop%",
+            "line_label.ilike.%fundo%reserva%",
+            "line_label.ilike.%reposi%patrimonial%",
           ].join(","));
 
         for (const row of (extraLines ?? []) as ParsedLine[]) {
@@ -202,6 +211,7 @@ export function useConsolidadoData(input: {
           null;
         const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
         const incentiveFee = findLineByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        const fundoReserva = findLineByPattern(lines, FUNDO_RESERVA_PATTERNS);
         // Prioriza a linha explícita da DRE; só cai para o valor salvo no
         // closing (que vem do lucro_liquido do estimador) quando a linha
         // não existir.
@@ -234,6 +244,7 @@ export function useConsolidadoData(input: {
           uhsDisponiveis,
           distribuicaoPorUh,
           gop,
+          fundoReserva: fundoReserva != null ? Math.abs(fundoReserva) : null,
         } satisfies ConsolidadoRow;
       });
     },
