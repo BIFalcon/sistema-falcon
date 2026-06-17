@@ -627,6 +627,7 @@ function DayBreakdown({
             <TableRow>
               <TableHead>Cliente</TableHead>
               <TableHead>Invoice</TableHead>
+              <TableHead>Reserva</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
@@ -657,6 +658,7 @@ function DayBreakdown({
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
                     {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
