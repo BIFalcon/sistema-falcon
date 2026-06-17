@@ -1472,7 +1472,7 @@ export default function ContasPagarPage() {
                     </TableHead>
                     {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                     {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
-                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
+                    {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros / Desc.</TableHead>}
                     <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
@@ -1840,7 +1840,7 @@ export default function ContasPagarPage() {
                   <TableHead className="text-right">Valor</TableHead>
                   {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                   {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
-                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros</TableHead>}
+                  {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros / Desc.</TableHead>}
                   <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                   <TableHead className="hidden md:table-cell">Agendado para</TableHead>
                   <TableHead>Status</TableHead>
