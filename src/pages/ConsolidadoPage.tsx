@@ -128,7 +128,31 @@ export default function ConsolidadoPage() {
       num(totals.fundoReserva),
     ];
     const sheet = XLSX.utils.aoa_to_sheet([header, ...body, totalRow]);
-    sheet["!cols"] = header.map((h, i) => ({ wch: i === 0 ? 30 : 16 }));
+    sheet["!cols"] = header.map((h, i) => ({ wch: i === 0 ? 30 : 18 }));
+
+    // Formatos por coluna: 1 = %, 2-10 = moeda BRL
+    const pctFmt = '0.0%';
+    const brlFmt = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00;"—"';
+    const colFmt: Record<number, string> = {
+      1: pctFmt,
+      2: brlFmt, 3: brlFmt, 4: brlFmt, 5: brlFmt, 6: brlFmt,
+      7: brlFmt, 8: brlFmt, 9: brlFmt, 10: brlFmt,
+    };
+    const totalRows = body.length + 2; // header + body + total
+    for (let r = 1; r < totalRows; r++) {
+      for (const cStr of Object.keys(colFmt)) {
+        const c = Number(cStr);
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = sheet[addr];
+        if (!cell) continue;
+        if (c === 1 && typeof cell.v === "number") {
+          // valor está em 0-100; converte para fração para o formato %
+          cell.v = cell.v / 100;
+        }
+        cell.t = "n";
+        cell.z = colFmt[c];
+      }
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, `${MONTHS_PT[month - 1]} ${year}`);
     XLSX.writeFile(wb, `Consolidado-${year}-${String(month).padStart(2, "0")}.xlsx`);
