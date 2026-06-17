@@ -336,6 +336,8 @@ export default function ContasPagarPage() {
   const balanceSantanderAmount = balanceSantander ? Number(balanceSantander.amount) : null;
   const balanceTotal =
     (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
+  const hasAnyBalance = balanceItauAmount !== null || balanceSantanderAmount !== null;
+  const balanceDiffComputed = hasAnyBalance ? balanceTotal - totalToPayPeriod : null;
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
   // Soma da seleção em lote
@@ -755,8 +757,8 @@ export default function ContasPagarPage() {
               />
               <Stat
                 label="Diferença"
-                value={balanceDiff !== null ? fmtBRL(balanceDiff) : "—"}
-                tone={balanceDiff !== null && balanceDiff < 0 ? "danger" : "neutral"}
+                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
+                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
               />
             </div>
           </Card>
