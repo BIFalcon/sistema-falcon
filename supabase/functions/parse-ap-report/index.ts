@@ -577,9 +577,9 @@ Deno.serve(async (req) => {
           ...baseFields,
           observation: prev.observation ?? null, // preserva comentário
           payment_status: preservedStatus,
-          // Preserva original_amount: nunca sobrescreve se já existe;
-          // garante valor para registros antigos que ainda não têm.
-          original_amount: prev.original_amount ?? p.amount,
+          // original_amount = valor da última remessa OMIE. Assim a "Diferença"
+          // só destaca edições manuais feitas no Falcon depois da importação.
+          original_amount: p.amount,
         });
       } else {
         inserts.push({
