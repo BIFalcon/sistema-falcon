@@ -757,8 +757,8 @@ export default function ContasPagarPage() {
               />
               <Stat
                 label="Diferença"
-                value={balanceDiff !== null ? fmtBRL(balanceDiff) : "—"}
-                tone={balanceDiff !== null && balanceDiff < 0 ? "danger" : "neutral"}
+                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
+                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
               />
             </div>
           </Card>
