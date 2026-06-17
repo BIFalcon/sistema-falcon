@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import DOMPurify from "dompurify";
 import { getDreSignedUrl } from "@/hooks/useDre";
 
 interface Props {
@@ -53,10 +54,16 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
         });
         const out: SheetHtml[] = wb.SheetNames.map((name) => ({
           name,
-          html: XLSX.utils.sheet_to_html(wb.Sheets[name], {
-            editable: false,
-            id: `sheet-${name.replace(/\s+/g, "-")}`,
-          }),
+          // SheetJS sheet_to_html não escapa o conteúdo das células — um
+          // .xlsx malicioso poderia injetar HTML/JS. Sanitizamos com
+          // DOMPurify antes de renderizar com dangerouslySetInnerHTML.
+          html: DOMPurify.sanitize(
+            XLSX.utils.sheet_to_html(wb.Sheets[name], {
+              editable: false,
+              id: `sheet-${name.replace(/\s+/g, "-")}`,
+            }),
+            { USE_PROFILES: { html: true } },
+          ),
         }));
         if (cancelled) return;
         setSheets(out);
