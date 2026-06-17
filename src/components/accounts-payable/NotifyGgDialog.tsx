@@ -55,10 +55,13 @@ export function NotifyGgDialog({
     if (storageKey) {
       try {
         const saved = localStorage.getItem(storageKey);
-        if (saved) setExtraEmails(saved);
+        setExtraEmails(saved ?? "");
       } catch {
         // ignora erros de storage (modo privado, etc.)
+        setExtraEmails("");
       }
+    } else {
+      setExtraEmails("");
     }
   }, [open, selectedEntries, storageKey]);
 
