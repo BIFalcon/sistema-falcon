@@ -79,12 +79,9 @@ Sem comentários. Datas em ISO. Se não conseguir ler, use null.`;
 }
 
 async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: string } | { error: string }> {
-  if (/^https?:\/\//i.test(path)) {
-    const r = await fetch(path);
-    if (!r.ok) return { error: `download_${r.status}` };
-    const mime = r.headers.get("content-type") ?? "application/octet-stream";
-    const buf = new Uint8Array(await r.arrayBuffer());
-    return { dataUrl: `data:${mime};base64,${bytesToBase64(buf)}` };
+  // Only allow storage-bucket keys; never fetch arbitrary URLs (SSRF protection).
+  if (/:\/\//.test(path) || path.startsWith("/") || path.includes("..")) {
+    return { error: "invalid_path" };
   }
   const { data, error } = await admin.storage.from("invoices").download(path);
   if (error || !data) return { error: error?.message ?? "download_failed" };
