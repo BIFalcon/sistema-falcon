@@ -2,15 +2,16 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
 import { useState } from "react";
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, ShieldCheck, Unlink, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, Pencil, ShieldCheck, Unlink, UserPlus, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -100,6 +101,24 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
+          {entry.is_manual && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400"
+              title="Lançamento manual"
+            >
+              <UserPlus className="h-3 w-3" /> Manual
+            </Badge>
+          )}
+          {entry.is_transfer && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-slate-500/40 text-slate-700 dark:text-slate-300"
+              title={`Transferência ${entry.transfer_from_bank ?? ""} → ${entry.transfer_to_bank ?? ""}`}
+            >
+              <ArrowRightLeft className="h-3 w-3" /> Transferência
+            </Badge>
+          )}
           {entry.is_group && canManage && <UngroupButton entry={entry} />}
           {issues?.has("cnpj_divergente") && (
             <Badge
@@ -146,7 +165,12 @@ export function ApEntryRow({
 
       {/* Valor */}
       <TableCell className="text-right font-mono text-xs px-2 py-1.5">
-        <div>{fmtBRL(Number(entry.amount))}</div>
+        <div className="flex items-center justify-end gap-1">
+          <span>{fmtBRL(Number(entry.amount))}</span>
+          {canManage && Number(entry.amount) === 0.01 && !archived && (
+            <EditAmountButton entry={entry} />
+          )}
+        </div>
       </TableCell>
 
       {/* Valor Original */}
