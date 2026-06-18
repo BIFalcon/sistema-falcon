@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -167,8 +167,8 @@ export function ApEntryRow({
       <TableCell className="text-right font-mono text-xs px-2 py-1.5">
         <div className="flex items-center justify-end gap-1">
           <span>{fmtBRL(Number(entry.amount))}</span>
-          {canManage && Number(entry.amount) === 0.01 && !archived && (
-            <EditAmountButton entry={entry} />
+          {canManage && !archived && (Number(entry.amount) === 0.01 || entry.is_manual) && (
+            <EditAmountButton entry={entry} allowAny={!!entry.is_manual} />
           )}
         </div>
       </TableCell>
@@ -183,26 +183,32 @@ export function ApEntryRow({
       {/* Valor Novo (pago com juros) */}
       {showPaidAmount && (
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
-          {entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}
+          <div className="flex items-center justify-end gap-1">
+            <span>{entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}</span>
+            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_amount" />}
+          </div>
         </TableCell>
       )}
 
       {/* Juros / Desconto */}
       {showPaidInterest && (
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
-          {entry.paid_interest != null && Number(entry.paid_interest) !== 0 ? (
-            Number(entry.paid_interest) > 0 ? (
-              <span className="text-amber-700 dark:text-amber-400">
-                {fmtBRL(Number(entry.paid_interest))}
-              </span>
+          <div className="flex items-center justify-end gap-1">
+            {entry.paid_interest != null && Number(entry.paid_interest) !== 0 ? (
+              Number(entry.paid_interest) > 0 ? (
+                <span className="text-amber-700 dark:text-amber-400">
+                  {fmtBRL(Number(entry.paid_interest))}
+                </span>
+              ) : (
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  -{fmtBRL(Math.abs(Number(entry.paid_interest)))} <span className="text-[10px] uppercase">desc.</span>
+                </span>
+              )
             ) : (
-              <span className="text-emerald-700 dark:text-emerald-400">
-                -{fmtBRL(Math.abs(Number(entry.paid_interest)))} <span className="text-[10px] uppercase">desc.</span>
-              </span>
-            )
-          ) : (
-            "—"
-          )}
+              <span>—</span>
+            )}
+            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_interest" />}
+          </div>
         </TableCell>
       )}
 
