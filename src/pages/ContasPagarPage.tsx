@@ -737,9 +737,37 @@ export default function ContasPagarPage() {
           {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
           {hotelId && (
           <>
-          <Card className="p-5 shadow-soft space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <BankBalanceField
+          <Card className="p-5 shadow-soft space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
+              <Stat
+                label={
+                  dateFrom === dateTo
+                    ? `Total a pagar em ${fmtDate(dateFrom)}`
+                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
+                }
+                value={fmtBRL(totalToPayPeriod)}
+              />
+              <Stat
+                label="Diferença"
+                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
+                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 text-muted-foreground"
+                onClick={() => setBalanceExpanded((p) => !p)}
+              >
+                {balanceExpanded ? "Ocultar saldos bancários" : "Atualizar saldos bancários"}
+                {balanceExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
+            {balanceExpanded && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                <BankBalanceField
                 bankName="itau"
                 label="Saldo Itaú"
                 value={balanceItauInput}
@@ -787,23 +815,8 @@ export default function ContasPagarPage() {
                   }
                 }}
               />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
-              <Stat
-                label={
-                  dateFrom === dateTo
-                    ? `Total a pagar em ${fmtDate(dateFrom)}`
-                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
-                }
-                value={fmtBRL(totalToPayPeriod)}
-              />
-              <Stat
-                label="Diferença"
-                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
-                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
-              />
-            </div>
+              </div>
+            )}
           </Card>
 
           {/* Cartão a receber — compacto */}
