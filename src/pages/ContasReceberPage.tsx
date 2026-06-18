@@ -1397,7 +1397,7 @@ function SendDocsDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
-            disabled={saving || !file1 || !proof}
+            disabled={saving || (!file1 && !file2) || !proof}
             onClick={async () => {
               setSaving(true);
               try { await onConfirm(file1, file2, proof); } finally { setSaving(false); }
