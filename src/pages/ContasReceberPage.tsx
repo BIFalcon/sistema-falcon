@@ -859,7 +859,6 @@ function DayBreakdown({
               })
               .then(({ error }) => {
                 if (error) console.error("extract-ar-document", error);
-                qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
               });
           }
           setInvoiceFor(null);
