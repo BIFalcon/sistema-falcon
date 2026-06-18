@@ -929,12 +929,41 @@ export function useUpdateEntryCategory() {
 export function useUpdateEntryAmount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { entryId: string; hotelId: string; amount: number }) => {
-      const { error } = await supabase
+    mutationFn: async (input: { entryId: string; hotelId: string; amount: number; allowAny?: boolean }) => {
+      let q = supabase
         .from("ap_entries")
         .update({ amount: input.amount, original_amount: input.amount } as never)
-        .eq("id", input.entryId)
-        .eq("amount", 0.01); // garantia server-side: só edita se ainda valer 0,01
+        .eq("id", input.entryId);
+      // Só restringe ao 0,01 quando não for liberação explícita (ex.: lançamento manual).
+      if (!input.allowAny) q = q.eq("amount", 0.01);
+      const { error } = await q;
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+// ── Edição manual de Valor Novo e Juros / Desconto ───────────────────────
+export function useUpdateEntryPaidValues() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      entryId: string;
+      hotelId: string;
+      paidAmount?: number | null;
+      paidInterest?: number | null;
+    }) => {
+      const update: Record<string, unknown> = {};
+      if (input.paidAmount !== undefined) update.paid_amount = input.paidAmount;
+      if (input.paidInterest !== undefined) update.paid_interest = input.paidInterest;
+      if (Object.keys(update).length === 0) return;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update(update as never)
+        .eq("id", input.entryId);
       if (error) throw error;
     },
     onSuccess: (_n, v) => {

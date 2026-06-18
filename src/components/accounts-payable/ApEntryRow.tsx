@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -167,8 +167,8 @@ export function ApEntryRow({
       <TableCell className="text-right font-mono text-xs px-2 py-1.5">
         <div className="flex items-center justify-end gap-1">
           <span>{fmtBRL(Number(entry.amount))}</span>
-          {canManage && Number(entry.amount) === 0.01 && !archived && (
-            <EditAmountButton entry={entry} />
+          {canManage && !archived && (Number(entry.amount) === 0.01 || entry.is_manual) && (
+            <EditAmountButton entry={entry} allowAny={!!entry.is_manual} />
           )}
         </div>
       </TableCell>
@@ -183,26 +183,32 @@ export function ApEntryRow({
       {/* Valor Novo (pago com juros) */}
       {showPaidAmount && (
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
-          {entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}
+          <div className="flex items-center justify-end gap-1">
+            <span>{entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}</span>
+            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_amount" />}
+          </div>
         </TableCell>
       )}
 
       {/* Juros / Desconto */}
       {showPaidInterest && (
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
-          {entry.paid_interest != null && Number(entry.paid_interest) !== 0 ? (
-            Number(entry.paid_interest) > 0 ? (
-              <span className="text-amber-700 dark:text-amber-400">
-                {fmtBRL(Number(entry.paid_interest))}
-              </span>
+          <div className="flex items-center justify-end gap-1">
+            {entry.paid_interest != null && Number(entry.paid_interest) !== 0 ? (
+              Number(entry.paid_interest) > 0 ? (
+                <span className="text-amber-700 dark:text-amber-400">
+                  {fmtBRL(Number(entry.paid_interest))}
+                </span>
+              ) : (
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  -{fmtBRL(Math.abs(Number(entry.paid_interest)))} <span className="text-[10px] uppercase">desc.</span>
+                </span>
+              )
             ) : (
-              <span className="text-emerald-700 dark:text-emerald-400">
-                -{fmtBRL(Math.abs(Number(entry.paid_interest)))} <span className="text-[10px] uppercase">desc.</span>
-              </span>
-            )
-          ) : (
-            "—"
-          )}
+              <span>—</span>
+            )}
+            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_interest" />}
+          </div>
         </TableCell>
       )}
 
@@ -310,7 +316,7 @@ function UngroupButton({ entry }: { entry: ApEntry }) {
   );
 }
 
-function EditAmountButton({ entry }: { entry: ApEntry }) {
+function EditAmountButton({ entry, allowAny = false }: { entry: ApEntry; allowAny?: boolean }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const update = useUpdateEntryAmount();
@@ -321,7 +327,7 @@ function EditAmountButton({ entry }: { entry: ApEntry }) {
           variant="ghost"
           size="icon"
           className="h-5 w-5 text-muted-foreground"
-          title="Editar valor (lançamento OMIE com valor 0,01)"
+          title={allowAny ? "Editar valor do lançamento manual" : "Editar valor (lançamento OMIE com valor 0,01)"}
         >
           <Pencil className="h-3 w-3" />
         </Button>
@@ -331,7 +337,9 @@ function EditAmountButton({ entry }: { entry: ApEntry }) {
           Corrigir valor
         </p>
         <p className="text-[11px] text-muted-foreground">
-          Lançamento veio do OMIE com R$ 0,01. Informe o valor correto.
+          {allowAny
+            ? "Lançamento manual. Informe o novo valor correto."
+            : "Lançamento veio do OMIE com R$ 0,01. Informe o valor correto."}
         </p>
         <Input
           type="number"
@@ -357,8 +365,96 @@ function EditAmountButton({ entry }: { entry: ApEntry }) {
                   entryId: entry.id,
                   hotelId: entry.hotel_id,
                   amount: parseFloat(value),
+                  allowAny,
                 });
                 toast.success("Valor atualizado");
+                setOpen(false);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+              }
+            }}
+          >
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function EditPaidValuesButton({
+  entry,
+  field,
+}: {
+  entry: ApEntry;
+  field: "paid_amount" | "paid_interest";
+}) {
+  const [open, setOpen] = useState(false);
+  const current = field === "paid_amount" ? entry.paid_amount : entry.paid_interest;
+  const [value, setValue] = useState<string>(current != null ? String(current) : "");
+  const update = useUpdateEntryPaidValues();
+
+  const label = field === "paid_amount" ? "Valor Novo (pago)" : "Juros / Desconto";
+  const help =
+    field === "paid_amount"
+      ? "Informe o valor efetivamente pago (deixe em branco para limpar)."
+      : "Use positivo para juros e negativo para desconto. Deixe em branco para limpar.";
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setValue(current != null ? String(current) : "");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 text-muted-foreground"
+          title={`Editar ${label}`}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 space-y-2" align="end">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <p className="text-[11px] text-muted-foreground">{help}</p>
+        <Input
+          type="number"
+          step="0.01"
+          placeholder="0,00 (vazio = limpar)"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            disabled={update.isPending}
+            onClick={async () => {
+              const trimmed = value.trim();
+              let parsed: number | null = null;
+              if (trimmed !== "") {
+                const n = parseFloat(trimmed);
+                if (Number.isNaN(n)) {
+                  toast.error("Valor inválido");
+                  return;
+                }
+                parsed = n;
+              }
+              try {
+                await update.mutateAsync({
+                  entryId: entry.id,
+                  hotelId: entry.hotel_id,
+                  [field === "paid_amount" ? "paidAmount" : "paidInterest"]: parsed,
+                } as Parameters<typeof update.mutateAsync>[0]);
+                toast.success(parsed == null ? `${label} removido` : `${label} atualizado`);
                 setOpen(false);
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
