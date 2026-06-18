@@ -723,11 +723,15 @@ export type Database = {
           amount: number | null
           ar_open: number | null
           billed_at: string | null
+          boleto_due_date: string | null
+          boleto_number: string | null
           confirmation_number: string | null
           created_at: string
           defaulting_at: string | null
           defaulting_note: string | null
           departure_date: string | null
+          doc_extraction_details: Json | null
+          doc_extraction_status: string | null
           documents_problem_at: string | null
           documents_problem_note: string | null
           entry_key: string
@@ -747,6 +751,7 @@ export type Database = {
           is_paid: boolean
           not_billable_note: string | null
           not_billable_reason: string | null
+          nota_number: string | null
           original_amount: number | null
           paid: number | null
           paid_at: string | null
@@ -766,11 +771,15 @@ export type Database = {
           amount?: number | null
           ar_open?: number | null
           billed_at?: string | null
+          boleto_due_date?: string | null
+          boleto_number?: string | null
           confirmation_number?: string | null
           created_at?: string
           defaulting_at?: string | null
           defaulting_note?: string | null
           departure_date?: string | null
+          doc_extraction_details?: Json | null
+          doc_extraction_status?: string | null
           documents_problem_at?: string | null
           documents_problem_note?: string | null
           entry_key: string
@@ -790,6 +799,7 @@ export type Database = {
           is_paid?: boolean
           not_billable_note?: string | null
           not_billable_reason?: string | null
+          nota_number?: string | null
           original_amount?: number | null
           paid?: number | null
           paid_at?: string | null
@@ -809,11 +819,15 @@ export type Database = {
           amount?: number | null
           ar_open?: number | null
           billed_at?: string | null
+          boleto_due_date?: string | null
+          boleto_number?: string | null
           confirmation_number?: string | null
           created_at?: string
           defaulting_at?: string | null
           defaulting_note?: string | null
           departure_date?: string | null
+          doc_extraction_details?: Json | null
+          doc_extraction_status?: string | null
           documents_problem_at?: string | null
           documents_problem_note?: string | null
           entry_key?: string
@@ -833,6 +847,7 @@ export type Database = {
           is_paid?: boolean
           not_billable_note?: string | null
           not_billable_reason?: string | null
+          nota_number?: string | null
           original_amount?: number | null
           paid?: number | null
           paid_at?: string | null
