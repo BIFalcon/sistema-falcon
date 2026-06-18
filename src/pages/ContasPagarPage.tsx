@@ -953,26 +953,8 @@ export default function ContasPagarPage() {
           </>
           )}
 
-          {/* Urgência */}
-          <Card className="p-5 shadow-soft">
-              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
-                Urgência de pagamento
-              </h3>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                <UrgencyCell
-                  label="Vencidos"
-                  count={overdueCount}
-                  tone="danger"
-                  active={period === "overdue"}
-                  onClick={() => selectUrgencyPeriod("overdue")}
-                />
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => selectUrgencyPeriod("today")} />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => selectUrgencyPeriod("tomorrow")} />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => selectUrgencyPeriod("this_week")} />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => selectUrgencyPeriod("next_week")} />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => selectUrgencyPeriod("next_month")} />
-              </div>
-              {distributionEntries.length > 0 && (
+          {/* Resumo da distribuição (movido do card de urgência) */}
+          {distributionEntries.length > 0 && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-accent font-semibold">
@@ -984,8 +966,7 @@ export default function ContasPagarPage() {
                   </div>
                   <p className="text-base font-bold">{fmtBRL(distributionTotal)}</p>
                 </div>
-              )}
-          </Card>
+          )}
 
           {/* Importação + filtros + tabela */}
           <Card className="p-5 shadow-soft space-y-4">
