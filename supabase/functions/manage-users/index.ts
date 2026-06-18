@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
           .eq("email", payload.email)
           .maybeSingle();
         if (prof?.email && prof.status !== "banned") {
-          const origin = req.headers.get("origin") ?? "";
+          const origin = getAppBaseUrl();
           const actionLink = await createPasswordSetupLink(admin, {
             userId: prof.user_id,
             email: prof.email,
