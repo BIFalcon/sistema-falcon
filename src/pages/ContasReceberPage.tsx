@@ -58,7 +58,7 @@ import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
@@ -139,6 +139,7 @@ function exportToInvoiceToExcel(
   const rows = entries.map((e) => {
     const term = findContractTerm(contracts, e.account_number, e.account_name);
     const estimated =
+      e.boleto_due_date ??
       e.estimated_due_date ??
       (e.gg_confirmed_at && term != null
         ? addDays(e.gg_confirmed_at.slice(0, 10), term)
@@ -150,6 +151,8 @@ function exportToInvoiceToExcel(
     return {
       "Hotel": hotelName(e.hotel_id),
       "Hóspede": e.account_name ?? "",
+      "Nº Nota": e.nota_number ?? "",
+      "Nº Boleto": e.boleto_number ?? "",
       "Valor": Number(e.amount ?? 0),
       "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
       "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
@@ -164,8 +167,9 @@ function exportToInvoiceToExcel(
   });
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 28 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
-    { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 18 }, { wch: 14 },
+    { wch: 28 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
+    { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 40 },
+    { wch: 18 }, { wch: 14 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
@@ -605,6 +609,7 @@ function DayBreakdown({
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
   const setStatus = useSetToInvoiceGgStatus();
+  const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
@@ -628,6 +633,8 @@ function DayBreakdown({
               <TableHead>Cliente</TableHead>
               <TableHead>Invoice</TableHead>
               <TableHead>Reserva</TableHead>
+              <TableHead>Nº Nota</TableHead>
+              <TableHead>Nº Boleto</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
@@ -641,8 +648,18 @@ function DayBreakdown({
               const dueFromConfirm = term != null && e.gg_confirmed_at
                 ? addDays(e.gg_confirmed_at.slice(0, 10), term)
                 : null;
-              const due = e.estimated_due_date ?? dueFromConfirm
+              // Prioriza o vencimento extraído do boleto; cai para contrato/estimativa.
+              const due = e.boleto_due_date
+                ?? e.estimated_due_date
+                ?? dueFromConfirm
                 ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
+              // Prazo: se há boleto + faturamento, calcula diretamente; senão usa contrato.
+              let prazoDias: number | null = term;
+              if (e.boleto_due_date && e.billed_at) {
+                const billed = new Date(e.billed_at.slice(0, 10) + "T00:00:00").getTime();
+                const dueT = new Date(e.boleto_due_date + "T00:00:00").getTime();
+                prazoDias = Math.round((dueT - billed) / (1000 * 60 * 60 * 24));
+              }
               const isEditing = editingId === e.id;
               const dPending = e.gg_status === "pendente" ? (daysSinceUpload?.(e.upload_id) ?? null) : null;
               const pendingBadge = dPending == null ? null
@@ -659,9 +676,13 @@ function DayBreakdown({
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.nota_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.boleto_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
-                    {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
+                    {prazoDias != null
+                      ? `${prazoDias} dias`
+                      : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-xs">
                     {due ? (
@@ -832,7 +853,7 @@ function DayBreakdown({
       <InvoiceUploadDialog
         entry={invoiceFor?.entry ?? null}
         onClose={() => setInvoiceFor(null)}
-        onConfirm={async (file1Url, file2Url) => {
+        onConfirm={async (notaPath, boletoPath) => {
           if (!invoiceFor) return;
           const term = invoiceFor.term;
           const estimated = term != null
@@ -843,10 +864,25 @@ function DayBreakdown({
             gg_status: "faturado",
             gg_note: invoiceFor.entry.gg_note,
             estimated_due_date: estimated,
-            invoice_file_1: file1Url,
-            invoice_file_2: file2Url,
+            invoice_file_1: notaPath,
+            invoice_file_2: boletoPath,
             billed_at: new Date().toISOString(),
           });
+          // Extrai número da nota, número do boleto e vencimento (em background)
+          if (notaPath || boletoPath) {
+            supabase.functions
+              .invoke("extract-ar-document", {
+                body: {
+                  entry_id: invoiceFor.entry.id,
+                  nota_path: notaPath,
+                  boleto_path: boletoPath,
+                },
+              })
+              .then(({ error }) => {
+                if (error) console.error("extract-ar-document", error);
+                qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+              });
+          }
           setInvoiceFor(null);
           toast.success("Marcado como faturado");
         }}
@@ -904,16 +940,30 @@ function DayBreakdown({
       <SendDocsDialog
         entry={sendDocsFor}
         onClose={() => setSendDocsFor(null)}
-        onConfirm={async (file1, file2, proof) => {
+        onConfirm={async (notaPath, boletoPath, proof) => {
           if (!sendDocsFor) return;
           await setStatus.mutateAsync({
             id: sendDocsFor.id,
             gg_status: "documentos_enviados",
             gg_note: sendDocsFor.gg_note,
-            invoice_file_1: file1,
-            invoice_file_2: file2,
+            invoice_file_1: notaPath,
+            invoice_file_2: boletoPath,
             proof_file: proof,
           });
+          if (notaPath || boletoPath) {
+            supabase.functions
+              .invoke("extract-ar-document", {
+                body: {
+                  entry_id: sendDocsFor.id,
+                  nota_path: notaPath,
+                  boleto_path: boletoPath,
+                },
+              })
+              .then(({ error }) => {
+                if (error) console.error("extract-ar-document", error);
+                qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+              });
+          }
           setSendDocsFor(null);
           toast.success("Documentos enviados ao Financeiro");
         }}
@@ -929,21 +979,21 @@ function InvoiceUploadDialog({
 }: {
   entry: ToInvoiceEntry | null;
   onClose: () => void;
-  onConfirm: (file1Url: string, file2Url: string | null) => Promise<void>;
+  onConfirm: (notaPath: string | null, boletoPath: string | null) => Promise<void>;
 }) {
-  const [file1Url, setFile1Url] = useState<string | null>(null);
-  const [file2Url, setFile2Url] = useState<string | null>(null);
-  const [uploading1, setUploading1] = useState(false);
-  const [uploading2, setUploading2] = useState(false);
+  const [notaPath, setNotaPath] = useState<string | null>(null);
+  const [boletoPath, setBoletoPath] = useState<string | null>(null);
+  const [uploadingNota, setUploadingNota] = useState(false);
+  const [uploadingBoleto, setUploadingBoleto] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (entry) {
-      setFile1Url(entry.invoice_file_1 ?? null);
-      setFile2Url(entry.invoice_file_2 ?? null);
+      setNotaPath(entry.invoice_file_1 ?? null);
+      setBoletoPath(entry.invoice_file_2 ?? null);
     } else {
-      setFile1Url(null);
-      setFile2Url(null);
+      setNotaPath(null);
+      setBoletoPath(null);
     }
   }, [entry]);
 
@@ -963,20 +1013,20 @@ function InvoiceUploadDialog({
     window.open(data.signedUrl, "_blank", "noopener");
   }
 
-  async function handleUpload(file: File, slot: 1 | 2) {
+  async function handleUpload(file: File, kind: "nota" | "boleto") {
     if (!entry) return;
-    const setLoading = slot === 1 ? setUploading1 : setUploading2;
+    const setLoading = kind === "nota" ? setUploadingNota : setUploadingBoleto;
     setLoading(true);
     try {
       const ext = file.name.split(".").pop() ?? "bin";
-      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/${Date.now()}-${slot}.${ext}`;
+      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/${Date.now()}-${kind}.${ext}`;
       const { error } = await supabase.storage
         .from("invoices")
         .upload(path, file, { upsert: true, contentType: file.type });
       if (error) throw error;
-      if (slot === 1) setFile1Url(path);
-      else setFile2Url(path);
-      toast.success(`Arquivo ${slot} enviado`);
+      if (kind === "nota") setNotaPath(path);
+      else setBoletoPath(path);
+      toast.success(kind === "nota" ? "Nota enviada" : "Boleto enviado");
     } catch (err) {
       toast.error(`Falha ao enviar arquivo: ${(err as Error).message}`);
     } finally {
@@ -995,61 +1045,62 @@ function InvoiceUploadDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label className="text-xs">
-              Nota Fiscal / Boleto <span className="text-destructive">*</span>
-            </Label>
+            <Label className="text-xs">Nota Fiscal (opcional)</Label>
             <Input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              disabled={uploading1}
+              disabled={uploadingNota}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleUpload(f, 1);
+                if (f) handleUpload(f, "nota");
               }}
             />
-            {file1Url && (
+            {notaPath && (
               <button
                 type="button"
-                onClick={() => openStoredFile(file1Url)}
+                onClick={() => openStoredFile(notaPath)}
                 className="text-[11px] text-primary underline truncate block text-left"
               >
-                Arquivo 1 enviado ✓
+                Nota enviada ✓
               </button>
             )}
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Arquivo adicional (opcional)</Label>
+            <Label className="text-xs">Boleto (opcional)</Label>
             <Input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              disabled={uploading2}
+              disabled={uploadingBoleto}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleUpload(f, 2);
+                if (f) handleUpload(f, "boleto");
               }}
             />
-            {file2Url && (
+            {boletoPath && (
               <button
                 type="button"
-                onClick={() => openStoredFile(file2Url)}
+                onClick={() => openStoredFile(boletoPath)}
                 className="text-[11px] text-primary underline truncate block text-left"
               >
-                Arquivo 2 enviado ✓
+                Boleto enviado ✓
               </button>
             )}
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            O sistema lê automaticamente o número da nota, o número do boleto e a data de vencimento.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
           <Button
-            disabled={!file1Url || uploading1 || uploading2 || saving}
+            disabled={(!notaPath && !boletoPath) || uploadingNota || uploadingBoleto || saving}
             onClick={async () => {
-              if (!file1Url) return;
+              if (!notaPath && !boletoPath) return;
               setSaving(true);
               try {
-                await onConfirm(file1Url, file2Url);
+                await onConfirm(notaPath, boletoPath);
               } finally {
                 setSaving(false);
               }
@@ -1341,7 +1392,7 @@ function SendDocsDialog({
         <div className="space-y-3">
           {([1, 2, 3] as const).map((slot) => {
             const cur = slot === 1 ? file1 : slot === 2 ? file2 : proof;
-            const label = slot === 1 ? "NF / Boleto 1" : slot === 2 ? "NF / Boleto 2 (opcional)" : "Comprovante de envio";
+            const label = slot === 1 ? "Nota Fiscal (opcional)" : slot === 2 ? "Boleto (opcional)" : "Comprovante de envio";
             return (
               <div key={slot} className="space-y-1">
                 <Label className="text-xs">{label}</Label>
@@ -1366,7 +1417,7 @@ function SendDocsDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
-            disabled={saving || !file1 || !proof}
+            disabled={saving || (!file1 && !file2) || !proof}
             onClick={async () => {
               setSaving(true);
               try { await onConfirm(file1, file2, proof); } finally { setSaving(false); }
