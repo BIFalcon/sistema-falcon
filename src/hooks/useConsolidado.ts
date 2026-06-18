@@ -46,6 +46,27 @@ function findLineByPattern(lines: ParsedLine[], patterns: RegExp[]): number | nu
   return null;
 }
 
+/**
+ * Fallback: alguns hotéis (ex.: Manhattan) só expõem a linha
+ * "Taxa de Administração s/ GOP" como indicador derivado da DRE
+ * (ex.: `[bline_1] (-) Taxa de Administração s/ GOP`), e não como
+ * linha contábil "line". Procuramos também entre indicadores,
+ * ignorando o prefixo `[chave]` no início do rótulo.
+ */
+function findIndicatorByPattern(lines: ParsedLine[], patterns: RegExp[]): number | null {
+  for (const p of patterns) {
+    const hits = lines.filter((l) => {
+      if (l.line_type !== "indicator") return false;
+      const label = l.line_label.replace(/^\s*\[[^\]]+\]\s*/, "");
+      return p.test(label);
+    });
+    for (const hit of hits) {
+      if (hit.line_value != null && hit.line_value !== 0) return hit.line_value;
+    }
+  }
+  return null;
+}
+
 const TAXA_FEE_PATTERNS = [
   /taxas?\s+(de\s+)?administra[çc][ãa]o\s+falcon/i,
   /taxa\s+falcon/i,
@@ -210,7 +231,9 @@ export function useConsolidadoData(input: {
           (closing?.estimated_distribution as number | null | undefined) ??
           null;
         const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
-        const incentiveFee = findLineByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        const incentiveFee =
+          findLineByPattern(lines, TAXA_SUCESSO_PATTERNS) ??
+          findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
         const fundoReserva = findLineByPattern(lines, FUNDO_RESERVA_PATTERNS);
         // Prioriza a linha explícita da DRE; só cai para o valor salvo no
         // closing (que vem do lucro_liquido do estimador) quando a linha
