@@ -920,16 +920,30 @@ function DayBreakdown({
       <SendDocsDialog
         entry={sendDocsFor}
         onClose={() => setSendDocsFor(null)}
-        onConfirm={async (file1, file2, proof) => {
+        onConfirm={async (notaPath, boletoPath, proof) => {
           if (!sendDocsFor) return;
           await setStatus.mutateAsync({
             id: sendDocsFor.id,
             gg_status: "documentos_enviados",
             gg_note: sendDocsFor.gg_note,
-            invoice_file_1: file1,
-            invoice_file_2: file2,
+            invoice_file_1: notaPath,
+            invoice_file_2: boletoPath,
             proof_file: proof,
           });
+          if (notaPath || boletoPath) {
+            supabase.functions
+              .invoke("extract-ar-document", {
+                body: {
+                  entry_id: sendDocsFor.id,
+                  nota_path: notaPath,
+                  boleto_path: boletoPath,
+                },
+              })
+              .then(({ error }) => {
+                if (error) console.error("extract-ar-document", error);
+                qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+              });
+          }
           setSendDocsFor(null);
           toast.success("Documentos enviados ao Financeiro");
         }}
