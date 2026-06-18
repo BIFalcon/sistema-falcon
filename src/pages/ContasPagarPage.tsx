@@ -1206,6 +1206,8 @@ export default function ContasPagarPage() {
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
                   { value: "pendente", label: "Pendente (flag)" },
+                  { value: "manual", label: "Lançamento manual" },
+                  { value: "transferencia", label: "Transferência entre contas" },
                 ];
                 return (
                   <DropdownMenu>
