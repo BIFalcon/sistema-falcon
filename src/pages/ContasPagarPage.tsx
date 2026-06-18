@@ -310,8 +310,21 @@ export default function ContasPagarPage() {
   // Linhas efetivas exibidas — alterna entre ativos (displayRows) e pagos
   const effectiveDisplayRows = useMemo<typeof displayRows>(() => {
     if (!showPaid) return displayRows;
-    return paidEntries.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries]);
+    // Item 7 (Cuiabá): aplica o filtro de data sobre a DATA DE PAGAMENTO
+    // (payment_paid_at) — não sobre o vencimento. Isso unifica o comportamento
+    // entre hotéis em que o vencimento coincide com a data de pagamento (OMIE)
+    // e Cuiabá (TOTVS), onde frequentemente são diferentes.
+    const filteredPaid = paidEntries.filter((e) => {
+      const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
+      if (specificDates && specificDates.length > 0) {
+        return paidDate ? specificDates.includes(paidDate) : false;
+      }
+      if (dateFrom && paidDate && paidDate < dateFrom) return false;
+      if (dateTo && paidDate && paidDate > dateTo) return false;
+      return true;
+    });
+    return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
+  }, [showPaid, displayRows, paidEntries, dateFrom, dateTo, specificDates]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
