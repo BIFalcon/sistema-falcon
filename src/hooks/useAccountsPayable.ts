@@ -634,6 +634,9 @@ export function useSetEntryPaymentStatus() {
       if (input.scheduledDate !== undefined) update.scheduled_date = input.scheduledDate;
       if (input.paidInterest !== undefined) update.paid_interest = input.paidInterest;
       if (input.paidAmount !== undefined) update.paid_amount = input.paidAmount;
+      // Item 1: ao alterar status (exceto para "pendente"), limpa o flag is_pending.
+      // O flag só persiste enquanto o status do lançamento não mudar manualmente.
+      update.is_pending = false;
       const { error } = await supabase
         .from("ap_entries")
         .update(update as never)
@@ -659,7 +662,7 @@ export function useUnscheduleEntries() {
       if (input.entryIds.length === 0) return 0;
       const { error } = await supabase
         .from("ap_entries")
-        .update({ payment_status: "em_aprovacao", scheduled_date: null } as never)
+        .update({ payment_status: "em_aprovacao", scheduled_date: null, is_pending: false } as never)
         .in("id", input.entryIds)
         .eq("payment_status", "agendado");
       if (error) throw error;
