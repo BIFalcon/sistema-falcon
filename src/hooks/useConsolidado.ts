@@ -298,7 +298,9 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       }
       const uhsDisponiveis = findIndicator(lines, "uhs_disponiveis");
       const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
-      const taxaSucesso = findLineByPattern(lines, TAXA_SUCESSO_PATTERNS);
+      const taxaSucesso =
+        findLineByPattern(lines, TAXA_SUCESSO_PATTERNS) ??
+        findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
       return {
         uhsDisponiveis,
         taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
