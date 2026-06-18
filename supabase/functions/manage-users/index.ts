@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
           return json({ error: "only_processos_can_create_master" }, 403);
         }
 
-        const origin = req.headers.get("origin") ?? "";
+        const origin = getAppBaseUrl();
 
         // 1) Verifica se o usuário já existe.
         const { data: existingProfile } = await admin
@@ -531,7 +531,7 @@ Deno.serve(async (req) => {
         const actionLink = await createPasswordSetupLink(admin, {
           userId: payload.user_id,
           email: prof.email,
-          origin: req.headers.get("origin") ?? "",
+          origin: getAppBaseUrl(),
         });
 
         if (actionLink) {
