@@ -213,6 +213,8 @@ export function useApPageDerived(opts: {
           const ok = selectedStatuses.some((s) => {
             if (s === "issues") return e.gg_approval !== "approved";
             if (s === "pendente") return !!e.is_pending;
+            if (s === "manual") return !!e.is_manual;
+            if (s === "transferencia") return !!e.is_transfer;
             return e.payment_status === s;
           });
           if (!ok) return false;
@@ -318,6 +320,8 @@ export function useApPageDerived(opts: {
           const ok = selectedStatuses.some((s) => {
             if (s === "issues") return e.gg_approval !== "approved";
             if (s === "pendente") return !!e.is_pending;
+            if (s === "manual") return !!e.is_manual;
+            if (s === "transferencia") return !!e.is_transfer;
             return e.payment_status === s;
           });
           if (!ok) return false;

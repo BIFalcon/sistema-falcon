@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,6 +47,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
@@ -71,6 +81,8 @@ import {
   useDeleteCardReceivable,
   useUpdateEntryCategory,
   useGroupEntries,
+  useCreateManualEntry,
+  useCreateTransferEntry,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
@@ -187,6 +199,34 @@ export default function ContasPagarPage() {
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
 
+  // Lançamento manual / Transferência (item 4)
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualMode, setManualMode] = useState<"manual" | "transfer">("manual");
+  const [manualForm, setManualForm] = useState({
+    supplier: "",
+    cnpj: "",
+    documentNumber: "",
+    dueDate: "",
+    amount: "",
+    category: "",
+    paymentMethod: "",
+    bankAccount: "",
+    paymentStatus: "em_aprovacao" as ApPaymentStatus,
+    observation: "",
+  });
+  const [transferForm, setTransferForm] = useState({
+    fromBank: "itau",
+    toBank: "santander",
+    amount: "",
+    dueDate: "",
+    observation: "",
+  });
+  const createManual = useCreateManualEntry();
+  const createTransfer = useCreateTransferEntry();
+
+  // Saldo bancário — collapse/expand (item 2)
+  const [balanceExpanded, setBalanceExpanded] = useState(false);
+
   // Toggle "Ver pagos" (Bloco 7)
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
@@ -280,8 +320,21 @@ export default function ContasPagarPage() {
   // Linhas efetivas exibidas — alterna entre ativos (displayRows) e pagos
   const effectiveDisplayRows = useMemo<typeof displayRows>(() => {
     if (!showPaid) return displayRows;
-    return paidEntries.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries]);
+    // Item 7 (Cuiabá): aplica o filtro de data sobre a DATA DE PAGAMENTO
+    // (payment_paid_at) — não sobre o vencimento. Isso unifica o comportamento
+    // entre hotéis em que o vencimento coincide com a data de pagamento (OMIE)
+    // e Cuiabá (TOTVS), onde frequentemente são diferentes.
+    const filteredPaid = paidEntries.filter((e) => {
+      const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
+      if (specificDates && specificDates.length > 0) {
+        return paidDate ? specificDates.includes(paidDate) : false;
+      }
+      if (dateFrom && paidDate && paidDate < dateFrom) return false;
+      if (dateTo && paidDate && paidDate > dateTo) return false;
+      return true;
+    });
+    return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
+  }, [showPaid, displayRows, paidEntries, dateFrom, dateTo, specificDates]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
@@ -694,9 +747,37 @@ export default function ContasPagarPage() {
           {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
           {hotelId && (
           <>
-          <Card className="p-5 shadow-soft space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <BankBalanceField
+          <Card className="p-5 shadow-soft space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
+              <Stat
+                label={
+                  dateFrom === dateTo
+                    ? `Total a pagar em ${fmtDate(dateFrom)}`
+                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
+                }
+                value={fmtBRL(totalToPayPeriod)}
+              />
+              <Stat
+                label="Diferença"
+                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
+                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 text-muted-foreground"
+                onClick={() => setBalanceExpanded((p) => !p)}
+              >
+                {balanceExpanded ? "Ocultar saldos bancários" : "Atualizar saldos bancários"}
+                {balanceExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
+            {balanceExpanded && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                <BankBalanceField
                 bankName="itau"
                 label="Saldo Itaú"
                 value={balanceItauInput}
@@ -744,23 +825,8 @@ export default function ContasPagarPage() {
                   }
                 }}
               />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
-              <Stat
-                label={
-                  dateFrom === dateTo
-                    ? `Total a pagar em ${fmtDate(dateFrom)}`
-                    : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
-                }
-                value={fmtBRL(totalToPayPeriod)}
-              />
-              <Stat
-                label="Diferença"
-                value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
-                tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
-              />
-            </div>
+              </div>
+            )}
           </Card>
 
           {/* Cartão a receber — compacto */}
@@ -897,26 +963,8 @@ export default function ContasPagarPage() {
           </>
           )}
 
-          {/* Urgência */}
-          <Card className="p-5 shadow-soft">
-              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
-                Urgência de pagamento
-              </h3>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                <UrgencyCell
-                  label="Vencidos"
-                  count={overdueCount}
-                  tone="danger"
-                  active={period === "overdue"}
-                  onClick={() => selectUrgencyPeriod("overdue")}
-                />
-                <UrgencyCell label="Hoje" count={urgencyCounts.today} tone="danger" active={period === "today"} onClick={() => selectUrgencyPeriod("today")} />
-                <UrgencyCell label="Amanhã" count={urgencyCounts.tomorrow} tone="warning" active={period === "tomorrow"} onClick={() => selectUrgencyPeriod("tomorrow")} />
-                <UrgencyCell label="Essa semana" count={urgencyCounts.thisWeek} tone="amber" active={period === "this_week"} onClick={() => selectUrgencyPeriod("this_week")} />
-                <UrgencyCell label="Sem. que vem" count={urgencyCounts.nextWeek} tone="info" active={period === "next_week"} onClick={() => selectUrgencyPeriod("next_week")} />
-                <UrgencyCell label="Próx. mês" count={urgencyCounts.nextMonth} tone="muted" active={period === "next_month"} onClick={() => selectUrgencyPeriod("next_month")} />
-              </div>
-              {distributionEntries.length > 0 && (
+          {/* Resumo da distribuição (movido do card de urgência) */}
+          {distributionEntries.length > 0 && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-accent font-semibold">
@@ -928,8 +976,7 @@ export default function ContasPagarPage() {
                   </div>
                   <p className="text-base font-bold">{fmtBRL(distributionTotal)}</p>
                 </div>
-              )}
-          </Card>
+          )}
 
           {/* Importação + filtros + tabela */}
           <Card className="p-5 shadow-soft space-y-4">
@@ -1043,6 +1090,16 @@ export default function ContasPagarPage() {
                   )}
                   Importar Relatório
                 </Button>
+                {canManage && hotelId && sourceSystem && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => { setManualMode("manual"); setManualOpen(true); }}
+                  >
+                    <Plus className="h-4 w-4" /> Lançamento manual
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -1159,6 +1216,8 @@ export default function ContasPagarPage() {
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
                   { value: "pendente", label: "Pendente (flag)" },
+                  { value: "manual", label: "Lançamento manual" },
+                  { value: "transferencia", label: "Transferência entre contas" },
                 ];
                 return (
                   <DropdownMenu>
@@ -2052,6 +2111,259 @@ export default function ContasPagarPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de lançamento manual / transferência */}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Novo lançamento manual</DialogTitle>
+            <DialogDescription>
+              Adicione um lançamento avulso ou registre uma transferência entre contas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={manualMode === "manual" ? "default" : "outline"}
+              onClick={() => setManualMode("manual")}
+              className="gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" /> Lançamento normal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={manualMode === "transfer" ? "default" : "outline"}
+              onClick={() => setManualMode("transfer")}
+              className="gap-1"
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Transferência entre contas
+            </Button>
+          </div>
+
+          {manualMode === "manual" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="md:col-span-2">
+                <Label className="text-xs">Fornecedor</Label>
+                <Input
+                  value={manualForm.supplier}
+                  onChange={(e) => setManualForm({ ...manualForm, supplier: e.target.value })}
+                  placeholder="Nome do fornecedor"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">CNPJ / CPF</Label>
+                <Input
+                  value={manualForm.cnpj}
+                  onChange={(e) => setManualForm({ ...manualForm, cnpj: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Nº do documento</Label>
+                <Input
+                  value={manualForm.documentNumber}
+                  onChange={(e) => setManualForm({ ...manualForm, documentNumber: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Vencimento</Label>
+                <Input
+                  type="date"
+                  value={manualForm.dueDate}
+                  onChange={(e) => setManualForm({ ...manualForm, dueDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualForm.amount}
+                  onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                  onPaste={(e) => handlePasteBRL(e, (v) => setManualForm((f) => ({ ...f, amount: v })))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Categoria</Label>
+                <Input
+                  value={manualForm.category}
+                  onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Forma de pagamento</Label>
+                <Input
+                  value={manualForm.paymentMethod}
+                  onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Conta bancária</Label>
+                <Select
+                  value={manualForm.bankAccount || "__none__"}
+                  onValueChange={(v) =>
+                    setManualForm({ ...manualForm, bankAccount: v === "__none__" ? "" : v })
+                  }
+                >
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Status</Label>
+                <Select
+                  value={manualForm.paymentStatus}
+                  onValueChange={(v) =>
+                    setManualForm({ ...manualForm, paymentStatus: v as ApPaymentStatus })
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="em_aprovacao">Em Aprovação</SelectItem>
+                    <SelectItem value="autorizado">Autorizado</SelectItem>
+                    <SelectItem value="agendado">Agendado</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Observação</Label>
+                <Textarea
+                  rows={2}
+                  value={manualForm.observation}
+                  onChange={(e) => setManualForm({ ...manualForm, observation: e.target.value })}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">De (banco origem)</Label>
+                <Select
+                  value={transferForm.fromBank}
+                  onValueChange={(v) => setTransferForm({ ...transferForm, fromBank: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Para (banco destino)</Label>
+                <Select
+                  value={transferForm.toBank}
+                  onValueChange={(v) => setTransferForm({ ...transferForm, toBank: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={transferForm.amount}
+                  onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
+                  onPaste={(e) => handlePasteBRL(e, (v) => setTransferForm((f) => ({ ...f, amount: v })))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Data de vencimento</Label>
+                <Input
+                  type="date"
+                  value={transferForm.dueDate}
+                  onChange={(e) => setTransferForm({ ...transferForm, dueDate: e.target.value })}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Observação</Label>
+                <Textarea
+                  rows={2}
+                  value={transferForm.observation}
+                  onChange={(e) => setTransferForm({ ...transferForm, observation: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={
+                createManual.isPending ||
+                createTransfer.isPending ||
+                !hotelId ||
+                !sourceSystem ||
+                (manualMode === "manual"
+                  ? !manualForm.supplier.trim() ||
+                    !manualForm.amount ||
+                    Number.isNaN(parseFloat(manualForm.amount))
+                  : transferForm.fromBank === transferForm.toBank ||
+                    !transferForm.amount ||
+                    Number.isNaN(parseFloat(transferForm.amount)))
+              }
+              onClick={async () => {
+                if (!hotelId || !sourceSystem) return;
+                try {
+                  if (manualMode === "manual") {
+                    await createManual.mutateAsync({
+                      hotelId,
+                      sourceSystem,
+                      supplier: manualForm.supplier.trim(),
+                      cnpj: manualForm.cnpj || null,
+                      documentNumber: manualForm.documentNumber || null,
+                      dueDate: manualForm.dueDate || null,
+                      amount: parseFloat(manualForm.amount),
+                      category: manualForm.category || null,
+                      paymentMethod: manualForm.paymentMethod || null,
+                      bankAccount: manualForm.bankAccount || null,
+                      paymentStatus: manualForm.paymentStatus,
+                      observation: manualForm.observation || null,
+                    });
+                    toast.success("Lançamento manual criado");
+                    setManualForm({
+                      supplier: "", cnpj: "", documentNumber: "", dueDate: "",
+                      amount: "", category: "", paymentMethod: "", bankAccount: "",
+                      paymentStatus: "em_aprovacao", observation: "",
+                    });
+                  } else {
+                    await createTransfer.mutateAsync({
+                      hotelId,
+                      sourceSystem,
+                      fromBank: transferForm.fromBank,
+                      toBank: transferForm.toBank,
+                      amount: parseFloat(transferForm.amount),
+                      dueDate: transferForm.dueDate || null,
+                      observation: transferForm.observation || null,
+                    });
+                    toast.success("Transferência registrada");
+                    setTransferForm({
+                      fromBank: "itau", toBank: "santander",
+                      amount: "", dueDate: "", observation: "",
+                    });
+                  }
+                  setManualOpen(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+                }
+              }}
+            >
+              {createManual.isPending || createTransfer.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

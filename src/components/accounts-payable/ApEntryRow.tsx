@@ -2,15 +2,16 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
 import { useState } from "react";
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, ShieldCheck, Unlink, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, Pencil, ShieldCheck, Unlink, UserPlus, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -100,6 +101,24 @@ export function ApEntryRow({
               Arquivado
             </Badge>
           )}
+          {entry.is_manual && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400"
+              title="Lançamento manual"
+            >
+              <UserPlus className="h-3 w-3" /> Manual
+            </Badge>
+          )}
+          {entry.is_transfer && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 border-slate-500/40 text-slate-700 dark:text-slate-300"
+              title={`Transferência ${entry.transfer_from_bank ?? ""} → ${entry.transfer_to_bank ?? ""}`}
+            >
+              <ArrowRightLeft className="h-3 w-3" /> Transferência
+            </Badge>
+          )}
           {entry.is_group && canManage && <UngroupButton entry={entry} />}
           {issues?.has("cnpj_divergente") && (
             <Badge
@@ -146,7 +165,12 @@ export function ApEntryRow({
 
       {/* Valor */}
       <TableCell className="text-right font-mono text-xs px-2 py-1.5">
-        <div>{fmtBRL(Number(entry.amount))}</div>
+        <div className="flex items-center justify-end gap-1">
+          <span>{fmtBRL(Number(entry.amount))}</span>
+          {canManage && Number(entry.amount) === 0.01 && !archived && (
+            <EditAmountButton entry={entry} />
+          )}
+        </div>
       </TableCell>
 
       {/* Valor Original */}
@@ -283,6 +307,69 @@ function UngroupButton({ entry }: { entry: ApEntry }) {
       <Unlink className="h-3 w-3" />
       {ungroup.isPending ? "Desagrupando..." : "Desagrupar"}
     </Button>
+  );
+}
+
+function EditAmountButton({ entry }: { entry: ApEntry }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const update = useUpdateEntryAmount();
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) setValue(""); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 text-muted-foreground"
+          title="Editar valor (lançamento OMIE com valor 0,01)"
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 space-y-2" align="end">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Corrigir valor
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          Lançamento veio do OMIE com R$ 0,01. Informe o valor correto.
+        </p>
+        <Input
+          type="number"
+          step="0.01"
+          min="0.01"
+          placeholder="0,00"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            size="sm"
+            disabled={
+              update.isPending ||
+              !value ||
+              Number.isNaN(parseFloat(value)) ||
+              parseFloat(value) <= 0
+            }
+            onClick={async () => {
+              try {
+                await update.mutateAsync({
+                  entryId: entry.id,
+                  hotelId: entry.hotel_id,
+                  amount: parseFloat(value),
+                });
+                toast.success("Valor atualizado");
+                setOpen(false);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+              }
+            }}
+          >
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
