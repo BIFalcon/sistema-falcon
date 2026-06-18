@@ -29,7 +29,7 @@ export interface ApUpload {
 export interface ApEntry {
   id: string;
   hotel_id: string;
-  upload_id: string;
+  upload_id: string | null;
   source_system: FinancialSystem;
   entry_key: string;
   supplier: string;
@@ -66,6 +66,10 @@ export interface ApEntry {
   grouped_ids?: string[] | null;
   archived_reason?: string | null;
   archived_upload_id?: string | null;
+  is_manual?: boolean | null;
+  is_transfer?: boolean | null;
+  transfer_from_bank?: string | null;
+  transfer_to_bank?: string | null;
 }
 
 export interface ApBankBalance {
