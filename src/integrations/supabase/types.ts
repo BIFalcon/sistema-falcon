@@ -241,7 +241,9 @@ export type Database = {
           interest_fees: number | null
           is_distribution: boolean
           is_group: boolean
+          is_manual: boolean
           is_pending: boolean
+          is_transfer: boolean
           lookup_key: string | null
           observation: string | null
           omie_situation: string | null
@@ -258,8 +260,10 @@ export type Database = {
           scheduled_date: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
+          transfer_from_bank: string | null
+          transfer_to_bank: string | null
           updated_at: string
-          upload_id: string
+          upload_id: string | null
         }
         Insert: {
           amount: number
@@ -285,7 +289,9 @@ export type Database = {
           interest_fees?: number | null
           is_distribution?: boolean
           is_group?: boolean
+          is_manual?: boolean
           is_pending?: boolean
+          is_transfer?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
@@ -302,8 +308,10 @@ export type Database = {
           scheduled_date?: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
+          transfer_from_bank?: string | null
+          transfer_to_bank?: string | null
           updated_at?: string
-          upload_id: string
+          upload_id?: string | null
         }
         Update: {
           amount?: number
@@ -329,7 +337,9 @@ export type Database = {
           interest_fees?: number | null
           is_distribution?: boolean
           is_group?: boolean
+          is_manual?: boolean
           is_pending?: boolean
+          is_transfer?: boolean
           lookup_key?: string | null
           observation?: string | null
           omie_situation?: string | null
@@ -346,8 +356,10 @@ export type Database = {
           scheduled_date?: string | null
           source_system?: Database["public"]["Enums"]["financial_system"]
           supplier?: string
+          transfer_from_bank?: string | null
+          transfer_to_bank?: string | null
           updated_at?: string
-          upload_id?: string
+          upload_id?: string | null
         }
         Relationships: [
           {
