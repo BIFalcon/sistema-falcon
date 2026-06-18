@@ -629,6 +629,8 @@ function DayBreakdown({
               <TableHead>Cliente</TableHead>
               <TableHead>Invoice</TableHead>
               <TableHead>Reserva</TableHead>
+              <TableHead>Nº Nota</TableHead>
+              <TableHead>Nº Boleto</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Prazo</TableHead>
               <TableHead>Vencimento estimado</TableHead>
@@ -642,8 +644,18 @@ function DayBreakdown({
               const dueFromConfirm = term != null && e.gg_confirmed_at
                 ? addDays(e.gg_confirmed_at.slice(0, 10), term)
                 : null;
-              const due = e.estimated_due_date ?? dueFromConfirm
+              // Prioriza o vencimento extraído do boleto; cai para contrato/estimativa.
+              const due = e.boleto_due_date
+                ?? e.estimated_due_date
+                ?? dueFromConfirm
                 ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
+              // Prazo: se há boleto + faturamento, calcula diretamente; senão usa contrato.
+              let prazoDias: number | null = term;
+              if (e.boleto_due_date && e.billed_at) {
+                const billed = new Date(e.billed_at.slice(0, 10) + "T00:00:00").getTime();
+                const dueT = new Date(e.boleto_due_date + "T00:00:00").getTime();
+                prazoDias = Math.round((dueT - billed) / (1000 * 60 * 60 * 24));
+              }
               const isEditing = editingId === e.id;
               const dPending = e.gg_status === "pendente" ? (daysSinceUpload?.(e.upload_id) ?? null) : null;
               const pendingBadge = dPending == null ? null
@@ -660,9 +672,13 @@ function DayBreakdown({
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.nota_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.boleto_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
-                    {term != null ? `${term} dias` : <span className="text-muted-foreground">sem contrato</span>}
+                    {prazoDias != null
+                      ? `${prazoDias} dias`
+                      : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-xs">
                     {due ? (
