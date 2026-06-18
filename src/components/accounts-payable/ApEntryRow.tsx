@@ -74,6 +74,8 @@ export function ApEntryRow({
       ? "bg-violet-500/10 dark:bg-violet-500/10"
       : "";
 
+  const canEditPaidValues = !archived && (Number(entry.amount) === 0.01 || !!entry.is_manual);
+
   return (
     <TableRow
       className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
@@ -185,7 +187,7 @@ export function ApEntryRow({
         <TableCell className="text-right font-mono text-xs hidden lg:table-cell px-2 py-1.5">
           <div className="flex items-center justify-end gap-1">
             <span>{entry.paid_amount != null ? fmtBRL(Number(entry.paid_amount)) : "—"}</span>
-            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_amount" />}
+            {canManage && canEditPaidValues && <EditPaidValuesButton entry={entry} field="paid_amount" />}
           </div>
         </TableCell>
       )}
@@ -207,7 +209,7 @@ export function ApEntryRow({
             ) : (
               <span>—</span>
             )}
-            {canManage && !archived && <EditPaidValuesButton entry={entry} field="paid_interest" />}
+            {canManage && canEditPaidValues && <EditPaidValuesButton entry={entry} field="paid_interest" />}
           </div>
         </TableCell>
       )}
