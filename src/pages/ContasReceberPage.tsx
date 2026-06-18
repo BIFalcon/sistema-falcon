@@ -605,6 +605,7 @@ function DayBreakdown({
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
   const setStatus = useSetToInvoiceGgStatus();
+  const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
