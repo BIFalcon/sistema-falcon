@@ -1080,6 +1080,16 @@ export default function ContasPagarPage() {
                   )}
                   Importar Relatório
                 </Button>
+                {canManage && hotelId && sourceSystem && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => { setManualMode("manual"); setManualOpen(true); }}
+                  >
+                    <Plus className="h-4 w-4" /> Lançamento manual
+                  </Button>
+                )}
               </div>
             </div>
 
