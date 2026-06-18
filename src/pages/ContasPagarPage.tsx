@@ -189,6 +189,34 @@ export default function ContasPagarPage() {
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
 
+  // Lançamento manual / Transferência (item 4)
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualMode, setManualMode] = useState<"manual" | "transfer">("manual");
+  const [manualForm, setManualForm] = useState({
+    supplier: "",
+    cnpj: "",
+    documentNumber: "",
+    dueDate: "",
+    amount: "",
+    category: "",
+    paymentMethod: "",
+    bankAccount: "",
+    paymentStatus: "em_aprovacao" as ApPaymentStatus,
+    observation: "",
+  });
+  const [transferForm, setTransferForm] = useState({
+    fromBank: "itau",
+    toBank: "santander",
+    amount: "",
+    dueDate: "",
+    observation: "",
+  });
+  const createManual = useCreateManualEntry();
+  const createTransfer = useCreateTransferEntry();
+
+  // Saldo bancário — collapse/expand (item 2)
+  const [balanceExpanded, setBalanceExpanded] = useState(false);
+
   // Toggle "Ver pagos" (Bloco 7)
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
