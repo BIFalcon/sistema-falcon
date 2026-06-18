@@ -139,6 +139,7 @@ function exportToInvoiceToExcel(
   const rows = entries.map((e) => {
     const term = findContractTerm(contracts, e.account_number, e.account_name);
     const estimated =
+      e.boleto_due_date ??
       e.estimated_due_date ??
       (e.gg_confirmed_at && term != null
         ? addDays(e.gg_confirmed_at.slice(0, 10), term)
@@ -150,6 +151,8 @@ function exportToInvoiceToExcel(
     return {
       "Hotel": hotelName(e.hotel_id),
       "Hóspede": e.account_name ?? "",
+      "Nº Nota": e.nota_number ?? "",
+      "Nº Boleto": e.boleto_number ?? "",
       "Valor": Number(e.amount ?? 0),
       "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
       "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
@@ -164,8 +167,9 @@ function exportToInvoiceToExcel(
   });
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 28 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
-    { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 18 }, { wch: 14 },
+    { wch: 28 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
+    { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 40 },
+    { wch: 18 }, { wch: 14 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
