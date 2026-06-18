@@ -2111,6 +2111,259 @@ export default function ContasPagarPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de lançamento manual / transferência */}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Novo lançamento manual</DialogTitle>
+            <DialogDescription>
+              Adicione um lançamento avulso ou registre uma transferência entre contas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={manualMode === "manual" ? "default" : "outline"}
+              onClick={() => setManualMode("manual")}
+              className="gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" /> Lançamento normal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={manualMode === "transfer" ? "default" : "outline"}
+              onClick={() => setManualMode("transfer")}
+              className="gap-1"
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Transferência entre contas
+            </Button>
+          </div>
+
+          {manualMode === "manual" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="md:col-span-2">
+                <Label className="text-xs">Fornecedor</Label>
+                <Input
+                  value={manualForm.supplier}
+                  onChange={(e) => setManualForm({ ...manualForm, supplier: e.target.value })}
+                  placeholder="Nome do fornecedor"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">CNPJ / CPF</Label>
+                <Input
+                  value={manualForm.cnpj}
+                  onChange={(e) => setManualForm({ ...manualForm, cnpj: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Nº do documento</Label>
+                <Input
+                  value={manualForm.documentNumber}
+                  onChange={(e) => setManualForm({ ...manualForm, documentNumber: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Vencimento</Label>
+                <Input
+                  type="date"
+                  value={manualForm.dueDate}
+                  onChange={(e) => setManualForm({ ...manualForm, dueDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualForm.amount}
+                  onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                  onPaste={(e) => handlePasteBRL(e, (v) => setManualForm((f) => ({ ...f, amount: v })))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Categoria</Label>
+                <Input
+                  value={manualForm.category}
+                  onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Forma de pagamento</Label>
+                <Input
+                  value={manualForm.paymentMethod}
+                  onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Conta bancária</Label>
+                <Select
+                  value={manualForm.bankAccount || "__none__"}
+                  onValueChange={(v) =>
+                    setManualForm({ ...manualForm, bankAccount: v === "__none__" ? "" : v })
+                  }
+                >
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Status</Label>
+                <Select
+                  value={manualForm.paymentStatus}
+                  onValueChange={(v) =>
+                    setManualForm({ ...manualForm, paymentStatus: v as ApPaymentStatus })
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="em_aprovacao">Em Aprovação</SelectItem>
+                    <SelectItem value="autorizado">Autorizado</SelectItem>
+                    <SelectItem value="agendado">Agendado</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Observação</Label>
+                <Textarea
+                  rows={2}
+                  value={manualForm.observation}
+                  onChange={(e) => setManualForm({ ...manualForm, observation: e.target.value })}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">De (banco origem)</Label>
+                <Select
+                  value={transferForm.fromBank}
+                  onValueChange={(v) => setTransferForm({ ...transferForm, fromBank: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Para (banco destino)</Label>
+                <Select
+                  value={transferForm.toBank}
+                  onValueChange={(v) => setTransferForm({ ...transferForm, toBank: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="itau">Itaú</SelectItem>
+                    <SelectItem value="santander">Santander</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={transferForm.amount}
+                  onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
+                  onPaste={(e) => handlePasteBRL(e, (v) => setTransferForm((f) => ({ ...f, amount: v })))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Data de vencimento</Label>
+                <Input
+                  type="date"
+                  value={transferForm.dueDate}
+                  onChange={(e) => setTransferForm({ ...transferForm, dueDate: e.target.value })}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Observação</Label>
+                <Textarea
+                  rows={2}
+                  value={transferForm.observation}
+                  onChange={(e) => setTransferForm({ ...transferForm, observation: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={
+                createManual.isPending ||
+                createTransfer.isPending ||
+                !hotelId ||
+                !sourceSystem ||
+                (manualMode === "manual"
+                  ? !manualForm.supplier.trim() ||
+                    !manualForm.amount ||
+                    Number.isNaN(parseFloat(manualForm.amount))
+                  : transferForm.fromBank === transferForm.toBank ||
+                    !transferForm.amount ||
+                    Number.isNaN(parseFloat(transferForm.amount)))
+              }
+              onClick={async () => {
+                if (!hotelId || !sourceSystem) return;
+                try {
+                  if (manualMode === "manual") {
+                    await createManual.mutateAsync({
+                      hotelId,
+                      sourceSystem,
+                      supplier: manualForm.supplier.trim(),
+                      cnpj: manualForm.cnpj || null,
+                      documentNumber: manualForm.documentNumber || null,
+                      dueDate: manualForm.dueDate || null,
+                      amount: parseFloat(manualForm.amount),
+                      category: manualForm.category || null,
+                      paymentMethod: manualForm.paymentMethod || null,
+                      bankAccount: manualForm.bankAccount || null,
+                      paymentStatus: manualForm.paymentStatus,
+                      observation: manualForm.observation || null,
+                    });
+                    toast.success("Lançamento manual criado");
+                    setManualForm({
+                      supplier: "", cnpj: "", documentNumber: "", dueDate: "",
+                      amount: "", category: "", paymentMethod: "", bankAccount: "",
+                      paymentStatus: "em_aprovacao", observation: "",
+                    });
+                  } else {
+                    await createTransfer.mutateAsync({
+                      hotelId,
+                      sourceSystem,
+                      fromBank: transferForm.fromBank,
+                      toBank: transferForm.toBank,
+                      amount: parseFloat(transferForm.amount),
+                      dueDate: transferForm.dueDate || null,
+                      observation: transferForm.observation || null,
+                    });
+                    toast.success("Transferência registrada");
+                    setTransferForm({
+                      fromBank: "itau", toBank: "santander",
+                      amount: "", dueDate: "", observation: "",
+                    });
+                  }
+                  setManualOpen(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+                }
+              }}
+            >
+              {createManual.isPending || createTransfer.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
