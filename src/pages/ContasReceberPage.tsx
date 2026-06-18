@@ -832,7 +832,7 @@ function DayBreakdown({
       <InvoiceUploadDialog
         entry={invoiceFor?.entry ?? null}
         onClose={() => setInvoiceFor(null)}
-        onConfirm={async (file1Url, file2Url) => {
+        onConfirm={async (notaPath, boletoPath) => {
           if (!invoiceFor) return;
           const term = invoiceFor.term;
           const estimated = term != null
@@ -843,10 +843,25 @@ function DayBreakdown({
             gg_status: "faturado",
             gg_note: invoiceFor.entry.gg_note,
             estimated_due_date: estimated,
-            invoice_file_1: file1Url,
-            invoice_file_2: file2Url,
+            invoice_file_1: notaPath,
+            invoice_file_2: boletoPath,
             billed_at: new Date().toISOString(),
           });
+          // Extrai número da nota, número do boleto e vencimento (em background)
+          if (notaPath || boletoPath) {
+            supabase.functions
+              .invoke("extract-ar-document", {
+                body: {
+                  entry_id: invoiceFor.entry.id,
+                  nota_path: notaPath,
+                  boleto_path: boletoPath,
+                },
+              })
+              .then(({ error }) => {
+                if (error) console.error("extract-ar-document", error);
+                qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+              });
+          }
           setInvoiceFor(null);
           toast.success("Marcado como faturado");
         }}
