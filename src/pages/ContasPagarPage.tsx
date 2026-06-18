@@ -404,8 +404,9 @@ export default function ContasPagarPage() {
     };
     for (const e of entries) if (selectedIds.has(e.id)) sum += effective(e);
     for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += effective(e);
+    for (const e of salaryEntries) if (selectedIds.has(e.id)) sum += effective(e);
     return sum;
-  }, [selectedIds, entries, distributionEntries]);
+  }, [selectedIds, entries, distributionEntries, salaryEntries]);
 
   // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
   const selectionHasOverdue = useMemo(() => {
