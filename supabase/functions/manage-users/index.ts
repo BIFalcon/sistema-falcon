@@ -13,6 +13,13 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SENDER_DOMAIN = "notify.falconhoteis.com.br";
 const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
 
+const DEFAULT_APP_BASE_URL = "https://sistema-falcon.lovable.app";
+function getAppBaseUrl(): string {
+  const v = Deno.env.get("APP_BASE_URL");
+  if (v && /^https:\/\//i.test(v)) return v.replace(/\/$/, "");
+  return DEFAULT_APP_BASE_URL;
+}
+
 async function getUnsubscribeToken(
   admin: ReturnType<typeof createClient>,
   email: string,
@@ -219,7 +226,7 @@ Deno.serve(async (req) => {
           .eq("email", payload.email)
           .maybeSingle();
         if (prof?.email && prof.status !== "banned") {
-          const origin = req.headers.get("origin") ?? "";
+          const origin = getAppBaseUrl();
           const actionLink = await createPasswordSetupLink(admin, {
             userId: prof.user_id,
             email: prof.email,
@@ -277,7 +284,7 @@ Deno.serve(async (req) => {
           return json({ error: "only_processos_can_create_master" }, 403);
         }
 
-        const origin = req.headers.get("origin") ?? "";
+        const origin = getAppBaseUrl();
 
         // 1) Verifica se o usuário já existe.
         const { data: existingProfile } = await admin
@@ -524,7 +531,7 @@ Deno.serve(async (req) => {
         const actionLink = await createPasswordSetupLink(admin, {
           userId: payload.user_id,
           email: prof.email,
-          origin: req.headers.get("origin") ?? "",
+          origin: getAppBaseUrl(),
         });
 
         if (actionLink) {
