@@ -929,21 +929,21 @@ function InvoiceUploadDialog({
 }: {
   entry: ToInvoiceEntry | null;
   onClose: () => void;
-  onConfirm: (file1Url: string, file2Url: string | null) => Promise<void>;
+  onConfirm: (notaPath: string | null, boletoPath: string | null) => Promise<void>;
 }) {
-  const [file1Url, setFile1Url] = useState<string | null>(null);
-  const [file2Url, setFile2Url] = useState<string | null>(null);
-  const [uploading1, setUploading1] = useState(false);
-  const [uploading2, setUploading2] = useState(false);
+  const [notaPath, setNotaPath] = useState<string | null>(null);
+  const [boletoPath, setBoletoPath] = useState<string | null>(null);
+  const [uploadingNota, setUploadingNota] = useState(false);
+  const [uploadingBoleto, setUploadingBoleto] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (entry) {
-      setFile1Url(entry.invoice_file_1 ?? null);
-      setFile2Url(entry.invoice_file_2 ?? null);
+      setNotaPath(entry.invoice_file_1 ?? null);
+      setBoletoPath(entry.invoice_file_2 ?? null);
     } else {
-      setFile1Url(null);
-      setFile2Url(null);
+      setNotaPath(null);
+      setBoletoPath(null);
     }
   }, [entry]);
 
@@ -963,20 +963,20 @@ function InvoiceUploadDialog({
     window.open(data.signedUrl, "_blank", "noopener");
   }
 
-  async function handleUpload(file: File, slot: 1 | 2) {
+  async function handleUpload(file: File, kind: "nota" | "boleto") {
     if (!entry) return;
-    const setLoading = slot === 1 ? setUploading1 : setUploading2;
+    const setLoading = kind === "nota" ? setUploadingNota : setUploadingBoleto;
     setLoading(true);
     try {
       const ext = file.name.split(".").pop() ?? "bin";
-      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/${Date.now()}-${slot}.${ext}`;
+      const path = `${entry.hotel_id ?? "unknown"}/${entry.id}/${Date.now()}-${kind}.${ext}`;
       const { error } = await supabase.storage
         .from("invoices")
         .upload(path, file, { upsert: true, contentType: file.type });
       if (error) throw error;
-      if (slot === 1) setFile1Url(path);
-      else setFile2Url(path);
-      toast.success(`Arquivo ${slot} enviado`);
+      if (kind === "nota") setNotaPath(path);
+      else setBoletoPath(path);
+      toast.success(kind === "nota" ? "Nota enviada" : "Boleto enviado");
     } catch (err) {
       toast.error(`Falha ao enviar arquivo: ${(err as Error).message}`);
     } finally {
@@ -995,61 +995,62 @@ function InvoiceUploadDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label className="text-xs">
-              Nota Fiscal / Boleto <span className="text-destructive">*</span>
-            </Label>
+            <Label className="text-xs">Nota Fiscal (opcional)</Label>
             <Input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              disabled={uploading1}
+              disabled={uploadingNota}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleUpload(f, 1);
+                if (f) handleUpload(f, "nota");
               }}
             />
-            {file1Url && (
+            {notaPath && (
               <button
                 type="button"
-                onClick={() => openStoredFile(file1Url)}
+                onClick={() => openStoredFile(notaPath)}
                 className="text-[11px] text-primary underline truncate block text-left"
               >
-                Arquivo 1 enviado ✓
+                Nota enviada ✓
               </button>
             )}
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Arquivo adicional (opcional)</Label>
+            <Label className="text-xs">Boleto (opcional)</Label>
             <Input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              disabled={uploading2}
+              disabled={uploadingBoleto}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleUpload(f, 2);
+                if (f) handleUpload(f, "boleto");
               }}
             />
-            {file2Url && (
+            {boletoPath && (
               <button
                 type="button"
-                onClick={() => openStoredFile(file2Url)}
+                onClick={() => openStoredFile(boletoPath)}
                 className="text-[11px] text-primary underline truncate block text-left"
               >
-                Arquivo 2 enviado ✓
+                Boleto enviado ✓
               </button>
             )}
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            O sistema lê automaticamente o número da nota, o número do boleto e a data de vencimento.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
           <Button
-            disabled={!file1Url || uploading1 || uploading2 || saving}
+            disabled={(!notaPath && !boletoPath) || uploadingNota || uploadingBoleto || saving}
             onClick={async () => {
-              if (!file1Url) return;
+              if (!notaPath && !boletoPath) return;
               setSaving(true);
               try {
-                await onConfirm(file1Url, file2Url);
+                await onConfirm(notaPath, boletoPath);
               } finally {
                 setSaving(false);
               }
