@@ -1372,7 +1372,7 @@ function SendDocsDialog({
         <div className="space-y-3">
           {([1, 2, 3] as const).map((slot) => {
             const cur = slot === 1 ? file1 : slot === 2 ? file2 : proof;
-            const label = slot === 1 ? "NF / Boleto 1" : slot === 2 ? "NF / Boleto 2 (opcional)" : "Comprovante de envio";
+            const label = slot === 1 ? "Nota Fiscal (opcional)" : slot === 2 ? "Boleto (opcional)" : "Comprovante de envio";
             return (
               <div key={slot} className="space-y-1">
                 <Label className="text-xs">{label}</Label>
