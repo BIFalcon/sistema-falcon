@@ -16,7 +16,7 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -71,6 +71,8 @@ import {
   useDeleteCardReceivable,
   useUpdateEntryCategory,
   useGroupEntries,
+  useCreateManualEntry,
+  useCreateTransferEntry,
   type ApEntry,
   type ApPaymentStatus,
   type FinancialSystem,
