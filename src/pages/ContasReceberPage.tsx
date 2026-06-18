@@ -58,7 +58,7 @@ import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 function ymKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
