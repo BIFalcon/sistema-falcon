@@ -925,6 +925,121 @@ export function useUpdateEntryCategory() {
   });
 }
 
+// ── Edição de valor (apenas lançamentos OMIE com valor 0,01) ─────────────
+export function useUpdateEntryAmount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entryId: string; hotelId: string; amount: number }) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({ amount: input.amount, original_amount: input.amount } as never)
+        .eq("id", input.entryId)
+        .eq("amount", 0.01); // garantia server-side: só edita se ainda valer 0,01
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+// ── Lançamento manual (item 4) ──────────────────────────────────────────
+export interface ManualEntryInput {
+  hotelId: string;
+  sourceSystem: FinancialSystem;
+  supplier: string;
+  cnpj?: string | null;
+  documentNumber?: string | null;
+  description?: string | null;
+  dueDate?: string | null;
+  amount: number;
+  category?: string | null;
+  paymentMethod?: string | null;
+  bankAccount?: string | null;
+  paymentStatus?: ApPaymentStatus;
+  observation?: string | null;
+}
+
+export interface TransferEntryInput {
+  hotelId: string;
+  sourceSystem: FinancialSystem;
+  fromBank: string;
+  toBank: string;
+  amount: number;
+  dueDate?: string | null;
+  observation?: string | null;
+}
+
+export function useCreateManualEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ManualEntryInput) => {
+      const entryKey = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const { error } = await supabase
+        .from("ap_entries")
+        .insert({
+          hotel_id: input.hotelId,
+          upload_id: null,
+          source_system: input.sourceSystem,
+          entry_key: entryKey,
+          supplier: input.supplier,
+          cnpj: input.cnpj ?? null,
+          document_number: input.documentNumber ?? null,
+          description: input.description ?? null,
+          due_date: input.dueDate ?? null,
+          amount: input.amount,
+          category: input.category ?? null,
+          payment_method: input.paymentMethod ?? null,
+          bank_account: input.bankAccount ?? null,
+          payment_status: input.paymentStatus ?? "em_aprovacao",
+          observation: input.observation ?? null,
+          gg_approval: "approved",
+          is_manual: true,
+        } as never);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+export function useCreateTransferEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: TransferEntryInput) => {
+      const entryKey = `transfer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const supplier = `Transferência ${input.fromBank} → ${input.toBank}`;
+      const { error } = await supabase
+        .from("ap_entries")
+        .insert({
+          hotel_id: input.hotelId,
+          upload_id: null,
+          source_system: input.sourceSystem,
+          entry_key: entryKey,
+          supplier,
+          due_date: input.dueDate ?? null,
+          amount: input.amount,
+          bank_account: input.fromBank,
+          transfer_from_bank: input.fromBank,
+          transfer_to_bank: input.toBank,
+          payment_status: "em_aprovacao",
+          observation: input.observation ?? null,
+          gg_approval: "approved",
+          is_transfer: true,
+          category: "Transferência entre contas",
+        } as never);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
 /**
  * Agrupa múltiplos lançamentos em um único novo lançamento com categoria personalizada.
  * - Cria um novo `ap_entries` com is_group = true, grouped_ids = [ids], soma dos valores
