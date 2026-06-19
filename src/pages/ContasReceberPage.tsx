@@ -369,7 +369,9 @@ function ToInvoiceSection({
       arr = arr.filter(
         (e) =>
           e.account_name?.toLowerCase().includes(q) ||
-          e.account_number?.toLowerCase().includes(q),
+          e.account_number?.toLowerCase().includes(q) ||
+          e.confirmation_number?.toLowerCase().includes(q) ||
+          e.invoice_number?.toLowerCase().includes(q),
       );
     }
     return arr;
