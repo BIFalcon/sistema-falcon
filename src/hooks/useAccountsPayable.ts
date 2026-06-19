@@ -1036,6 +1036,7 @@ export function useUpdateManualEntry() {
           bank_account: input.bankAccount ?? null,
           payment_status: input.paymentStatus ?? "em_aprovacao",
           observation: input.observation ?? null,
+          is_distribution: detectIsDistribution(input.category, input.description),
         } as never)
         .eq("id", input.entryId)
         .eq("is_manual", true);
@@ -1083,6 +1084,7 @@ export function useCreateManualEntry() {
           observation: input.observation ?? null,
           gg_approval: "approved",
           is_manual: true,
+          is_distribution: detectIsDistribution(input.category, input.description),
         } as never);
       if (error) throw error;
     },
