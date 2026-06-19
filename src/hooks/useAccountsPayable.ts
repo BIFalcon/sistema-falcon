@@ -1000,6 +1000,54 @@ export interface ManualEntryInput {
   observation?: string | null;
 }
 
+// ── Edição completa de lançamento MANUAL ─────────────────────────────────
+export interface UpdateManualEntryInput {
+  entryId: string;
+  hotelId: string;
+  supplier: string;
+  cnpj?: string | null;
+  documentNumber?: string | null;
+  description?: string | null;
+  dueDate?: string | null;
+  amount: number;
+  category?: string | null;
+  paymentMethod?: string | null;
+  bankAccount?: string | null;
+  paymentStatus?: ApPaymentStatus;
+  observation?: string | null;
+}
+
+export function useUpdateManualEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateManualEntryInput) => {
+      const { error } = await supabase
+        .from("ap_entries")
+        .update({
+          supplier: input.supplier,
+          cnpj: input.cnpj ?? null,
+          document_number: input.documentNumber ?? null,
+          description: input.description ?? null,
+          due_date: input.dueDate ?? null,
+          amount: input.amount,
+          original_amount: input.amount,
+          category: input.category ?? null,
+          payment_method: input.paymentMethod ?? null,
+          bank_account: input.bankAccount ?? null,
+          payment_status: input.paymentStatus ?? "em_aprovacao",
+          observation: input.observation ?? null,
+        } as never)
+        .eq("id", input.entryId)
+        .eq("is_manual", true);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
 export interface TransferEntryInput {
   hotelId: string;
   sourceSystem: FinancialSystem;
