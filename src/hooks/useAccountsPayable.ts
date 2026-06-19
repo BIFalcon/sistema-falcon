@@ -1018,6 +1018,17 @@ export interface UpdateManualEntryInput {
 }
 
 export function useUpdateManualEntry() {
+  return useUpdateManualEntryImpl();
+}
+
+function detectIsDistribution(category?: string | null, description?: string | null): boolean {
+  const toAscii = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
+  return blob.includes("distribuicao de lucros");
+}
+
+function useUpdateManualEntryImpl() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: UpdateManualEntryInput) => {
