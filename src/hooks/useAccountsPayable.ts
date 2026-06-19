@@ -1018,6 +1018,17 @@ export interface UpdateManualEntryInput {
 }
 
 export function useUpdateManualEntry() {
+  return useUpdateManualEntryImpl();
+}
+
+function detectIsDistribution(category?: string | null, description?: string | null): boolean {
+  const toAscii = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const blob = `${toAscii(category ?? "")} ${toAscii(description ?? "")}`;
+  return blob.includes("distribuicao de lucros");
+}
+
+function useUpdateManualEntryImpl() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: UpdateManualEntryInput) => {
@@ -1036,6 +1047,7 @@ export function useUpdateManualEntry() {
           bank_account: input.bankAccount ?? null,
           payment_status: input.paymentStatus ?? "em_aprovacao",
           observation: input.observation ?? null,
+          is_distribution: detectIsDistribution(input.category, input.description),
         } as never)
         .eq("id", input.entryId)
         .eq("is_manual", true);
@@ -1083,6 +1095,7 @@ export function useCreateManualEntry() {
           observation: input.observation ?? null,
           gg_approval: "approved",
           is_manual: true,
+          is_distribution: detectIsDistribution(input.category, input.description),
         } as never);
       if (error) throw error;
     },
