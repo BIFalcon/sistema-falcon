@@ -195,6 +195,8 @@ export default function ContasPagarPage() {
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
+  const [paidConfirmOpen, setPaidConfirmOpen] = useState(false);
+  const [paidDate, setPaidDate] = useState("");
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
