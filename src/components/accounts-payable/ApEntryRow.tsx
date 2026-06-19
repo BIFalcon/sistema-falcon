@@ -10,8 +10,11 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, useUpdateManualEntry, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -104,13 +107,16 @@ export function ApEntryRow({
             </Badge>
           )}
           {entry.is_manual && (
-            <Badge
-              variant="outline"
-              className="text-[10px] gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400"
-              title="Lançamento manual"
-            >
-              <UserPlus className="h-3 w-3" /> Manual
-            </Badge>
+            <>
+              <Badge
+                variant="outline"
+                className="text-[10px] gap-1 border-sky-500/40 text-sky-700 dark:text-sky-400"
+                title="Lançamento manual"
+              >
+                <UserPlus className="h-3 w-3" /> Manual
+              </Badge>
+              {canManage && !archived && <EditManualEntryButton entry={entry} />}
+            </>
           )}
           {entry.is_transfer && (
             <Badge
