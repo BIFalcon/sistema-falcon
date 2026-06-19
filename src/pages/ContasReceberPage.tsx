@@ -610,6 +610,16 @@ function DayBreakdown({
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
+  // Matriz (Master, Controladoria, GOP, Patronos) precisa conseguir VER os
+  // documentos enviados pelos adms/GGs mesmo quando não tem permissão de ação.
+  const canViewDocs =
+    isMaster ||
+    hasRole("controladoria") ||
+    hasRole("patronos") ||
+    hasRole("gop") ||
+    hasRole("financeiro") ||
+    hasRole("adm") ||
+    hasRole("gg");
   const setStatus = useSetToInvoiceGgStatus();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
