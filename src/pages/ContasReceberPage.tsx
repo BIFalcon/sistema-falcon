@@ -620,6 +620,21 @@ function DayBreakdown({
     hasRole("financeiro") ||
     hasRole("adm") ||
     hasRole("gg");
+
+  async function openInvoiceStoredFile(value: string) {
+    if (/^https?:\/\//i.test(value)) {
+      window.open(value, "_blank", "noopener");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("invoices")
+      .createSignedUrl(value, 60 * 10);
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir o arquivo");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
+  }
   const setStatus = useSetToInvoiceGgStatus();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
