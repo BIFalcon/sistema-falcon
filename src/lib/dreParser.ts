@@ -821,7 +821,11 @@ function findMonthColumn(
     const months = new Set<number>();
     for (let c = 0; c < width; c++) {
       for (const cell of [row[c], displayRow[c]]) {
-        const date = parseHeaderDate(cell);
+        // Não aceita números puros como datas (Excel serial) na detecção do
+        // cabeçalho — isso faz qualquer valor monetário entre 20.000 e
+        // 80.000 (ex.: R$ 75.257,05) virar "Janeiro de 2106" e contaminar
+        // o mapeamento de colunas (bug clássico em ANO ANTERIOR).
+        const date = typeof cell === "number" ? null : parseHeaderDate(cell);
         if (date?.month) { months.add(date.month); continue; }
         if (typeof cell !== "string") continue;
         const norm = cell.trim().toLowerCase();
@@ -844,7 +848,7 @@ function findMonthColumn(
       const cells = [row[c], displayRow[c]];
       for (const cell of cells) {
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
-        const date = parseHeaderDate(cell);
+        const date = typeof cell === "number" ? null : parseHeaderDate(cell);
         if (date?.month === targetMonth) {
           const best = bestMonthValueColumn(rows, displayRows, r, c);
           candidates.push({ headerRow: r, colIndex: best.colIndex, label, year: date.year, dataCount: best.dataCount });
