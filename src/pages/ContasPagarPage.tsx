@@ -195,6 +195,8 @@ export default function ContasPagarPage() {
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
+  const [paidConfirmOpen, setPaidConfirmOpen] = useState(false);
+  const [paidDate, setPaidDate] = useState("");
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCategoryName, setGroupCategoryName] = useState("");
   const groupEntries = useGroupEntries();
@@ -478,12 +480,20 @@ export default function ContasPagarPage() {
       setSchedulingOpen(true);
       return;
     }
+    // Pago → abre modal pedindo a data efetiva de pagamento (default = hoje).
+    if (newStatus === "pago") {
+      const today = new Date();
+      const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      setPaidDate(iso);
+      setPaidConfirmOpen(true);
+      return;
+    }
     await executeStatusChange(newStatus);
   }
 
   async function executeStatusChange(
     newStatus: ApPaymentStatus,
-    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number },
+    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number; paidDate?: string },
   ) {
     if (!hotelId) return;
     const ids = Array.from(selectedIds);
@@ -503,6 +513,7 @@ export default function ContasPagarPage() {
         scheduledDate: extra?.scheduledDate ?? null,
         paidInterest: extra?.paidInterest ?? null,
         paidAmount: extra?.paidAmount ?? null,
+        paidDate: extra?.paidDate ?? undefined,
       });
       setSelectedIds(new Set());
       toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
@@ -2053,6 +2064,47 @@ export default function ContasPagarPage() {
               }}
             >
               Confirmar agendamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de confirmação de pagamento — pede data efetiva */}
+      <AlertDialog open={paidConfirmOpen} onOpenChange={setPaidConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe a data em que o pagamento foi efetivamente realizado.
+              Já vem preenchida com a data de hoje — ajuste se necessário.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Data de pagamento
+              </label>
+              <Input
+                type="date"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {selectedIds.size} lançamento(s) — total{" "}
+                <strong>{fmtBRL(selectedTotal)}</strong>
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!paidDate}
+              onClick={() => {
+                setPaidConfirmOpen(false);
+                executeStatusChange("pago", { paidDate });
+              }}
+            >
+              Confirmar pagamento
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
