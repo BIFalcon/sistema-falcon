@@ -397,10 +397,10 @@ function ToInvoiceSection({
           </div>
           <div className="flex items-center gap-2">
             <Input
-              placeholder="Buscar por nome do cliente..."
+              placeholder="Buscar por cliente, nº reserva ou invoice..."
               value={clientSearch}
               onChange={(e) => setClientSearch(e.target.value)}
-              className="w-56 h-9"
+              className="w-72 h-9"
             />
             <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as typeof faturamentoFilter)}>
               <SelectTrigger className="w-36 h-9">
