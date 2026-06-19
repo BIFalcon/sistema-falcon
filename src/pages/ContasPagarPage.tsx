@@ -480,12 +480,20 @@ export default function ContasPagarPage() {
       setSchedulingOpen(true);
       return;
     }
+    // Pago → abre modal pedindo a data efetiva de pagamento (default = hoje).
+    if (newStatus === "pago") {
+      const today = new Date();
+      const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      setPaidDate(iso);
+      setPaidConfirmOpen(true);
+      return;
+    }
     await executeStatusChange(newStatus);
   }
 
   async function executeStatusChange(
     newStatus: ApPaymentStatus,
-    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number },
+    extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number; paidDate?: string },
   ) {
     if (!hotelId) return;
     const ids = Array.from(selectedIds);
@@ -505,6 +513,7 @@ export default function ContasPagarPage() {
         scheduledDate: extra?.scheduledDate ?? null,
         paidInterest: extra?.paidInterest ?? null,
         paidAmount: extra?.paidAmount ?? null,
+        paidDate: extra?.paidDate ?? undefined,
       });
       setSelectedIds(new Set());
       toast.success(`${ids.length} lançamento(s) marcados como ${labelForStatus(newStatus)}`, {
