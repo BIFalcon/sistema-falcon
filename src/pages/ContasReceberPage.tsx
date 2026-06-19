@@ -730,6 +730,40 @@ function DayBreakdown({
                         Não pago: "{e.paid_note}"
                       </div>
                     )}
+                    {canViewDocs && (e.invoice_file_1 || e.invoice_file_2 || e.proof_file) && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {e.invoice_file_1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.invoice_file_1!)}
+                          >
+                            Ver nota
+                          </Button>
+                        )}
+                        {e.invoice_file_2 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.invoice_file_2!)}
+                          >
+                            Ver boleto
+                          </Button>
+                        )}
+                        {e.proof_file && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.proof_file!)}
+                          >
+                            Ver comprovante
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
                         {canConfirm && (
