@@ -628,12 +628,22 @@ export function useSetEntryPaymentStatus() {
       scheduledDate?: string | null;
       paidInterest?: number | null;
       paidAmount?: number | null;
+      paidDate?: string | null;
     }) => {
       if (input.entryIds.length === 0) return 0;
       const update: Record<string, unknown> = { payment_status: input.status };
       if (input.scheduledDate !== undefined) update.scheduled_date = input.scheduledDate;
       if (input.paidInterest !== undefined) update.paid_interest = input.paidInterest;
       if (input.paidAmount !== undefined) update.paid_amount = input.paidAmount;
+      // Data efetiva de pagamento informada pela coordenadora financeira.
+      // Recebe "YYYY-MM-DD" e grava como timestamp ao meio-dia UTC para evitar
+      // problemas de fuso. Se nulo explicitamente, limpa o campo (o trigger
+      // do banco repreenche para now() apenas quando o valor é NULL).
+      if (input.paidDate !== undefined) {
+        update.payment_paid_at = input.paidDate
+          ? new Date(`${input.paidDate}T12:00:00Z`).toISOString()
+          : null;
+      }
       // Item 1: ao alterar status (exceto para "pendente"), limpa o flag is_pending.
       // O flag só persiste enquanto o status do lançamento não mudar manualmente.
       update.is_pending = false;
