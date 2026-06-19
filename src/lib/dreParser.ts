@@ -751,7 +751,9 @@ function countNumericColumnData(rows: unknown[][], headerRow: number, colIndex: 
 }
 
 function isAggregateOrMonthHeaderCell(cell: unknown): "aggregate" | "month" | null {
-  const date = parseHeaderDate(cell);
+  // Mesma proteção: números puros não podem ser interpretados como datas
+  // (evita que valores monetários sejam confundidos com colunas de mês).
+  const date = typeof cell === "number" ? null : parseHeaderDate(cell);
   if (date?.month) return "month";
   if (typeof cell !== "string") return null;
   const norm = cell.trim().toLowerCase();
@@ -949,7 +951,7 @@ function findAllMonthColumns(rows: unknown[][]): Map<number, number> {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
-      const date = parseHeaderDate(cell);
+      const date = typeof cell === "number" ? null : parseHeaderDate(cell);
       if (date?.month && date.month >= 1 && date.month <= 12 && !result.has(date.month)) {
         result.set(date.month, c);
         continue;
