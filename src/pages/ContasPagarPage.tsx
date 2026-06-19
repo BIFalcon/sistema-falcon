@@ -2069,6 +2069,47 @@ export default function ContasPagarPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Modal de confirmação de pagamento — pede data efetiva */}
+      <AlertDialog open={paidConfirmOpen} onOpenChange={setPaidConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe a data em que o pagamento foi efetivamente realizado.
+              Já vem preenchida com a data de hoje — ajuste se necessário.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Data de pagamento
+              </label>
+              <Input
+                type="date"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {selectedIds.size} lançamento(s) — total{" "}
+                <strong>{fmtBRL(selectedTotal)}</strong>
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!paidDate}
+              onClick={() => {
+                setPaidConfirmOpen(false);
+                executeStatusChange("pago", { paidDate });
+              }}
+            >
+              Confirmar pagamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Dialog de agrupamento de lançamentos */}
       <AlertDialog
         open={groupDialogOpen}
