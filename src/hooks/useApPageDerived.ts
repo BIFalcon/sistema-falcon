@@ -410,35 +410,24 @@ export function useApPageDerived(opts: {
   );
 
   const totalToPayPeriod = useMemo(() => {
-    const isRelevant = (e: ApEntry) => {
-      const bank = (e.bank_account ?? "").toLowerCase();
-      const cat  = (e.category  ?? "").toLowerCase();
-      const isBank = bank.includes("itau") || bank.includes("santander");
-      const isSalary =
-        cat.includes("salario") || cat.includes("salário") ||
-        cat.includes("folha")   || cat.includes("rescisao") ||
-        cat.includes("rescisão")|| cat.includes("ferias")   ||
-        cat.includes("férias")  || cat.includes("13");
-      return isBank || isSalary;
+    // Soma todos os lançamentos (lançamentos OMIE/manuais + salários RH +
+    // distribuições) que vencem dentro do período selecionado, EXCLUINDO
+    // transferências entre contas (não representam saída real do caixa
+    // consolidado).
+    const isTransfer = (e: ApEntry) => !!e.is_transfer;
+    const inPeriod = (e: ApEntry) => {
+      if (specificDates && specificDates.length > 0) {
+        return !!e.due_date && new Set(specificDates).has(e.due_date);
+      }
+      if (!dateFrom || !dateTo) return true;
+      return !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo;
     };
-
-    const relevant = entries.filter(isRelevant);
-    const distTotal = distributionEntries
-      .reduce((s, e) => s + Number(e.amount ?? 0), 0);
-
-    if (specificDates && specificDates.length > 0) {
-      const set = new Set(specificDates);
-      return relevant
-        .filter((e) => !!e.due_date && set.has(e.due_date))
-        .reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
-    }
-    if (!dateFrom || !dateTo) {
-      return relevant.reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
-    }
-    return relevant
-      .filter((e) => !!e.due_date && e.due_date >= dateFrom && e.due_date <= dateTo)
-      .reduce((s, e) => s + Number(e.amount ?? 0), 0) + distTotal;
-  }, [entries, distributionEntries, dateFrom, dateTo, specificDates]);
+    const sum = (list: ApEntry[]) =>
+      list
+        .filter((e) => !isTransfer(e) && inPeriod(e))
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+    return sum(entries) + sum(salaryEntries) + sum(distributionEntries);
+  }, [entries, salaryEntries, distributionEntries, dateFrom, dateTo, specificDates]);
 
   const distributionTotal = useMemo(
     () => distributionEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
