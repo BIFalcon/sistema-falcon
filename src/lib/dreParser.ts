@@ -1294,6 +1294,7 @@ function extractMonthlySeries(
     const info = findMonthColumn(rows, m, targetYear, displayRows);
     if (info) monthCols.set(m, info.colIndex);
   }
+  console.log("[debug ExtMS] targetYear=", targetYear, "monthCols=", [...monthCols.entries()]);
   if (monthCols.size === 0) return {};
   const out: Partial<Record<IndicatorKey, (number | null)[]>> = {};
   for (const key of keys) {
