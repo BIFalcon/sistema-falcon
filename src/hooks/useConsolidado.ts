@@ -47,16 +47,34 @@ function findLineByPattern(lines: ParsedLine[], patterns: RegExp[]): number | nu
 }
 
 /**
+ * True quando existe ao menos uma linha contábil (line_type !== "indicator")
+ * cujo rótulo bate com algum dos padrões — independentemente do valor.
+ * Usado para decidir se devemos cair para o fallback de indicadores.
+ */
+function hasLineMatching(lines: ParsedLine[], patterns: RegExp[]): boolean {
+  return lines.some(
+    (l) => l.line_type !== "indicator" && patterns.some((p) => p.test(l.line_label)),
+  );
+}
+
+/**
  * Fallback: alguns hotéis (ex.: Manhattan) só expõem a linha
- * "Taxa de Administração s/ GOP" como indicador derivado da DRE
- * (ex.: `[bline_1] (-) Taxa de Administração s/ GOP`), e não como
- * linha contábil "line". Procuramos também entre indicadores,
- * ignorando o prefixo `[chave]` no início do rótulo.
+ * "Taxa de Administração s/ GOP" como indicador derivado da DRE,
+ * e não como linha contábil "line". Procuramos também entre
+ * indicadores, ignorando o prefixo `[chave]` no início do rótulo.
+ *
+ * IMPORTANTE: ignoramos prefixos `[bline_*]` (orçamento/budget) e
+ * `[pline_*]` (ano anterior) — esses representam projeções/comparativos,
+ * não o valor real do mês corrente.
  */
 function findIndicatorByPattern(lines: ParsedLine[], patterns: RegExp[]): number | null {
   for (const p of patterns) {
     const hits = lines.filter((l) => {
       if (l.line_type !== "indicator") return false;
+      const prefixMatch = l.line_label.match(/^\s*\[([^\]]+)\]\s*/);
+      const key = prefixMatch?.[1] ?? "";
+      // Ignora projeções de orçamento (bline_*) e ano anterior (pline_*).
+      if (/^(bline|pline)_/i.test(key)) return false;
       const label = l.line_label.replace(/^\s*\[[^\]]+\]\s*/, "");
       return p.test(label);
     });
@@ -231,9 +249,12 @@ export function useConsolidadoData(input: {
           (closing?.estimated_distribution as number | null | undefined) ??
           null;
         const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
-        const incentiveFee =
-          findLineByPattern(lines, TAXA_SUCESSO_PATTERNS) ??
-          findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        // Só cai para o indicador derivado quando NÃO existe linha contábil
+        // correspondente (caso Manhattan). Se a linha existe mas está zerada,
+        // o valor real é zero — não substituir por projeção de orçamento.
+        const incentiveFee = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
+          ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
+          : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
         const fundoReserva = findLineByPattern(lines, FUNDO_RESERVA_PATTERNS);
         // Prioriza a linha explícita da DRE; só cai para o valor salvo no
         // closing (que vem do lucro_liquido do estimador) quando a linha
@@ -298,9 +319,9 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       }
       const uhsDisponiveis = findIndicator(lines, "uhs_disponiveis");
       const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
-      const taxaSucesso =
-        findLineByPattern(lines, TAXA_SUCESSO_PATTERNS) ??
-        findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
+      const taxaSucesso = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
+        ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
+        : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
       return {
         uhsDisponiveis,
         taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
