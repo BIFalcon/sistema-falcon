@@ -392,7 +392,7 @@ export default function ContasPagarPage() {
   const balanceTotal =
     (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
   const hasAnyBalance = balanceItauAmount !== null || balanceSantanderAmount !== null;
-  const balanceDiffComputed = hasAnyBalance ? balanceTotal - totalToPayPeriod : null;
+  const balanceDiffComputed = hasAnyBalance ? balanceTotal - displayedTotalToPay : null;
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
   // Soma da seleção em lote (ignora transferências entre contas).
@@ -779,7 +779,7 @@ export default function ContasPagarPage() {
                     ? `Total a pagar em ${fmtDate(dateFrom)}`
                     : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
                 }
-                value={fmtBRL(totalToPayPeriod)}
+                value={fmtBRL(displayedTotalToPay)}
               />
               <Stat
                 label="Diferença"
