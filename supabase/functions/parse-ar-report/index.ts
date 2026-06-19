@@ -272,15 +272,28 @@ Deno.serve(async (req) => {
           inserted += chunk.length;
         }
       }
-      // Arquiva (não deleta) os registros que sumiram do novo upload — preserva histórico e justificativas.
-      const { data: existingFolios } = await admin
-        .from("ar_open_folio_entries")
-        .select("id, entry_key, archived_at, confirmation_number");
+      // Arquiva (não deleta) os registros que sumiram do novo upload — preserva
+      // histórico e justificativas. Paginação manual porque o PostgREST limita
+      // a 1000 linhas por request — sem isso, hotéis com >1k folios deixavam
+      // registros antigos visíveis mesmo após upload novo.
       const nowIso = new Date().toISOString();
       const toArchive: string[] = [];
-      for (const f of existingFolios ?? []) {
-        if (!f.confirmation_number || !f.entry_key) continue;
-        if (!seenKeys.has(f.entry_key) && !f.archived_at) toArchive.push(f.id);
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data: pageRows, error: pageErr } = await admin
+          .from("ar_open_folio_entries")
+          .select("id, entry_key, archived_at, confirmation_number")
+          .is("archived_at", null)
+          .range(from, from + pageSize - 1);
+        if (pageErr) throw pageErr;
+        const rows = pageRows ?? [];
+        for (const f of rows) {
+          if (!f.confirmation_number || !f.entry_key) continue;
+          if (!seenKeys.has(f.entry_key)) toArchive.push(f.id);
+        }
+        if (rows.length < pageSize) break;
+        from += pageSize;
       }
       if (toArchive.length) {
         const archiveChunk = 500;

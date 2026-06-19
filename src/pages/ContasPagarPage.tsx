@@ -395,7 +395,7 @@ export default function ContasPagarPage() {
   const balanceDiffComputed = hasAnyBalance ? balanceTotal - totalToPayPeriod : null;
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
-  // Soma da seleção em lote
+  // Soma da seleção em lote (ignora transferências entre contas).
   const selectedTotal = useMemo(() => {
     let sum = 0;
     const effective = (e: { amount: number | null; paid_amount?: number | null; paid_interest?: number | null }) => {
@@ -404,11 +404,22 @@ export default function ContasPagarPage() {
         ? Number(e.paid_amount)
         : Number(e.amount ?? 0);
     };
-    for (const e of entries) if (selectedIds.has(e.id)) sum += effective(e);
-    for (const e of distributionEntries) if (selectedIds.has(e.id)) sum += effective(e);
-    for (const e of salaryEntries) if (selectedIds.has(e.id)) sum += effective(e);
+    const add = (e: ApEntry) => {
+      if (!selectedIds.has(e.id)) return;
+      if (e.is_transfer) return;
+      sum += effective(e);
+    };
+    for (const e of entries) add(e);
+    for (const e of distributionEntries) add(e);
+    for (const e of salaryEntries) add(e);
     return sum;
   }, [selectedIds, entries, distributionEntries, salaryEntries]);
+
+  // Quando o usuário seleciona alguns lançamentos dentro do período filtrado,
+  // o "Total a pagar no período" passa a refletir apenas a seleção; caso
+  // contrário, mostra a soma de TODOS os lançamentos do período (lançamentos
+  // + salários RH + distribuições, exceto transferências).
+  const displayedTotalToPay = selectedIds.size > 0 ? selectedTotal : totalToPayPeriod;
 
   // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
   const selectionHasOverdue = useMemo(() => {
@@ -768,7 +779,7 @@ export default function ContasPagarPage() {
                     ? `Total a pagar em ${fmtDate(dateFrom)}`
                     : `Total a pagar ${fmtDate(dateFrom)} → ${fmtDate(dateTo)}`
                 }
-                value={fmtBRL(totalToPayPeriod)}
+                value={fmtBRL(displayedTotalToPay)}
               />
               <Stat
                 label="Diferença"

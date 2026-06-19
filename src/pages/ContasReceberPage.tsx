@@ -369,7 +369,9 @@ function ToInvoiceSection({
       arr = arr.filter(
         (e) =>
           e.account_name?.toLowerCase().includes(q) ||
-          e.account_number?.toLowerCase().includes(q),
+          e.account_number?.toLowerCase().includes(q) ||
+          e.confirmation_number?.toLowerCase().includes(q) ||
+          e.invoice_number?.toLowerCase().includes(q),
       );
     }
     return arr;
@@ -395,10 +397,10 @@ function ToInvoiceSection({
           </div>
           <div className="flex items-center gap-2">
             <Input
-              placeholder="Buscar por nome do cliente..."
+              placeholder="Buscar por cliente, nº reserva ou invoice..."
               value={clientSearch}
               onChange={(e) => setClientSearch(e.target.value)}
-              className="w-56 h-9"
+              className="w-72 h-9"
             />
             <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as typeof faturamentoFilter)}>
               <SelectTrigger className="w-36 h-9">
@@ -608,6 +610,31 @@ function DayBreakdown({
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
+  // Matriz (Master, Controladoria, GOP, Patronos) precisa conseguir VER os
+  // documentos enviados pelos adms/GGs mesmo quando não tem permissão de ação.
+  const canViewDocs =
+    isMaster ||
+    hasRole("controladoria") ||
+    hasRole("patronos") ||
+    hasRole("gop") ||
+    hasRole("financeiro") ||
+    hasRole("adm") ||
+    hasRole("gg");
+
+  async function openInvoiceStoredFile(value: string) {
+    if (/^https?:\/\//i.test(value)) {
+      window.open(value, "_blank", "noopener");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("invoices")
+      .createSignedUrl(value, 60 * 10);
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir o arquivo");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
+  }
   const setStatus = useSetToInvoiceGgStatus();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -716,6 +743,40 @@ function DayBreakdown({
                     {e.paid_note && !e.paid_date && (
                       <div className="text-[11px] text-amber-700 dark:text-amber-400 italic">
                         Não pago: "{e.paid_note}"
+                      </div>
+                    )}
+                    {canViewDocs && (e.invoice_file_1 || e.invoice_file_2 || e.proof_file) && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {e.invoice_file_1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.invoice_file_1!)}
+                          >
+                            Ver nota
+                          </Button>
+                        )}
+                        {e.invoice_file_2 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.invoice_file_2!)}
+                          >
+                            Ver boleto
+                          </Button>
+                        )}
+                        {e.proof_file && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => openInvoiceStoredFile(e.proof_file!)}
+                          >
+                            Ver comprovante
+                          </Button>
+                        )}
                       </div>
                     )}
                     {canShowActions && !isEditing && (
