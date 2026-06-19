@@ -866,6 +866,9 @@ function findMonthColumn(
     ? eligible.filter((candidate) => candidate.year === targetYear)
     : eligible;
   const best = preferred.sort((a, b) => b.dataCount - a.dataCount || a.headerRow - b.headerRow || a.colIndex - b.colIndex)[0];
+  if (targetMonth === 1 || targetMonth === 2) {
+    console.log("[debug fMC] m=",targetMonth,"cands=",candidates.map(c=>({hr:c.headerRow,col:c.colIndex,year:c.year,dc:c.dataCount,label:c.label})),"winner=",best?.colIndex);
+  }
   return best ? { headerRow: best.headerRow, colIndex: best.colIndex, label: best.label } : null;
 }
 
