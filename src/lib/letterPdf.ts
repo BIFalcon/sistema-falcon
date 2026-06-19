@@ -887,7 +887,26 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   drawPageHeader(doc, "Comentários do mês", falconData, brandData);
   doc.setTextColor(TEXT);
   const blocks: string[] = [];
-  const push = (s?: string | null) => { if (s && s.trim()) blocks.push(s.trim()); };
+  // Dedup: a IA às vezes repete o mesmo parágrafo em mais de um campo
+  // (intro/operational/outlook + market_context/financial/closing) e o PDF
+  // acabava mostrando os dois primeiros parágrafos novamente no fim da
+  // carta. Comparamos por uma chave normalizada (minúsculo, sem acento,
+  // sem espaços/pontuação extra) para descartar repetições.
+  const seen = new Set<string>();
+  const push = (s?: string | null) => {
+    if (!s) return;
+    const trimmed = s.trim();
+    if (!trimmed) return;
+    const key = trimmed
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    blocks.push(trimmed);
+  };
   push(letter.ai_intro);
   push(letter.ai_market_context);
   push(letter.ai_operational);
