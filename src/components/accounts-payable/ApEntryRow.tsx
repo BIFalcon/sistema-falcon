@@ -646,3 +646,153 @@ export function PaymentStatusBadge({
     </TooltipProvider>
   );
 }
+
+function EditManualEntryButton({ entry }: { entry: ApEntry }) {
+  const [open, setOpen] = useState(false);
+  const update = useUpdateManualEntry();
+  const [form, setForm] = useState({
+    supplier: entry.supplier ?? "",
+    cnpj: entry.cnpj ?? "",
+    documentNumber: entry.document_number ?? "",
+    dueDate: entry.due_date ?? "",
+    amount: entry.amount != null ? String(entry.amount) : "",
+    category: entry.category ?? "",
+    paymentMethod: entry.payment_method ?? "",
+    bankAccount: entry.bank_account ?? "",
+    paymentStatus: (entry.payment_status ?? "em_aprovacao") as ApPaymentStatus,
+    observation: entry.observation ?? "",
+    description: entry.description ?? "",
+  });
+
+  function reset() {
+    setForm({
+      supplier: entry.supplier ?? "",
+      cnpj: entry.cnpj ?? "",
+      documentNumber: entry.document_number ?? "",
+      dueDate: entry.due_date ?? "",
+      amount: entry.amount != null ? String(entry.amount) : "",
+      category: entry.category ?? "",
+      paymentMethod: entry.payment_method ?? "",
+      bankAccount: entry.bank_account ?? "",
+      paymentStatus: (entry.payment_status ?? "em_aprovacao") as ApPaymentStatus,
+      observation: entry.observation ?? "",
+      description: entry.description ?? "",
+    });
+  }
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-5 w-5 text-muted-foreground"
+        title="Editar lançamento manual"
+        onClick={() => { reset(); setOpen(true); }}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) reset(); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar lançamento manual</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 space-y-1">
+              <Label>Fornecedor *</Label>
+              <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>CNPJ</Label>
+              <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Nº Documento</Label>
+              <Input value={form.documentNumber} onChange={(e) => setForm({ ...form, documentNumber: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Vencimento</Label>
+              <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Valor *</Label>
+              <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Categoria</Label>
+              <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Forma de pagamento</Label>
+              <Input value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Conta bancária</Label>
+              <Input value={form.bankAccount} onChange={(e) => setForm({ ...form, bankAccount: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select
+                value={form.paymentStatus}
+                onValueChange={(v) => setForm({ ...form, paymentStatus: v as ApPaymentStatus })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="em_aprovacao">Em Aprovação</SelectItem>
+                  <SelectItem value="autorizado">Autorizado</SelectItem>
+                  <SelectItem value="agendado">Agendado</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="pago_parcialmente">Pago Parcialmente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label>Descrição</Label>
+              <Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label>Observação</Label>
+              <Textarea rows={2} value={form.observation} onChange={(e) => setForm({ ...form, observation: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={
+                update.isPending ||
+                !form.supplier.trim() ||
+                !form.amount ||
+                Number.isNaN(parseFloat(form.amount)) ||
+                parseFloat(form.amount) <= 0
+              }
+              onClick={async () => {
+                try {
+                  await update.mutateAsync({
+                    entryId: entry.id,
+                    hotelId: entry.hotel_id,
+                    supplier: form.supplier.trim(),
+                    cnpj: form.cnpj.trim() || null,
+                    documentNumber: form.documentNumber.trim() || null,
+                    description: form.description.trim() || null,
+                    dueDate: form.dueDate || null,
+                    amount: parseFloat(form.amount),
+                    category: form.category.trim() || null,
+                    paymentMethod: form.paymentMethod.trim() || null,
+                    bankAccount: form.bankAccount.trim() || null,
+                    paymentStatus: form.paymentStatus,
+                    observation: form.observation.trim() || null,
+                  });
+                  toast.success("Lançamento atualizado");
+                  setOpen(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+                }
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
