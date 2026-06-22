@@ -392,7 +392,6 @@ export default function ContasPagarPage() {
   const balanceTotal =
     (balanceItauAmount ?? 0) + (balanceSantanderAmount ?? 0);
   const hasAnyBalance = balanceItauAmount !== null || balanceSantanderAmount !== null;
-  const balanceDiffComputed = hasAnyBalance ? balanceTotal - totalToPayPeriod : null;
   const acceptedExt = sourceSystem === "totvs" ? ".xls" : ".xlsx,.zip";
 
   // Soma da seleção em lote (ignora transferências entre contas).
@@ -420,6 +419,9 @@ export default function ContasPagarPage() {
   // contrário, mostra a soma de TODOS os lançamentos do período (lançamentos
   // + salários RH + distribuições, exceto transferências).
   const displayedTotalToPay = selectedIds.size > 0 ? selectedTotal : totalToPayPeriod;
+
+  // Diferença = saldo bancário - total exibido (mesma base do card "Total a pagar").
+  const balanceDiffComputed = hasAnyBalance ? balanceTotal - displayedTotalToPay : null;
 
   // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
   const selectionHasOverdue = useMemo(() => {
