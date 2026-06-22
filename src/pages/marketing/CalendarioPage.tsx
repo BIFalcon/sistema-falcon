@@ -8,12 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Heart, Users as UsersIcon, Building2, Loader2, Paperclip, X, FileText } from "lucide-react";
+import { Plus, Heart, Users as UsersIcon, Building2, Loader2, Paperclip, X, FileText, Pencil, Trash2, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRhCalendarDates, useAddCalendarPost, type RhCalendarDate } from "@/hooks/useRh";
+import {
+  useRhCalendarDates,
+  useAddCalendarPost,
+  useUpdateCalendarPost,
+  useDeleteCalendarPost,
+  useAddCalendarDate,
+  useMarketingMarkedDates,
+  type RhCalendarDate,
+} from "@/hooks/useRh";
 import { useAuth } from "@/contexts/AuthContext";
 import { MONTHS_PT } from "@/lib/constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function daysUntil(day: number, month: number): number {
   const now = new Date();
@@ -86,8 +95,9 @@ const STATUS_TO_KIND: Record<string, PostKind> = { ideia: "endo", acao: "hospede
 
 export default function MarketingCalendarioPage() {
   const { data: dates = [] } = useRhCalendarDates();
-  const { hasRole, isMaster } = useAuth();
+  const { hasRole, isMaster, user } = useAuth();
   const isMarketing = isMaster || hasRole("marketing");
+  const canManageDates = isMaster || hasRole("marketing") || hasRole("rh");
   const canPost: Record<PostKind, boolean> = {
     endo: isMarketing,
     hospedes: isMarketing,
@@ -96,6 +106,14 @@ export default function MarketingCalendarioPage() {
   const [open, setOpen] = useState<RhCalendarDate | null>(null);
   const year = new Date().getFullYear();
   const addPost = useAddCalendarPost();
+  const updatePost = useUpdateCalendarPost();
+  const deletePost = useDeleteCalendarPost();
+  const addDate = useAddCalendarDate();
+  const { data: markedDates } = useMarketingMarkedDates(year);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", content: "" });
+  const [newDateOpen, setNewDateOpen] = useState(false);
+  const [newDate, setNewDate] = useState({ day: "", month: "", title: "", category: "comemorativa", notes: "" });
 
   const grouped = useMemo(() => {
     const map: Record<number, RhCalendarDate[]> = {};
@@ -148,12 +166,19 @@ export default function MarketingCalendarioPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">Marketing</p>
-        <h1 className="text-3xl font-semibold">Calendário</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Ideias de Endomarketing e ações para os hóspedes ao longo do ano.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">Marketing</p>
+          <h1 className="text-3xl font-semibold">Calendário</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Ideias de Endomarketing e ações para os hóspedes ao longo do ano.
+          </p>
+        </div>
+        {canManageDates && (
+          <Button size="sm" onClick={() => setNewDateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nova data
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -167,6 +192,7 @@ export default function MarketingCalendarioPage() {
               <div className="space-y-2">
                 {items.map((d) => {
                   const dd = daysUntil(d.date_day, d.date_month);
+                  const hasMarketing = markedDates?.has(d.id);
                   return (
                     <button
                       key={d.id}
@@ -177,7 +203,12 @@ export default function MarketingCalendarioPage() {
                         {String(d.date_day).padStart(2, "0")}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{d.title}</p>
+                        <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                          {hasMarketing && (
+                            <Sparkles className="h-3 w-3 text-pink-500 shrink-0" aria-label="Marketing postou ideias" />
+                          )}
+                          <span className="truncate">{d.title}</span>
+                        </p>
                         <Badge variant="outline" className={`text-[10px] mt-0.5 ${categoryTone(d.category)}`}>
                           {d.category}
                         </Badge>
@@ -232,11 +263,84 @@ export default function MarketingCalendarioPage() {
                         <div className="space-y-2">
                           {filtered.map((p: any) => (
                             <div key={p.id} className={`pl-3 py-2 pr-2 rounded-md bg-muted/30 ${M.ring}`}>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.short}</Badge>
-                                <p className="text-sm font-medium">{p.title}</p>
-                              </div>
-                              {p.content && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{p.content}</p>}
+                              {editingId === p.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    value={editForm.title}
+                                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                  />
+                                  <Textarea
+                                    rows={3}
+                                    value={editForm.content}
+                                    onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          await updatePost.mutateAsync({
+                                            id: p.id,
+                                            title: editForm.title,
+                                            content: editForm.content || null,
+                                          });
+                                          toast.success("Atualizado.");
+                                          setEditingId(null);
+                                          posts.refetch();
+                                        } catch (e: any) {
+                                          toast.error("Erro: " + (e?.message ?? "desconhecido"));
+                                        }
+                                      }}
+                                      disabled={updatePost.isPending}
+                                    >
+                                      Salvar
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className={`text-[10px] ${M.chip}`}>{M.short}</Badge>
+                                    <p className="text-sm font-medium flex-1">{p.title}</p>
+                                    {p.author_id === user?.id && (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-6 w-6"
+                                          onClick={() => {
+                                            setEditingId(p.id);
+                                            setEditForm({ title: p.title, content: p.content ?? "" });
+                                          }}
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-6 w-6 text-destructive"
+                                          onClick={async () => {
+                                            if (!confirm("Excluir este post?")) return;
+                                            try {
+                                              await deletePost.mutateAsync(p.id);
+                                              toast.success("Excluído.");
+                                              posts.refetch();
+                                            } catch (e: any) {
+                                              toast.error("Erro: " + (e?.message ?? "desconhecido"));
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {p.content && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{p.content}</p>}
+                                </>
+                              )}
                               {Array.isArray(p.attachments) && p.attachments.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {p.attachments.map((att: { name: string; url: string }, i: number) => (
@@ -306,6 +410,94 @@ export default function MarketingCalendarioPage() {
               </Tabs>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newDateOpen} onOpenChange={setNewDateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova data no calendário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Dia</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={newDate.day}
+                  onChange={(e) => setNewDate({ ...newDate, day: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Mês</Label>
+                <Select value={newDate.month} onValueChange={(v) => setNewDate({ ...newDate, month: v })}>
+                  <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+                  <SelectContent>
+                    {MONTHS_PT.map((m, i) => (
+                      <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Título</Label>
+              <Input value={newDate.title} onChange={(e) => setNewDate({ ...newDate, title: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Categoria</Label>
+              <Select value={newDate.category} onValueChange={(v) => setNewDate({ ...newDate, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comemorativa">Comemorativa</SelectItem>
+                  <SelectItem value="feriado">Feriado</SelectItem>
+                  <SelectItem value="informativo">Informativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Notas (opcional)</Label>
+              <Textarea
+                rows={2}
+                value={newDate.notes}
+                onChange={(e) => setNewDate({ ...newDate, notes: e.target.value })}
+              />
+            </div>
+            <Button
+              className="w-full"
+              disabled={addDate.isPending}
+              onClick={async () => {
+                const d = Number(newDate.day);
+                const m = Number(newDate.month);
+                if (!d || d < 1 || d > 31 || !m || m < 1 || m > 12) {
+                  toast.error("Informe dia e mês válidos.");
+                  return;
+                }
+                if (!newDate.title.trim()) {
+                  toast.error("Informe um título.");
+                  return;
+                }
+                try {
+                  await addDate.mutateAsync({
+                    date_day: d,
+                    date_month: m,
+                    title: newDate.title.trim(),
+                    category: newDate.category,
+                    notes: newDate.notes || undefined,
+                  });
+                  toast.success("Data adicionada.");
+                  setNewDate({ day: "", month: "", title: "", category: "comemorativa", notes: "" });
+                  setNewDateOpen(false);
+                } catch (e: any) {
+                  toast.error("Erro: " + (e?.message ?? "desconhecido"));
+                }
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Adicionar
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
