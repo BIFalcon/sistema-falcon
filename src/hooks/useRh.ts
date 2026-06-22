@@ -252,6 +252,96 @@ export function useAddCalendarPost() {
   });
 }
 
+export function useUpdateCalendarPost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      title?: string;
+      content?: string | null;
+      attachments?: Array<{ name: string; url: string }>;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (input.title !== undefined) patch.title = input.title;
+      if (input.content !== undefined) patch.content = input.content;
+      if (input.attachments !== undefined) patch.attachments = input.attachments as never;
+      const { data, error } = await supabase
+        .from("rh_calendar_posts")
+        .update(patch)
+        .eq("id", input.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rh", "calendar-posts"] });
+      qc.invalidateQueries({ queryKey: ["marketing", "calendar-posts"] });
+    },
+  });
+}
+
+export function useDeleteCalendarPost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("rh_calendar_posts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rh", "calendar-posts"] });
+      qc.invalidateQueries({ queryKey: ["marketing", "calendar-posts"] });
+      qc.invalidateQueries({ queryKey: ["calendar", "marked-dates"] });
+    },
+  });
+}
+
+export function useAddCalendarDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      date_day: number;
+      date_month: number;
+      title: string;
+      category?: string;
+      notes?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from("rh_calendar_dates")
+        .insert({
+          date_day: input.date_day,
+          date_month: input.date_month,
+          title: input.title,
+          category: input.category ?? "informativo",
+          notes: input.notes ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rh", "calendar-dates"] });
+    },
+  });
+}
+
+/** Conjunto de date_ids que possuem ao menos um post de marketing (ideia/acao) no ano. */
+export function useMarketingMarkedDates(year: number) {
+  return useQuery({
+    queryKey: ["calendar", "marked-dates", year],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rh_calendar_posts")
+        .select("date_id, status")
+        .eq("year", year)
+        .in("status", ["ideia", "acao"]);
+      if (error) throw error;
+      return new Set((data ?? []).map((r: { date_id: string }) => r.date_id));
+    },
+  });
+}
+
 // ---------- metrics ----------
 
 export interface RhMetrics {
