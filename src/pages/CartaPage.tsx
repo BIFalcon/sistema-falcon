@@ -106,6 +106,13 @@ export default function CartaPage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
+  // Reset imediato ao trocar hotel/mês/ano — sem isso a página fica presa
+  // no fechamento anterior até o lookup/ensure terminar (ou até dar F5).
+  useEffect(() => {
+    if (closingIdParam) return;
+    setResolvedId(null);
+  }, [hotelId, month, year, closingIdParam]);
+
   const { data: existingClosing } = useQuery({
     enabled: !resolvedId && !!hotelId,
     queryKey: ["closing-lookup", hotelId, month, year],
@@ -133,7 +140,7 @@ export default function CartaPage() {
         .then((c) => setResolvedId(c.id))
         .catch((err) => toast.error(err.message));
     }
-  }, [resolvedId, hotelId, month, year, existingClosing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resolvedId, hotelId, month, year, existingClosing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
   const { data: letter } = useLetter(resolvedId);
