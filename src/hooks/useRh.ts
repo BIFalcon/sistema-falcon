@@ -261,7 +261,11 @@ export function useUpdateCalendarPost() {
       content?: string | null;
       attachments?: Array<{ name: string; url: string }>;
     }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: {
+        title?: string;
+        content?: string | null;
+        attachments?: never;
+      } = {};
       if (input.title !== undefined) patch.title = input.title;
       if (input.content !== undefined) patch.content = input.content;
       if (input.attachments !== undefined) patch.attachments = input.attachments as never;
