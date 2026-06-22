@@ -30,6 +30,14 @@ export default function DrePage() {
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
 
+  // Quando os filtros (hotel/mês/ano) mudam, limpa o id atual ANTES de
+  // re-resolver — assim a tela não exibe o fechamento anterior enquanto a
+  // resolução assíncrona acontece.
+  useEffect(() => {
+    if (closingIdParam) return;
+    setResolvedId(null);
+  }, [hotelId, month, year, closingIdParam]);
+
   // Quando o filtro de hotel/mês/ano muda (e não viemos via ?closing= explícito),
   // re-resolve o closing correspondente. Sem isso, a página fica presa no
   // primeiro closing carregado até o usuário atualizar a página.
