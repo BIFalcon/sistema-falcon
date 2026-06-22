@@ -79,10 +79,10 @@ export function useMarkEnvioSent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { closingId: string }) => {
-      const { error } = await supabase
-        .from("closings")
-        .update({ status_envio: "aprovado" } as TablesUpdate<"closings">)
-        .eq("id", input.closingId);
+      const { error } = await supabase.rpc("mark_envio_sent" as never, {
+        _closing_id: input.closingId,
+        _sent: true,
+      } as never);
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
@@ -100,10 +100,10 @@ export function useReopenEnvio() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { closingId: string }) => {
-      const { error } = await supabase
-        .from("closings")
-        .update({ status_envio: "em_andamento" } as TablesUpdate<"closings">)
-        .eq("id", input.closingId);
+      const { error } = await supabase.rpc("mark_envio_sent" as never, {
+        _closing_id: input.closingId,
+        _sent: false,
+      } as never);
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {

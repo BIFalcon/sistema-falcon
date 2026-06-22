@@ -2521,6 +2521,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      mark_envio_sent: {
+        Args: { _closing_id: string; _sent: boolean }
+        Returns: undefined
+      }
       month_pt: { Args: { _m: number }; Returns: string }
       move_to_dlq: {
         Args: {

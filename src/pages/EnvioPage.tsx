@@ -16,6 +16,7 @@ import {
   useReopenEnvio,
   type EnvioRow,
 } from "@/hooks/useEnvio";
+import { getLetterPdfSignedUrl } from "@/hooks/useLetter";
 import { MONTHS_PT, formatBRL } from "@/lib/constants";
 import {
   Send, CheckCircle2, FileText, Download, Clock, AlertTriangle, RotateCcw,
@@ -32,6 +33,7 @@ export default function EnvioPage() {
   const canSend = !isFernando && (isMaster || hasRole("ri"));
   const [confirmRow, setConfirmRow] = useState<EnvioRow | null>(null);
   const [reopenRow, setReopenRow] = useState<EnvioRow | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const hotelById = useMemo(
     () => new Map(allowedHotels.map((h) => [h.id, h])),
@@ -57,6 +59,27 @@ export default function EnvioPage() {
       setReopenRow(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao reabrir envio");
+    }
+  }
+
+  async function handleDownload(row: EnvioRow) {
+    if (!row.pdf_url) return;
+    setDownloadingId(row.id);
+    try {
+      // pdf_url é o caminho relativo no bucket "investor-letters".
+      // Se já vier como URL absoluta (http/https), abre direto.
+      const url = /^https?:\/\//i.test(row.pdf_url)
+        ? row.pdf_url
+        : await getLetterPdfSignedUrl(row.pdf_url);
+      if (!url) {
+        toast.error("Não foi possível gerar o link de download.");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao baixar PDF");
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -155,14 +178,14 @@ export default function EnvioPage() {
                     <TableCell>
                       {hasPdf ? (
                         <Button
-                          asChild
                           size="sm"
                           variant="outline"
                           className="gap-1"
+                          disabled={downloadingId === row.id}
+                          onClick={() => handleDownload(row)}
                         >
-                          <a href={row.pdf_url!} target="_blank" rel="noreferrer">
-                            <Download className="h-3.5 w-3.5" /> Baixar
-                          </a>
+                          <Download className="h-3.5 w-3.5" />
+                          {downloadingId === row.id ? "Abrindo…" : "Baixar"}
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground italic">PDF não gerado</span>
