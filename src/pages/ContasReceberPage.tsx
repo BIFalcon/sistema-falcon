@@ -185,7 +185,7 @@ export default function ContasReceberPage() {
   const canImportAr = isMaster || isPatronos;
   // Quem vê todos os hotéis: master, financeiro, controladoria, ri
   const seesAllHotels =
-    isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
+    isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri") || hasRole("operacoes");
   // GG/GOP: somente os hotéis da sua cartela
   const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);

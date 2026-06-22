@@ -154,7 +154,7 @@ const App = () => (
               {/* Gestão — Financeiro */}
               <Route path="/financeiro" element={<RoleGuard roles={["controladoria","patronos","gg","viewer"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ContasPagarPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","viewer"]}><ContasReceberPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","operacoes","viewer"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />

@@ -77,7 +77,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Fechamento",
         url: "/fechamento",
         icon: ClipboardList,
-        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","operacoes","viewer"] as AppRole[],
+        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"] as AppRole[],
         children: [
           { title: "Visão Geral", url: "/fechamento", icon: LayoutGrid, end: true },
           { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet },
@@ -104,11 +104,11 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Financeiro",
         url: "/financeiro",
         icon: Wallet,
-        allowedRoles: ["financeiro","gg","adm","gop","viewer"] as AppRole[],
+        allowedRoles: ["financeiro","gg","adm","gop","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, allowedRoles: ["financeiro","gg","viewer"] as AppRole[] },
           { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, allowedRoles: ["financeiro","viewer"] as AppRole[] },
-          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, allowedRoles: ["financeiro","gg","adm","gop","viewer"] as AppRole[] },
+          { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, allowedRoles: ["financeiro","gg","adm","gop","operacoes","viewer"] as AppRole[] },
         ],
       },
       // Adiciona "Clientes" também no menu do financeiro.
