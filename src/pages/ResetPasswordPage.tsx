@@ -8,6 +8,46 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import falconLogo from "@/assets/falcon-logo-white.png";
 
+/**
+ * supabase.functions.invoke jogou FunctionsHttpError com mensagem genérica
+ * ("non-2xx status code") quando a função respondeu com 4xx/5xx. O corpo
+ * com o erro real precisa ser lido manualmente do Response em error.context.
+ */
+async function readInvokeError(error: unknown, data: { error?: string } | null): Promise<string | null> {
+  if (data?.error) return mapKnownError(data.error);
+  if (!error) return null;
+  const ctx = (error as { context?: Response }).context;
+  if (ctx && typeof ctx.text === "function") {
+    try {
+      const text = await ctx.clone().text();
+      try {
+        const parsed = JSON.parse(text) as { error?: string };
+        if (parsed?.error) return mapKnownError(parsed.error);
+      } catch {
+        if (text) return text;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return (error as Error)?.message ?? null;
+}
+
+function mapKnownError(code: string): string {
+  switch (code) {
+    case "invalid_or_used":
+      return "Este link de definição de senha já foi utilizado ou foi substituído por um link mais recente. Verifique seu e-mail pelo convite mais novo ou solicite um novo link.";
+    case "expired":
+      return "Este link expirou. Solicite um novo convite ou um novo link de recuperação de senha.";
+    case "missing_token":
+      return "Link inválido. Abra novamente o convite recebido por e-mail.";
+    case "weak_password":
+      return "A senha não atende aos requisitos mínimos.";
+    default:
+      return code;
+  }
+}
+
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -27,7 +67,10 @@ export default function ResetPasswordPage() {
           const { data, error } = await supabase.functions.invoke("manage-users", {
             body: { action: "validate_password_setup", setup_token: customSetupToken },
           });
-          if (error || data?.error) throw new Error(data?.error ?? error?.message);
+          if (error || data?.error) {
+            const msg = await readInvokeError(error, data);
+            throw new Error(msg ?? "Não foi possível validar o link.");
+          }
           setSetupToken(customSetupToken);
           setSessionReady(true);
           return;
@@ -109,11 +152,19 @@ export default function ResetPasswordPage() {
       return;
     }
     setSubmitting(true);
-    const { error } = setupToken
-      ? await supabase.functions.invoke("manage-users", {
-          body: { action: "complete_password_setup", setup_token: setupToken, password },
-        }).then(({ data, error: fnError }) => ({ error: fnError || (data?.error ? new Error(data.error) : null) }))
-      : await supabase.auth.updateUser({ password });
+    let error: Error | null = null;
+    if (setupToken) {
+      const { data, error: fnError } = await supabase.functions.invoke("manage-users", {
+        body: { action: "complete_password_setup", setup_token: setupToken, password },
+      });
+      if (fnError || data?.error) {
+        const msg = await readInvokeError(fnError, data);
+        error = new Error(msg ?? "Não foi possível salvar a nova senha.");
+      }
+    } else {
+      const { error: authErr } = await supabase.auth.updateUser({ password });
+      if (authErr) error = authErr;
+    }
     setSubmitting(false);
     if (error) {
       toast.error("Erro", { description: error.message });
