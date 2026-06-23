@@ -207,7 +207,22 @@ Deno.serve(async (req) => {
         password: payload.password,
         email_confirm: true,
       });
-      if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
+      if (updateErr) {
+        const raw = (updateErr.message ?? "").toLowerCase();
+        // GoTrue retorna 422 quando a senha é fraca / vazou (HIBP) ou não atende aos requisitos.
+        const status = (updateErr as { status?: number }).status;
+        if (
+          status === 422 ||
+          raw.includes("pwned") ||
+          raw.includes("weak") ||
+          raw.includes("password") ||
+          raw.includes("compromised") ||
+          raw.includes("breach")
+        ) {
+          return json({ ok: false, error: "weak_password", detail: updateErr.message }, 400);
+        }
+        return json({ ok: false, error: updateErr.message }, 400);
+      }
 
       await admin.from("profiles").update({ status: "active" }).eq("user_id", result.data.user_id);
       await admin
