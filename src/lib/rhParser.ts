@@ -76,14 +76,15 @@ function cleanCpf(value: unknown): string | null {
 }
 
 function findCol(header: string[], ...candidates: string[]): number {
-  const normalized = header.map((c) => toAscii(normalize(c)));
+  const stripDots = (s: string) => s.replace(/\./g, "");
+  const normalized = header.map((c) => stripDots(toAscii(normalize(c))));
   for (const cand of candidates) {
-    const target = toAscii(cand);
+    const target = stripDots(toAscii(cand));
     const idx = normalized.findIndex((h) => h === target);
     if (idx >= 0) return idx;
   }
   for (const cand of candidates) {
-    const target = toAscii(cand);
+    const target = stripDots(toAscii(cand));
     const idx = normalized.findIndex((h) => h.includes(target));
     if (idx >= 0) return idx;
   }
@@ -99,10 +100,20 @@ function pick(row: unknown[], idx: number): unknown {
 export function detectFormat(headers: string[]): RhFormat {
   const flat = headers.map((h) => toAscii(normalize(h))).join("|");
   if (flat.includes("assensus")) return "ASSENSUS";
+  // Listagens da Assensus vêm em duas planilhas separadas
+  // ("LISTAGEM_ATIVOS_…" e "LISTAGEM_RESCISOES_…") sem a marca textual
+  // "Assensus" no conteúdo — usamos os títulos das abas/cabeçalhos.
+  if (
+    flat.includes("rescisoes calculadas") ||
+    flat.includes("relacao de rescisoes") ||
+    flat.includes("empregados")
+  ) {
+    return "ASSENSUS";
+  }
   if (flat.includes("rcastro") || flat.includes("r castro") || flat.includes("r. castro")) return "RCASTRO";
   if (flat.includes("pousada") || flat.includes("ativos") || flat.includes("demitidos") || flat.includes("inativos")) return "POUSADA";
   // heurística por colunas
-  if (flat.includes("matricula") && flat.includes("admissao")) {
+  if ((flat.includes("matricula") || flat.includes("codigo")) && flat.includes("admissao")) {
     if (flat.includes("centro de custo")) return "ASSENSUS";
     if (flat.includes("filial")) return "RCASTRO";
     return "POUSADA";
@@ -171,7 +182,15 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
       const row = rows[i] || [];
       const textCells = row.filter((c) => typeof c === "string" && (c as string).trim().length > 1).length;
       const flat = row.map((c) => toAscii(normalize(c))).join("|");
-      if (textCells >= 3 && (flat.includes("nome") || flat.includes("matric") || flat.includes("cpf"))) {
+      const flatNoDot = flat.replace(/\./g, "");
+      if (
+        textCells >= 3 &&
+        (flat.includes("nome") ||
+          flat.includes("matric") ||
+          flat.includes("empregado") ||
+          flat.includes("colaborador") ||
+          flatNoDot.includes("cpf"))
+      ) {
         headerIdx = i;
         break;
       }
@@ -184,8 +203,8 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
 
     const cols = {
       matricula: findCol(header, "matricula", "matrícula", "id", "codigo", "código"),
-      name: findCol(header, "nome", "nome completo", "colaborador", "funcionario", "funcionário"),
-      cpf: findCol(header, "cpf"),
+      name: findCol(header, "nome", "nome completo", "colaborador", "funcionario", "funcionário", "empregado"),
+      cpf: findCol(header, "cpf", "c.p.f", "c.p.f.", "nº do c.p.f.", "n do cpf", "no do cpf"),
       role: findCol(header, "cargo", "funcao", "função"),
       department: findCol(header, "setor", "departamento", "area", "área"),
       admission: findCol(header, "admissao", "admissão", "data admissao", "data de admissao", "dt admissao"),
