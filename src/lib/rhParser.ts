@@ -100,10 +100,20 @@ function pick(row: unknown[], idx: number): unknown {
 export function detectFormat(headers: string[]): RhFormat {
   const flat = headers.map((h) => toAscii(normalize(h))).join("|");
   if (flat.includes("assensus")) return "ASSENSUS";
+  // Listagens da Assensus vêm em duas planilhas separadas
+  // ("LISTAGEM_ATIVOS_…" e "LISTAGEM_RESCISOES_…") sem a marca textual
+  // "Assensus" no conteúdo — usamos os títulos das abas/cabeçalhos.
+  if (
+    flat.includes("rescisoes calculadas") ||
+    flat.includes("relacao de rescisoes") ||
+    flat.includes("empregados")
+  ) {
+    return "ASSENSUS";
+  }
   if (flat.includes("rcastro") || flat.includes("r castro") || flat.includes("r. castro")) return "RCASTRO";
   if (flat.includes("pousada") || flat.includes("ativos") || flat.includes("demitidos") || flat.includes("inativos")) return "POUSADA";
   // heurística por colunas
-  if (flat.includes("matricula") && flat.includes("admissao")) {
+  if ((flat.includes("matricula") || flat.includes("codigo")) && flat.includes("admissao")) {
     if (flat.includes("centro de custo")) return "ASSENSUS";
     if (flat.includes("filial")) return "RCASTRO";
     return "POUSADA";
