@@ -681,9 +681,9 @@ function useDreAnalyticsImpl(input: {
             const m = parseInt(cMatch[1], 10) - 1;
             const label = cMatch[2];
             if (!currentDetailSeries.has(label)) currentDetailSeries.set(label, Array(12).fill(null));
-            // Mesma máscara de período aplicada às séries dos indicadores:
-            // só popula meses dentro do range visualizado.
-            if (currentMonthRange.includes(m + 1)) {
+            // Popula do início do ano até o mês selecionado, para que o
+            // gráfico exiba a linha do Realizado em todos os meses anteriores.
+            if (m + 1 <= input.month) {
               currentDetailSeries.get(label)![m] = val ?? null;
             }
             continue;
