@@ -53,6 +53,10 @@ export function AppHeader() {
   const isIndicadores = pathname.startsWith("/indicadores");
   const isHomePage = pathname === "/" || pathname === "/home";
   const isMarketing = pathname.startsWith("/marketing");
+  const isRhTurnover = pathname.startsWith("/rh/turnover");
+  const canSeeMatriz =
+    isRhTurnover &&
+    (isMaster || hasRole("rh") || hasRole("viewer") || hasRole("fernando"));
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
@@ -187,6 +191,9 @@ export function AppHeader() {
                   {h.name}
                 </SelectItem>
               ))}
+              {canSeeMatriz && (
+                <SelectItem value="__matriz__">Matriz</SelectItem>
+              )}
             </SelectContent>
           </Select>
         )}
