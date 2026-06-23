@@ -152,11 +152,19 @@ export default function ResetPasswordPage() {
       return;
     }
     setSubmitting(true);
-    const { error } = setupToken
-      ? await supabase.functions.invoke("manage-users", {
-          body: { action: "complete_password_setup", setup_token: setupToken, password },
-        }).then(({ data, error: fnError }) => ({ error: fnError || (data?.error ? new Error(data.error) : null) }))
-      : await supabase.auth.updateUser({ password });
+    let error: Error | null = null;
+    if (setupToken) {
+      const { data, error: fnError } = await supabase.functions.invoke("manage-users", {
+        body: { action: "complete_password_setup", setup_token: setupToken, password },
+      });
+      if (fnError || data?.error) {
+        const msg = await readInvokeError(fnError, data);
+        error = new Error(msg ?? "Não foi possível salvar a nova senha.");
+      }
+    } else {
+      const { error: authErr } = await supabase.auth.updateUser({ password });
+      if (authErr) error = authErr;
+    }
     setSubmitting(false);
     if (error) {
       toast.error("Erro", { description: error.message });
