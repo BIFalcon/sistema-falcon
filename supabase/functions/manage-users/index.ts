@@ -521,10 +521,14 @@ Deno.serve(async (req) => {
             console.error("[set_status] falha ao banir sessão:", banErr);
           }
         } else if (payload.status === "active") {
-          // Reativa: remove o ban no auth (não restaura roles automaticamente).
+          // Reativa: remove o ban no auth, confirma o e-mail e libera login com senha.
+          // Importante para casos em que a senha foi definida manualmente fora do fluxo
+          // de convite, pois o profile pode estar "active" enquanto o Auth ainda bloqueia
+          // login com "Email not confirmed".
           try {
             await admin.auth.admin.updateUserById(payload.user_id, {
               ban_duration: "none",
+              email_confirm: true,
             });
           } catch (unbanErr) {
             console.error("[set_status] falha ao reativar sessão:", unbanErr);
