@@ -224,3 +224,71 @@ export function detectGender(fullName: string | null | undefined): "M" | "F" | "
 export function detectGenderBatch(names: string[]): Array<"M" | "F" | "N"> {
   return names.map(detectGender);
 }
+
+// Cargos com flexão feminina inequívoca. Usados como fallback quando o nome
+// não permite identificar o sexo. Lista propositalmente conservadora — cargos
+// unissex (atendente, recepcionista, gerente, supervisor, auxiliar, etc.) e
+// formas duplas como "Cozinheiro(A)" ficam de fora.
+const FEMALE_ROLES = [
+  "camareira",
+  "arrumadeira",
+  "cozinheira",
+  "copeira",
+  "lavadeira",
+  "passadeira",
+  "faxineira",
+  "governanta",
+  "supervisora",
+  "gerenta",
+  "garconete",
+  "anfitria",
+  "anfitriã",
+  "auxiliar de camareira",
+  "auxiliar de cozinheira",
+  "secretaria",
+  "atendente feminina",
+  "recepcionista feminina",
+];
+
+const MALE_ROLES = [
+  "camareiro",
+  "arrumador",
+  "cozinheiro",
+  "copeiro",
+  "garcom",
+  "garçom",
+  "mensageiro",
+  "anfitriao",
+  "anfitrião",
+];
+
+function normalizeRole(role: string): string {
+  return role
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function detectGenderFromRole(role: string | null | undefined): "M" | "F" | "N" {
+  if (!role) return "N";
+  const r = normalizeRole(role);
+  // Cargos com marcação dupla (ex.: "Cozinheiro(a)", "Supervisor(a)", "Atendente (o/a)")
+  // são unissex — não dá para inferir o sexo.
+  if (/\((a|o\/a|a\/o)\)/i.test(r) || /\/a\b/.test(r) || /\bo\/a\b/.test(r)) return "N";
+  for (const k of FEMALE_ROLES) {
+    if (new RegExp(`\\b${k}\\b`).test(r)) return "F";
+  }
+  for (const k of MALE_ROLES) {
+    if (new RegExp(`\\b${k}\\b`).test(r)) return "M";
+  }
+  return "N";
+}
+
+export function detectGenderWithRole(
+  fullName: string | null | undefined,
+  role: string | null | undefined,
+): "M" | "F" | "N" {
+  const byName = detectGender(fullName);
+  if (byName !== "N") return byName;
+  return detectGenderFromRole(role);
+}
