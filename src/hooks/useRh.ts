@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseRhFile, type ParsedRhEmployee } from "@/lib/rhParser";
-import { detectGender } from "@/lib/rhGenderDetector";
+import { detectGenderWithRole } from "@/lib/rhGenderDetector";
 
 // ---------- types ----------
 
@@ -192,7 +192,7 @@ export function useUploadRhFile() {
           admission_date: e.admission_date,
           termination_date: e.dismissal_date,
           birth_date: e.birth_date,
-          gender: e.gender_raw || detectGender(e.full_name),
+          gender: e.gender_raw || detectGenderWithRole(e.full_name, e.role),
           salary: e.salary,
           status: e.status,
           source_format: parsed.format,
