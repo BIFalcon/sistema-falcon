@@ -16,7 +16,7 @@ const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--mute
 const BAR_COLOR = "hsl(var(--primary))";
 
 function formatPct(n: number) {
-  return `${n.toFixed(1)}%`;
+  return `${n.toFixed(2).replace(".", ",")}%`;
 }
 
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -126,8 +126,8 @@ export default function TurnoverPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Ativos" value={String(metrics.ativos)} />
-        <KpiCard label="Desligados (12m)" value={String(metrics.inativos)} />
+        <KpiCard label="Ativos / Total" value={String(metrics.ativos)} />
+        <KpiCard label="Desligamentos" value={String(metrics.inativos)} sub="planilha de rescisões" />
         <KpiCard label="% Experiência" value={formatPct(metrics.pctExperiencia)} sub="< 90 dias" />
         <KpiCard label="% Turnover" value={formatPct(metrics.pctTurnover)} />
         <KpiCard label="% Rotatividade" value={formatPct(metrics.pctRotatividade)} />
