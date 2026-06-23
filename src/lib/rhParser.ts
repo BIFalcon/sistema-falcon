@@ -76,14 +76,15 @@ function cleanCpf(value: unknown): string | null {
 }
 
 function findCol(header: string[], ...candidates: string[]): number {
-  const normalized = header.map((c) => toAscii(normalize(c)));
+  const stripDots = (s: string) => s.replace(/\./g, "");
+  const normalized = header.map((c) => stripDots(toAscii(normalize(c))));
   for (const cand of candidates) {
-    const target = toAscii(cand);
+    const target = stripDots(toAscii(cand));
     const idx = normalized.findIndex((h) => h === target);
     if (idx >= 0) return idx;
   }
   for (const cand of candidates) {
-    const target = toAscii(cand);
+    const target = stripDots(toAscii(cand));
     const idx = normalized.findIndex((h) => h.includes(target));
     if (idx >= 0) return idx;
   }
