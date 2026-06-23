@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis, LabelList } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -850,22 +850,13 @@ export default function IndicadoresDrePage() {
                     }
                   />
                   {visible.current  && (
-                    <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false}>
-                      <LabelList dataKey="current" position="top" offset={10} formatter={formatChartValue}
-                        style={{ fontSize: 11, fontWeight: 600, fill: "#1D4ED8" }} />
-                    </Line>
+                    <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false} />
                   )}
                   {visible.budget   && (
-                    <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3">
-                      <LabelList dataKey="budget" position="bottom" offset={10} formatter={formatChartValue}
-                        style={{ fontSize: 10, fill: "#16A34A" }} />
-                    </Line>
+                    <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3" />
                   )}
                   {visible.previous && (
-                    <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3">
-                      <LabelList dataKey="previous" position="top" offset={22} formatter={formatChartValue}
-                        style={{ fontSize: 10, fill: "#6B7280" }} />
-                    </Line>
+                    <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3" />
                   )}
                 </LineChart>
               </ChartContainer>
