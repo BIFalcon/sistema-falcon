@@ -481,8 +481,11 @@ export function calcMetrics(
     ativos,
     inativos,
     pctExperiencia: round2((novos / safeTotal) * 100),
-    pctTurnover: round2(((admissoes + desligamentos) / 2 / safeTotal) * 100),
-    pctRotatividade: round2((desligamentos / safeTotal) * 100),
+    // Definição validada com RH:
+    //   • Turnover     = desligamentos / ativos × 100
+    //   • Rotatividade = ((admissões + desligamentos) / 2) / ativos × 100
+    pctTurnover: round2((desligamentos / safeTotal) * 100),
+    pctRotatividade: round2(((admissoes + desligamentos) / 2 / safeTotal) * 100),
     porSexo,
     porFaixaEtaria,
     tempoCasaMedio: tempoCasaCount ? tempoCasaSum / tempoCasaCount : 0,
