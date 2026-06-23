@@ -582,9 +582,10 @@ function useDreAnalyticsImpl(input: {
             const [, key, mStr] = curMatch;
             const m = parseInt(mStr, 10) - 1;
             if (!seriesCur[key]) seriesCur[key] = Array(12).fill(null);
-            // Só popula o range corrente — fora dele permanece null para
-            // que o gráfico não desenhe meses fora do período em análise.
-            if (currentMonthRange.includes(m + 1)) seriesCur[key][m] = val ?? null;
+            // Popula do início do ano até o mês selecionado, para que o
+            // gráfico exiba a linha do Realizado em todos os meses anteriores
+            // (a tabela continua respeitando o `monthsWindow` do período).
+            if (m + 1 <= input.month) seriesCur[key][m] = val ?? null;
             continue;
           }
 
