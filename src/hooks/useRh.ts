@@ -413,15 +413,21 @@ export function calcMetrics(
     const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
     return !Number.isNaN(adm) && adm <= refTs;
   });
-  const total = knownAtRef.length;
-  const ativos = knownAtRef.filter(isActiveAtRef).length;
-  const inativos = total - ativos;
+  // Definição (ASSENSUS): a planilha mensal traz duas abas — ATIVOS (linhas
+  // sem data de rescisão) e RESCISÕES (linhas com data de rescisão). Os KPIs
+  // refletem exatamente isso:
+  //   • Ativos = Total      → linhas sem termination_date (ativos no mês)
+  //   • Desligamentos       → linhas com termination_date no upload do mês
+  const ativos = knownAtRef.filter((e) => !e.termination_date).length;
+  const desligamentosTotais = knownAtRef.filter((e) => !!e.termination_date).length;
+  const total = ativos;          // denominador = quadro ativo
+  const inativos = desligamentosTotais;
 
   const ninetyMs = 90 * 86400000;
 
   let novos = 0;
   let admissoes = 0;
-  let desligamentos = 0;
+  const desligamentos = desligamentosTotais;
   const porSexo = { M: 0, F: 0, N: 0 };
   const porFaixaEtaria: Record<string, number> = Object.fromEntries(FAIXAS.map((f) => [f.label, 0]));
   porFaixaEtaria["desconhecida"] = 0;
@@ -466,22 +472,17 @@ export function calcMetrics(
         admissoes++;
       }
     }
-    if (e.termination_date) {
-      const term = new Date(e.termination_date);
-      if (term.getFullYear() === targetYear && term.getMonth() + 1 === targetMonth) {
-        desligamentos++;
-      }
-    }
   }
 
   const safeTotal = total || 1;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   return {
     total,
     ativos,
     inativos,
-    pctExperiencia: (novos / safeTotal) * 100,
-    pctTurnover: ((admissoes + desligamentos) / 2 / safeTotal) * 100,
-    pctRotatividade: (desligamentos / safeTotal) * 100,
+    pctExperiencia: round2((novos / safeTotal) * 100),
+    pctTurnover: round2(((admissoes + desligamentos) / 2 / safeTotal) * 100),
+    pctRotatividade: round2((desligamentos / safeTotal) * 100),
     porSexo,
     porFaixaEtaria,
     tempoCasaMedio: tempoCasaCount ? tempoCasaSum / tempoCasaCount : 0,
