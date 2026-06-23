@@ -171,7 +171,15 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
       const row = rows[i] || [];
       const textCells = row.filter((c) => typeof c === "string" && (c as string).trim().length > 1).length;
       const flat = row.map((c) => toAscii(normalize(c))).join("|");
-      if (textCells >= 3 && (flat.includes("nome") || flat.includes("matric") || flat.includes("cpf"))) {
+      const flatNoDot = flat.replace(/\./g, "");
+      if (
+        textCells >= 3 &&
+        (flat.includes("nome") ||
+          flat.includes("matric") ||
+          flat.includes("empregado") ||
+          flat.includes("colaborador") ||
+          flatNoDot.includes("cpf"))
+      ) {
         headerIdx = i;
         break;
       }
@@ -184,8 +192,8 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
 
     const cols = {
       matricula: findCol(header, "matricula", "matrícula", "id", "codigo", "código"),
-      name: findCol(header, "nome", "nome completo", "colaborador", "funcionario", "funcionário"),
-      cpf: findCol(header, "cpf"),
+      name: findCol(header, "nome", "nome completo", "colaborador", "funcionario", "funcionário", "empregado"),
+      cpf: findCol(header, "cpf", "c.p.f", "c.p.f.", "nº do c.p.f.", "n do cpf", "no do cpf"),
       role: findCol(header, "cargo", "funcao", "função"),
       department: findCol(header, "setor", "departamento", "area", "área"),
       admission: findCol(header, "admissao", "admissão", "data admissao", "data de admissao", "dt admissao"),
