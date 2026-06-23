@@ -42,8 +42,15 @@ function mapKnownError(code: string): string {
     case "missing_token":
       return "Link inválido. Abra novamente o convite recebido por e-mail.";
     case "weak_password":
-      return "A senha não atende aos requisitos mínimos.";
+      return "Essa senha foi identificada em vazamentos públicos ou não atende aos requisitos mínimos de segurança. Escolha uma senha diferente — recomendamos combinar letras maiúsculas, minúsculas, números e símbolos, e evitar senhas comuns ou já usadas em outros sites.";
     default:
+      // Mensagens comuns vindas direto do GoTrue
+      if (/pwned|breach|compromised/i.test(code)) {
+        return "Essa senha aparece em vazamentos públicos conhecidos. Por segurança, escolha outra senha que você nunca tenha usado em outros sites.";
+      }
+      if (/password/i.test(code)) {
+        return "A senha informada não foi aceita: " + code;
+      }
       return code;
   }
 }
