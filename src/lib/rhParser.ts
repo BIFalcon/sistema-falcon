@@ -243,7 +243,10 @@ export async function parseRhFile(file: File | ArrayBuffer): Promise<ParseRhResu
   // os campos preservando admissão da aba ATIVOS e demissão da aba DEMITIDOS.
   const merged = new Map<string, ParsedRhEmployee>();
   for (const e of employees) {
-    const key = e.cpf || e.employee_key;
+    // Dedup preferindo matrícula/código (employee_key), pois a mesma planilha
+    // pode trazer CPFs repetidos (erros de digitação, jovens aprendizes, etc.)
+    // e não queremos colapsar pessoas distintas.
+    const key = e.employee_key || e.cpf || e.full_name;
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, { ...e, employee_key: key });
