@@ -560,7 +560,13 @@ export default function ContasPagarPage() {
     if (ids.length === 0) return;
     // Captura status anterior para permitir desfazer
     const previousByEntry = new Map<string, ApPaymentStatus>();
-    const allEntries = [...entries, ...distributionEntries];
+    const allEntries = [
+      ...entries,
+      ...distributionEntries,
+      ...salaryEntries,
+      ...paidEntries,
+      ...allPaidEntries,
+    ];
     for (const e of allEntries) {
       if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
     }
