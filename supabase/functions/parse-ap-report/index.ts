@@ -491,7 +491,7 @@ Deno.serve(async (req) => {
     for (let from = 0; ; from += pageSize) {
       const { data: page, error: pErr } = await admin
         .from("ap_entries")
-        .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status, original_amount")
+        .select("id, entry_key, lookup_key, gg_approval, gg_approval_by, gg_approval_at, gg_approval_notes, primary_document_id, observation, archived_at, payment_status, original_amount, is_group, grouped_ids")
         .eq("hotel_id", hotelId)
         .range(from, from + pageSize - 1);
       if (pErr) throw pErr;
@@ -621,11 +621,31 @@ Deno.serve(async (req) => {
     //    demais são arquivados normalmente.
     const toArchivePaid: string[] = [];
     const toArchiveOther: string[] = [];
+    // Match desagrupado: se uma remessa nova traz os filhos de um agrupamento
+    // anterior individualmente, o "pai" (is_group=true) some — mas isso NÃO
+    // significa que foi removido do OMIE. Tratamos como substituído (paid_history).
+    const toArchiveSubstituted: string[] = [];
     for (const e of existing ?? []) {
       if (updatedIds.has(e.id)) continue;
       if (seenKeys.has(e.entry_key) || e.archived_at) continue;
-      if (e.payment_status === "pago") toArchivePaid.push(e.id);
-      else toArchiveOther.push(e.id);
+      if (e.payment_status === "pago" || e.payment_status === "quitado") {
+        toArchivePaid.push(e.id);
+        continue;
+      }
+      // Verifica se é um agrupamento cujos filhos vieram desagrupados na nova
+      // remessa (todos os grouped_ids estão em updatedIds ou em seenKeys).
+      if (e.is_group && Array.isArray(e.grouped_ids) && e.grouped_ids.length > 0) {
+        const allChildrenMatched = (e.grouped_ids as string[]).every((cid) => {
+          if (updatedIds.has(cid)) return true;
+          const child = (existing ?? []).find((x: any) => x.id === cid);
+          return child ? seenKeys.has(child.entry_key) : false;
+        });
+        if (allChildrenMatched) {
+          toArchiveSubstituted.push(e.id);
+          continue;
+        }
+      }
+      toArchiveOther.push(e.id);
     }
     const nowIso = new Date().toISOString();
     const archiveChunk = 500;
@@ -634,6 +654,13 @@ Deno.serve(async (req) => {
       await admin
         .from("ap_entries")
         .update({ archived_at: nowIso, archived_reason: "paid_history" })
+        .in("id", chunk);
+    }
+    for (let i = 0; i < toArchiveSubstituted.length; i += archiveChunk) {
+      const chunk = toArchiveSubstituted.slice(i, i + archiveChunk);
+      await admin
+        .from("ap_entries")
+        .update({ archived_at: nowIso, archived_reason: "substituted", archived_upload_id: uploadRow.id })
         .in("id", chunk);
     }
     for (let i = 0; i < toArchiveOther.length; i += archiveChunk) {
@@ -680,6 +707,7 @@ Deno.serve(async (req) => {
       inserted: inserts.length,
       archived_paid: toArchivePaid.length,
       omie_removed: toArchiveOther.length,
+      substituted: toArchiveSubstituted.length,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("parse-ap-report error", err);
