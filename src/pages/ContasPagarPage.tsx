@@ -361,12 +361,9 @@ export default function ContasPagarPage() {
     const q = (searchText ?? "").toLowerCase().replace(",", ".").replace("r$", "").trim();
     const filteredPaid = sourcePaid.filter((e) => {
       const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
-      if (specificDates && specificDates.length > 0) {
-        if (!paidDate || !specificDates.includes(paidDate)) return false;
-      } else {
-        if (dateFrom && paidDate && paidDate < dateFrom) return false;
-        if (dateTo && paidDate && paidDate > dateTo) return false;
-      }
+      // Filtro dedicado de data de pagamento (só existe no modo "Ver pagos").
+      if (paidDateFrom && (!paidDate || paidDate < paidDateFrom)) return false;
+      if (paidDateTo && (!paidDate || paidDate > paidDateTo)) return false;
       if (q) {
         const matchText =
           e.supplier?.toLowerCase().includes(q) ||
@@ -388,7 +385,7 @@ export default function ContasPagarPage() {
       return true;
     });
     return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, dateFrom, dateTo, specificDates, searchText]);
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
