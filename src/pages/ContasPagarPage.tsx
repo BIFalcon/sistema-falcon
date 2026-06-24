@@ -66,8 +66,11 @@ import {
   useApEntries,
   useAllApEntries,
   useApPaidEntries,
+  useAllApPaidEntries,
   useApOmieRemovedEntries,
   useRestoreApEntry,
+  useDeleteApEntries,
+  useMarkRemovedAsPaid,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useUnscheduleEntries,
@@ -118,6 +121,9 @@ export default function ContasPagarPage() {
     isFinanceiroCoordenadora ||
     hasRole("controladoria");
   const canMarkPaid = !isFernando && (isMaster || isFinanceiroCoordenadora);
+  // Quitado: master, patronos ou qualquer usuário da Controladoria (inclui equipe).
+  const canMarkQuitado =
+    !isFernando && (isMaster || isFinanceiroCoordenadora || hasRole("controladoria"));
   const canMarkAutorizado = !isFernando && (isMaster || isFinanceiroCoordenadora);
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
@@ -232,11 +238,24 @@ export default function ContasPagarPage() {
   // Toggle "Ver pagos" (Bloco 7)
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
+  // Pagos de TODOS os hotéis (modo consolidado).
+  const { data: allPaidEntries = [] } = useAllApPaidEntries(showPaid && showingAllHotels);
 
   // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
   const [showOmieRemoved, setShowOmieRemoved] = useState(false);
-  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(hotelId, showOmieRemoved);
+  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
+    hotelId,
+    showOmieRemoved,
+    { dateFrom, dateTo },
+  );
   const restoreApEntry = useRestoreApEntry();
+  const deleteApEntries = useDeleteApEntries();
+  const markRemovedAsPaid = useMarkRemovedAsPaid();
+  // Estado da aba "Removidos do OMIE": seleção múltipla + modal "Marcar Pago".
+  const [removedSelectedIds, setRemovedSelectedIds] = useState<Set<string>>(new Set());
+  const [removedPaidOpen, setRemovedPaidOpen] = useState(false);
+  const [removedPaidDate, setRemovedPaidDate] = useState("");
+  const [removedPaidAmount, setRemovedPaidAmount] = useState("");
 
   // Edição inline de cartão a receber (Bloco 11)
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
