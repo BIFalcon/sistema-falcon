@@ -566,7 +566,12 @@ Deno.serve(async (req) => {
         bank_account: normalizeBank((p.raw as any)?.conta_corrente ?? null),
         hotel_cnpj: hotelCnpjDigits || null,
       };
-      const omieFalconStatus = sourceSystem === "omie" ? omieStatusToFalcon(p.omie_situation) : "em_aprovacao";
+      // TOTVS não traz status — entra sempre como "Não aprovado pelo GG"
+      // até que a equipe financeira marque manualmente.
+      const omieFalconStatus: ApPaymentStatus =
+        sourceSystem === "omie"
+          ? omieStatusToFalcon(p.omie_situation)
+          : "nao_aprovado_gg";
       if (prev) {
         updatedIds.add(prev.id);
         // Nova remessa substitui TUDO — apenas observation (comentário) é preservado
