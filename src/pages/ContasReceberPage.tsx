@@ -646,6 +646,19 @@ function DayBreakdown({
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
   const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
   const [sendDocsFor, setSendDocsFor] = useState<ToInvoiceEntry | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const allSelected = entries.length > 0 && entries.every((e) => selectedIds.has(e.id));
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(entries.map((e) => e.id)));
+  };
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -653,11 +666,33 @@ function DayBreakdown({
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Button>
         <h3 className="text-sm font-semibold">Lançamentos de {formatDay(day)}</h3>
+        {canShowActions && selectedIds.size > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {selectedIds.size} selecionado(s)
+            </span>
+            <Button size="sm" onClick={() => setBulkPayOpen(true)}>
+              Marcar como pago
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              Limpar
+            </Button>
+          </div>
+        )}
       </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              {canShowActions && (
+                <TableHead className="w-8">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Selecionar todos"
+                  />
+                </TableHead>
+              )}
               <TableHead>Cliente</TableHead>
               <TableHead>Invoice</TableHead>
               <TableHead>Reserva</TableHead>
@@ -698,6 +733,15 @@ function DayBreakdown({
                 : null;
               return (
                 <TableRow key={e.id}>
+                  {canShowActions && (
+                    <TableCell className="w-8">
+                      <Checkbox
+                        checked={selectedIds.has(e.id)}
+                        onCheckedChange={() => toggleSelected(e.id)}
+                        aria-label="Selecionar lançamento"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="font-medium text-sm">{e.account_name ?? "—"}</div>
                     <div className="text-xs text-muted-foreground">{e.account_number ?? ""}</div>
