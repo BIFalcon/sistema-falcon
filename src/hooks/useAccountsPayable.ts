@@ -10,6 +10,7 @@ export type ApPaymentStatus =
   | "agendado"     // agendado (unifica antigo "inserido")
   | "pago"         // pago
   | "pago_parcialmente" // pago parcialmente (OMIE)
+  | "quitado"      // quitado (após pago — fecha o ciclo)
   | "nao_aprovado_gg"; // OMIE indica que GG ainda não aprovou (a vencer/vencido/etc.)
 
 export interface ApUpload {
@@ -60,6 +61,8 @@ export interface ApEntry {
   paid_interest: number | null;
   paid_amount: number | null;
   original_amount: number | null;
+  settled_at?: string | null;
+  settled_by?: string | null;
   /** Flag paralelo "Pendente" — coexiste com payment_status. */
   is_pending?: boolean | null;
   is_group?: boolean | null;
