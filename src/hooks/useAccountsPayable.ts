@@ -440,8 +440,7 @@ export function useApPaidEntries(hotelId: string | null, enabled = false) {
         .from("ap_entries")
         .select("*")
         .eq("hotel_id", hotelId)
-        .not("archived_at", "is", null)
-        .eq("payment_status", "pago")
+        .in("payment_status", ["pago", "quitado", "pago_parcialmente"])
         .order("due_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ApEntry[];
@@ -449,14 +448,36 @@ export function useApPaidEntries(hotelId: string | null, enabled = false) {
   });
 }
 
+/** Pagos/quitados de TODOS os hotéis acessíveis ao usuário. */
+export function useAllApPaidEntries(enabled = false) {
+  return useQuery({
+    enabled,
+    queryKey: ["ap-paid-all"],
+    queryFn: async (): Promise<ApEntry[]> => {
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .select("*")
+        .in("payment_status", ["pago", "quitado", "pago_parcialmente"])
+        .order("payment_paid_at", { ascending: false, nullsFirst: false })
+        .limit(20000);
+      if (error) throw error;
+      return (data ?? []) as ApEntry[];
+    },
+  });
+}
+
 /** Lançamentos arquivados por sumirem da nova remessa do OMIE (e não foram pagos). */
-export function useApOmieRemovedEntries(hotelId: string | null, enabled = false) {
+export function useApOmieRemovedEntries(
+  hotelId: string | null,
+  enabled = false,
+  opts?: { dateFrom?: string; dateTo?: string },
+) {
   return useQuery({
     enabled: enabled && !!hotelId,
-    queryKey: ["ap-omie-removed", hotelId],
+    queryKey: ["ap-omie-removed", hotelId, opts?.dateFrom ?? "", opts?.dateTo ?? ""],
     queryFn: async (): Promise<(ApEntry & { archived_upload?: { file_name: string | null; uploaded_at: string | null } | null })[]> => {
       if (!hotelId) return [];
-      const { data, error } = await supabase
+      let q = supabase
         .from("ap_entries")
         .select("*, archived_upload:ap_uploads!ap_entries_archived_upload_id_fkey(file_name, uploaded_at)")
         .eq("hotel_id", hotelId)
@@ -464,6 +485,9 @@ export function useApOmieRemovedEntries(hotelId: string | null, enabled = false)
         .eq("archived_reason", "omie_removed")
         .order("archived_at", { ascending: false })
         .limit(2000);
+      if (opts?.dateFrom) q = q.gte("due_date", opts.dateFrom);
+      if (opts?.dateTo) q = q.lte("due_date", opts.dateTo);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
     },
@@ -474,15 +498,80 @@ export function useApOmieRemovedEntries(hotelId: string | null, enabled = false)
 export function useRestoreApEntry() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; hotelId: string }) => {
+    mutationFn: async (input: { id: string | string[]; hotelId: string }) => {
+      const ids = Array.isArray(input.id) ? input.id : [input.id];
+      if (ids.length === 0) return;
       const { error } = await supabase
         .from("ap_entries")
         .update({ archived_at: null, archived_reason: null, archived_upload_id: null } as never)
-        .eq("id", input.id);
+        .in("id", ids);
       if (error) throw error;
     },
     onSuccess: (_n, v) => {
       qc.invalidateQueries({ queryKey: ["ap-omie-removed", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+    },
+  });
+}
+
+/** Exclui de vez (hard delete) lançamentos arquivados — usado em "Removidos do OMIE". */
+export function useDeleteApEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; hotelId: string }) => {
+      if (input.ids.length === 0) return;
+      const { error } = await supabase
+        .from("ap_entries")
+        .delete()
+        .in("id", input.ids);
+      if (error) throw error;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-omie-removed", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-paid", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-paid-all"] });
+    },
+  });
+}
+
+/**
+ * Marca lançamentos REMOVIDOS do OMIE como Pagos (sem precisar restaurar antes).
+ * Move da aba "Removidos" para "Pagos": tira o flag de remoção, define status=pago
+ * e mantém archived_at preenchido (para continuar fora da lista de ativos).
+ */
+export function useMarkRemovedAsPaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      ids: string[];
+      hotelId: string;
+      paidDate: string; // YYYY-MM-DD
+      paidAmount?: number | null;
+      paidInterest?: number | null;
+    }) => {
+      if (input.ids.length === 0) return 0;
+      const update: Record<string, unknown> = {
+        payment_status: "pago",
+        payment_paid_at: new Date(`${input.paidDate}T12:00:00Z`).toISOString(),
+        archived_reason: "paid_history",
+        is_pending: false,
+      };
+      if (input.paidAmount != null) update.paid_amount = input.paidAmount;
+      if (input.paidInterest != null) update.paid_interest = input.paidInterest;
+      const { error } = await supabase
+        .from("ap_entries")
+        .update(update as never)
+        .in("id", input.ids);
+      if (error) throw error;
+      return input.ids.length;
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-omie-removed", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-paid", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-paid-all"] });
       qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
       qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
     },
