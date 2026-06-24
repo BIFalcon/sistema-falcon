@@ -23,6 +23,7 @@ import {
 } from "@/hooks/useHotelAssets";
 import { Building2, Image as ImageIcon, Search, Upload, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useSignedPrivateUrl } from "@/lib/privateStorage";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -170,6 +171,8 @@ export default function HoteisPage() {
 
 function HotelCard({ hotel, onSelect }: { hotel: HotelRow; onSelect: () => void }) {
   const ready = !!hotel.cover_url && !!hotel.brand_logo_url;
+  const coverUrl = useSignedPrivateUrl(hotel.cover_url, "hotel-assets");
+  const brandLogoUrl = useSignedPrivateUrl(hotel.brand_logo_url, "hotel-assets");
   return (
     <button
       type="button"
@@ -177,16 +180,16 @@ function HotelCard({ hotel, onSelect }: { hotel: HotelRow; onSelect: () => void 
       className="group text-left rounded-lg border bg-card hover:border-accent hover:shadow-soft transition-all overflow-hidden"
     >
       <div className="aspect-[16/9] bg-muted relative">
-        {hotel.cover_url ? (
-          <img src={hotel.cover_url} alt={hotel.name} className="h-full w-full object-cover" />
+        {hotel.cover_url && coverUrl ? (
+          <img src={coverUrl} alt={hotel.name} className="h-full w-full object-cover" />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground">
             <Building2 className="h-8 w-8" />
           </div>
         )}
-        {hotel.brand_logo_url && (
+        {hotel.brand_logo_url && brandLogoUrl && (
           <div className="absolute top-2 right-2 h-9 w-9 rounded bg-white/90 p-1 flex items-center justify-center shadow">
-            <img src={hotel.brand_logo_url} alt={hotel.brand} className="max-h-full max-w-full object-contain" />
+            <img src={brandLogoUrl} alt={hotel.brand} className="max-h-full max-w-full object-contain" />
           </div>
         )}
       </div>
