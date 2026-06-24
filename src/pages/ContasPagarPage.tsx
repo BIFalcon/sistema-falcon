@@ -300,15 +300,21 @@ export default function ContasPagarPage() {
     categories,
     urgencyCounts,
     overdueCount,
-    showOriginalAmount,
-    showPaidAmount,
-    showPaidInterest,
+    showOriginalAmount: showOriginalAmountRaw,
+    showPaidAmount: showPaidAmountRaw,
+    showPaidInterest: showPaidInterestRaw,
     issueCounts,
     issueEntries,
     totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
+
+  // No histórico de Pagos sempre exibimos as 3 colunas (valor original, valor novo,
+  // juros/desconto) para que o usuário veja com clareza o quanto foi pago de fato.
+  const showOriginalAmount = showOriginalAmountRaw || showPaid;
+  const showPaidAmount = showPaidAmountRaw || showPaid;
+  const showPaidInterest = showPaidInterestRaw || showPaid;
 
   // Aplica ordenação por coluna em cima do displayRows derivado.
   // Linhas do tipo "group" são mantidas no topo (a ordenação só altera entre singles).
