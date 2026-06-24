@@ -144,8 +144,11 @@ export default function ContasPagarPage() {
   );
   const sourceSystem = (hotel?.financial_system ?? null) as FinancialSystem | null;
   const isOmie = sourceSystem === "omie";
-  // Hotéis OMIE não têm aprovação GG no Falcon — correção é feita direto no OMIE.
-  const showApproval = !isOmie;
+  const isTotvs = sourceSystem === "totvs";
+  // OMIE: correção é feita direto no OMIE. TOTVS: aprovação é feita por e-mail.
+  const showApproval = !isOmie && !isTotvs;
+  // Em TOTVS, a coluna "Categoria" representa a Conta Corrente.
+  const categoryHeaderLabel = isTotvs ? "Conta Corrente" : "Categoria";
   const canApprove = canApproveBase && showApproval;
 
   // ── Dados remotos ──────────────────────────────────────────────────────
@@ -1841,7 +1844,7 @@ export default function ContasPagarPage() {
                     {showOriginalAmount && <TableHead className="text-right hidden lg:table-cell">Valor Original</TableHead>}
                     {showPaidAmount     && <TableHead className="text-right hidden lg:table-cell">Valor Novo</TableHead>}
                     {showPaidInterest   && <TableHead className="text-right hidden lg:table-cell">Juros / Desc.</TableHead>}
-                    <TableHead className="hidden lg:table-cell">Categoria</TableHead>
+                    <TableHead className="hidden lg:table-cell">{categoryHeaderLabel}</TableHead>
                     {sourceSystem === "omie" && <TableHead className="hidden lg:table-cell">Conta</TableHead>}
                     {showApproval && <TableHead>Aprovação GG</TableHead>}
                     <TableHead className="hidden md:table-cell">Agendado para</TableHead>
