@@ -36,11 +36,15 @@ async function callAi(aiKey: string, kind: "nota" | "boleto", dataUrl: string) {
   const sys = kind === "boleto"
     ? `Você lê BOLETOS bancários brasileiros (qualquer banco). Devolva SOMENTE JSON:
 {
-  "boleto_number": "string com o NÚMERO DO DOCUMENTO/título (Núm. do documento, Nosso Número ou Número do título) | null",
+  "boleto_number": "string com o NÚMERO DO DOCUMENTO do título | null",
   "due_date": "YYYY-MM-DD (campo Vencimento) | null",
   "amount": número decimal (Valor do Documento) | null,
   "barcode": "linha digitável (com ou sem pontos) | null"
 }
+REGRA CRÍTICA para boleto_number:
+- Use SEMPRE o campo "Núm. do documento" (também chamado de "Número do documento", "Número do título" ou "Seu número").
+- NUNCA use o "Nosso Número" (Nosso Nº / Nosso numero) — esse é o número interno do banco e NÃO é o que queremos.
+- Se houver ambos no boleto, escolha "Núm. do documento". Só caia para "Nosso Número" se realmente não existir o campo "Núm. do documento".
 Sem comentários. Datas em ISO. Se não conseguir ler, use null.`
     : `Você lê NOTAS FISCAIS brasileiras (NF-e, NFS-e, recibo). Devolva SOMENTE JSON:
 {
