@@ -574,8 +574,13 @@ Deno.serve(async (req) => {
           : "nao_aprovado_gg";
       if (prev) {
         updatedIds.add(prev.id);
-        // Nova remessa substitui TUDO — apenas observation (comentário) é preservado
-        const preservedStatus = omieFalconStatus;
+        // OMIE: nova remessa substitui o status (vem da própria planilha).
+        // TOTVS: planilha NÃO traz status — preserva o que o financeiro
+        // marcou manualmente (agendado, autorizado, pago, etc.).
+        const preservedStatus =
+          sourceSystem === "totvs"
+            ? (prev.payment_status ?? omieFalconStatus)
+            : omieFalconStatus;
         updates.push({
           id: prev.id,
           ...baseFields,
