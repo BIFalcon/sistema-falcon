@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Plus, Sparkles, Building2, Loader2, Paperclip, X, FileText, Pencil, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedPrivateUrl } from "@/lib/privateStorage";
 import {
   useRhCalendarDates,
   useAddCalendarPost,
@@ -96,8 +97,8 @@ export default function CalendarioPage() {
         const path = `calendar/${year}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { error } = await supabase.storage.from("rh-photos").upload(path, file, { upsert: true });
         if (error) { toast.error(`Erro ao enviar ${file.name}`); continue; }
-        const { data } = supabase.storage.from("rh-photos").getPublicUrl(path);
-        uploaded.push({ name: file.name, url: data.publicUrl });
+        // Bucket privado — armazena o path; URL assinada é gerada no clique.
+        uploaded.push({ name: file.name, url: path });
       }
       setAttachments((a) => [...a, ...uploaded]);
     } finally {
@@ -294,16 +295,19 @@ export default function CalendarioPage() {
                               {Array.isArray(p.attachments) && p.attachments.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {p.attachments.map((att: { name: string; url: string }, i: number) => (
-                                    <a
+                                    <button
                                       key={i}
-                                      href={att.url}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                      type="button"
+                                      onClick={async () => {
+                                        const signed = await getSignedPrivateUrl(att.url, "rh-photos");
+                                        if (signed) window.open(signed, "_blank", "noreferrer");
+                                        else toast.error("Não foi possível abrir o anexo.");
+                                      }}
                                       className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border border-border hover:bg-muted/50"
                                     >
                                       <FileText className="h-3 w-3" />
                                       <span className="truncate max-w-[180px]">{att.name}</span>
-                                    </a>
+                                    </button>
                                   ))}
                                 </div>
                               )}
