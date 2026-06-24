@@ -138,6 +138,7 @@ export default function OrganogramaPage() {
   const [form, setForm] = useState({ name: "", position: "", photo_url: "", responsibilities: "" });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const resps = useResponsibilities(editing?.id ?? null);
+  const editingPhotoUrl = useSignedPrivateUrl(form.photo_url || null, "rh-photos");
 
   const matriz = useMemo(() => buildTree(nodes.filter((n) => !n.hotel_id)), [nodes]);
 
@@ -306,8 +307,8 @@ export default function OrganogramaPage() {
             <div><Label>Cargo</Label><Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></div>
             <div className="space-y-2">
               <Label>Foto</Label>
-              {form.photo_url && (
-                <img src={form.photo_url} alt="" className="w-16 h-16 rounded-full object-cover border" />
+              {form.photo_url && editingPhotoUrl && (
+                <img src={editingPhotoUrl} alt="" className="w-16 h-16 rounded-full object-cover border" />
               )}
               <Input
                 type="file"
@@ -327,8 +328,8 @@ export default function OrganogramaPage() {
                       toast.error("Erro ao enviar foto.");
                       return;
                     }
-                    const { data: urlData } = supabase.storage.from("rh-photos").getPublicUrl(path);
-                    setForm((f) => ({ ...f, photo_url: urlData.publicUrl }));
+                    // Bucket is private — store the raw path; signed URLs are generated on read.
+                    setForm((f) => ({ ...f, photo_url: path }));
                   } finally {
                     setUploadingPhoto(false);
                   }
