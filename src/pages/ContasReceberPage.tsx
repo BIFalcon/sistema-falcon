@@ -1328,6 +1328,64 @@ function PaymentDialog({
 }
 
 function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
+  return _GgStatusBadgeImpl({ status });
+}
+
+function BulkPaidDialog({
+  open,
+  count,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  count: number;
+  onClose: () => void;
+  onConfirm: (paidDate: string) => Promise<void>;
+}) {
+  const [paidDate, setPaidDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setPaidDate(new Date().toISOString().slice(0, 10));
+      setSaving(false);
+    }
+  }, [open]);
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Marcar como pago</DialogTitle>
+          <DialogDescription>
+            {count} lançamento(s) selecionado(s). Informe a data do pagamento aplicada a todos.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label className="text-xs">Data do pagamento</Label>
+          <input
+            type="date"
+            value={paidDate}
+            onChange={(e) => setPaidDate(e.target.value)}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button
+            disabled={!paidDate || saving}
+            onClick={async () => {
+              setSaving(true);
+              try { await onConfirm(paidDate); } finally { setSaving(false); }
+            }}
+          >
+            {saving ? "Salvando..." : "Confirmar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function _GgStatusBadgeImpl({ status }: { status: ToInvoiceEntry["gg_status"] }) {
   if (status === "faturado")
     return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Faturado</Badge>;
   if (status === "nao_faturado")
