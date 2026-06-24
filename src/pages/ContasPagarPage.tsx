@@ -241,6 +241,11 @@ export default function ContasPagarPage() {
   // Pagos de TODOS os hotéis (modo consolidado).
   const { data: allPaidEntries = [] } = useAllApPaidEntries(showPaid && showingAllHotels);
 
+  // Filtro de data de pagamento — só aparece quando "Ver pagos" está ativo.
+  // Independente do filtro global de vencimento (que filtra ativos por due_date).
+  const [paidDateFrom, setPaidDateFrom] = useState("");
+  const [paidDateTo, setPaidDateTo] = useState("");
+
   // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
   const [showOmieRemoved, setShowOmieRemoved] = useState(false);
   const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
@@ -356,12 +361,9 @@ export default function ContasPagarPage() {
     const q = (searchText ?? "").toLowerCase().replace(",", ".").replace("r$", "").trim();
     const filteredPaid = sourcePaid.filter((e) => {
       const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
-      if (specificDates && specificDates.length > 0) {
-        if (!paidDate || !specificDates.includes(paidDate)) return false;
-      } else {
-        if (dateFrom && paidDate && paidDate < dateFrom) return false;
-        if (dateTo && paidDate && paidDate > dateTo) return false;
-      }
+      // Filtro dedicado de data de pagamento (só existe no modo "Ver pagos").
+      if (paidDateFrom && (!paidDate || paidDate < paidDateFrom)) return false;
+      if (paidDateTo && (!paidDate || paidDate > paidDateTo)) return false;
       if (q) {
         const matchText =
           e.supplier?.toLowerCase().includes(q) ||
@@ -383,7 +385,7 @@ export default function ContasPagarPage() {
       return true;
     });
     return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, dateFrom, dateTo, specificDates, searchText]);
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
@@ -1414,6 +1416,45 @@ export default function ContasPagarPage() {
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
+            {showPaid && (
+              <div className="flex items-end gap-3 flex-wrap p-3 rounded-md bg-muted/30 border">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Data de pagamento (de)
+                  </label>
+                  <Input
+                    type="date"
+                    value={paidDateFrom}
+                    onChange={(e) => setPaidDateFrom(e.target.value)}
+                    className="h-9 w-[160px]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Data de pagamento (até)
+                  </label>
+                  <Input
+                    type="date"
+                    value={paidDateTo}
+                    onChange={(e) => setPaidDateTo(e.target.value)}
+                    className="h-9 w-[160px]"
+                  />
+                </div>
+                {(paidDateFrom || paidDateTo) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9"
+                    onClick={() => { setPaidDateFrom(""); setPaidDateTo(""); }}
+                  >
+                    Limpar
+                  </Button>
+                )}
+                <p className="text-[11px] text-muted-foreground ml-auto">
+                  Filtra apenas pela <strong>data efetiva de pagamento</strong> dos lançamentos arquivados.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1702,6 +1743,38 @@ export default function ContasPagarPage() {
                         title="Marcar pagamento como Quitado (conferido pela controladoria)"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" /> Quitar
+                      </Button>
+                    )}
+                    {showPaid && canManage && selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        disabled={deleteApEntries.isPending}
+                        onClick={async () => {
+                          const ids = Array.from(selectedIds);
+                          if (!confirm(`Excluir definitivamente ${ids.length} lançamento(s) pago(s)?\n\nUse esta opção quando o pagamento foi estornado pelo banco ou registrado por engano.`)) return;
+                          // Agrupa por hotel para invalidar caches corretamente.
+                          const source = showingAllHotels ? allPaidEntries : paidEntries;
+                          const byHotel = new Map<string, string[]>();
+                          source.forEach((e) => {
+                            if (!selectedIds.has(e.id)) return;
+                            const arr = byHotel.get(e.hotel_id) ?? [];
+                            arr.push(e.id);
+                            byHotel.set(e.hotel_id, arr);
+                          });
+                          try {
+                            for (const [hid, hids] of byHotel) {
+                              await deleteApEntries.mutateAsync({ ids: hids, hotelId: hid });
+                            }
+                            toast.success(`${ids.length} lançamento(s) excluídos`);
+                            setSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
                       </Button>
                     )}
                     {selectedIds.size > 0 && canManage && (
