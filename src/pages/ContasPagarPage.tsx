@@ -1416,6 +1416,45 @@ export default function ContasPagarPage() {
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
+            {showPaid && (
+              <div className="flex items-end gap-3 flex-wrap p-3 rounded-md bg-muted/30 border">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Data de pagamento (de)
+                  </label>
+                  <Input
+                    type="date"
+                    value={paidDateFrom}
+                    onChange={(e) => setPaidDateFrom(e.target.value)}
+                    className="h-9 w-[160px]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Data de pagamento (até)
+                  </label>
+                  <Input
+                    type="date"
+                    value={paidDateTo}
+                    onChange={(e) => setPaidDateTo(e.target.value)}
+                    className="h-9 w-[160px]"
+                  />
+                </div>
+                {(paidDateFrom || paidDateTo) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9"
+                    onClick={() => { setPaidDateFrom(""); setPaidDateTo(""); }}
+                  >
+                    Limpar
+                  </Button>
+                )}
+                <p className="text-[11px] text-muted-foreground ml-auto">
+                  Filtra apenas pela <strong>data efetiva de pagamento</strong> dos lançamentos arquivados.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
