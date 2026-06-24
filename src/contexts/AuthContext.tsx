@@ -19,6 +19,10 @@ interface AuthContextValue {
   roles: AppRole[];
   userHotels: Hotel[];
   allowedHotels: Hotel[];
+  /** Hotel "Matriz" (rh_only), exposto à parte para uso exclusivo do módulo de RH. */
+  matrizHotel: Hotel | null;
+  /** True quando o usuário pode ver Matriz no filtro de Turnover/Rotatividade. */
+  canSeeMatriz: boolean;
   loading: boolean;
   isMaster: boolean;
   isGg: boolean;
@@ -71,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase
           .from("hotels")
           .select(
-            "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,created_at",
+            "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,rh_only,created_at",
           )
           .eq("is_active", true)
           .order("name"),
@@ -148,7 +152,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isMaster = roles.some((r) => (MASTER_ROLES as readonly string[]).includes(r));
   const GLOBAL_ACCESS_ROLES = ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer"];
   const hasGlobalAccess = isMaster || roles.some((r) => GLOBAL_ACCESS_ROLES.includes(r as string));
-  const allowedHotels = hasGlobalAccess ? allHotels : userHotels;
+  // Hotéis "rh_only" (ex.: Matriz) nunca entram nos filtros globais.
+  const isRhOnly = (h: Hotel) => (h as { rh_only?: boolean }).rh_only === true;
+  const allowedHotels = (hasGlobalAccess ? allHotels : userHotels).filter((h) => !isRhOnly(h));
+  const matrizHotel = allHotels.find(isRhOnly) ?? null;
+  const canSeeMatriz =
+    !!matrizHotel &&
+    (isMaster ||
+      roles.includes("rh" as AppRole) ||
+      roles.includes("viewer" as AppRole) ||
+      roles.includes("fernando" as AppRole));
 
   const isPatronos = roles.includes("patronos" as AppRole);
   // O papel "financeiro" foi descontinuado: equipe migrou para controladoria, coordenadoria virou patronos.
@@ -181,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     userHotels,
     allowedHotels,
+    matrizHotel,
+    canSeeMatriz,
     loading,
     isMaster,
     isGg: roles.includes("gg" as AppRole),
