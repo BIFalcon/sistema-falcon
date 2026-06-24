@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgNodes, type RhOrgNode } from "@/hooks/useRh";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignedPrivateUrl } from "@/lib/privateStorage";
 
 interface NodeWithChildren extends RhOrgNode {
   children: NodeWithChildren[];
@@ -57,6 +58,7 @@ function OrgNode({
   const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children.length > 0;
   const isVacant = node.is_open_position;
+  const photoUrl = useSignedPrivateUrl(node.photo_url, "rh-photos");
 
   return (
     <div className="flex flex-col items-center">
@@ -68,8 +70,8 @@ function OrgNode({
           onClick={() => hasChildren && setExpanded((x) => !x)}
         >
           <div className="w-14 h-14 rounded-full overflow-hidden mx-auto mb-2 bg-muted border-2 border-primary/20 flex items-center justify-center">
-            {node.photo_url ? (
-              <img src={node.photo_url} alt={node.name} className="w-full h-full object-cover" />
+            {node.photo_url && photoUrl ? (
+              <img src={photoUrl} alt={node.name} className="w-full h-full object-cover" />
             ) : (
               <span className="text-xl font-bold text-muted-foreground">
                 {isVacant ? "?" : (node.name?.charAt(0).toUpperCase() ?? "?")}
