@@ -28,6 +28,7 @@ import { HighlightsEditor } from "@/components/closings/HighlightsEditor";
 import { AiNarrativePanel } from "@/components/closings/AiNarrativePanel";
 import { CartaPdfViewerDialog } from "@/components/closings/CartaPdfViewerDialog";
 import { MONTHS_PT, hotelSkipsCarta, sanitizeFileName } from "@/lib/constants";
+import { getSignedPrivateUrl } from "@/lib/privateStorage";
 import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle, RefreshCw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
@@ -293,12 +294,16 @@ export default function CartaPage() {
     }
     setGeneratingPdf(true);
     try {
+      const [hotelCoverUrl, brandLogoUrl] = await Promise.all([
+        getSignedPrivateUrl(hotelRow?.cover_url ?? null, "hotel-assets"),
+        getSignedPrivateUrl(hotelRow?.brand_logo_url ?? null, "hotel-assets"),
+      ]);
       const blob = await generateLetterPdf({
         letter,
         closing,
         hotel,
-        hotelCoverUrl: hotelRow?.cover_url ?? null,
-        brandLogoUrl: hotelRow?.brand_logo_url ?? null,
+        hotelCoverUrl,
+        brandLogoUrl,
         falconLogoUrl: falconLogoUrl ?? null,
         highlights,
         indicators: indicatorMap,
