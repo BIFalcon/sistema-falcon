@@ -1745,6 +1745,38 @@ export default function ContasPagarPage() {
                         <CheckCircle2 className="h-3.5 w-3.5" /> Quitar
                       </Button>
                     )}
+                    {showPaid && canManage && selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        disabled={deleteApEntries.isPending}
+                        onClick={async () => {
+                          const ids = Array.from(selectedIds);
+                          if (!confirm(`Excluir definitivamente ${ids.length} lançamento(s) pago(s)?\n\nUse esta opção quando o pagamento foi estornado pelo banco ou registrado por engano.`)) return;
+                          // Agrupa por hotel para invalidar caches corretamente.
+                          const source = showingAllHotels ? allPaidEntries : paidEntries;
+                          const byHotel = new Map<string, string[]>();
+                          source.forEach((e) => {
+                            if (!selectedIds.has(e.id)) return;
+                            const arr = byHotel.get(e.hotel_id) ?? [];
+                            arr.push(e.id);
+                            byHotel.set(e.hotel_id, arr);
+                          });
+                          try {
+                            for (const [hid, hids] of byHotel) {
+                              await deleteApEntries.mutateAsync({ ids: hids, hotelId: hid });
+                            }
+                            toast.success(`${ids.length} lançamento(s) excluídos`);
+                            setSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    )}
                     {selectedIds.size > 0 && canManage && (
                       <Button
                         size="sm"
