@@ -517,6 +517,10 @@ export default function ContasPagarPage() {
       toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
       return;
     }
+    if (newStatus === "quitado" && !canMarkQuitado) {
+      toast.error("Apenas controladoria/patronos podem quitar");
+      return;
+    }
     if (newStatus === "autorizado" && !canMarkAutorizado) {
       toast.error("Apenas a coordenadoria do financeiro pode autorizar pagamentos");
       return;
@@ -1535,6 +1539,18 @@ export default function ContasPagarPage() {
                         onClick={() => handleBulkPaymentStatus("pago")}
                       >
                         <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                      </Button>
+                    )}
+                    {canMarkQuitado && showPaid && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-teal-500/40 text-teal-700 hover:bg-teal-500/10 dark:text-teal-400"
+                        disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                        onClick={() => handleBulkPaymentStatus("quitado")}
+                        title="Marcar pagamento como Quitado (conferido pela controladoria)"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Quitar
                       </Button>
                     )}
                     {selectedIds.size > 0 && canManage && (
