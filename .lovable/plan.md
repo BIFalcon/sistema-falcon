@@ -1,42 +1,61 @@
-## Problema
+## 1) Histórico de Pagamentos — colunas faltantes + busca
 
-Hoje, ao escolher **Matriz** no filtro do Turnover, o sistema cai em **3 Rios Plaza**. Causa: o `AppHeader` tem um efeito que, se o `hotelId` selecionado não existe na lista de hotéis permitidos, reseta para o primeiro hotel da lista. Como `__matriz__` é apenas um valor de marcador (não um hotel real), ele é descartado e substituído.
+**Tabela "Pagos" (histórico):**
+- Adicionar 3 colunas visíveis: **Valor original**, **Juros pagos** e **Valor pago (efetivo)**. Hoje só aparece o valor original.
+- Mostrar as colunas mesmo quando o lançamento ficou arquivado (após nova remessa). O parser do OMIE já preserva `paid_amount` e `paid_interest` ao arquivar; o histórico passa a ler esses campos.
 
-Além disso, hoje não existe nenhum "lugar" para armazenar colaboradores da Matriz, então só corrigir o reset não resolve — a Matriz precisa ter um escopo próprio para receber a planilha de ativos/desligados.
+**Filtro/busca:**
+- Corrigir o filtro de busca da aba "Pagos": hoje o estado de busca da aba ativa não é aplicado ao subconjunto histórico. Vou unificar com o mesmo `searchTerm` que já existe e aplicar nos campos `supplier_name`, `description`, `amount`, `paid_amount`, `cnpj`, `nota`.
 
-## Solução
+## 2) Novo status "Quitado"
 
-Tratar Matriz como um **"hotel especial" usado apenas em RH/Turnover**, com planilha própria e isolado dos outros módulos.
+**Fluxo:** Coordenadora/Patrono marca **Pago** → qualquer usuário da Controladoria (incl. equipe) pode marcar como **Quitado**.
 
-### 1. Banco (migração)
-- Criar 1 registro em `hotels` representando a Matriz (ex.: id `matriz`, nome "Matriz", `active = true`, `show_in_closing = false`).
-- Adicionar coluna booleana `rh_only` (default `false`) em `hotels` e marcá-la como `true` para esse registro. Essa flag indica: "só aparece em telas de RH (Turnover/Rotatividade)".
+**Banco (migração):**
+- Estender o enum `ap_payment_status` com `quitado` (mantém `pago`, `pago_parcialmente`, `agendado`, `pendente`).
+- Adicionar colunas: `settled_at timestamptz`, `settled_by uuid`.
+- Trigger `enforce_ap_payment_status_change`: permitir transição `pago → quitado` para Master/Controladoria/Patronos; bloquear marcar `quitado` se status atual não é `pago`/`pago_parcialmente`.
+- Atualizar policies para permitir update do campo por controladoria.
 
-### 2. Permissões / lista de hotéis (`AuthContext` + `useHotelAssets`)
-- Onde a lista `allowedHotels` é construída, **excluir hotéis com `rh_only = true`** do retorno padrão.
-- Expor uma lista paralela `rhAllowedHotels` (ou similar) que inclui Matriz apenas para usuários com papel **Master, RH, Viewer ou Fernando**.
+**Front:**
+- Botão "Marcar Quitado" na linha (e em lote) na aba **Pagos**, visível para Master/Controladoria/Patronos.
+- Badge "Quitado" com cor distinta.
+- Aba "Pagos" passa a listar **Pago + Quitado**, com filtro adicional `subStatus`.
 
-### 3. Filtro no header (`AppHeader.tsx`)
-- Quando estiver na rota `/rh/turnover` e o usuário puder ver Matriz, mostrar o item "Matriz" no Select (já existe), mas usando o **id real do hotel Matriz** em vez do sentinela `__matriz__`.
-- Ajustar o efeito que reseta `hotelId` para considerar válidos tanto os hotéis em `allowedHotels` **quanto** o hotel Matriz quando o usuário tem permissão e está na tela de Turnover. Isso elimina o "vira 3 Rios Plaza".
-- Garantir que Matriz **não apareça** em nenhum outro filtro global (Financeiro, Indicadores, Fechamento, etc.).
+**Pendente desaparece após pagar:** o "Pendente" já é o default; vou ajustar a contagem/filtro "Pendente" para excluir entries com `payment_status in ('pago','pago_parcialmente','quitado','agendado')`. Hoje em alguns lugares ainda aparece como pendente — vou corrigir o derived em `useApPageDerived`.
 
-### 4. Página de Turnover (`TurnoverPage.tsx`)
-- Nenhuma mudança de lógica de filtro além de aceitar o id da Matriz como qualquer outro hotel (o filtro `e.hotel_id === hotelId` já cobre).
-- **Ranking**: excluir Matriz do ranking entre hotéis (ela é corporativa, não compete).
-- **Upload**: o botão de upload já usa `hotelId`; ao ter Matriz selecionada, a planilha é importada com `hotel_id = matriz`. Os mesmos formatos POUSADA/ASSENSUS/RCASTRO continuam aceitos.
+## 3) Visão "Todos os hotéis" — histórico de pagos
 
-### 5. Sidebar / navegação
-- Nenhuma mudança. Matriz não vira item de menu — continua sendo apenas uma opção dentro do filtro de hotel do Turnover.
+Na visão consolidada (sem hotel selecionado), adicionar a aba/toggle **"Pagos (todos os hotéis)"** mostrando tudo que já foi pago/quitado, com coluna "Hotel" e os mesmos campos (Valor original, Juros, Valor pago, Data do pagamento, Quem marcou).
 
-## Resultado esperado
+## 4) Removidos do OMIE — 5 ajustes
 
-- Master, RH, Viewer e Fernando veem "Matriz" no filtro do Turnover; ao selecionar, a tela mostra zero dados (até subir a primeira planilha) — e **não** cai mais em 3 Rios Plaza.
-- Upload da planilha de ativos/desligados da Matriz fica vinculado a esse escopo isolado.
-- Matriz não aparece em Financeiro, Fechamento, Indicadores, Conciliação, etc.
-- KPIs, gráficos e cálculos (Ativos, Desligamentos, % Experiência, % Turnover, % Rotatividade, Tempo de casa) funcionam para Matriz exatamente como para qualquer outro hotel.
+a. **Seleção múltipla** com checkbox por linha + "selecionar todos" + ações em lote: **Restaurar**, **Marcar como Pago**, **Excluir**.
 
-## Fora deste plano
+b. **Marcar como Pago direto** (sem precisar restaurar): para Patrono/Master. Abre o mesmo modal de data efetiva + valor pago + juros. Mantém o lançamento fora dos ativos, só registra o pagamento e move de "Removidos" para "Pagos".
 
-- Ajustes nos parsers POUSADA/R.CASTRO/Carneiros (combinado para o próximo passo).
-- Qualquer mudança de fórmula nos indicadores (continuam as já validadas).
+c. **Match desagrupado:** ao processar uma remessa nova, antes de marcar como "removidos" os lançamentos antigos agrupados, **expandir o agrupamento** (campo `grouped_entry_ids` no `ap_entries` — verificar nome) e comparar item-a-item (fornecedor + valor + vencimento) contra a remessa nova desagrupada. Se cada componente do agrupado bater, considerar substituído e arquivar como "pago/substituído", não como "removido".
+
+d. **Excluir lançamentos removidos:** ação por linha + em lote → hard delete (ou `archived_status='excluido'`). Visível para Master/Patrono/Controladoria.
+
+e. **Filtro global de vencimento aplica-se à aba Removidos do OMIE**: hoje a lista ignora `dateFrom/dateTo`. Vou aplicar o mesmo filtro de período (`due_date BETWEEN dateFrom AND dateTo`) na query `useApOmieRemovedEntries`.
+
+## 5) E-mails aos ADMs no Notify-GG
+
+Bug: o template/edge function `notify-gg-ap` envia ao GG mas os ADMs (e CCs adicionados no `NotifyGgDialog`) não recebem.
+
+**Investigar e corrigir:**
+- Conferir se `extra_recipients` está sendo persistido em `ap_notification_log` e enviado em `to`/`cc` na função.
+- Conferir se os usuários com role `adm` do hotel estão sendo incluídos automaticamente (espelhar `users_with_role_for_hotel('adm', ...)` como já é feito em AR).
+- Garantir `cc` na chamada Resend e log no `email_send_log`.
+
+## Detalhes técnicos
+
+- Tipos do Supabase serão regenerados após a migração (aceitar antes de codar o front que depende de `settled_at`).
+- Não mexer nas fórmulas/parsers de DRE. Não mexer no escopo Matriz/RH.
+- Manter testes: `scripts/test-parse-arc.mjs` — adicionar caso para match desagrupado se houver fixture.
+
+## Fora de escopo
+
+- Mudar UI/UX além do necessário para os 5 itens.
+- Ajustar Contas a Receber, Conciliação, RH, etc.

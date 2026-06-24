@@ -609,6 +609,12 @@ const STATUS_CONFIG: Record<ApPaymentStatus, { label: string; className: string;
     tooltip: "Pagamento parcial registrado no OMIE",
     Icon: Banknote,
   },
+  quitado: {
+    label: "Quitado",
+    className: "border-teal-500/40 text-teal-700 dark:text-teal-400 bg-teal-50/40 dark:bg-teal-500/10",
+    tooltip: "Pagamento conferido e quitado pela controladoria",
+    Icon: CheckCircle2,
+  },
 };
 
 export function PaymentStatusBadge({

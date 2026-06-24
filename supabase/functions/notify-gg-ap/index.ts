@@ -69,11 +69,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Buscar dados
-    const [{ data: hotel }, { data: entriesRaw }, { data: ggs }] = await Promise.all([
+    // Buscar dados — inclui automaticamente GG e ADM do hotel.
+    const [{ data: hotel }, { data: entriesRaw }, { data: ggs }, { data: adms }] = await Promise.all([
       admin.from("hotels").select("id,name,financial_system").eq("id", hotelId).single(),
       admin.from("ap_entries").select("*").eq("hotel_id", hotelId).in("id", entryIds),
       admin.rpc("users_with_role_for_hotel", { _role: "gg", _hotel_id: hotelId }),
+      admin.rpc("users_with_role_for_hotel", { _role: "adm", _hotel_id: hotelId }),
     ]);
 
     // Filtra por intervalo de vencimento (se informado).
@@ -92,7 +93,8 @@ Deno.serve(async (req) => {
     }
 
     const ggRecipients = (ggs ?? []) as { user_id: string; email: string; display_name: string | null }[];
-    if (ggRecipients.length === 0 && extraEmails.length === 0) {
+    const admRecipients = (adms ?? []) as { user_id: string; email: string; display_name: string | null }[];
+    if (ggRecipients.length === 0 && admRecipients.length === 0 && extraEmails.length === 0) {
       return new Response(JSON.stringify({ ok: true, sent: 0, recipients: 0, warning: "no_gg_for_hotel" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -141,6 +143,21 @@ Deno.serve(async (req) => {
           body_md: bodyMd,
           link_url: linkUrl,
           payload: { manual: true, entry_count: entries.length, total },
+        })),
+      ...admRecipients
+        .filter((a) => a.user_id && a.email)
+        .filter((a) => !ggRecipients.some((g) => g.user_id === a.user_id))
+        .map((a) => ({
+          event: "ap_pendencies_to_gg" as const,
+          closing_id: null,
+          hotel_id: hotelId,
+          recipient_user_id: a.user_id,
+          recipient_email: a.email,
+          recipient_role: "adm",
+          subject,
+          body_md: bodyMd,
+          link_url: linkUrl,
+          payload: { manual: true, entry_count: entries.length, total, cc: true },
         })),
       ...extraEmails.map((email) => ({
         event: "ap_pendencies_to_gg" as const,

@@ -258,6 +258,8 @@ export type Database = {
           primary_document_id: string | null
           raw: Json
           scheduled_date: string | null
+          settled_at: string | null
+          settled_by: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           transfer_from_bank: string | null
@@ -306,6 +308,8 @@ export type Database = {
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null
+          settled_at?: string | null
+          settled_by?: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           transfer_from_bank?: string | null
@@ -354,6 +358,8 @@ export type Database = {
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null
+          settled_at?: string | null
+          settled_by?: string | null
           source_system?: Database["public"]["Enums"]["financial_system"]
           supplier?: string
           transfer_from_bank?: string | null
@@ -2577,6 +2583,7 @@ export type Database = {
         | "autorizado"
         | "pago_parcialmente"
         | "nao_aprovado_gg"
+        | "quitado"
       app_role:
         | "processos"
         | "fernando"
@@ -2774,6 +2781,7 @@ export const Constants = {
         "autorizado",
         "pago_parcialmente",
         "nao_aprovado_gg",
+        "quitado",
       ],
       app_role: [
         "processos",

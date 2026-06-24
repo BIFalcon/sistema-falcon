@@ -66,8 +66,11 @@ import {
   useApEntries,
   useAllApEntries,
   useApPaidEntries,
+  useAllApPaidEntries,
   useApOmieRemovedEntries,
   useRestoreApEntry,
+  useDeleteApEntries,
+  useMarkRemovedAsPaid,
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useUnscheduleEntries,
@@ -118,6 +121,9 @@ export default function ContasPagarPage() {
     isFinanceiroCoordenadora ||
     hasRole("controladoria");
   const canMarkPaid = !isFernando && (isMaster || isFinanceiroCoordenadora);
+  // Quitado: master, patronos ou qualquer usuário da Controladoria (inclui equipe).
+  const canMarkQuitado =
+    !isFernando && (isMaster || isFinanceiroCoordenadora || hasRole("controladoria"));
   const canMarkAutorizado = !isFernando && (isMaster || isFinanceiroCoordenadora);
   const isGg = hasRole("gg");
   const canApproveBase = canManage || isGg;
@@ -232,11 +238,24 @@ export default function ContasPagarPage() {
   // Toggle "Ver pagos" (Bloco 7)
   const [showPaid, setShowPaid] = useState(false);
   const { data: paidEntries = [] } = useApPaidEntries(hotelId, showPaid);
+  // Pagos de TODOS os hotéis (modo consolidado).
+  const { data: allPaidEntries = [] } = useAllApPaidEntries(showPaid && showingAllHotels);
 
   // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
   const [showOmieRemoved, setShowOmieRemoved] = useState(false);
-  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(hotelId, showOmieRemoved);
+  const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
+    hotelId,
+    showOmieRemoved,
+    { dateFrom, dateTo },
+  );
   const restoreApEntry = useRestoreApEntry();
+  const deleteApEntries = useDeleteApEntries();
+  const markRemovedAsPaid = useMarkRemovedAsPaid();
+  // Estado da aba "Removidos do OMIE": seleção múltipla + modal "Marcar Pago".
+  const [removedSelectedIds, setRemovedSelectedIds] = useState<Set<string>>(new Set());
+  const [removedPaidOpen, setRemovedPaidOpen] = useState(false);
+  const [removedPaidDate, setRemovedPaidDate] = useState("");
+  const [removedPaidAmount, setRemovedPaidAmount] = useState("");
 
   // Edição inline de cartão a receber (Bloco 11)
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -281,15 +300,21 @@ export default function ContasPagarPage() {
     categories,
     urgencyCounts,
     overdueCount,
-    showOriginalAmount,
-    showPaidAmount,
-    showPaidInterest,
+    showOriginalAmount: showOriginalAmountRaw,
+    showPaidAmount: showPaidAmountRaw,
+    showPaidInterest: showPaidInterestRaw,
     issueCounts,
     issueEntries,
     totalToPayPeriod,
     distributionTotal,
     balanceDiff,
   } = derived;
+
+  // No histórico de Pagos sempre exibimos as 3 colunas (valor original, valor novo,
+  // juros/desconto) para que o usuário veja com clareza o quanto foi pago de fato.
+  const showOriginalAmount = showOriginalAmountRaw || showPaid;
+  const showPaidAmount = showPaidAmountRaw || showPaid;
+  const showPaidInterest = showPaidInterestRaw || showPaid;
 
   // Aplica ordenação por coluna em cima do displayRows derivado.
   // Linhas do tipo "group" são mantidas no topo (a ordenação só altera entre singles).
@@ -322,21 +347,43 @@ export default function ContasPagarPage() {
   // Linhas efetivas exibidas — alterna entre ativos (displayRows) e pagos
   const effectiveDisplayRows = useMemo<typeof displayRows>(() => {
     if (!showPaid) return displayRows;
+    // Fonte dos pagos: hotel selecionado OU consolidado (todos os hotéis).
+    const sourcePaid = showingAllHotels ? allPaidEntries : paidEntries;
     // Item 7 (Cuiabá): aplica o filtro de data sobre a DATA DE PAGAMENTO
     // (payment_paid_at) — não sobre o vencimento. Isso unifica o comportamento
     // entre hotéis em que o vencimento coincide com a data de pagamento (OMIE)
     // e Cuiabá (TOTVS), onde frequentemente são diferentes.
-    const filteredPaid = paidEntries.filter((e) => {
+    const q = (searchText ?? "").toLowerCase().replace(",", ".").replace("r$", "").trim();
+    const filteredPaid = sourcePaid.filter((e) => {
       const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
       if (specificDates && specificDates.length > 0) {
-        return paidDate ? specificDates.includes(paidDate) : false;
+        if (!paidDate || !specificDates.includes(paidDate)) return false;
+      } else {
+        if (dateFrom && paidDate && paidDate < dateFrom) return false;
+        if (dateTo && paidDate && paidDate > dateTo) return false;
       }
-      if (dateFrom && paidDate && paidDate < dateFrom) return false;
-      if (dateTo && paidDate && paidDate > dateTo) return false;
+      if (q) {
+        const matchText =
+          e.supplier?.toLowerCase().includes(q) ||
+          e.cnpj?.toLowerCase().includes(q) ||
+          e.document_number?.toLowerCase().includes(q);
+        if (!matchText) {
+          const candidates = [
+            Number(e.amount ?? 0),
+            Number(e.paid_amount ?? 0),
+            Number(e.original_amount ?? 0),
+          ];
+          const matchVal = candidates.some((v) => {
+            const val = v.toFixed(2);
+            return val.includes(q) || val.replace(".", ",").includes(q);
+          });
+          if (!matchVal) return false;
+        }
+      }
       return true;
     });
     return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, dateFrom, dateTo, specificDates]);
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, dateFrom, dateTo, specificDates, searchText]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
@@ -469,11 +516,17 @@ export default function ContasPagarPage() {
   }
 
   async function handleBulkPaymentStatus(newStatus: ApPaymentStatus) {
-    if (!hotelId) return;
     const ids = Array.from(selectedIds);
+    // Para Quitar permitimos modo consolidado (sem hotel selecionado);
+    // demais ações continuam exigindo um hotel ativo.
+    if (newStatus !== "quitado" && !hotelId) return;
     if (ids.length === 0) return;
     if (newStatus === "pago" && !canMarkPaid) {
       toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
+      return;
+    }
+    if (newStatus === "quitado" && !canMarkQuitado) {
+      toast.error("Apenas controladoria/patronos podem quitar");
       return;
     }
     if (newStatus === "autorizado" && !canMarkAutorizado) {
@@ -508,19 +561,25 @@ export default function ContasPagarPage() {
     newStatus: ApPaymentStatus,
     extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number; paidDate?: string },
   ) {
-    if (!hotelId) return;
     const ids = Array.from(selectedIds);
+    if (newStatus !== "quitado" && !hotelId) return;
     if (ids.length === 0) return;
     // Captura status anterior para permitir desfazer
     const previousByEntry = new Map<string, ApPaymentStatus>();
-    const allEntries = [...entries, ...distributionEntries];
+    const allEntries = [
+      ...entries,
+      ...distributionEntries,
+      ...salaryEntries,
+      ...paidEntries,
+      ...allPaidEntries,
+    ];
     for (const e of allEntries) {
       if (selectedIds.has(e.id)) previousByEntry.set(e.id, e.payment_status);
     }
     const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
       await setPaymentStatus.mutateAsync({
-        hotelId,
+        hotelId: hotelId ?? "",
         entryIds: ids,
         status: newStatus,
         scheduledDate: extra?.scheduledDate ?? null,
@@ -1024,31 +1083,31 @@ export default function ContasPagarPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* "Ver pagos" disponível com hotel selecionado OU em modo consolidado. */}
+                <Button
+                  variant={showPaid ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setShowPaid((p) => !p);
+                    setShowOmieRemoved(false);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  {showPaid ? "Ver ativos" : "Ver pagos"}
+                </Button>
                 {hotelId && (
-                  <>
-                    <Button
-                      variant={showPaid ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowPaid((p) => !p);
-                        setShowOmieRemoved(false);
-                        setSelectedIds(new Set());
-                      }}
-                    >
-                      {showPaid ? "Ver ativos" : "Ver pagos"}
-                    </Button>
-                    <Button
-                      variant={showOmieRemoved ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowOmieRemoved((p) => !p);
-                        setShowPaid(false);
-                        setSelectedIds(new Set());
-                      }}
-                    >
-                      {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
-                    </Button>
-                  </>
+                  <Button
+                    variant={showOmieRemoved ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setShowOmieRemoved((p) => !p);
+                      setShowPaid(false);
+                      setSelectedIds(new Set());
+                      setRemovedSelectedIds(new Set());
+                    }}
+                  >
+                    {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
+                  </Button>
                 )}
                 {lastUpload && (
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
@@ -1132,12 +1191,113 @@ export default function ContasPagarPage() {
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Estes lançamentos estavam ativos e <strong>sumiram</strong> em uma remessa do OMIE sem serem marcados como pagos.
-                  Use "Restaurar" se quiser reincluí-los na lista de ativos.
+                  Use "Restaurar" para reincluir, "Marcar Pago" se já foram quitados, ou "Excluir" para remover de vez.
+                  O filtro global de vencimento também se aplica aqui.
                 </p>
+                {canManage && (
+                  <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md bg-muted/30 flex-wrap">
+                    <div className="text-xs text-muted-foreground">
+                      {removedSelectedIds.size > 0
+                        ? `${removedSelectedIds.size} selecionado(s)`
+                        : "Selecione lançamentos para ações em lote"}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={removedSelectedIds.size === 0 || restoreApEntry.isPending}
+                        onClick={async () => {
+                          try {
+                            await restoreApEntry.mutateAsync({
+                              id: Array.from(removedSelectedIds),
+                              hotelId,
+                            });
+                            toast.success(`${removedSelectedIds.size} lançamento(s) restaurados`);
+                            setRemovedSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao restaurar");
+                          }
+                        }}
+                      >
+                        Restaurar
+                      </Button>
+                      {canMarkPaid && (
+                        <Button
+                          size="sm"
+                          className="h-8 gap-1"
+                          disabled={removedSelectedIds.size === 0 || markRemovedAsPaid.isPending}
+                          onClick={() => {
+                            const today = new Date();
+                            const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+                            setRemovedPaidDate(iso);
+                            const sum = omieRemovedEntries
+                              .filter((e) => removedSelectedIds.has(e.id))
+                              .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+                            setRemovedPaidAmount(sum.toFixed(2));
+                            setRemovedPaidOpen(true);
+                          }}
+                        >
+                          <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        disabled={removedSelectedIds.size === 0 || deleteApEntries.isPending}
+                        onClick={async () => {
+                          if (!confirm(`Excluir definitivamente ${removedSelectedIds.size} lançamento(s)?`)) return;
+                          try {
+                            await deleteApEntries.mutateAsync({
+                              ids: Array.from(removedSelectedIds),
+                              hotelId,
+                            });
+                            toast.success(`${removedSelectedIds.size} lançamento(s) excluídos`);
+                            setRemovedSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                      {removedSelectedIds.size > 0 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8"
+                          onClick={() => setRemovedSelectedIds(new Set())}
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {canManage && (
+                          <TableHead className="w-8">
+                            <Checkbox
+                              checked={
+                                omieRemovedEntries.length > 0 &&
+                                omieRemovedEntries.every((e) => removedSelectedIds.has(e.id))
+                              }
+                              onCheckedChange={(c) => {
+                                setRemovedSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (c) omieRemovedEntries.forEach((e) => next.add(e.id));
+                                  else omieRemovedEntries.forEach((e) => next.delete(e.id));
+                                  return next;
+                                });
+                              }}
+                              aria-label="Selecionar todos removidos"
+                            />
+                          </TableHead>
+                        )}
                         <TableHead>Fornecedor</TableHead>
                         <TableHead>Nº Doc</TableHead>
                         <TableHead>Vencimento</TableHead>
@@ -1151,7 +1311,7 @@ export default function ContasPagarPage() {
                     <TableBody>
                       {omieRemovedEntries.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground text-sm py-6">
+                          <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground text-sm py-6">
                             Nenhum lançamento removido do OMIE.
                           </TableCell>
                         </TableRow>
@@ -1160,6 +1320,21 @@ export default function ContasPagarPage() {
                         const upload = (e as { archived_upload?: { file_name: string | null; uploaded_at: string | null } | null }).archived_upload;
                         return (
                           <TableRow key={e.id}>
+                            {canManage && (
+                              <TableCell className="w-8">
+                                <Checkbox
+                                  checked={removedSelectedIds.has(e.id)}
+                                  onCheckedChange={(c) => {
+                                    setRemovedSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (c) next.add(e.id);
+                                      else next.delete(e.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="font-medium">{e.supplier}</div>
                               {e.cnpj && <div className="text-[11px] text-muted-foreground">{e.cnpj}</div>}
@@ -1177,21 +1352,42 @@ export default function ContasPagarPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               {canManage ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={restoreApEntry.isPending}
-                                  onClick={async () => {
-                                    try {
-                                      await restoreApEntry.mutateAsync({ id: e.id, hotelId });
-                                      toast.success("Lançamento restaurado para ativos");
-                                    } catch (err: any) {
-                                      toast.error(err?.message ?? "Falha ao restaurar");
-                                    }
-                                  }}
-                                >
-                                  Restaurar
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={restoreApEntry.isPending}
+                                    onClick={async () => {
+                                      try {
+                                        await restoreApEntry.mutateAsync({ id: e.id, hotelId });
+                                        toast.success("Lançamento restaurado para ativos");
+                                      } catch (err: any) {
+                                        toast.error(err?.message ?? "Falha ao restaurar");
+                                      }
+                                    }}
+                                  >
+                                    Restaurar
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    disabled={deleteApEntries.isPending}
+                                    title="Excluir definitivamente"
+                                    onClick={async () => {
+                                      if (!confirm("Excluir este lançamento definitivamente?")) return;
+                                      try {
+                                        await deleteApEntries.mutateAsync({ ids: [e.id], hotelId });
+                                        toast.success("Lançamento excluído");
+                                      } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               ) : (
                                 <span className="text-[11px] text-muted-foreground">sem permissão</span>
                               )}
@@ -1240,6 +1436,7 @@ export default function ContasPagarPage() {
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
+                  { value: "quitado", label: "Quitado" },
                   { value: "pendente", label: "Pendente (flag)" },
                   { value: "manual", label: "Lançamento manual" },
                   { value: "transferencia", label: "Transferência entre contas" },
@@ -1493,6 +1690,18 @@ export default function ContasPagarPage() {
                         onClick={() => handleBulkPaymentStatus("pago")}
                       >
                         <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                      </Button>
+                    )}
+                    {canMarkQuitado && showPaid && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8 border-teal-500/40 text-teal-700 hover:bg-teal-500/10 dark:text-teal-400"
+                        disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
+                        onClick={() => handleBulkPaymentStatus("quitado")}
+                        title="Marcar pagamento como Quitado (conferido pela controladoria)"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Quitar
                       </Button>
                     )}
                     {selectedIds.size > 0 && canManage && (
@@ -2115,6 +2324,93 @@ export default function ContasPagarPage() {
               onClick={() => {
                 setPaidConfirmOpen(false);
                 executeStatusChange("pago", { paidDate });
+              }}
+            >
+              Confirmar pagamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal "Marcar Pago" para lançamentos em Removidos do OMIE */}
+      <AlertDialog open={removedPaidOpen} onOpenChange={setRemovedPaidOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar pagamento (Removidos do OMIE)</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removedSelectedIds.size} lançamento(s) serão marcados como Pagos sem
+              voltar para a lista de ativos. Aparecerão na aba "Pagos".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Data de pagamento
+              </label>
+              <Input
+                type="date"
+                value={removedPaidDate}
+                onChange={(e) => setRemovedPaidDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Valor pago (com juros / desconto, se houver)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                value={removedPaidAmount}
+                onChange={(e) => setRemovedPaidAmount(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setRemovedPaidAmount)}
+              />
+              {(() => {
+                const original = omieRemovedEntries
+                  .filter((e) => removedSelectedIds.has(e.id))
+                  .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+                const paidNum = parseFloat(removedPaidAmount || "0");
+                const diff = paidNum - original;
+                return (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Original: <strong>{fmtBRL(original)}</strong>
+                    {Math.abs(diff) >= 0.005 && (
+                      <>
+                        {" · "}
+                        {diff > 0 ? "Juros" : "Desconto"}:{" "}
+                        <strong>{fmtBRL(Math.abs(diff))}</strong>
+                      </>
+                    )}
+                  </p>
+                );
+              })()}
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!removedPaidDate || !hotelId || markRemovedAsPaid.isPending}
+              onClick={async () => {
+                if (!hotelId) return;
+                const original = omieRemovedEntries
+                  .filter((e) => removedSelectedIds.has(e.id))
+                  .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+                const paidNum = parseFloat(removedPaidAmount || "0");
+                const diff = paidNum - original;
+                const hasDelta = !Number.isNaN(paidNum) && Math.abs(diff) >= 0.005;
+                try {
+                  await markRemovedAsPaid.mutateAsync({
+                    ids: Array.from(removedSelectedIds),
+                    hotelId,
+                    paidDate: removedPaidDate,
+                    paidAmount: hasDelta ? paidNum : null,
+                    paidInterest: hasDelta ? diff : null,
+                  });
+                  toast.success(`${removedSelectedIds.size} lançamento(s) marcados como Pago`);
+                  setRemovedSelectedIds(new Set());
+                  setRemovedPaidOpen(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Erro ao marcar como pago");
+                }
               }}
             >
               Confirmar pagamento
