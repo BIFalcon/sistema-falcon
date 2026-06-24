@@ -13,6 +13,19 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRhTrainings, type RhTraining } from "@/hooks/useRh";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignedPrivateUrl } from "@/lib/privateStorage";
+
+function TrainingCardImage({ url, alt }: { url: string; alt: string }) {
+  const signed = useSignedPrivateUrl(url, "rh-assets");
+  if (!signed) return null;
+  return <img src={signed} alt={alt} className="w-full h-full object-cover" />;
+}
+
+function TrainingPreviewImage({ url }: { url: string }) {
+  const signed = useSignedPrivateUrl(url, "rh-assets");
+  if (!signed) return null;
+  return <img src={signed} alt="preview" className="w-full h-full object-cover" />;
+}
 
 export default function TreinamentosPage() {
   const { data: trainings = [] } = useRhTrainings();
@@ -63,8 +76,8 @@ export default function TreinamentosPage() {
           .from("rh-assets")
           .upload(path, imageFile, { upsert: false, contentType: imageFile.type });
         if (upErr) throw upErr;
-        const { data: pub } = supabase.storage.from("rh-assets").getPublicUrl(path);
-        image_url = pub.publicUrl;
+        // Bucket privado — armazena o path; URLs assinadas são geradas em leitura.
+        image_url = path;
       }
       const payload = {
         title: form.title,
@@ -115,7 +128,7 @@ export default function TreinamentosPage() {
               <Card key={t.id} className="p-4 shadow-soft flex flex-col gap-2">
                 {t.image_url && (
                   <div className="-mx-4 -mt-4 mb-1 h-32 overflow-hidden rounded-t-md bg-muted">
-                    <img src={t.image_url} alt={t.title} className="w-full h-full object-cover" />
+                    <TrainingCardImage url={t.image_url} alt={t.title} />
                   </div>
                 )}
                 <div className="flex items-start justify-between gap-2">
@@ -157,11 +170,11 @@ export default function TreinamentosPage() {
               <div className="flex items-center gap-3 mt-1">
                 {(imageFile || form.image_url) && (
                   <div className="relative h-16 w-16 rounded-md overflow-hidden bg-muted shrink-0">
-                    <img
-                      src={imageFile ? URL.createObjectURL(imageFile) : (form.image_url || "")}
-                      alt="preview"
-                      className="w-full h-full object-cover"
-                    />
+                    {imageFile ? (
+                      <img src={URL.createObjectURL(imageFile)} alt="preview" className="w-full h-full object-cover" />
+                    ) : form.image_url ? (
+                      <TrainingPreviewImage url={form.image_url} />
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => { setImageFile(null); setForm({ ...form, image_url: "" }); if (imgRef.current) imgRef.current.value = ""; }}
