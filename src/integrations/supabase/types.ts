@@ -1438,6 +1438,7 @@ export type Database = {
           name: string
           num_apartments: number | null
           opera_property_name: string | null
+          rh_only: boolean
           show_in_closing: boolean
         }
         Insert: {
@@ -1456,6 +1457,7 @@ export type Database = {
           name: string
           num_apartments?: number | null
           opera_property_name?: string | null
+          rh_only?: boolean
           show_in_closing?: boolean
         }
         Update: {
@@ -1474,6 +1476,7 @@ export type Database = {
           name?: string
           num_apartments?: number | null
           opera_property_name?: string | null
+          rh_only?: boolean
           show_in_closing?: boolean
         }
         Relationships: []

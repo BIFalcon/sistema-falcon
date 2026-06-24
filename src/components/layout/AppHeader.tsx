@@ -47,16 +47,14 @@ export function AppHeader() {
   const { pathname } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
-  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole } = useAuth();
+  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
   const isHomePage = pathname === "/" || pathname === "/home";
   const isMarketing = pathname.startsWith("/marketing");
   const isRhTurnover = pathname.startsWith("/rh/turnover");
-  const canSeeMatriz =
-    isRhTurnover &&
-    (isMaster || hasRole("rh") || hasRole("viewer") || hasRole("fernando"));
+  const showMatrizOption = isRhTurnover && canSeeMatriz && !!matrizHotel;
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
@@ -82,13 +80,14 @@ export function AppHeader() {
 
   // Garante que o hotel selecionado é permitido (ou null = todos quando master)
   useEffect(() => {
-    if (hotelId && !allowedHotels.find((h) => h.id === hotelId)) {
+    const isMatrizSelected = showMatrizOption && hotelId === matrizHotel?.id;
+    if (hotelId && !allowedHotels.find((h) => h.id === hotelId) && !isMatrizSelected) {
       setHotelId(allowedHotels[0]?.id ?? null);
     }
     if (!hotelId && !isMaster && allowedHotels.length === 1) {
       setHotelId(allowedHotels[0].id);
     }
-  }, [allowedHotels, hotelId, isMaster, setHotelId]);
+  }, [allowedHotels, hotelId, isMaster, setHotelId, showMatrizOption, matrizHotel]);
 
   // GG: forçar sempre o único hotel permitido
   useEffect(() => {
@@ -191,8 +190,8 @@ export function AppHeader() {
                   {h.name}
                 </SelectItem>
               ))}
-              {canSeeMatriz && (
-                <SelectItem value="__matriz__">Matriz</SelectItem>
+              {showMatrizOption && matrizHotel && (
+                <SelectItem value={matrizHotel.id}>{matrizHotel.name}</SelectItem>
               )}
             </SelectContent>
           </Select>
