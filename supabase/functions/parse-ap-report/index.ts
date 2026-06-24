@@ -147,7 +147,6 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
     const docNumber = normalize(row[3]);
     const dueRaw = row[5];
     const paymentMethod = normalize(row[6]);
-    const interest = parseNumber(row[9]);
     const amount = parseNumber(row[11]);
     if (!supplier || amount <= 0) continue;
     // pula cabeçalhos / totais
@@ -169,10 +168,10 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
       payment_method: paymentMethod || null,
       category: null,
       observation: null,
-      interest_fees: interest || null,
+      interest_fees: null,
       omie_situation: null,
       is_distribution: isDistributionEntry(null, description),
-      raw: { row },
+      raw: { row, conta_corrente: paymentMethod || null },
     });
   }
   return out;
