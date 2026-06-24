@@ -1074,6 +1074,27 @@ function DayBreakdown({
           toast.success("Documentos enviados ao Financeiro");
         }}
       />
+      <BulkPaidDialog
+        open={bulkPayOpen}
+        count={selectedIds.size}
+        onClose={() => setBulkPayOpen(false)}
+        onConfirm={async (paidDate) => {
+          const ids = Array.from(selectedIds);
+          const selectedEntries = entries.filter((e) => ids.includes(e.id));
+          for (const e of selectedEntries) {
+            await setStatus.mutateAsync({
+              id: e.id,
+              gg_status: e.gg_status,
+              gg_note: e.gg_note,
+              paid_date: paidDate,
+              paid_note: null,
+            });
+          }
+          setBulkPayOpen(false);
+          setSelectedIds(new Set());
+          toast.success(`${ids.length} lançamento(s) marcados como pagos`);
+        }}
+      />
     </div>
   );
 }
