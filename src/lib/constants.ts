@@ -44,6 +44,7 @@ export interface Hotel {
   brand: string;
   active: boolean;
   show_in_closing?: boolean;
+  rh_only?: boolean;
 }
 
 // ====== Workflow de Fechamento ======
