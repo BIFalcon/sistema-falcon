@@ -147,7 +147,6 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
     const docNumber = normalize(row[3]);
     const dueRaw = row[5];
     const paymentMethod = normalize(row[6]);
-    const interest = parseNumber(row[9]);
     const amount = parseNumber(row[11]);
     if (!supplier || amount <= 0) continue;
     // pula cabeçalhos / totais
@@ -169,10 +168,10 @@ function parseTotvsXls(buf: ArrayBuffer): ParsedEntry[] {
       payment_method: paymentMethod || null,
       category: null,
       observation: null,
-      interest_fees: interest || null,
+      interest_fees: null,
       omie_situation: null,
       is_distribution: isDistributionEntry(null, description),
-      raw: { row },
+      raw: { row, conta_corrente: paymentMethod || null },
     });
   }
   return out;
@@ -567,11 +566,21 @@ Deno.serve(async (req) => {
         bank_account: normalizeBank((p.raw as any)?.conta_corrente ?? null),
         hotel_cnpj: hotelCnpjDigits || null,
       };
-      const omieFalconStatus = sourceSystem === "omie" ? omieStatusToFalcon(p.omie_situation) : "em_aprovacao";
+      // TOTVS não traz status — entra sempre como "Não aprovado pelo GG"
+      // até que a equipe financeira marque manualmente.
+      const omieFalconStatus: ApPaymentStatus =
+        sourceSystem === "omie"
+          ? omieStatusToFalcon(p.omie_situation)
+          : "nao_aprovado_gg";
       if (prev) {
         updatedIds.add(prev.id);
-        // Nova remessa substitui TUDO — apenas observation (comentário) é preservado
-        const preservedStatus = omieFalconStatus;
+        // OMIE: nova remessa substitui o status (vem da própria planilha).
+        // TOTVS: planilha NÃO traz status — preserva o que o financeiro
+        // marcou manualmente (agendado, autorizado, pago, etc.).
+        const preservedStatus =
+          sourceSystem === "totvs"
+            ? (prev.payment_status ?? omieFalconStatus)
+            : omieFalconStatus;
         updates.push({
           id: prev.id,
           ...baseFields,
