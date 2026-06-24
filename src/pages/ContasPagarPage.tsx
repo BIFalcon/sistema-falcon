@@ -1065,31 +1065,31 @@ export default function ContasPagarPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* "Ver pagos" disponível com hotel selecionado OU em modo consolidado. */}
+                <Button
+                  variant={showPaid ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setShowPaid((p) => !p);
+                    setShowOmieRemoved(false);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  {showPaid ? "Ver ativos" : "Ver pagos"}
+                </Button>
                 {hotelId && (
-                  <>
-                    <Button
-                      variant={showPaid ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowPaid((p) => !p);
-                        setShowOmieRemoved(false);
-                        setSelectedIds(new Set());
-                      }}
-                    >
-                      {showPaid ? "Ver ativos" : "Ver pagos"}
-                    </Button>
-                    <Button
-                      variant={showOmieRemoved ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowOmieRemoved((p) => !p);
-                        setShowPaid(false);
-                        setSelectedIds(new Set());
-                      }}
-                    >
-                      {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
-                    </Button>
-                  </>
+                  <Button
+                    variant={showOmieRemoved ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setShowOmieRemoved((p) => !p);
+                      setShowPaid(false);
+                      setSelectedIds(new Set());
+                      setRemovedSelectedIds(new Set());
+                    }}
+                  >
+                    {showOmieRemoved ? "Ver ativos" : "Removidos do OMIE"}
+                  </Button>
                 )}
                 {lastUpload && (
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
