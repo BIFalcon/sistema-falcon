@@ -1185,12 +1185,113 @@ export default function ContasPagarPage() {
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Estes lançamentos estavam ativos e <strong>sumiram</strong> em uma remessa do OMIE sem serem marcados como pagos.
-                  Use "Restaurar" se quiser reincluí-los na lista de ativos.
+                  Use "Restaurar" para reincluir, "Marcar Pago" se já foram quitados, ou "Excluir" para remover de vez.
+                  O filtro global de vencimento também se aplica aqui.
                 </p>
+                {canManage && (
+                  <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md bg-muted/30 flex-wrap">
+                    <div className="text-xs text-muted-foreground">
+                      {removedSelectedIds.size > 0
+                        ? `${removedSelectedIds.size} selecionado(s)`
+                        : "Selecione lançamentos para ações em lote"}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={removedSelectedIds.size === 0 || restoreApEntry.isPending}
+                        onClick={async () => {
+                          try {
+                            await restoreApEntry.mutateAsync({
+                              id: Array.from(removedSelectedIds),
+                              hotelId,
+                            });
+                            toast.success(`${removedSelectedIds.size} lançamento(s) restaurados`);
+                            setRemovedSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao restaurar");
+                          }
+                        }}
+                      >
+                        Restaurar
+                      </Button>
+                      {canMarkPaid && (
+                        <Button
+                          size="sm"
+                          className="h-8 gap-1"
+                          disabled={removedSelectedIds.size === 0 || markRemovedAsPaid.isPending}
+                          onClick={() => {
+                            const today = new Date();
+                            const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+                            setRemovedPaidDate(iso);
+                            const sum = omieRemovedEntries
+                              .filter((e) => removedSelectedIds.has(e.id))
+                              .reduce((s, e) => s + Number(e.amount ?? 0), 0);
+                            setRemovedPaidAmount(sum.toFixed(2));
+                            setRemovedPaidOpen(true);
+                          }}
+                        >
+                          <Banknote className="h-3.5 w-3.5" /> Marcar Pago
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        disabled={removedSelectedIds.size === 0 || deleteApEntries.isPending}
+                        onClick={async () => {
+                          if (!confirm(`Excluir definitivamente ${removedSelectedIds.size} lançamento(s)?`)) return;
+                          try {
+                            await deleteApEntries.mutateAsync({
+                              ids: Array.from(removedSelectedIds),
+                              hotelId,
+                            });
+                            toast.success(`${removedSelectedIds.size} lançamento(s) excluídos`);
+                            setRemovedSelectedIds(new Set());
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                      {removedSelectedIds.size > 0 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8"
+                          onClick={() => setRemovedSelectedIds(new Set())}
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {canManage && (
+                          <TableHead className="w-8">
+                            <Checkbox
+                              checked={
+                                omieRemovedEntries.length > 0 &&
+                                omieRemovedEntries.every((e) => removedSelectedIds.has(e.id))
+                              }
+                              onCheckedChange={(c) => {
+                                setRemovedSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (c) omieRemovedEntries.forEach((e) => next.add(e.id));
+                                  else omieRemovedEntries.forEach((e) => next.delete(e.id));
+                                  return next;
+                                });
+                              }}
+                              aria-label="Selecionar todos removidos"
+                            />
+                          </TableHead>
+                        )}
                         <TableHead>Fornecedor</TableHead>
                         <TableHead>Nº Doc</TableHead>
                         <TableHead>Vencimento</TableHead>
@@ -1204,7 +1305,7 @@ export default function ContasPagarPage() {
                     <TableBody>
                       {omieRemovedEntries.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground text-sm py-6">
+                          <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground text-sm py-6">
                             Nenhum lançamento removido do OMIE.
                           </TableCell>
                         </TableRow>
@@ -1213,6 +1314,21 @@ export default function ContasPagarPage() {
                         const upload = (e as { archived_upload?: { file_name: string | null; uploaded_at: string | null } | null }).archived_upload;
                         return (
                           <TableRow key={e.id}>
+                            {canManage && (
+                              <TableCell className="w-8">
+                                <Checkbox
+                                  checked={removedSelectedIds.has(e.id)}
+                                  onCheckedChange={(c) => {
+                                    setRemovedSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (c) next.add(e.id);
+                                      else next.delete(e.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="font-medium">{e.supplier}</div>
                               {e.cnpj && <div className="text-[11px] text-muted-foreground">{e.cnpj}</div>}
@@ -1230,21 +1346,42 @@ export default function ContasPagarPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               {canManage ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={restoreApEntry.isPending}
-                                  onClick={async () => {
-                                    try {
-                                      await restoreApEntry.mutateAsync({ id: e.id, hotelId });
-                                      toast.success("Lançamento restaurado para ativos");
-                                    } catch (err: any) {
-                                      toast.error(err?.message ?? "Falha ao restaurar");
-                                    }
-                                  }}
-                                >
-                                  Restaurar
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={restoreApEntry.isPending}
+                                    onClick={async () => {
+                                      try {
+                                        await restoreApEntry.mutateAsync({ id: e.id, hotelId });
+                                        toast.success("Lançamento restaurado para ativos");
+                                      } catch (err: any) {
+                                        toast.error(err?.message ?? "Falha ao restaurar");
+                                      }
+                                    }}
+                                  >
+                                    Restaurar
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    disabled={deleteApEntries.isPending}
+                                    title="Excluir definitivamente"
+                                    onClick={async () => {
+                                      if (!confirm("Excluir este lançamento definitivamente?")) return;
+                                      try {
+                                        await deleteApEntries.mutateAsync({ ids: [e.id], hotelId });
+                                        toast.success("Lançamento excluído");
+                                      } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               ) : (
                                 <span className="text-[11px] text-muted-foreground">sem permissão</span>
                               )}
