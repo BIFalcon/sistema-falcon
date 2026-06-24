@@ -341,21 +341,43 @@ export default function ContasPagarPage() {
   // Linhas efetivas exibidas — alterna entre ativos (displayRows) e pagos
   const effectiveDisplayRows = useMemo<typeof displayRows>(() => {
     if (!showPaid) return displayRows;
+    // Fonte dos pagos: hotel selecionado OU consolidado (todos os hotéis).
+    const sourcePaid = showingAllHotels ? allPaidEntries : paidEntries;
     // Item 7 (Cuiabá): aplica o filtro de data sobre a DATA DE PAGAMENTO
     // (payment_paid_at) — não sobre o vencimento. Isso unifica o comportamento
     // entre hotéis em que o vencimento coincide com a data de pagamento (OMIE)
     // e Cuiabá (TOTVS), onde frequentemente são diferentes.
-    const filteredPaid = paidEntries.filter((e) => {
+    const q = (searchText ?? "").toLowerCase().replace(",", ".").replace("r$", "").trim();
+    const filteredPaid = sourcePaid.filter((e) => {
       const paidDate = (e.payment_paid_at ?? "").slice(0, 10) || e.due_date || "";
       if (specificDates && specificDates.length > 0) {
-        return paidDate ? specificDates.includes(paidDate) : false;
+        if (!paidDate || !specificDates.includes(paidDate)) return false;
+      } else {
+        if (dateFrom && paidDate && paidDate < dateFrom) return false;
+        if (dateTo && paidDate && paidDate > dateTo) return false;
       }
-      if (dateFrom && paidDate && paidDate < dateFrom) return false;
-      if (dateTo && paidDate && paidDate > dateTo) return false;
+      if (q) {
+        const matchText =
+          e.supplier?.toLowerCase().includes(q) ||
+          e.cnpj?.toLowerCase().includes(q) ||
+          e.document_number?.toLowerCase().includes(q);
+        if (!matchText) {
+          const candidates = [
+            Number(e.amount ?? 0),
+            Number(e.paid_amount ?? 0),
+            Number(e.original_amount ?? 0),
+          ];
+          const matchVal = candidates.some((v) => {
+            const val = v.toFixed(2);
+            return val.includes(q) || val.replace(".", ",").includes(q);
+          });
+          if (!matchVal) return false;
+        }
+      }
       return true;
     });
     return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, dateFrom, dateTo, specificDates]);
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, dateFrom, dateTo, specificDates, searchText]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
@@ -1259,6 +1281,7 @@ export default function ContasPagarPage() {
                   { value: "agendado", label: "Agendado" },
                   { value: "pago", label: "Pago" },
                   { value: "pago_parcialmente", label: "Pago Parcialmente" },
+                  { value: "quitado", label: "Quitado" },
                   { value: "pendente", label: "Pendente (flag)" },
                   { value: "manual", label: "Lançamento manual" },
                   { value: "transferencia", label: "Transferência entre contas" },
