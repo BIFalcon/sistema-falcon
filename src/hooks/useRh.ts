@@ -82,13 +82,15 @@ export function useRhEmployees(hotelId?: string, referenceMonth?: number, refere
   return useQuery({
     queryKey: ["rh", "employees", hotelId ?? "all", referenceYear ?? "all-years", referenceMonth ?? "all-months"],
     queryFn: async () => {
-      let q = supabase.from("rh_employees").select("*").order("name");
-      if (hotelId) q = q.eq("hotel_id", hotelId);
-      if (referenceMonth) q = q.eq("reference_month", referenceMonth);
-      if (referenceYear) q = q.eq("reference_year", referenceYear);
-      const { data, error } = await q;
+      // RPC com máscara: GG vê a lista sem CPF/salário/data de nascimento/dados
+      // de demissão. RH/Master continuam vendo tudo.
+      const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
+        _hotel_id: hotelId ?? null,
+        _reference_month: referenceMonth ?? null,
+        _reference_year: referenceYear ?? null,
+      });
       if (error) throw error;
-      return (data ?? []) as RhEmployee[];
+      return (data ?? []) as unknown as RhEmployee[];
     },
   });
 }

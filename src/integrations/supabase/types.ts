@@ -2484,6 +2484,36 @@ export type Database = {
           version_number: number
         }[]
       }
+      get_rh_employees_for_user: {
+        Args: {
+          _hotel_id?: string
+          _reference_month?: number
+          _reference_year?: number
+        }
+        Returns: {
+          admission_date: string
+          birth_date: string
+          cpf: string
+          created_at: string
+          department: string
+          employee_key: string
+          gender: string
+          hotel_id: string
+          id: string
+          name: string
+          position: string
+          raw: Json
+          reference_month: number
+          reference_year: number
+          salary: number
+          source_format: string
+          status: string
+          termination_date: string
+          termination_reason: string
+          updated_at: string
+          upload_id: string
+        }[]
+      }
       get_year_latest_dre_lines: {
         Args: { _hotel_id: string; _year: number }
         Returns: {
