@@ -510,8 +510,10 @@ export default function ContasPagarPage() {
   }
 
   async function handleBulkPaymentStatus(newStatus: ApPaymentStatus) {
-    if (!hotelId) return;
     const ids = Array.from(selectedIds);
+    // Para Quitar permitimos modo consolidado (sem hotel selecionado);
+    // demais ações continuam exigindo um hotel ativo.
+    if (newStatus !== "quitado" && !hotelId) return;
     if (ids.length === 0) return;
     if (newStatus === "pago" && !canMarkPaid) {
       toast.error("Apenas a coordenadoria do financeiro pode marcar como Pago");
@@ -553,8 +555,8 @@ export default function ContasPagarPage() {
     newStatus: ApPaymentStatus,
     extra?: { scheduledDate?: string; paidInterest?: number; paidAmount?: number; paidDate?: string },
   ) {
-    if (!hotelId) return;
     const ids = Array.from(selectedIds);
+    if (newStatus !== "quitado" && !hotelId) return;
     if (ids.length === 0) return;
     // Captura status anterior para permitir desfazer
     const previousByEntry = new Map<string, ApPaymentStatus>();
@@ -565,7 +567,7 @@ export default function ContasPagarPage() {
     const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
       await setPaymentStatus.mutateAsync({
-        hotelId,
+        hotelId: hotelId ?? "",
         entryIds: ids,
         status: newStatus,
         scheduledDate: extra?.scheduledDate ?? null,
