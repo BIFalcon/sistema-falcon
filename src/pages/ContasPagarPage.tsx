@@ -241,6 +241,11 @@ export default function ContasPagarPage() {
   // Pagos de TODOS os hotéis (modo consolidado).
   const { data: allPaidEntries = [] } = useAllApPaidEntries(showPaid && showingAllHotels);
 
+  // Filtro de data de pagamento — só aparece quando "Ver pagos" está ativo.
+  // Independente do filtro global de vencimento (que filtra ativos por due_date).
+  const [paidDateFrom, setPaidDateFrom] = useState("");
+  const [paidDateTo, setPaidDateTo] = useState("");
+
   // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
   const [showOmieRemoved, setShowOmieRemoved] = useState(false);
   const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
