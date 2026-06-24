@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const PRIVATE_BUCKETS = ["rh-photos", "rh-assets"] as const;
+const PRIVATE_BUCKETS = ["rh-photos", "rh-assets", "hotel-assets"] as const;
 type PrivateBucket = (typeof PRIVATE_BUCKETS)[number];
 
 /** Extracts { bucket, path } from a stored value that may be either a raw

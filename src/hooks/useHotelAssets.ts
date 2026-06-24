@@ -104,8 +104,8 @@ export async function uploadHotelAsset(
     .from("hotel-assets")
     .upload(path, file, { contentType: file.type, upsert: true });
   if (error) throw error;
-  const { data } = supabase.storage.from("hotel-assets").getPublicUrl(path);
-  return data.publicUrl;
+  // Bucket is private — store the raw storage path; consumers resolve a signed URL on read.
+  return path;
 }
 
 /* ───────── Falcon institucional (system-assets) ───────── */
