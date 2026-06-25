@@ -76,7 +76,7 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "patronos", label: "Patronos (Coordenadoria Financeiro)", scope: "Acesso total + autoriza pagamento" },
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
   { value: "gop", label: "Gerente de Operações (GOP)", scope: "Acesso à cartela de hotéis definida" },
-  { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso apenas ao próprio hotel" },
+  { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso a um ou mais hotéis da cartela" },
   { value: "adm", label: "Administrativo do Hotel (Adm)", scope: "Acesso apenas ao próprio hotel" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
   { value: "marketing", label: "Marketing", scope: "Acesso ao módulo de Marketing em todos os hotéis" },
@@ -498,7 +498,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const canAdvanceStep3 =
     isMasterFlag ||
     hasGlobalAccess ||
-    (primaryRole === "gg" && hotelIds.length === 1) ||
+    (primaryRole === "gg" && hotelIds.length >= 1) ||
     (primaryRole === "adm" && hotelIds.length === 1) ||
     (primaryRole === "gop" && hotelIds.length >= 1);
 
@@ -727,9 +727,9 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
               ) : (
                 <div className="space-y-2">
                   <Label>
-                    {primaryRole === "gg"
-                      ? "Selecione 1 hotel"
-                      : primaryRole === "adm"
+                     {primaryRole === "gg"
+                       ? "Selecione um ou mais hotéis"
+                       : primaryRole === "adm"
                       ? "Selecione 1 hotel"
                       : "Selecione os hotéis da cartela"}
                   </Label>
@@ -743,8 +743,8 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                         >
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={(v) => {
-                              if (primaryRole === "gg" || primaryRole === "adm") {
+                             onCheckedChange={(v) => {
+                               if (primaryRole === "adm") {
                                 setHotelIds(v ? [h.id] : []);
                               } else {
                                 setHotelIds(
