@@ -93,7 +93,7 @@ export default function TurnoverPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6 max-w-[1400px]" translate="no">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">RH & People</p>
