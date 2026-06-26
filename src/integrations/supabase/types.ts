@@ -224,6 +224,7 @@ export type Database = {
           archived_upload_id: string | null
           bank_account: string | null
           category: string | null
+          category_normalized: string | null
           cnpj: string | null
           created_at: string
           description: string | null
@@ -274,6 +275,7 @@ export type Database = {
           archived_upload_id?: string | null
           bank_account?: string | null
           category?: string | null
+          category_normalized?: string | null
           cnpj?: string | null
           created_at?: string
           description?: string | null
@@ -324,6 +326,7 @@ export type Database = {
           archived_upload_id?: string | null
           bank_account?: string | null
           category?: string | null
+          category_normalized?: string | null
           cnpj?: string | null
           created_at?: string
           description?: string | null
@@ -2453,6 +2456,17 @@ export type Database = {
           _subject: string
         }
         Returns: number
+      }
+      get_ap_category_monthly_series: {
+        Args: { _category_normalized?: string; _hotel_id: string }
+        Returns: {
+          category_normalized: string
+          entry_count: number
+          hotel_id: string
+          ref_month: number
+          ref_year: number
+          total_amount: number
+        }[]
       }
       get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
       get_hotel_financial: {
