@@ -489,6 +489,7 @@ export type IndicatorKey =
   | "adr"
   | "revpar"
   | "roomnights"
+  | "numero_hospedes"
   | "distribuicao_por_uh"
   | "uhs_total"
   | "uhs_disponiveis"
@@ -558,6 +559,7 @@ export const INDICATORS: { key: IndicatorKey; rx: RegExp[] }[] = [
   { key: "uhs_total", rx: [/^n[úu]mero\s+de\s+apartamentos$/i, /^n[úu]mero\s+de\s+apartamentos\s+no/i, /^uhs?\s+pool/i] },
   { key: "uhs_disponiveis", rx: [/n[úu]mero\s+de\s+apartamentos\s+dispon/i, /^apartamentos\s+dispon[íi]veis/i, /uhs?\s+dispon/i] },
   { key: "roomnights", rx: [/^roomnights$/i, /^room\s*nights?$/i, /^apartamentos\s+ocupados/i] },
+  { key: "numero_hospedes", rx: [/^n[úu]mero\s+de\s+h[óo]spedes/i, /^n[ºo]\s*de\s+h[óo]spedes/i] },
   { key: "ocupacao", rx: [/taxa\s+de\s+ocupa/i] },
   { key: "adr", rx: [/^di[áa]ria\s+m[ée]dia\s+bruta/i, /^di[áa]ria\s+m[ée]dia(\s+\(em\s+r\$\))?$/i, /^di[áa]ria\s+m[ée]dia(?!\s+l[íi]quida)/i] },
   { key: "revpar", rx: [/^revpar\s+total/i, /^revpar\s+hospedagem/i, /^revpar(\s+\(em\s+r\$\))?$/i, /revpar/i] },
@@ -1038,6 +1040,7 @@ export async function parseDreExcel(
 
   const indicators: Record<IndicatorKey, IndicatorHit | null> = {
     ocupacao: null, adr: null, revpar: null, roomnights: null,
+    numero_hospedes: null,
     distribuicao_por_uh: null,
     uhs_total: null, uhs_disponiveis: null,
     receita_hospedagem: null, receita_ab: null,
@@ -1327,6 +1330,7 @@ export const INDICATOR_LABELS: Record<IndicatorKey, string> = {
   adr: "Diária Média (ADR)",
   revpar: "RevPAR",
   roomnights: "Room Nights",
+  numero_hospedes: "Número de Hóspedes",
   distribuicao_por_uh: "Distribuição por UH",
   uhs_total: "UHs Totais",
   uhs_disponiveis: "UHs Disponíveis",
@@ -1347,6 +1351,9 @@ export function formatIndicator(key: IndicatorKey, value: number | null): string
     return `${pct.toFixed(1)}%`;
   }
   if (key === "roomnights" || key === "uhs_total" || key === "uhs_disponiveis") {
+    return Math.round(value).toLocaleString("pt-BR");
+  }
+  if (key === "numero_hospedes") {
     return Math.round(value).toLocaleString("pt-BR");
   }
   if (key === "adr" || key === "revpar" || key === "distribuicao_por_uh") {
