@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Pencil, Loader2, Building2, Users } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgNodes, type RhOrgNode } from "@/hooks/useRh";
@@ -140,76 +139,7 @@ export default function OrganogramaPage() {
   const resps = useResponsibilities(editing?.id ?? null);
   const editingPhotoUrl = useSignedPrivateUrl(form.photo_url || null, "rh-photos");
 
-  const matriz = useMemo(() => buildTree(nodes.filter((n) => !n.hotel_id)), [nodes]);
-
-  // GOPs com seus hotéis (aba Hotéis)
-  const { data: gopHotels = [] } = useQuery({
-    queryKey: ["rh-org-gop-hotels"],
-    queryFn: async () => {
-      const { data: gopRoles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "gop");
-      if (!gopRoles?.length) return [] as Array<{ id: string; name: string; hotels: Array<{ id: string; name: string }> }>;
-      const gopIds = Array.from(new Set(gopRoles.map((r) => r.user_id)));
-
-      const [{ data: profiles }, { data: userHotels }] = await Promise.all([
-        supabase.from("profiles").select("user_id, display_name, email").in("user_id", gopIds),
-        supabase
-          .from("user_hotels")
-          .select("user_id, hotel_id, hotels(id, name)")
-          .in("user_id", gopIds),
-      ]);
-
-      return (profiles ?? []).map((p) => ({
-        id: p.user_id,
-        name: p.display_name ?? p.email ?? "GOP",
-        hotels: (userHotels ?? [])
-          .filter((uh) => uh.user_id === p.user_id)
-          .map((uh) => uh.hotels as unknown as { id: string; name: string })
-          .filter(Boolean),
-      }));
-    },
-  });
-
-  const hoteisTree: NodeWithChildren[] = useMemo(() => {
-    if (!gopHotels.length) return [];
-    const ceo: NodeWithChildren = {
-      id: "synthetic-ceo",
-      parent_id: null,
-      name: "CEO",
-      position: "CEO",
-      department: null,
-      hotel_id: null,
-      photo_url: null,
-      is_open_position: false,
-      sort_order: 0,
-      children: gopHotels.map((g) => ({
-        id: `gop-${g.id}`,
-        parent_id: "synthetic-ceo",
-        name: g.name,
-        position: "GOP",
-        department: null,
-        hotel_id: null,
-        photo_url: null,
-        is_open_position: false,
-        sort_order: 0,
-        children: g.hotels.map((h) => ({
-          id: `hotel-${h.id}`,
-          parent_id: `gop-${g.id}`,
-          name: h.name,
-          position: "Hotel",
-          department: null,
-          hotel_id: h.id,
-          photo_url: null,
-          is_open_position: false,
-          sort_order: 0,
-          children: [],
-        })),
-      })),
-    };
-    return [ceo];
-  }, [gopHotels]);
+  const tree = useMemo(() => buildTree(nodes), [nodes]);
 
   const openEdit = (n: NodeWithChildren) => {
     setEditing(n);
@@ -255,10 +185,7 @@ export default function OrganogramaPage() {
     onError: (e: any) => toast.error("Erro: " + (e?.message ?? "desconhecido")),
   });
 
-  const handleEdit = (n: NodeWithChildren) => {
-    if (n.id.startsWith("synthetic-") || n.id.startsWith("gop-") || n.id.startsWith("hotel-")) return;
-    openEdit(n);
-  };
+  const handleEdit = (n: NodeWithChildren) => openEdit(n);
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -268,36 +195,16 @@ export default function OrganogramaPage() {
         <p className="text-sm text-muted-foreground mt-1">Estrutura organizacional da Falcon.</p>
       </div>
 
-      <Tabs defaultValue="matriz">
-        <TabsList>
-          <TabsTrigger value="matriz"><Users className="h-3.5 w-3.5 mr-2" /> Matriz</TabsTrigger>
-          <TabsTrigger value="hoteis"><Building2 className="h-3.5 w-3.5 mr-2" /> Hotéis</TabsTrigger>
-        </TabsList>
-        <TabsContent value="matriz" className="mt-4">
-          <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
-            <div className="flex flex-col items-center gap-6 w-full">
-              {matriz.map((root) => (
-                <OrgNode key={root.id} node={root} canEdit={canEdit} onEdit={handleEdit} />
-              ))}
-              {matriz.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum nó cadastrado.</p>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-        <TabsContent value="hoteis" className="mt-4">
-          <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
-            <div className="flex flex-col items-center gap-6 w-full">
-              {hoteisTree.map((root) => (
-                <OrgNode key={root.id} node={root} canEdit={false} onEdit={handleEdit} />
-              ))}
-              {hoteisTree.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum GOP com hotéis associados.</p>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+      <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
+        <div className="flex flex-col items-center gap-6 w-full">
+          {tree.map((root) => (
+            <OrgNode key={root.id} node={root} canEdit={canEdit} onEdit={handleEdit} />
+          ))}
+          {tree.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nenhum nó cadastrado.</p>
+          )}
+        </div>
+      </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-md">
