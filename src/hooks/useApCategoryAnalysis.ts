@@ -16,14 +16,10 @@ export function useApCategoryMonthlySeries(
     enabled: !!hotelId,
     queryKey: ["ap-category-series", hotelId, categoryNormalized],
     queryFn: async (): Promise<ApCategoryMonthPoint[]> => {
-      const { data, error } = await supabase.rpc(
-        // @ts-expect-error - função recém-criada, types serão regenerados
-        "get_ap_category_monthly_series",
-        {
-          _hotel_id: hotelId!,
-          _category_normalized: categoryNormalized ?? null,
-        },
-      );
+      const { data, error } = await supabase.rpc("get_ap_category_monthly_series", {
+        _hotel_id: hotelId!,
+        _category_normalized: categoryNormalized ?? null,
+      });
       if (error) throw error;
       return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
         refYear: Number(r.ref_year ?? 0),
