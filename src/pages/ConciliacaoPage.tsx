@@ -307,7 +307,7 @@ export default function ConciliacaoPage() {
   const uniqueDateSet = useMemo(() => new Set(uniqueDates), [uniqueDates]);
 
   return (
-    <div className="space-y-6 max-w-[1100px]">
+    <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
           Controladoria

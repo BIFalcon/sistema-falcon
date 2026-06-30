@@ -139,7 +139,7 @@ export default function DrePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2" onClick={() => navigate("/")}>
