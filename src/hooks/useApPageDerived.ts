@@ -367,12 +367,11 @@ export function useApPageDerived(opts: {
   // Visibilidade das colunas Valor Original/Novo/Juros — só aparecem se houver
   // pelo menos um entry com valor relevante.
   const showOriginalAmount = useMemo(
-    () => entries.some((e) => e.original_amount != null
-      && Number(e.original_amount) !== Number(e.amount)),
+    () => entries.some((e) => (e.original_amount != null && Number(e.original_amount) !== Number(e.amount)) || e.paid_interest != null),
     [entries],
   );
   const showPaidAmount = useMemo(
-    () => entries.some((e) => e.paid_amount != null),
+    () => entries.some((e) => e.paid_amount != null || e.paid_interest != null),
     [entries],
   );
   const showPaidInterest = useMemo(
