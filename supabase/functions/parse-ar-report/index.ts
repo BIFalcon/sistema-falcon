@@ -57,6 +57,30 @@ function makeOpenFolioKey(p: { confirmation_number: string | null; property_name
   return `${p.confirmation_number ?? ""}|${p.property_name_raw ?? ""}|${p.arrival_date ?? ""}|${p.departure_date ?? ""}`;
 }
 
+// Chave de deduplicação acumulativa para "A Faturar":
+// property + transaction_date + confirmation_number + amount + account_name + account_number.
+// É calculada SOMENTE no servidor para casar registros já existentes mesmo
+// que tenham sido importados com `entry_key` no formato antigo (sem account_name).
+function makeDedupKey(e: {
+  hotel_id: string | null;
+  property_name_raw?: string | null;
+  transaction_date: string | null;
+  confirmation_number: string | null;
+  amount: number | string | null;
+  account_name: string | null;
+  account_number: string | null;
+}): string {
+  const amt = e.amount == null || e.amount === "" ? "" : Number(e.amount).toFixed(2);
+  return [
+    e.hotel_id ?? toAscii(normalize(e.property_name_raw)),
+    e.transaction_date ?? "",
+    toAscii(normalize(e.confirmation_number)),
+    amt,
+    toAscii(normalize(e.account_name)),
+    toAscii(normalize(e.account_number)),
+  ].join("|");
+}
+
 async function loadHotelMap(admin: any): Promise<HotelMap> {
   const map: HotelMap = new Map();
   const { data } = await admin
@@ -232,17 +256,75 @@ Deno.serve(async (req) => {
 
     if (kind === "to_invoice") {
       result = mapToInvoiceEntries(parsedEntries as ToInvoicePayload[], hotelMap, uploadRow.id);
-      // upsert acumulativo por entry_key
+      // Acumulativo + dedup: só insere o que ainda NÃO existe. Nunca sobrescreve
+      // registros já presentes (preserva pago, documentos, notas, status, etc).
+      // Chave de match: property + transaction_date + confirmation + amount +
+      // account_name + account_number — exatamente como solicitado.
       if (result.entries.length) {
-        const chunkSize = 500;
-        for (let i = 0; i < result.entries.length; i += chunkSize) {
-          const chunk = result.entries.slice(i, i + chunkSize);
-          const { error: insErr } = await admin
-            .from("ar_to_invoice_entries")
-            .upsert(chunk, { onConflict: "entry_key" });
-          if (insErr) throw insErr;
-          inserted += chunk.length;
+        // 1) Dedup interno do arquivo (linhas idênticas no mesmo upload).
+        const incomingByKey = new Map<string, any>();
+        for (const e of result.entries) {
+          const k = makeDedupKey(e);
+          if (!incomingByKey.has(k)) incomingByKey.set(k, e);
         }
+        const incomingDupes = result.entries.length - incomingByKey.size;
+
+        // 2) Carrega chaves existentes nos hotéis afetados.
+        const hotelIds = Array.from(
+          new Set(
+            result.entries
+              .map((e: any) => e.hotel_id)
+              .filter((id: string | null): id is string => !!id),
+          ),
+        );
+        const existingKeys = new Set<string>();
+        if (hotelIds.length) {
+          const pageSize = 1000;
+          let from = 0;
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { data: rows, error: exErr } = await admin
+              .from("ar_to_invoice_entries")
+              .select(
+                "hotel_id, transaction_date, confirmation_number, amount, account_name, account_number",
+              )
+              .in("hotel_id", hotelIds)
+              .range(from, from + pageSize - 1);
+            if (exErr) throw exErr;
+            const list = rows ?? [];
+            for (const r of list) existingKeys.add(makeDedupKey(r as any));
+            if (list.length < pageSize) break;
+            from += pageSize;
+          }
+        }
+
+        // 3) Filtra e gera entry_key novo (com account_name) para evitar
+        //    colisão com o unique constraint no caso de account_name divergente.
+        const toInsert: any[] = [];
+        let alreadyExists = 0;
+        for (const [k, e] of incomingByKey) {
+          if (existingKeys.has(k)) {
+            alreadyExists += 1;
+            continue;
+          }
+          toInsert.push({ ...e, entry_key: k.slice(0, 240) });
+        }
+
+        if (toInsert.length) {
+          const chunkSize = 500;
+          for (let i = 0; i < toInsert.length; i += chunkSize) {
+            const chunk = toInsert.slice(i, i + chunkSize);
+            const { error: insErr } = await admin
+              .from("ar_to_invoice_entries")
+              .insert(chunk);
+            if (insErr) throw insErr;
+            inserted += chunk.length;
+          }
+        }
+
+        (result as any).skipped_existing = alreadyExists;
+        (result as any).skipped_duplicate_in_file = incomingDupes;
+        (result as any).total_rows = result.entries.length;
       }
     } else {
       result = mapOpenFolioEntries(parsedEntries as OpenFolioPayload[], hotelMap, uploadRow.id);
@@ -339,6 +421,9 @@ Deno.serve(async (req) => {
       upload_id: uploadRow.id,
       entries: inserted,
       unmapped_properties: result.unmapped,
+      total_rows: (result as any).total_rows ?? inserted,
+      skipped_existing: (result as any).skipped_existing ?? 0,
+      skipped_duplicate_in_file: (result as any).skipped_duplicate_in_file ?? 0,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("parse-ar-report error", err);
