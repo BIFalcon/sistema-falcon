@@ -90,7 +90,7 @@ export default function EnvioPage() {
   }, [rows]);
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Workflow</p>
         <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">

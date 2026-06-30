@@ -776,7 +776,7 @@ export default function ContasPagarPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6">
       {/* Cabeçalho */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">

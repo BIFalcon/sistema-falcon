@@ -193,7 +193,7 @@ export default function ContasReceberPage() {
   const [tab, setTab] = useState<"to_invoice" | "open_folio">("to_invoice");
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Gestão · Financeiro</p>
         <h1 className="text-2xl font-semibold">Contas a Receber</h1>
