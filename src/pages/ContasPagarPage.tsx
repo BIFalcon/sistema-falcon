@@ -547,7 +547,13 @@ export default function ContasPagarPage() {
       setScheduledDate("");
       // Pré-preenche com o total selecionado; equipe pode alterar para
       // refletir juros (valor maior) ou desconto (valor menor).
-      setScheduledPaidAmount(selectedTotal.toFixed(2));
+      // Se houver apenas 1 item selecionado e ele já tiver paid_amount pré-definido, usamos ele.
+      const singleEntry = ids.length === 1 ? entries.find(e => e.id === ids[0]) : null;
+      if (singleEntry && singleEntry.paid_amount != null) {
+        setScheduledPaidAmount(Number(singleEntry.paid_amount).toFixed(2));
+      } else {
+        setScheduledPaidAmount(selectedTotal.toFixed(2));
+      }
       setSchedulingOpen(true);
       return;
     }
@@ -556,6 +562,7 @@ export default function ContasPagarPage() {
       const today = new Date();
       const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       setPaidDate(iso);
+      // Para pagamento em lote, preserva juros ou valores já calculados quando há apenas 1 item
       setPaidConfirmOpen(true);
       return;
     }
@@ -2399,7 +2406,19 @@ export default function ContasPagarPage() {
               disabled={!paidDate}
               onClick={() => {
                 setPaidConfirmOpen(false);
-                executeStatusChange("pago", { paidDate });
+                // Se houver apenas 1 item selecionado, repassa os juros e valor pago que ele porventura
+                // já tenha calculado durante a fase de agendamento (ou edição de juros)
+                const ids = Array.from(selectedIds);
+                const singleEntry = ids.length === 1 ? entries.find((e) => e.id === ids[0]) : null;
+                if (singleEntry && singleEntry.paid_amount != null && singleEntry.paid_interest != null) {
+                  executeStatusChange("pago", {
+                    paidDate,
+                    paidAmount: Number(singleEntry.paid_amount),
+                    paidInterest: Number(singleEntry.paid_interest),
+                  });
+                } else {
+                  executeStatusChange("pago", { paidDate });
+                }
               }}
             >
               Confirmar pagamento
