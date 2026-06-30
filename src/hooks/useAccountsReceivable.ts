@@ -121,6 +121,9 @@ export function useUploadArReport() {
         upload_id: string;
         entries: number;
         unmapped_properties: string[];
+        total_rows?: number;
+        skipped_existing?: number;
+        skipped_duplicate_in_file?: number;
       };
     },
     onSuccess: (_d, v) => {
