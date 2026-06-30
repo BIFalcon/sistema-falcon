@@ -58,9 +58,12 @@ function makeOpenFolioKey(p: { confirmation_number: string | null; property_name
 }
 
 // Chave de deduplicação acumulativa para "A Faturar":
-// property + transaction_date + confirmation_number + amount + account_name + account_number.
-// É calculada SOMENTE no servidor para casar registros já existentes mesmo
-// que tenham sido importados com `entry_key` no formato antigo (sem account_name).
+// property + transaction_date + confirmation_number + amount + account_number.
+// Observação: `account_name` foi REMOVIDO da chave porque o relatório do Opera
+// frequentemente troca o nome exibido para o mesmo `account_number` (ex.: razão
+// social diferente em meses distintos), o que estava gerando falsos "novos"
+// registros — mesma reserva, mesmo valor, mesma data, mesmo CNPJ, só com nome
+// grafado diferente. `account_number` é o identificador estável.
 function makeDedupKey(e: {
   hotel_id: string | null;
   property_name_raw?: string | null;
@@ -76,7 +79,6 @@ function makeDedupKey(e: {
     e.transaction_date ?? "",
     toAscii(normalize(e.confirmation_number)),
     amt,
-    toAscii(normalize(e.account_name)),
     toAscii(normalize(e.account_number)),
   ].join("|");
 }
@@ -286,7 +288,7 @@ Deno.serve(async (req) => {
             const { data: rows, error: exErr } = await admin
               .from("ar_to_invoice_entries")
               .select(
-                "hotel_id, transaction_date, confirmation_number, amount, account_name, account_number",
+                "hotel_id, transaction_date, confirmation_number, amount, account_number",
               )
               .in("hotel_id", hotelIds)
               .range(from, from + pageSize - 1);
