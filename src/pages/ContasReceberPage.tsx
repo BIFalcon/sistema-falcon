@@ -2376,7 +2376,19 @@ function UploadCard({
       const res = await upload.mutateAsync({ file: f, kind });
       const unmapped = (res?.unmapped_properties ?? []) as string[];
       let undone = false;
-      const baseMsg = `${res.entries} linha(s) processadas`;
+      const skippedExisting = (res as any).skipped_existing ?? 0;
+      const skippedDupFile = (res as any).skipped_duplicate_in_file ?? 0;
+      const totalRows = (res as any).total_rows ?? res.entries;
+      const partsExtra: string[] = [];
+      if (kind === "to_invoice") {
+        partsExtra.push(`${res.entries} nova(s)`);
+        if (skippedExisting) partsExtra.push(`${skippedExisting} já existia(m)`);
+        if (skippedDupFile) partsExtra.push(`${skippedDupFile} duplicada(s) no arquivo`);
+      }
+      const baseMsg =
+        kind === "to_invoice"
+          ? `${totalRows} linha(s) lidas · ${partsExtra.join(" · ")}`
+          : `${res.entries} linha(s) processadas`;
       if (unmapped.length) {
         toast.warning(`${baseMsg}. ${unmapped.length} hotel(éis) não mapeado(s) — configure em Hotéis.`, {
           duration: 8000,
