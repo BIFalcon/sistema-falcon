@@ -14,18 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _ar_cleanup_ids: {
-        Row: {
-          id: string
-        }
-        Insert: {
-          id: string
-        }
-        Update: {
-          id?: string
-        }
-        Relationships: []
-      }
       ap_anticipation: {
         Row: {
           anticipated_amount: number
