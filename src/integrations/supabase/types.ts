@@ -2427,6 +2427,7 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_ar_notification: {
         Args: {
           _body_md: string
