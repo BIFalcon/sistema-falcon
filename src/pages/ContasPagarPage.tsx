@@ -387,8 +387,25 @@ export default function ContasPagarPage() {
       }
       return true;
     });
-    return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText]);
+    const rows = filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
+    if (sortField) {
+      rows.sort((a, b) => {
+        const ea = a.entry;
+        const eb = b.entry;
+        if (sortField === "amount") {
+          // Na aba Pagos, "valor" = valor efetivamente pago (com juros/desconto).
+          const va = Number(ea.paid_amount ?? ea.amount ?? 0);
+          const vb = Number(eb.paid_amount ?? eb.amount ?? 0);
+          return sortDir === "asc" ? va - vb : vb - va;
+        }
+        const va = (ea.payment_paid_at ?? ea.due_date ?? "");
+        const vb = (eb.payment_paid_at ?? eb.due_date ?? "");
+        if (va === vb) return 0;
+        return sortDir === "asc" ? (va < vb ? -1 : 1) : (va < vb ? 1 : -1);
+      });
+    }
+    return rows;
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText, sortField, sortDir]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
