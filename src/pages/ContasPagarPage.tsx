@@ -579,7 +579,16 @@ export default function ContasPagarPage() {
       const today = new Date();
       const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       setPaidDate(iso);
-      // Para pagamento em lote, preserva juros ou valores já calculados quando há apenas 1 item
+      // Pré-preenche o input de valor pago quando 1 item já tem paid_amount
+      // definido no agendamento; caso contrário deixa em branco para permitir
+      // que o usuário informe o valor real (com juros/desconto).
+      const ids = Array.from(selectedIds);
+      const singleEntry = ids.length === 1 ? entries.find((e) => e.id === ids[0]) : null;
+      if (singleEntry?.paid_amount != null) {
+        setScheduledPaidAmount(Number(singleEntry.paid_amount).toFixed(2));
+      } else {
+        setScheduledPaidAmount("");
+      }
       setPaidConfirmOpen(true);
       return;
     }
