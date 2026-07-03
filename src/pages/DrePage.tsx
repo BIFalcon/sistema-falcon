@@ -64,6 +64,11 @@ export default function DrePage() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const canUpload = isMaster || hasRole("controladoria") || hasRole("gop");
+  // ADM tem acesso apenas de leitura: baixar/visualizar DRE e comentar.
+  // Nunca pode aprovar/devolver — escondemos totalmente o card de ações.
+  const canSeeApprovalActions = !hasRole("adm") || isMaster
+    || hasRole("controladoria") || hasRole("patronos") || hasRole("gop")
+    || hasRole("gg") || hasRole("fernando");
 
   const latestVersionId = useMemo(() => {
     if (!versions.length) return null;
@@ -237,17 +242,19 @@ export default function DrePage() {
             )}
           </Card>
 
-          <Card className="p-5 shadow-soft">
-            <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Ações do estágio</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Estágio atual: <strong className="text-foreground">{STATUS_LABELS[closing.status_dre]}</strong>
-            </p>
-            <ApprovalActions
-              closingId={closing.id}
-              stage="dre"
-              currentStatus={closing.status_dre}
-            />
-          </Card>
+          {canSeeApprovalActions && (
+            <Card className="p-5 shadow-soft">
+              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Ações do estágio</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Estágio atual: <strong className="text-foreground">{STATUS_LABELS[closing.status_dre]}</strong>
+              </p>
+              <ApprovalActions
+                closingId={closing.id}
+                stage="dre"
+                currentStatus={closing.status_dre}
+              />
+            </Card>
+          )}
         </div>
 
         {/* COL 3: Comentários */}

@@ -128,9 +128,9 @@ const App = () => (
               <Route path="/home" element={<HomePage />} />
 
               {/* Fechamento */}
-              <Route path="/fechamento" element={<FechamentoPage />} />
-              <Route path="/fechamento/dre" element={<DrePage />} />
-              <Route path="/fechamento/carta" element={<CartaPage />} />
+              <Route path="/fechamento" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"]}><FechamentoPage /></RoleGuard>} />
+              <Route path="/fechamento/dre" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer"]}><DrePage /></RoleGuard>} />
+              <Route path="/fechamento/carta" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"]}><CartaPage /></RoleGuard>} />
               <Route path="/fechamento/financeiro" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><FinanceiroPage /></RoleGuard>} />
               <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />
               <Route path="/fechamento/performance" element={<PerformanceSlaGuard><PerformanceSlaPage /></PerformanceSlaGuard>} />
