@@ -387,8 +387,25 @@ export default function ContasPagarPage() {
       }
       return true;
     });
-    return filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
-  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText]);
+    const rows = filteredPaid.map((e) => ({ kind: "single" as const, entry: e }));
+    if (sortField) {
+      rows.sort((a, b) => {
+        const ea = a.entry;
+        const eb = b.entry;
+        if (sortField === "amount") {
+          // Na aba Pagos, "valor" = valor efetivamente pago (com juros/desconto).
+          const va = Number(ea.paid_amount ?? ea.amount ?? 0);
+          const vb = Number(eb.paid_amount ?? eb.amount ?? 0);
+          return sortDir === "asc" ? va - vb : vb - va;
+        }
+        const va = (ea.payment_paid_at ?? ea.due_date ?? "");
+        const vb = (eb.payment_paid_at ?? eb.due_date ?? "");
+        if (va === vb) return 0;
+        return sortDir === "asc" ? (va < vb ? -1 : 1) : (va < vb ? 1 : -1);
+      });
+    }
+    return rows;
+  }, [showPaid, displayRows, paidEntries, allPaidEntries, showingAllHotels, paidDateFrom, paidDateTo, searchText, sortField, sortDir]);
   const sortIndicator = (field: "amount" | "due_date") =>
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕";
 
@@ -562,7 +579,16 @@ export default function ContasPagarPage() {
       const today = new Date();
       const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       setPaidDate(iso);
-      // Para pagamento em lote, preserva juros ou valores já calculados quando há apenas 1 item
+      // Pré-preenche o input de valor pago quando 1 item já tem paid_amount
+      // definido no agendamento; caso contrário deixa em branco para permitir
+      // que o usuário informe o valor real (com juros/desconto).
+      const ids = Array.from(selectedIds);
+      const singleEntry = ids.length === 1 ? entries.find((e) => e.id === ids[0]) : null;
+      if (singleEntry?.paid_amount != null) {
+        setScheduledPaidAmount(Number(singleEntry.paid_amount).toFixed(2));
+      } else {
+        setScheduledPaidAmount("");
+      }
       setPaidConfirmOpen(true);
       return;
     }
@@ -2380,8 +2406,8 @@ export default function ContasPagarPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar pagamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Informe a data em que o pagamento foi efetivamente realizado.
-              Já vem preenchida com a data de hoje — ajuste se necessário.
+              Informe a data efetiva do pagamento e, se houver juros ou desconto,
+              o valor pago — o sistema calcula a diferença automaticamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
@@ -2394,10 +2420,39 @@ export default function ContasPagarPage() {
                 value={paidDate}
                 onChange={(e) => setPaidDate(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                Valor pago (com juros / desconto, se houver)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={fmtBRL(selectedTotal)}
+                value={scheduledPaidAmount}
+                onChange={(e) => setScheduledPaidAmount(e.target.value)}
+                onPaste={(e) => handlePasteBRL(e, setScheduledPaidAmount)}
+              />
               <p className="text-[11px] text-muted-foreground mt-1">
-                {selectedIds.size} lançamento(s) — total{" "}
+                {selectedIds.size} lançamento(s) — original{" "}
                 <strong>{fmtBRL(selectedTotal)}</strong>
               </p>
+              {scheduledPaidAmount && !Number.isNaN(parseFloat(scheduledPaidAmount)) && (() => {
+                const diff = parseFloat(scheduledPaidAmount) - selectedTotal;
+                if (Math.abs(diff) < 0.005) return null;
+                if (diff > 0) {
+                  return (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                      Juros calculados: <strong>{fmtBRL(diff)}</strong>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
+                    Desconto calculado: <strong>{fmtBRL(Math.abs(diff))}</strong>
+                  </p>
+                );
+              })()}
             </div>
           </div>
           <AlertDialogFooter>
@@ -2406,8 +2461,22 @@ export default function ContasPagarPage() {
               disabled={!paidDate}
               onClick={() => {
                 setPaidConfirmOpen(false);
-                // Se houver apenas 1 item selecionado, repassa os juros e valor pago que ele porventura
-                // já tenha calculado durante a fase de agendamento (ou edição de juros)
+                // 1) Usa o valor digitado no modal (prioridade máxima).
+                const inputNum = scheduledPaidAmount ? parseFloat(scheduledPaidAmount) : NaN;
+                const hasInput = !Number.isNaN(inputNum);
+                const inputDiff = hasInput ? inputNum - selectedTotal : 0;
+                const hasInputDelta = hasInput && Math.abs(inputDiff) >= 0.005;
+                if (hasInputDelta) {
+                  executeStatusChange("pago", {
+                    paidDate,
+                    paidAmount: inputNum,
+                    paidInterest: inputDiff,
+                  });
+                  setScheduledPaidAmount("");
+                  return;
+                }
+                // 2) Se o usuário não digitou nada, tenta reaproveitar juros já
+                //    calculados no agendamento (para 1 item selecionado).
                 const ids = Array.from(selectedIds);
                 const singleEntry = ids.length === 1 ? entries.find((e) => e.id === ids[0]) : null;
                 if (singleEntry && singleEntry.paid_amount != null && singleEntry.paid_interest != null) {
@@ -2419,6 +2488,7 @@ export default function ContasPagarPage() {
                 } else {
                   executeStatusChange("pago", { paidDate });
                 }
+                setScheduledPaidAmount("");
               }}
             >
               Confirmar pagamento
