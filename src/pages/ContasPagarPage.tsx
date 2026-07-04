@@ -320,7 +320,11 @@ export default function ContasPagarPage() {
 
   // No histórico de Pagos sempre exibimos as 3 colunas (valor original, valor novo,
   // juros/desconto) para que o usuário veja com clareza o quanto foi pago de fato.
-  const showOriginalAmount = showOriginalAmountRaw || showPaid;
+  // Simplificado: apenas 3 colunas — Valor, Juros/Desc, Novo Valor.
+  // "Valor Original" foi removido por confusão com "Valor". A referência
+  // do valor de origem continua salva em `original_amount` no banco.
+  const showOriginalAmount = false;
+  void showOriginalAmountRaw;
   const showPaidAmount = showPaidAmountRaw || showPaid;
   const showPaidInterest = showPaidInterestRaw || showPaid;
 
