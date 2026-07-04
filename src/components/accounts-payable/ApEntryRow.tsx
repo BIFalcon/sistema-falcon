@@ -402,11 +402,27 @@ function EditPaidValuesButton({
   const [value, setValue] = useState<string>(current != null ? String(current) : "");
   const update = useUpdateEntryPaidValues();
 
+  const baseAmount = Number(entry.amount ?? 0);
   const label = field === "paid_amount" ? "Valor Novo (pago)" : "Juros / Desconto";
   const help =
     field === "paid_amount"
-      ? "Informe o valor efetivamente pago (deixe em branco para limpar)."
-      : "Use positivo para juros e negativo para desconto. Deixe em branco para limpar.";
+      ? "Informe o valor efetivamente pago. O Juros é calculado automaticamente (Novo − Valor)."
+      : "Use positivo para juros e negativo para desconto. O Novo Valor é calculado automaticamente (Valor + Juros).";
+
+  // Preview auto-calculado do campo oposto para o usuário conferir antes de salvar.
+  const trimmedPreview = value.trim();
+  let previewCounterpart: string | null = null;
+  if (trimmedPreview !== "") {
+    const n = parseFloat(trimmedPreview.replace(",", "."));
+    if (!Number.isNaN(n)) {
+      if (field === "paid_interest") {
+        previewCounterpart = `Novo Valor: ${(baseAmount + n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
+      } else {
+        const juros = n - baseAmount;
+        previewCounterpart = `${juros >= 0 ? "Juros" : "Desconto"}: ${Math.abs(juros).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
+      }
+    }
+  }
 
   return (
     <Popover
@@ -438,6 +454,9 @@ function EditPaidValuesButton({
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
+        {previewCounterpart && (
+          <p className="text-[11px] text-muted-foreground">{previewCounterpart}</p>
+        )}
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
             Cancelar
@@ -449,7 +468,7 @@ function EditPaidValuesButton({
               const trimmed = value.trim();
               let parsed: number | null = null;
               if (trimmed !== "") {
-                const n = parseFloat(trimmed);
+                const n = parseFloat(trimmed.replace(",", "."));
                 if (Number.isNaN(n)) {
                   toast.error("Valor inválido");
                   return;
@@ -457,11 +476,26 @@ function EditPaidValuesButton({
                 parsed = n;
               }
               try {
+                // Sempre grava os DOIS campos sincronizados para evitar juros
+                // "órfãos" (juros sem Novo Valor correspondente e vice-versa).
+                let paidAmount: number | null;
+                let paidInterest: number | null;
+                if (parsed == null) {
+                  paidAmount = null;
+                  paidInterest = null;
+                } else if (field === "paid_interest") {
+                  paidInterest = Number(parsed.toFixed(2));
+                  paidAmount = Number((baseAmount + parsed).toFixed(2));
+                } else {
+                  paidAmount = Number(parsed.toFixed(2));
+                  paidInterest = Number((parsed - baseAmount).toFixed(2));
+                }
                 await update.mutateAsync({
                   entryId: entry.id,
                   hotelId: entry.hotel_id,
-                  [field === "paid_amount" ? "paidAmount" : "paidInterest"]: parsed,
-                } as Parameters<typeof update.mutateAsync>[0]);
+                  paidAmount,
+                  paidInterest,
+                });
                 toast.success(parsed == null ? `${label} removido` : `${label} atualizado`);
                 setOpen(false);
               } catch (err) {
