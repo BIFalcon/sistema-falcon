@@ -2049,11 +2049,14 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
+          email: string | null
           hotel_id: string | null
           id: string
           is_open_position: boolean
           name: string
+          node_type: string | null
           parent_id: string | null
+          phone: string | null
           photo_url: string | null
           position: string | null
           sort_order: number
@@ -2062,11 +2065,14 @@ export type Database = {
         Insert: {
           created_at?: string
           department?: string | null
+          email?: string | null
           hotel_id?: string | null
           id?: string
           is_open_position?: boolean
           name: string
+          node_type?: string | null
           parent_id?: string | null
+          phone?: string | null
           photo_url?: string | null
           position?: string | null
           sort_order?: number
@@ -2075,11 +2081,14 @@ export type Database = {
         Update: {
           created_at?: string
           department?: string | null
+          email?: string | null
           hotel_id?: string | null
           id?: string
           is_open_position?: boolean
           name?: string
+          node_type?: string | null
           parent_id?: string | null
+          phone?: string | null
           photo_url?: string | null
           position?: string | null
           sort_order?: number

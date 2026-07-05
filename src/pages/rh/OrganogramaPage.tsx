@@ -6,12 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Pencil, Loader2 } from "lucide-react";
+import { Pencil, Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgNodes, type RhOrgNode } from "@/hooks/useRh";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSignedPrivateUrl } from "@/lib/privateStorage";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NodeWithChildren extends RhOrgNode {
   children: NodeWithChildren[];
@@ -57,18 +64,20 @@ function OrgNode({
   const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children.length > 0;
   const isVacant = node.is_open_position;
+  const isAccountExecutive = node.node_type === "account_executive";
   const photoUrl = useSignedPrivateUrl(node.photo_url, "rh-photos");
 
   return (
     <div className="flex flex-col items-center">
       <div className="relative group">
         <div
-          className={`w-36 rounded-xl border bg-card p-3 shadow-sm select-none transition-shadow
+          className={`rounded-xl border bg-card p-3 shadow-sm select-none transition-shadow
+            ${isAccountExecutive ? "w-32 border-dashed border-orange-300" : "w-36"}
             ${hasChildren ? "cursor-pointer hover:shadow-md" : ""}
             ${isVacant ? "border-dashed opacity-60" : ""}`}
           onClick={() => hasChildren && setExpanded((x) => !x)}
         >
-          <div className="w-14 h-14 rounded-full overflow-hidden mx-auto mb-2 bg-muted border-2 border-primary/20 flex items-center justify-center">
+          <div className={`w-14 h-14 rounded-full overflow-hidden mx-auto mb-2 bg-muted border-2 flex items-center justify-center ${isAccountExecutive ? "border-orange-300" : "border-primary/20"}`}>
             {node.photo_url && photoUrl ? (
               <img src={photoUrl} alt={node.name} className="w-full h-full object-cover" />
             ) : (
@@ -88,6 +97,11 @@ function OrgNode({
           {node.department && (
             <Badge variant="outline" className="text-[9px] mt-1 w-full justify-center truncate">
               {node.department}
+            </Badge>
+          )}
+          {isAccountExecutive && (
+            <Badge variant="outline" className="text-[9px] mt-1 w-full justify-center text-orange-600 border-orange-300">
+              Exec. de Contas
             </Badge>
           )}
           {canEdit && (
@@ -111,10 +125,10 @@ function OrgNode({
       {expanded && hasChildren && (
         <div className="flex flex-col items-center mt-5">
           <div className="h-5 border-l border-border" />
-          <div className="flex flex-row items-start gap-4">
+          <div className={node.children.length > 4 ? "grid grid-cols-2 gap-4" : "flex flex-row items-start gap-4"}>
             {node.children.map((child) => (
               <div key={child.id} className="flex flex-col items-center">
-                {node.children.length > 1 && (
+                {node.children.length > 1 && node.children.length <= 4 && (
                   <div className="h-4 border-l border-border" />
                 )}
                 <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
@@ -134,7 +148,23 @@ export default function OrganogramaPage() {
   const qc = useQueryClient();
 
   const [editing, setEditing] = useState<NodeWithChildren | null>(null);
-  const [form, setForm] = useState({ name: "", position: "", photo_url: "", responsibilities: "" });
+  const [form, setForm] = useState({
+    name: "",
+    position: "",
+    photo_url: "",
+    responsibilities: "",
+    email: "",
+    phone: "",
+    node_type: "standard",
+  });
+  const [addingNode, setAddingNode] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: "",
+    position: "",
+    department: "",
+    parent_id: "",
+    node_type: "standard",
+  });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const resps = useResponsibilities(editing?.id ?? null);
   const editingPhotoUrl = useSignedPrivateUrl(form.photo_url || null, "rh-photos");
@@ -148,6 +178,9 @@ export default function OrganogramaPage() {
       position: n.position ?? "",
       photo_url: n.photo_url ?? "",
       responsibilities: "",
+      email: n.email ?? "",
+      phone: n.phone ?? "",
+      node_type: n.node_type ?? "standard",
     });
   };
 
@@ -165,6 +198,9 @@ export default function OrganogramaPage() {
         name: form.name,
         position: form.position || null,
         photo_url: form.photo_url || null,
+        email: form.email || null,
+        phone: form.phone || null,
+        node_type: form.node_type || "standard",
       }).eq("id", editing.id);
       if (error) throw error;
 
@@ -185,18 +221,59 @@ export default function OrganogramaPage() {
     onError: (e: any) => toast.error("Erro: " + (e?.message ?? "desconhecido")),
   });
 
+  const addNode = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rh_org_nodes").insert({
+        name: addForm.name,
+        position: addForm.position || null,
+        department: addForm.department || null,
+        parent_id: addForm.parent_id || null,
+        node_type: addForm.node_type || "standard",
+        sort_order: 999,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rh", "org-nodes"] });
+      toast.success("Colaborador adicionado.");
+      setAddingNode(false);
+      setAddForm({ name: "", position: "", department: "", parent_id: "", node_type: "standard" });
+    },
+    onError: (e: any) => toast.error("Erro: " + (e?.message ?? "desconhecido")),
+  });
+
+  const removeNode = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("rh_org_nodes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rh", "org-nodes"] });
+      toast.success("Removido do organograma.");
+      setEditing(null);
+    },
+    onError: (e: any) => toast.error("Erro: " + (e?.message ?? "desconhecido")),
+  });
+
   const handleEdit = (n: NodeWithChildren) => openEdit(n);
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">RH & People</p>
-        <h1 className="text-3xl font-semibold">Organograma</h1>
-        <p className="text-sm text-muted-foreground mt-1">Estrutura organizacional da Falcon.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">RH & People</p>
+          <h1 className="text-3xl font-semibold">Organograma</h1>
+          <p className="text-sm text-muted-foreground mt-1">Estrutura organizacional da Falcon.</p>
+        </div>
+        {canEdit && (
+          <Button onClick={() => setAddingNode(true)} size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-2" /> Adicionar colaborador
+          </Button>
+        )}
       </div>
 
-      <div className="overflow-x-auto overflow-y-auto min-h-[400px] p-6 border rounded-lg bg-muted/20">
-        <div className="flex flex-col items-center gap-6 w-full">
+      <div className="overflow-x-auto overflow-y-auto min-h-[400px] max-h-[80vh] p-6 border rounded-lg bg-muted/20">
+        <div className="flex flex-col items-center gap-6 w-max mx-auto">
           {tree.map((root) => (
             <OrgNode key={root.id} node={root} canEdit={canEdit} onEdit={handleEdit} />
           ))}
@@ -209,9 +286,27 @@ export default function OrganogramaPage() {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Editar nó</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
             <div><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div><Label>Cargo</Label><Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></div>
+            <div>
+              <Label>E-mail</Label>
+              <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@falconhoteis.com.br" />
+            </div>
+            <div>
+              <Label>Telefone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={form.node_type} onValueChange={(v) => setForm({ ...form, node_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Gerente Geral / Padrão</SelectItem>
+                  <SelectItem value="account_executive">Executivo de Contas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Foto</Label>
               {form.photo_url && editingPhotoUrl && (
@@ -253,11 +348,67 @@ export default function OrganogramaPage() {
               <Textarea rows={5} value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} />
             </div>
           </div>
+          <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+            {canEdit && editing && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={removeNode.isPending}
+                onClick={() => {
+                  if (!confirm(`Remover ${editing.name} do organograma?`)) return;
+                  removeNode.mutate(editing.id);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Remover do organograma
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+              <Button onClick={() => save.mutate()} disabled={save.isPending}>
+                {save.isPending && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
+                Salvar
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addingNode} onOpenChange={setAddingNode}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Adicionar colaborador</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nome</Label><Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} /></div>
+            <div><Label>Cargo</Label><Input value={addForm.position} onChange={(e) => setAddForm({ ...addForm, position: e.target.value })} /></div>
+            <div><Label>Departamento</Label><Input value={addForm.department} onChange={(e) => setAddForm({ ...addForm, department: e.target.value })} /></div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={addForm.node_type} onValueChange={(v) => setAddForm({ ...addForm, node_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Gerente Geral / Padrão</SelectItem>
+                  <SelectItem value="account_executive">Executivo de Contas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Subordinado a</Label>
+              <Select value={addForm.parent_id || "__root__"} onValueChange={(v) => setAddForm({ ...addForm, parent_id: v === "__root__" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Nó raiz (sem superior)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__root__">Nó raiz (sem superior)</SelectItem>
+                  {nodes.map((n) => (
+                    <SelectItem key={n.id} value={n.id}>{n.name}{n.position ? ` — ${n.position}` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              {save.isPending && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
-              Salvar
+            <Button variant="outline" onClick={() => setAddingNode(false)}>Cancelar</Button>
+            <Button onClick={() => addNode.mutate()} disabled={addNode.isPending || !addForm.name.trim()}>
+              {addNode.isPending && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
+              Adicionar
             </Button>
           </DialogFooter>
         </DialogContent>

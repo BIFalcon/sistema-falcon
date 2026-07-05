@@ -30,7 +30,9 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 export default function TurnoverPage() {
-  const { allowedHotels, isMaster } = useAuth();
+  const { allowedHotels, isMaster, hasRole } = useAuth();
+  const canUpload = isMaster || hasRole("rh");
+  const isRhManager = isMaster || hasRole("rh") || hasRole("processos");
   const { hotelId, month, year } = useModuleFilters("rh");
   const [periodMonths, setPeriodMonths] = useState(1);
 
@@ -45,7 +47,8 @@ export default function TurnoverPage() {
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
 
-  const { data: allEmployees = [], isLoading } = useRhEmployees(undefined, month, year);
+  const rhHotelId = isRhManager ? undefined : hotelId;
+  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year);
   const upload = useUploadRhFile();
 
   const scopedEmployees = useMemo(
@@ -175,6 +178,7 @@ export default function TurnoverPage() {
       </div>
 
       {/* Upload */}
+      {canUpload && (
       <Card
         className={`p-8 border-2 border-dashed shadow-soft transition-colors ${
           dragOver ? "border-accent bg-accent/5" : "border-border"
@@ -214,6 +218,7 @@ export default function TurnoverPage() {
           </Button>
         </div>
       </Card>
+      )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando colaboradores…</p>}
 
