@@ -49,6 +49,9 @@ export interface RhOrgNode {
   photo_url: string | null;
   is_open_position: boolean;
   sort_order: number;
+  email?: string | null;
+  phone?: string | null;
+  node_type?: string | null;
 }
 
 export interface RhTraining {
