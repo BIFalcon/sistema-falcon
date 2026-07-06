@@ -62,10 +62,31 @@ function OrgNode({
   onEdit: (n: NodeWithChildren) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<{ standard: boolean; execs: boolean }>({
+    standard: true,
+    execs: false,
+  });
   const hasChildren = node.children.length > 0;
   const isVacant = node.is_open_position;
   const isAccountExecutive = node.node_type === "account_executive";
   const photoUrl = useSignedPrivateUrl(node.photo_url, "rh-photos");
+
+  const standardChildren = node.children.filter((c) => c.node_type !== "account_executive");
+  const execChildren = node.children.filter((c) => c.node_type === "account_executive");
+  const hasBothGroups = standardChildren.length > 0 && execChildren.length > 0;
+
+  const renderChildrenRow = (list: NodeWithChildren[]) => (
+    <div className={list.length > 4 ? "grid grid-cols-3 gap-4 justify-items-center" : "flex flex-row items-start gap-4"}>
+      {list.map((child) => (
+        <div key={child.id} className="flex flex-col items-center">
+          {list.length > 1 && list.length <= 4 && (
+            <div className="h-4 border-l border-border" />
+          )}
+          <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex flex-col items-center">
@@ -125,16 +146,44 @@ function OrgNode({
       {expanded && hasChildren && (
         <div className="flex flex-col items-center mt-5">
           <div className="h-5 border-l border-border" />
-          <div className={node.children.length > 4 ? "grid grid-cols-2 gap-4" : "flex flex-row items-start gap-4"}>
-            {node.children.map((child) => (
-              <div key={child.id} className="flex flex-col items-center">
-                {node.children.length > 1 && node.children.length <= 4 && (
-                  <div className="h-4 border-l border-border" />
+          {hasBothGroups ? (
+            <div className="flex flex-col items-center gap-4">
+              {/* Grupo Padrão / GGs — nível hierárquico principal */}
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroups((s) => ({ ...s, standard: !s.standard }))}
+                  className="text-[11px] font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-3 py-1 hover:bg-primary/20 transition-colors"
+                >
+                  {expandedGroups.standard ? "▾" : "▸"} Gerentes Gerais ({standardChildren.length})
+                </button>
+                {expandedGroups.standard && (
+                  <div className="flex flex-col items-center mt-3">
+                    <div className="h-3 border-l border-border" />
+                    {renderChildrenRow(standardChildren)}
+                  </div>
                 )}
-                <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
               </div>
-            ))}
-          </div>
+              {/* Grupo Execs. de Conta — nível de assessoria/staff */}
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroups((s) => ({ ...s, execs: !s.execs }))}
+                  className="text-[11px] font-semibold uppercase tracking-wider text-orange-600 bg-orange-50 dark:bg-orange-950/30 border border-dashed border-orange-300 rounded-full px-3 py-1 hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+                >
+                  {expandedGroups.execs ? "▾" : "▸"} Executivos de Conta ({execChildren.length})
+                </button>
+                {expandedGroups.execs && (
+                  <div className="flex flex-col items-center mt-3">
+                    <div className="h-3 border-l border-dashed border-orange-300" />
+                    {renderChildrenRow(execChildren)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            renderChildrenRow(node.children)
+          )}
         </div>
       )}
     </div>
