@@ -2432,6 +2432,7 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_rh_directory: { Args: { _user_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
