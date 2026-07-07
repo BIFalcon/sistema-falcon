@@ -89,6 +89,22 @@ function findCol(header: string[], ...candidates: string[]): number {
 
 function parseToInvoice(rows: unknown[][]): ParsedToInvoiceEntry[] {
   if (rows.length < 2) return [];
+  // Detecção de formato TOTVS (3 Rios Plaza). O relatório TOTVS tem 13 colunas
+  // fixas — UH, TIPO UH, RESERVA, CONTA, COD.DEB, DESCRIÇÃO, NOTA, VALOR,
+  // DOCUMENTO, DATA, HORA, USUARIO, Cliente — e pode vir COM ou SEM cabeçalho.
+  // Opera sempre traz "Property Name" nas primeiras linhas; se não achamos
+  // e o layout bate com TOTVS, delega para o parser TOTVS.
+  const firstRows = rows.slice(0, 8);
+  const hasOperaHeader = firstRows.some((r) =>
+    (r ?? []).some((cell) => {
+      const c = toAscii(normalize(cell));
+      return c.includes("property name") || c === "property";
+    }),
+  );
+  if (!hasOperaHeader) {
+    const totvs = parseToInvoiceTotvs(rows);
+    if (totvs) return totvs;
+  }
   // O arquivo real tem:
   //   linha 0: título "Faturados" (a ignorar)
   //   linha 1: vazia
@@ -154,6 +170,97 @@ function parseToInvoice(rows: unknown[][]): ParsedToInvoiceEntry[] {
       confirmation_number: confirmationNumber || null,
       reservation_status: normalize(row[cResStatus] ?? "") || null,
       departure_date: parseDate(row[cDep]),
+      entry_key: keyBase.replace(/\s+/g, " ").slice(0, 240),
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * Parser do relatório de Faturamento do TOTVS (usado no 3 Rios Plaza).
+ * Colunas fixas (0-indexed):
+ *   0 UH · 1 TIPO UH · 2 RESERVA · 3 CONTA · 4 COD.DEB · 5 DESCRIÇÃO ·
+ *   6 NOTA · 7 VALOR · 8 DOCUMENTO · 9 DATA · 10 HORA · 11 USUARIO · 12 Cliente
+ *
+ * O arquivo pode vir COM cabeçalho (planilha manual) ou SEM cabeçalho (export
+ * padrão do TOTVS já começa na linha 0 com dados). Detectamos e pulamos o
+ * cabeçalho automaticamente. Retorna null se o layout não parecer TOTVS.
+ *
+ * Como o relatório não traz o nome do hotel, cravamos o `property_name_raw`
+ * como "IBIS STYLES TRES RIOS" — o mesmo `opera_property_name` cadastrado
+ * para o 3 Rios Plaza — para que a edge function faça o link com o hotel.
+ */
+const TOTVS_TRES_RIOS_PROPERTY = "IBIS STYLES TRES RIOS";
+
+function isTotvsHeaderRow(row: unknown[]): boolean {
+  const cells = (row ?? []).map((c) => toAscii(normalize(c)));
+  return (
+    cells.includes("uh") &&
+    cells.some((c) => c.startsWith("cod.deb") || c.startsWith("cod deb"))
+  );
+}
+
+function looksLikeTotvsDataRow(row: unknown[]): boolean {
+  if (!row || row.length < 12) return false;
+  const col4 = toAscii(normalize(row[4] ?? ""));
+  const col5 = toAscii(normalize(row[5] ?? ""));
+  // COD.DEB "FATUR" e/ou DESCRIÇÃO iniciando com "A_Faturar"/"A Faturar"
+  return col4.startsWith("fatur") || col5.startsWith("a_fatur") || col5.startsWith("a fatur");
+}
+
+function parseToInvoiceTotvs(rows: unknown[][]): ParsedToInvoiceEntry[] | null {
+  // Primeira linha "de dado" — pula qualquer cabeçalho detectado.
+  let start = 0;
+  if (isTotvsHeaderRow(rows[0] ?? [])) start = 1;
+  // Confirma que a partir daí temos dado no shape TOTVS.
+  const sample = rows[start] ?? [];
+  if (!looksLikeTotvsDataRow(sample)) return null;
+
+  const entries: ParsedToInvoiceEntry[] = [];
+  for (let i = start; i < rows.length; i += 1) {
+    const row = rows[i] ?? [];
+    if (!row.length) continue;
+    // Ignora linhas de totalização/vazias.
+    if (!looksLikeTotvsDataRow(row)) continue;
+
+    const propertyName = TOTVS_TRES_RIOS_PROPERTY;
+    const reserva = normalize(row[2] ?? "");
+    const conta = normalize(row[3] ?? "");
+    const codDeb = normalize(row[4] ?? "");
+    const descricao = normalize(row[5] ?? "");
+    const nota = normalize(row[6] ?? "");
+    // VALOR no TOTVS costuma vir como crédito (negativo). Para "a faturar"
+    // interessa o módulo do valor a ser cobrado.
+    const rawValor = parseNumber(row[7] ?? 0);
+    const amount = Math.abs(rawValor);
+    const documento = normalize(row[8] ?? "");
+    const transactionDate = parseDate(row[9]);
+    const cliente = normalize(row[12] ?? "");
+
+    const invoiceNumber = nota && nota !== "0" ? nota : (documento && documento !== "0" ? documento : null);
+    const accountNumber = conta || null;
+    const confirmationNumber = reserva || null;
+
+    const keyBase = `${toAscii(propertyName)}|${invoiceNumber ?? ""}|${confirmationNumber ?? ""}|${accountNumber ?? ""}|${transactionDate ?? ""}|${amount.toFixed(2)}`;
+
+    entries.push({
+      property_name_raw: propertyName,
+      account_number: accountNumber,
+      account_name: cliente || null,
+      // "TIPO UH" (ex.: DBC) — não é conta contábil; mantemos para referência.
+      account_type: normalize(row[1] ?? "") || null,
+      invoice_number: invoiceNumber,
+      // TOTVS não traz status de fatura; usa a DESCRIÇÃO (A_Faturar) ou COD.DEB.
+      invoice_status: descricao || codDeb || null,
+      transaction_date: transactionDate,
+      original_amount: amount || null,
+      amount: amount || null,
+      paid: null,
+      ar_open: amount || null,
+      confirmation_number: confirmationNumber,
+      reservation_status: null,
+      departure_date: null,
       entry_key: keyBase.replace(/\s+/g, " ").slice(0, 240),
     });
   }
