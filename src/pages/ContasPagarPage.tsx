@@ -199,6 +199,12 @@ export default function ContasPagarPage() {
   const [uploading, setUploading] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Trocar de hotel = nova sessão: limpar seleções para evitar aplicar ações
+  // (ex.: agendar com juros) em lançamentos de hotéis diferentes.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [hotelId]);
   const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
