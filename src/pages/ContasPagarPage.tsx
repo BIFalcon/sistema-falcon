@@ -2355,15 +2355,39 @@ export default function ContasPagarPage() {
       </AlertDialog>
 
       {/* Modal de agendamento */}
-      <AlertDialog open={schedulingOpen} onOpenChange={setSchedulingOpen}>
+      <AlertDialog
+        open={schedulingOpen}
+        onOpenChange={(open) => {
+          setSchedulingOpen(open);
+          if (!open) setEditingScheduledEntryId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Data de agendamento</AlertDialogTitle>
+            <AlertDialogTitle>
+              {editingScheduledEntryId ? "Editar agendamento" : "Data de agendamento"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Selecione a data prevista de pagamento. Se houver juros ou desconto,
-              ajuste o valor abaixo — o sistema reconhece automaticamente a diferença.
+              {editingScheduledEntryId
+                ? "Ajuste a data e/ou o valor deste agendamento. O sistema recalcula automaticamente juros/desconto pela diferença em relação ao valor original."
+                : "Selecione a data prevista de pagamento. Se houver juros ou desconto, ajuste o valor abaixo — o sistema reconhece automaticamente a diferença."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(() => {
+            const allEntriesForEdit = [
+              ...entries,
+              ...distributionEntries,
+              ...salaryEntries,
+              ...paidEntries,
+              ...allPaidEntries,
+            ];
+            const editingEntry = editingScheduledEntryId
+              ? allEntriesForEdit.find((x) => x.id === editingScheduledEntryId) ?? null
+              : null;
+            const baseTotal = editingEntry
+              ? Number(editingEntry.amount ?? 0)
+              : selectedTotal;
+            return (
           <div className="space-y-3">
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
@@ -2382,16 +2406,16 @@ export default function ContasPagarPage() {
               <Input
                 type="number"
                 step="0.01"
-                placeholder={fmtBRL(selectedTotal)}
+                placeholder={fmtBRL(baseTotal)}
                 value={scheduledPaidAmount}
                 onChange={(e) => setScheduledPaidAmount(e.target.value)}
                 onPaste={(e) => handlePasteBRL(e, setScheduledPaidAmount)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Valor original: <strong>{fmtBRL(selectedTotal)}</strong>
+                Valor original: <strong>{fmtBRL(baseTotal)}</strong>
               </p>
               {scheduledPaidAmount && !Number.isNaN(parseFloat(scheduledPaidAmount)) && (() => {
-                const diff = parseFloat(scheduledPaidAmount) - selectedTotal;
+                const diff = parseFloat(scheduledPaidAmount) - baseTotal;
                 if (Math.abs(diff) < 0.005) return null;
                 if (diff > 0) {
                   return (
@@ -2408,14 +2432,44 @@ export default function ContasPagarPage() {
               })()}
             </div>
           </div>
+            );
+          })()}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setEditingScheduledEntryId(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={!scheduledDate}
-              onClick={() => {
+              onClick={async () => {
                 setSchedulingOpen(false);
                 const paidNum = scheduledPaidAmount ? parseFloat(scheduledPaidAmount) : NaN;
                 const hasPaid = !Number.isNaN(paidNum);
+                if (editingScheduledEntryId) {
+                  const allEntriesForEdit = [
+                    ...entries,
+                    ...distributionEntries,
+                    ...salaryEntries,
+                    ...paidEntries,
+                    ...allPaidEntries,
+                  ];
+                  const editingEntry = allEntriesForEdit.find((x) => x.id === editingScheduledEntryId);
+                  const baseTotal = Number(editingEntry?.amount ?? 0);
+                  const diff = hasPaid ? paidNum - baseTotal : 0;
+                  const hasDelta = hasPaid && Math.abs(diff) >= 0.005;
+                  try {
+                    await setPaymentStatus.mutateAsync({
+                      hotelId: editingEntry?.hotel_id ?? hotelId ?? "",
+                      entryIds: [editingScheduledEntryId],
+                      status: "agendado",
+                      scheduledDate,
+                      paidAmount: hasDelta ? paidNum : null,
+                      paidInterest: hasDelta ? diff : null,
+                    });
+                    toast.success("Agendamento atualizado.");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Erro ao atualizar agendamento");
+                  }
+                  setEditingScheduledEntryId(null);
+                  return;
+                }
                 const diff = hasPaid ? paidNum - selectedTotal : 0;
                 // Só persiste paid_amount/paid_interest quando há diferença real
                 // (juros ou desconto). Caso contrário mantém os campos nulos.
@@ -2427,7 +2481,7 @@ export default function ContasPagarPage() {
                 });
               }}
             >
-              Confirmar agendamento
+              {editingScheduledEntryId ? "Salvar alterações" : "Confirmar agendamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
