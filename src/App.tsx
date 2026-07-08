@@ -137,7 +137,7 @@ const App = () => (
               <Route
                 path="/fechamento/consolidado"
                 element={
-                  <RoleGuard roles={["controladoria","patronos","gop","ri","processos","viewer"]}>
+                    <RoleGuard roles={["controladoria","patronos","gop","ri","processos","operacoes","viewer"]}>
                     <ConsolidadoPage />
                   </RoleGuard>
                 }

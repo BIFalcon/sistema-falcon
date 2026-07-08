@@ -1075,6 +1075,8 @@ export type Database = {
       }
       comments: {
         Row: {
+          attachment_name: string | null
+          attachment_url: string | null
           author_id: string
           closing_id: string
           content: string
@@ -1083,6 +1085,8 @@ export type Database = {
           stage: Database["public"]["Enums"]["closing_stage"]
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_url?: string | null
           author_id: string
           closing_id: string
           content: string
@@ -1091,6 +1095,8 @@ export type Database = {
           stage: Database["public"]["Enums"]["closing_stage"]
         }
         Update: {
+          attachment_name?: string | null
+          attachment_url?: string | null
           author_id?: string
           closing_id?: string
           content?: string

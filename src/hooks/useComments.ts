@@ -9,6 +9,8 @@ export interface CommentRow {
   author_id: string;
   content: string;
   created_at: string;
+  attachment_url: string | null;
+  attachment_name: string | null;
   author?: { display_name: string | null; email: string | null } | null;
 }
 
@@ -51,12 +53,16 @@ export function useAddComment() {
       stage: ClosingStage;
       content: string;
       userId: string;
+      attachmentUrl?: string | null;
+      attachmentName?: string | null;
     }) => {
       const { error } = await supabase.from("comments").insert({
         closing_id: input.closingId,
         stage: input.stage,
         content: input.content,
         author_id: input.userId,
+        attachment_url: input.attachmentUrl ?? null,
+        attachment_name: input.attachmentName ?? null,
       });
       if (error) throw error;
     },

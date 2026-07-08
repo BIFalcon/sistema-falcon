@@ -77,7 +77,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Fechamento",
         url: "/fechamento",
         icon: ClipboardList,
-        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer"] as AppRole[],
+        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Visão Geral", url: "/fechamento", icon: LayoutGrid, end: true, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"] as AppRole[] },
           { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer"] as AppRole[] },
@@ -85,7 +85,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet, allowedRoles: ["financeiro","viewer"] as AppRole[] },
           { title: "Envio", url: "/fechamento/envio", icon: Send, allowedRoles: ["ri"] as AppRole[] },
           { title: "Performance SLA", url: "/fechamento/performance", icon: Gauge, requireMaster: true },
-          { title: "Consolidado de Resultados", url: "/fechamento/consolidado", icon: LayoutGrid, allowedRoles: ["controladoria", "gop", "ri", "financeiro", "processos", "viewer"] as AppRole[] },
+          { title: "Consolidado de Resultados", url: "/fechamento/consolidado", icon: LayoutGrid, allowedRoles: ["controladoria", "patronos", "gop", "ri", "financeiro", "processos", "operacoes", "viewer"] as AppRole[] },
         ],
       },
     ],
