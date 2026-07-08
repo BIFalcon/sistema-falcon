@@ -210,6 +210,10 @@ export default function ContasPagarPage() {
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledPaidAmount, setScheduledPaidAmount] = useState("");
+  // Quando definido, o modal de agendamento está no modo "editar" para este
+  // lançamento específico — usa entry.id em vez de selectedIds e ignora o
+  // total selecionado (usa apenas o valor do próprio lançamento).
+  const [editingScheduledEntryId, setEditingScheduledEntryId] = useState<string | null>(null);
   const [paidConfirmOpen, setPaidConfirmOpen] = useState(false);
   const [paidDate, setPaidDate] = useState("");
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
