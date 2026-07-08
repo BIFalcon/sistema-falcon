@@ -717,6 +717,22 @@ export default function ContasPagarPage() {
     }
   }
 
+  // ── Editar agendamento de um lançamento já "agendado" ─────────────────
+  function openEditSchedule(entry: ApEntry) {
+    if (!canMarkInsertedAgendado) {
+      toast.error("Sem permissão para editar agendamento");
+      return;
+    }
+    setEditingScheduledEntryId(entry.id);
+    setScheduledDate(entry.scheduled_date ?? "");
+    const base =
+      entry.paid_amount != null
+        ? Number(entry.paid_amount)
+        : Number(entry.amount ?? 0);
+    setScheduledPaidAmount(base.toFixed(2));
+    setSchedulingOpen(true);
+  }
+
   // ── Marcar/desmarcar Pendente em lote ─────────────────────────────────
   async function handleBulkPending() {
     if (!hotelId) return;
