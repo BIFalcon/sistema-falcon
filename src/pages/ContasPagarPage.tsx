@@ -1997,6 +1997,7 @@ export default function ContasPagarPage() {
                           showOriginalAmount={showOriginalAmount}
                           showPaidAmount={showPaidAmount}
                           showPaidInterest={showPaidInterest}
+                          onEditSchedule={canMarkInsertedAgendado ? openEditSchedule : undefined}
                         />
                       );
                     })
