@@ -44,6 +44,8 @@ interface EntryRowProps {
   showPaidInterest?: boolean;
   /** Linha de Distribuição de Lucros — não exibe status de aprovação GG. */
   isDistribution?: boolean;
+  /** Se definido, mostra botão de editar agendamento em lançamentos "agendado". */
+  onEditSchedule?: (entry: ApEntry) => void;
 }
 
 export function ApEntryRow({
@@ -64,6 +66,7 @@ export function ApEntryRow({
   showPaidAmount = true,
   showPaidInterest = true,
   isDistribution = false,
+  onEditSchedule,
 }: EntryRowProps) {
   const overdue = entry.omie_situation?.toLowerCase().includes("atras");
   const archived = !!entry.archived_at;
@@ -260,8 +263,21 @@ export function ApEntryRow({
       {/* Agendado para */}
       <TableCell className="text-xs hidden md:table-cell px-2 py-1.5">
         {entry.payment_status === "agendado" && entry.scheduled_date ? (
-          <span className={isScheduledOverdue(entry.scheduled_date) ? "text-destructive font-semibold" : ""}>
-            {fmtDate(entry.scheduled_date)}
+          <span className="inline-flex items-center gap-1">
+            <span className={isScheduledOverdue(entry.scheduled_date) ? "text-destructive font-semibold" : ""}>
+              {fmtDate(entry.scheduled_date)}
+            </span>
+            {onEditSchedule && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                title="Editar agendamento (data e valor)"
+                onClick={() => onEditSchedule(entry)}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
           </span>
         ) : (
           <span className="text-muted-foreground">—</span>
