@@ -2160,6 +2160,7 @@ export default function ContasPagarPage() {
                     canEditObservation={canManage}
                     canManageCategory={canManage}
                     canManage={canManage}
+                    onEditSchedule={canMarkInsertedAgendado ? openEditSchedule : undefined}
                   />
                 ))}
               </TableBody>
