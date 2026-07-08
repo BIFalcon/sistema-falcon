@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAddComment, useComments } from "@/hooks/useComments";
 import type { ClosingStage } from "@/lib/constants";
 import { toast } from "sonner";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Paperclip, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { getSignedPrivateUrl } from "@/lib/privateStorage";
 
 interface Props {
   closingId: string;
@@ -18,21 +20,50 @@ export function CommentsThread({ closingId, stage }: Props) {
   const { data: comments = [], isLoading } = useComments(closingId, stage);
   const addComment = useAddComment();
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function submit() {
-    if (!text.trim() || !user) return;
+    if ((!text.trim() && !file) || !user) return;
     try {
+      let attachmentUrl: string | null = null;
+      let attachmentName: string | null = null;
+      if (file) {
+        setUploading(true);
+        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${closingId}/${stage}/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("comment-attachments")
+          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (upErr) throw upErr;
+        attachmentUrl = path;
+        attachmentName = file.name;
+      }
       await addComment.mutateAsync({
         closingId,
         stage,
-        content: text.trim(),
+        content: text.trim() || (attachmentName ? `📎 ${attachmentName}` : ""),
         userId: user.id,
+        attachmentUrl,
+        attachmentName,
       });
       setText("");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao publicar comentário";
       toast.error(msg);
+    } finally {
+      setUploading(false);
     }
+  }
+
+  async function openAttachment(path: string | null) {
+    if (!path) return;
+    const url = await getSignedPrivateUrl(path, "comment-attachments", 3600);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else toast.error("Não foi possível abrir o anexo");
   }
 
   return (
@@ -59,6 +90,16 @@ export function CommentsThread({ closingId, stage }: Props) {
               </span>
             </div>
             <p className="text-sm text-foreground whitespace-pre-wrap">{c.content}</p>
+            {c.attachment_url && (
+              <button
+                type="button"
+                onClick={() => openAttachment(c.attachment_url)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Paperclip className="h-3 w-3" />
+                {c.attachment_name ?? "Anexo"}
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -71,13 +112,47 @@ export function CommentsThread({ closingId, stage }: Props) {
           rows={3}
           className="resize-none"
         />
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || addComment.isPending}
+            >
+              <Paperclip className="h-3.5 w-3.5 mr-1" />
+              Anexar
+            </Button>
+            {file && (
+              <div className="flex items-center gap-1 min-w-0 text-xs text-muted-foreground">
+                <span className="truncate max-w-[180px]">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Remover anexo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
           <Button
             size="sm"
             onClick={submit}
-            disabled={!text.trim() || addComment.isPending}
+            disabled={(!text.trim() && !file) || addComment.isPending || uploading}
           >
-            {addComment.isPending ? "Publicando…" : "Publicar comentário"}
+            {uploading ? "Enviando anexo…" : addComment.isPending ? "Publicando…" : "Publicar comentário"}
           </Button>
         </div>
       </div>
