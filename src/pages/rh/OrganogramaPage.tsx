@@ -205,6 +205,7 @@ export default function OrganogramaPage() {
     email: "",
     phone: "",
     node_type: "standard",
+    parent_id: "" as string,
   });
   const [addingNode, setAddingNode] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -220,6 +221,30 @@ export default function OrganogramaPage() {
 
   const tree = useMemo(() => buildTree(nodes), [nodes]);
 
+  // IDs de todos os descendentes do nó em edição — não podem virar seu superior (ciclo).
+  const descendantIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!editing) return set;
+    const childrenByParent = new Map<string, string[]>();
+    nodes.forEach((n) => {
+      if (!n.parent_id) return;
+      const arr = childrenByParent.get(n.parent_id) ?? [];
+      arr.push(n.id);
+      childrenByParent.set(n.parent_id, arr);
+    });
+    const stack = [editing.id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const child of childrenByParent.get(cur) ?? []) {
+        if (!set.has(child)) {
+          set.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    return set;
+  }, [nodes, editing]);
+
   const openEdit = (n: NodeWithChildren) => {
     setEditing(n);
     setForm({
@@ -230,6 +255,7 @@ export default function OrganogramaPage() {
       email: n.email ?? "",
       phone: n.phone ?? "",
       node_type: n.node_type ?? "standard",
+      parent_id: n.parent_id ?? "",
     });
   };
 
@@ -243,6 +269,12 @@ export default function OrganogramaPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!editing) return;
+      if (form.parent_id === editing.id) {
+        throw new Error("Um nó não pode ser superior de si mesmo.");
+      }
+      if (form.parent_id && descendantIds.has(form.parent_id)) {
+        throw new Error("Não é possível escolher um subordinado como superior.");
+      }
       const { error } = await supabase.from("rh_org_nodes").update({
         name: form.name,
         position: form.position || null,
@@ -250,6 +282,7 @@ export default function OrganogramaPage() {
         email: form.email || null,
         phone: form.phone || null,
         node_type: form.node_type || "standard",
+        parent_id: form.parent_id || null,
       }).eq("id", editing.id);
       if (error) throw error;
 
@@ -353,6 +386,25 @@ export default function OrganogramaPage() {
                 <SelectContent>
                   <SelectItem value="standard">Gerente Geral / Padrão</SelectItem>
                   <SelectItem value="account_executive">Executivo de Contas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Superior (Gerente)</Label>
+              <Select
+                value={form.parent_id || "__root__"}
+                onValueChange={(v) => setForm({ ...form, parent_id: v === "__root__" ? "" : v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__root__">— Sem superior (raiz) —</SelectItem>
+                  {nodes
+                    .filter((n) => n.id !== editing?.id && !descendantIds.has(n.id))
+                    .map((n) => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {n.name}{n.position ? ` — ${n.position}` : ""}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
