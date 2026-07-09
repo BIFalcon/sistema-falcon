@@ -339,6 +339,22 @@ async function approxRowCount(
   return count ?? null;
 }
 
+async function latestUpdatedAt(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  col: string | null,
+): Promise<string | null> {
+  if (!col) return null;
+  const { data, error } = await supabase
+    .from(table)
+    .select(col)
+    .order(col, { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const v = (data[0] as Record<string, unknown>)[col];
+  return v == null ? null : String(v);
+}
+
 async function handleManifest(ctx: RequestContext): Promise<Response> {
   let discovered: Map<string, string[]>;
   try {
@@ -355,18 +371,22 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await approxRowCount(ctx.supabase, t);
+    const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
     // In privileged + include_sensitive mode, no columns are blocked from the
     // payload, but the manifest still flags them as sensitive for auditing.
     const blocked = ctx.includeSensitive ? [] : sensitive;
     tables.push({
       table: t,
+      resource: t,
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
       sensitive_columns: sensitive,
       row_count: rowCount,
+      record_count: rowCount,
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
+      latest_updated_at: latest,
       supports_cursor: true,
       supports_updated_since: incrementalCol !== null,
       non_paginated: false,
@@ -392,6 +412,52 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     derived_resources: DERIVED_RESOURCES,
     derived: derived,
   }, 200, ctx.requestId);
+}
+
+// Lightweight per-resource watermarks: only latest_updated_at and record_count.
+// No row data, no sensitive columns, no payload. Intended for smart syncs so
+// callers can skip resources that have not changed since their last cursor.
+async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; rowsReturned: number }> {
+  let discovered: Map<string, string[]>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch (e) {
+    return {
+      res: errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId),
+      rowsReturned: 0,
+    };
+  }
+  const tableNames = Array.from(discovered.keys()).sort();
+  const resources = [] as Array<{
+    resource: string;
+    incremental_column: string | null;
+    supports_updated_since: boolean;
+    latest_updated_at: string | null;
+    record_count: number | null;
+  }>;
+  for (const t of tableNames) {
+    const cols: string[] = discovered.get(t) ?? [];
+    const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
+    const [rowCount, latest] = await Promise.all([
+      approxRowCount(ctx.supabase, t),
+      latestUpdatedAt(ctx.supabase, t, incrementalCol),
+    ]);
+    resources.push({
+      resource: t,
+      incremental_column: incrementalCol,
+      supports_updated_since: incrementalCol !== null,
+      latest_updated_at: latest,
+      record_count: rowCount,
+    });
+  }
+  const res = json({
+    schema_version: SCHEMA_VERSION,
+    request_id: ctx.requestId,
+    generated_at: new Date().toISOString(),
+    scope: ctx.scope,
+    resources,
+  }, 200, ctx.requestId);
+  return { res, rowsReturned: resources.length };
 }
 
 async function handleHealth(ctx: RequestContext): Promise<Response> {
