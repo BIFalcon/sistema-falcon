@@ -221,6 +221,30 @@ export default function OrganogramaPage() {
 
   const tree = useMemo(() => buildTree(nodes), [nodes]);
 
+  // IDs de todos os descendentes do nó em edição — não podem virar seu superior (ciclo).
+  const descendantIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!editing) return set;
+    const childrenByParent = new Map<string, string[]>();
+    nodes.forEach((n) => {
+      if (!n.parent_id) return;
+      const arr = childrenByParent.get(n.parent_id) ?? [];
+      arr.push(n.id);
+      childrenByParent.set(n.parent_id, arr);
+    });
+    const stack = [editing.id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const child of childrenByParent.get(cur) ?? []) {
+        if (!set.has(child)) {
+          set.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    return set;
+  }, [nodes, editing]);
+
   const openEdit = (n: NodeWithChildren) => {
     setEditing(n);
     setForm({
