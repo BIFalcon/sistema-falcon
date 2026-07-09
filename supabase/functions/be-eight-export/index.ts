@@ -339,6 +339,22 @@ async function approxRowCount(
   return count ?? null;
 }
 
+async function latestUpdatedAt(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  col: string | null,
+): Promise<string | null> {
+  if (!col) return null;
+  const { data, error } = await supabase
+    .from(table)
+    .select(col)
+    .order(col, { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const v = (data[0] as Record<string, unknown>)[col];
+  return v == null ? null : String(v);
+}
+
 async function handleManifest(ctx: RequestContext): Promise<Response> {
   let discovered: Map<string, string[]>;
   try {
@@ -355,18 +371,22 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await approxRowCount(ctx.supabase, t);
+    const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
     // In privileged + include_sensitive mode, no columns are blocked from the
     // payload, but the manifest still flags them as sensitive for auditing.
     const blocked = ctx.includeSensitive ? [] : sensitive;
     tables.push({
       table: t,
+      resource: t,
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
       sensitive_columns: sensitive,
       row_count: rowCount,
+      record_count: rowCount,
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
+      latest_updated_at: latest,
       supports_cursor: true,
       supports_updated_since: incrementalCol !== null,
       non_paginated: false,
@@ -392,6 +412,52 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     derived_resources: DERIVED_RESOURCES,
     derived: derived,
   }, 200, ctx.requestId);
+}
+
+// Lightweight per-resource watermarks: only latest_updated_at and record_count.
+// No row data, no sensitive columns, no payload. Intended for smart syncs so
+// callers can skip resources that have not changed since their last cursor.
+async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; rowsReturned: number }> {
+  let discovered: Map<string, string[]>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch (e) {
+    return {
+      res: errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId),
+      rowsReturned: 0,
+    };
+  }
+  const tableNames = Array.from(discovered.keys()).sort();
+  const resources = [] as Array<{
+    resource: string;
+    incremental_column: string | null;
+    supports_updated_since: boolean;
+    latest_updated_at: string | null;
+    record_count: number | null;
+  }>;
+  for (const t of tableNames) {
+    const cols: string[] = discovered.get(t) ?? [];
+    const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
+    const [rowCount, latest] = await Promise.all([
+      approxRowCount(ctx.supabase, t),
+      latestUpdatedAt(ctx.supabase, t, incrementalCol),
+    ]);
+    resources.push({
+      resource: t,
+      incremental_column: incrementalCol,
+      supports_updated_since: incrementalCol !== null,
+      latest_updated_at: latest,
+      record_count: rowCount,
+    });
+  }
+  const res = json({
+    schema_version: SCHEMA_VERSION,
+    request_id: ctx.requestId,
+    generated_at: new Date().toISOString(),
+    scope: ctx.scope,
+    resources,
+  }, 200, ctx.requestId);
+  return { res, rowsReturned: resources.length };
 }
 
 async function handleHealth(ctx: RequestContext): Promise<Response> {
@@ -636,38 +702,80 @@ Deno.serve(async (req) => {
   const includeSensitive = wantsSensitive && scope === "privileged";
   const ctx: RequestContext = { requestId, supabase, scope, includeSensitive };
 
-  // Audit log (per request_id). Never logs the token value.
-  const auditEntry = {
-    kind: "be_eight_export_audit",
-    request_id: requestId,
-    scope,
-    include_sensitive: includeSensitive,
-    method: req.method,
-    path: url.pathname,
-    params: Object.fromEntries(url.searchParams.entries()),
-    user_agent: req.headers.get("user-agent") ?? null,
-    at: new Date().toISOString(),
-  };
-  console.log(JSON.stringify(auditEntry));
-
   // Strip the function base prefix to get the action.
   const path = url.pathname.replace(/^.*\/be-eight-export/, "") || "/";
+  const startedAt = Date.now();
+  const resourceParam =
+    url.searchParams.get("resource") ?? url.searchParams.get("table") ?? null;
+  const updatedSinceParam = url.searchParams.get("updated_since");
+
+  const audit = (extra: Record<string, unknown>) => {
+    console.log(JSON.stringify({
+      kind: "be_eight_export_audit",
+      request_id: requestId,
+      scope,
+      include_sensitive: includeSensitive,
+      method: req.method,
+      path,
+      resource: resourceParam,
+      updated_since: updatedSinceParam,
+      params: Object.fromEntries(url.searchParams.entries()),
+      user_agent: req.headers.get("user-agent") ?? null,
+      at: new Date().toISOString(),
+      duration_ms: Date.now() - startedAt,
+      ...extra,
+    }));
+  };
+
+  const rowsFromBody = async (res: Response): Promise<{ res: Response; rows: number }> => {
+    try {
+      const cloned = res.clone();
+      const body = await cloned.json() as { count?: number; rows?: unknown[] };
+      const rows = typeof body?.count === "number"
+        ? body.count
+        : Array.isArray(body?.rows) ? body.rows.length : 0;
+      return { res, rows };
+    } catch {
+      return { res, rows: 0 };
+    }
+  };
 
   try {
-    if (path === "/" || path === "" || path === "/health") return await handleHealth(ctx);
-    if (path === "/manifest") return await handleManifest(ctx);
-    if (path === "/export") {
+    let response: Response;
+    let rowsReturned = 0;
+    if (path === "/" || path === "" || path === "/health") {
+      response = await handleHealth(ctx);
+    } else if (path === "/manifest") {
+      response = await handleManifest(ctx);
+    } else if (path === "/watermarks") {
+      const r = await handleWatermarks(ctx);
+      response = r.res;
+      rowsReturned = r.rowsReturned;
+    } else if (path === "/export") {
       const resource = url.searchParams.get("resource");
-      if (!resource) return errorResponse(400, "missing_param", "resource is required", requestId);
-      return await handleResource(ctx, resource, url);
-    }
-    if (path === "/export-table") {
+      if (!resource) {
+        response = errorResponse(400, "missing_param", "resource is required", requestId);
+      } else {
+        const r = await rowsFromBody(await handleResource(ctx, resource, url));
+        response = r.res;
+        rowsReturned = r.rows;
+      }
+    } else if (path === "/export-table") {
       const table = url.searchParams.get("table");
-      if (!table) return errorResponse(400, "missing_param", "table is required", requestId);
-      return await exportTable(ctx, table, url);
+      if (!table) {
+        response = errorResponse(400, "missing_param", "table is required", requestId);
+      } else {
+        const r = await rowsFromBody(await exportTable(ctx, table, url));
+        response = r.res;
+        rowsReturned = r.rows;
+      }
+    } else {
+      response = errorResponse(404, "not_found", `Unknown path: ${path}`, requestId);
     }
-    return errorResponse(404, "not_found", `Unknown path: ${path}`, requestId);
+    audit({ status: response.status, rows_returned: rowsReturned });
+    return response;
   } catch (err) {
+    audit({ status: 500, rows_returned: 0, error: err instanceof Error ? err.message : "unknown" });
     return errorResponse(500, "internal_error", err instanceof Error ? err.message : "unknown", requestId);
   }
 });
