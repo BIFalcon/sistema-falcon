@@ -205,6 +205,7 @@ export default function OrganogramaPage() {
     email: "",
     phone: "",
     node_type: "standard",
+    parent_id: "" as string,
   });
   const [addingNode, setAddingNode] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -230,6 +231,7 @@ export default function OrganogramaPage() {
       email: n.email ?? "",
       phone: n.phone ?? "",
       node_type: n.node_type ?? "standard",
+      parent_id: n.parent_id ?? "",
     });
   };
 
@@ -243,6 +245,12 @@ export default function OrganogramaPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!editing) return;
+      if (form.parent_id === editing.id) {
+        throw new Error("Um nó não pode ser superior de si mesmo.");
+      }
+      if (form.parent_id && descendantIds.has(form.parent_id)) {
+        throw new Error("Não é possível escolher um subordinado como superior.");
+      }
       const { error } = await supabase.from("rh_org_nodes").update({
         name: form.name,
         position: form.position || null,
@@ -250,6 +258,7 @@ export default function OrganogramaPage() {
         email: form.email || null,
         phone: form.phone || null,
         node_type: form.node_type || "standard",
+        parent_id: form.parent_id || null,
       }).eq("id", editing.id);
       if (error) throw error;
 
