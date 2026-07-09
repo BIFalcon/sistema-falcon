@@ -702,38 +702,80 @@ Deno.serve(async (req) => {
   const includeSensitive = wantsSensitive && scope === "privileged";
   const ctx: RequestContext = { requestId, supabase, scope, includeSensitive };
 
-  // Audit log (per request_id). Never logs the token value.
-  const auditEntry = {
-    kind: "be_eight_export_audit",
-    request_id: requestId,
-    scope,
-    include_sensitive: includeSensitive,
-    method: req.method,
-    path: url.pathname,
-    params: Object.fromEntries(url.searchParams.entries()),
-    user_agent: req.headers.get("user-agent") ?? null,
-    at: new Date().toISOString(),
-  };
-  console.log(JSON.stringify(auditEntry));
-
   // Strip the function base prefix to get the action.
   const path = url.pathname.replace(/^.*\/be-eight-export/, "") || "/";
+  const startedAt = Date.now();
+  const resourceParam =
+    url.searchParams.get("resource") ?? url.searchParams.get("table") ?? null;
+  const updatedSinceParam = url.searchParams.get("updated_since");
+
+  const audit = (extra: Record<string, unknown>) => {
+    console.log(JSON.stringify({
+      kind: "be_eight_export_audit",
+      request_id: requestId,
+      scope,
+      include_sensitive: includeSensitive,
+      method: req.method,
+      path,
+      resource: resourceParam,
+      updated_since: updatedSinceParam,
+      params: Object.fromEntries(url.searchParams.entries()),
+      user_agent: req.headers.get("user-agent") ?? null,
+      at: new Date().toISOString(),
+      duration_ms: Date.now() - startedAt,
+      ...extra,
+    }));
+  };
+
+  const rowsFromBody = async (res: Response): Promise<{ res: Response; rows: number }> => {
+    try {
+      const cloned = res.clone();
+      const body = await cloned.json() as { count?: number; rows?: unknown[] };
+      const rows = typeof body?.count === "number"
+        ? body.count
+        : Array.isArray(body?.rows) ? body.rows.length : 0;
+      return { res, rows };
+    } catch {
+      return { res, rows: 0 };
+    }
+  };
 
   try {
-    if (path === "/" || path === "" || path === "/health") return await handleHealth(ctx);
-    if (path === "/manifest") return await handleManifest(ctx);
-    if (path === "/export") {
+    let response: Response;
+    let rowsReturned = 0;
+    if (path === "/" || path === "" || path === "/health") {
+      response = await handleHealth(ctx);
+    } else if (path === "/manifest") {
+      response = await handleManifest(ctx);
+    } else if (path === "/watermarks") {
+      const r = await handleWatermarks(ctx);
+      response = r.res;
+      rowsReturned = r.rowsReturned;
+    } else if (path === "/export") {
       const resource = url.searchParams.get("resource");
-      if (!resource) return errorResponse(400, "missing_param", "resource is required", requestId);
-      return await handleResource(ctx, resource, url);
-    }
-    if (path === "/export-table") {
+      if (!resource) {
+        response = errorResponse(400, "missing_param", "resource is required", requestId);
+      } else {
+        const r = await rowsFromBody(await handleResource(ctx, resource, url));
+        response = r.res;
+        rowsReturned = r.rows;
+      }
+    } else if (path === "/export-table") {
       const table = url.searchParams.get("table");
-      if (!table) return errorResponse(400, "missing_param", "table is required", requestId);
-      return await exportTable(ctx, table, url);
+      if (!table) {
+        response = errorResponse(400, "missing_param", "table is required", requestId);
+      } else {
+        const r = await rowsFromBody(await exportTable(ctx, table, url));
+        response = r.res;
+        rowsReturned = r.rows;
+      }
+    } else {
+      response = errorResponse(404, "not_found", `Unknown path: ${path}`, requestId);
     }
-    return errorResponse(404, "not_found", `Unknown path: ${path}`, requestId);
+    audit({ status: response.status, rows_returned: rowsReturned });
+    return response;
   } catch (err) {
+    audit({ status: 500, rows_returned: 0, error: err instanceof Error ? err.message : "unknown" });
     return errorResponse(500, "internal_error", err instanceof Error ? err.message : "unknown", requestId);
   }
 });
