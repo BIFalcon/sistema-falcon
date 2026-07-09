@@ -389,6 +389,25 @@ export default function OrganogramaPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Superior (Gerente)</Label>
+              <Select
+                value={form.parent_id || "__root__"}
+                onValueChange={(v) => setForm({ ...form, parent_id: v === "__root__" ? "" : v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__root__">— Sem superior (raiz) —</SelectItem>
+                  {nodes
+                    .filter((n) => n.id !== editing?.id && !descendantIds.has(n.id))
+                    .map((n) => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {n.name}{n.position ? ` — ${n.position}` : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Foto</Label>
               {form.photo_url && editingPhotoUrl && (
