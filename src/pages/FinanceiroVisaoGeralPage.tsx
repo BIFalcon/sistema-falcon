@@ -70,6 +70,26 @@ export default function FinanceiroVisaoGeralPage() {
     },
   });
 
+  // Saldos bancários (Itaú + Santander) — sem filtro de data, mais recente por banco
+  const { data: bankBalances = [] } = useQuery({
+    queryKey: ["ap-bank-balance-vg", hotelFilter],
+    enabled: hotelFilter !== "all",
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ap_bank_balance")
+        .select("bank_name,amount,balance_date,hotel_id")
+        .eq("hotel_id", hotelFilter)
+        .order("balance_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        bank_name: string;
+        amount: number;
+        balance_date: string;
+        hotel_id: string;
+      }>;
+    },
+  });
+
   // Filtro por hotel/aplicação de RLS no front
   const filterByScope = <T extends { hotel_id: string | null }>(arr: T[]) => {
     let r = arr;
@@ -100,78 +120,97 @@ export default function FinanceiroVisaoGeralPage() {
     [paidEntries, hotelFilter, seesAllHotels, restrictedHotelIds],
   );
 
-  // ===== Cards superiores (usam date range) =====
-  const totalDuePeriod = useMemo(
+  // ===== Cards principais =====
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  // A pagar: vencimento >= hoje. Com filtro, respeita o range.
+  const totalAPagar = useMemo(
     () =>
       apScoped
-        .filter(
-          (e) =>
-            e.due_date &&
-            e.due_date >= dateFrom &&
-            e.due_date <= dateTo &&
-            e.gg_approval !== "rejected",
-        )
+        .filter((e) => {
+          if (e.payment_status === "pago") return false;
+          if (!e.due_date || e.due_date < todayIso) return false;
+          if (e.gg_approval === "rejected") return false;
+          if (dateFrom && e.due_date < dateFrom) return false;
+          if (dateTo && e.due_date > dateTo) return false;
+          return true;
+        })
         .reduce((s, e) => s + Number(e.amount ?? 0), 0),
-    [apScoped, dateFrom, dateTo],
+    [apScoped, todayIso, dateFrom, dateTo],
   );
 
-  // Em atraso: ignora o filtro de período — sempre tudo que venceu até ontem
-  // (espelha o filtro "vencidos" do Contas a Pagar).
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const totalOverdue = useMemo(
+  // Em atraso: vencidos, NUNCA filtra por data.
+  const totalVencido = useMemo(
     () =>
       apScoped
         .filter(
           (e) =>
             e.due_date &&
             e.due_date < todayIso &&
-            e.gg_approval !== "rejected" &&
-            e.payment_status !== "pago",
+            e.payment_status !== "pago" &&
+            e.gg_approval !== "rejected",
         )
         .reduce((s, e) => s + Number(e.amount ?? 0), 0),
     [apScoped, todayIso],
   );
 
+  const totalGeralAPagar = totalAPagar + totalVencido;
+
+  // A faturar: usa estimated_due_date. Sem filtro = tudo.
+  const totalAFaturar = useMemo(
+    () =>
+      tiScoped
+        .filter((e) => {
+          if (dateFrom && e.estimated_due_date && e.estimated_due_date < dateFrom)
+            return false;
+          if (dateTo && e.estimated_due_date && e.estimated_due_date > dateTo)
+            return false;
+          // sem data e sem filtro = inclui
+          if (!e.estimated_due_date && (dateFrom || dateTo)) return false;
+          return true;
+        })
+        .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0),
+    [tiScoped, dateFrom, dateTo],
+  );
+
+  // Open Folio: NUNCA filtra — sempre total.
   const totalOpenFolio = useMemo(
     () => ofScoped.reduce((s, e) => s + Number(e.balance ?? 0), 0),
     [ofScoped],
   );
 
-  // A faturar no período: usa Vencimento Estimado (definido no módulo de Faturamento).
-  const totalToInvoicePeriod = useMemo(
-    () =>
-      tiScoped
-        .filter(
-          (e) =>
-            e.estimated_due_date &&
-            e.estimated_due_date >= dateFrom &&
-            e.estimated_due_date <= dateTo,
-        )
-        .reduce((s, e) => s + Number(e.ar_open ?? e.amount ?? 0), 0),
-    [tiScoped, dateFrom, dateTo],
-  );
+  // Saldo em conta: soma do saldo mais recente por banco (Itaú + Santander), sem filtro.
+  const saldoConta = useMemo(() => {
+    const latest = new Map<string, number>();
+    for (const b of bankBalances) {
+      if (!latest.has(b.bank_name)) latest.set(b.bank_name, Number(b.amount ?? 0));
+    }
+    return Array.from(latest.values()).reduce((s, v) => s + v, 0);
+  }, [bankBalances]);
 
-  const saldoLiquido = totalOpenFolio - totalDuePeriod;
+  // Saldo líquido: Saldo conta − Total a pagar + Open Folio.
+  const saldoLiquido = saldoConta - totalGeralAPagar + totalOpenFolio;
 
-  // ===== Encargos financeiros =====
-  // Juros pagos no período (data efetiva do pagamento dentro do range).
+  // ===== Encargos financeiros (filtro próprio) =====
+  const [anticDateFrom, setAnticDateFrom] = useState("");
+  const [anticDateTo, setAnticDateTo] = useState("");
+
+  // Juros pagos: por data efetiva do pagamento, filtro próprio.
   const jurosPagos = useMemo(
     () =>
       paidScoped
         .filter((e) => {
-          if (!e.payment_paid_at) return false;
-          const d = e.payment_paid_at.slice(0, 10);
-          return d >= dateFrom && d <= dateTo;
+          if (!e.paid_interest || Number(e.paid_interest) === 0) return false;
+          if (e.payment_status !== "pago") return false;
+          const d = e.payment_paid_at?.slice(0, 10);
+          if (!d) return false;
+          if (anticDateFrom && d < anticDateFrom) return false;
+          if (anticDateTo && d > anticDateTo) return false;
+          return true;
         })
         .reduce((s, e) => s + Number(e.paid_interest ?? 0), 0),
-    [paidScoped, dateFrom, dateTo],
+    [paidScoped, anticDateFrom, anticDateTo],
   );
-
-  // Antecipação: deriva mês/ano de dateFrom
-  const period = useMemo(() => {
-    const d = dateFrom ? new Date(dateFrom + "T00:00:00") : new Date();
-    return { month: d.getMonth() + 1, year: d.getFullYear() };
-  }, [dateFrom]);
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -186,41 +225,60 @@ export default function FinanceiroVisaoGeralPage() {
       </div>
 
       {/* BLOCO 1 — Cards principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           icon={<Wallet className="h-4 w-4" />}
-          label="A pagar no período"
-          value={fmtBRL(totalDuePeriod)}
+          label="A pagar"
+          value={fmtBRL(totalAPagar)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-pagar")}
         />
         <SummaryCard
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Em atraso"
-          value={fmtBRL(totalOverdue)}
-          tone={totalOverdue > 0 ? "destructive" : "default"}
+          value={fmtBRL(totalVencido)}
+          tone={totalVencido > 0 ? "destructive" : "default"}
           onClick={() => navigate("/financeiro/contas-pagar")}
         />
         <SummaryCard
+          icon={<Wallet className="h-4 w-4" />}
+          label="Total a pagar"
+          value={fmtBRL(totalGeralAPagar)}
+          tone={totalGeralAPagar > 0 ? "warning" : "default"}
+          subtitle="A pagar + Em atraso"
+          bold
+        />
+        <SummaryCard
           icon={<ArrowDownCircle className="h-4 w-4" />}
-          label="A faturar no período"
-          value={fmtBRL(totalToInvoicePeriod)}
+          label="A faturar"
+          value={fmtBRL(totalAFaturar)}
           tone="default"
           onClick={() => navigate("/financeiro/contas-receber")}
         />
         <SummaryCard
           icon={<Hourglass className="h-4 w-4" />}
-          label="Open Folio em aberto"
+          label="Open Folio"
           value={fmtBRL(totalOpenFolio)}
           tone={totalOpenFolio > 0 ? "warning" : "default"}
           onClick={() => navigate("/financeiro/contas-receber")}
+        />
+        <SummaryCard
+          icon={<CreditCard className="h-4 w-4" />}
+          label="Saldo em conta"
+          value={fmtBRL(saldoConta)}
+          tone="default"
+          subtitle={
+            hotelFilter === "all"
+              ? "Selecione um hotel"
+              : "Itaú + Santander (mais recente)"
+          }
         />
         <SummaryCard
           icon={<TrendingUp className="h-4 w-4" />}
           label="Saldo líquido"
           value={fmtBRL(saldoLiquido)}
           tone={saldoLiquido < 0 ? "destructive" : "default"}
-          subtitle="A receber − A pagar"
+          subtitle="Saldo conta − Total a pagar + Open Folio"
         />
       </div>
 
@@ -245,30 +303,43 @@ export default function FinanceiroVisaoGeralPage() {
         </div>
       </section>
 
-      {/* BLOCO 3 — Encargos financeiros */}
+      {/* BLOCO 3 — Encargos financeiros (filtro próprio de período) */}
       <section className="space-y-3">
-        <SectionHeader
-          icon={<TrendingUp className="h-4 w-4" />}
-          title="Encargos financeiros"
-          subtitle={
-            hotelFilter === "all"
-              ? "Antecipação: selecione um hotel para informar"
-              : undefined
-          }
-        />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SummaryCard
-            icon={<Clock className="h-4 w-4" />}
-            label="Juros pagos no período"
-            value={fmtBRL(jurosPagos)}
-            tone={jurosPagos > 0 ? "warning" : "default"}
-          />
-          <AnticipationCards
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-accent"><TrendingUp className="h-4 w-4" /></span>
+              <h3 className="font-medium text-sm">Encargos financeiros</h3>
+              {hotelFilter === "all" && (
+                <span className="text-xs text-muted-foreground">
+                  · Antecipação: selecione um hotel para informar
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                placeholder="De"
+                value={anticDateFrom}
+                onChange={(e) => setAnticDateFrom(e.target.value)}
+                className="w-36 h-8 text-xs"
+              />
+              <Input
+                type="date"
+                placeholder="Até"
+                value={anticDateTo}
+                onChange={(e) => setAnticDateTo(e.target.value)}
+                className="w-36 h-8 text-xs"
+              />
+            </div>
+          </div>
+          <AnticipationSection
             hotelId={hotelFilter === "all" ? null : hotelFilter}
-            year={period.year}
-            month={period.month}
             canEdit={canEditAnticipation}
             userId={user?.id ?? null}
+            dateFrom={anticDateFrom}
+            dateTo={anticDateTo}
+            jurosPagos={jurosPagos}
           />
         </div>
       </section>
@@ -276,173 +347,214 @@ export default function FinanceiroVisaoGeralPage() {
   );
 }
 
-// ── Antecipação de recebíveis ──────────────────────────────────────────────
+// ── Antecipação de recebíveis (acumulativa) ────────────────────────────────
 interface ApAnticipationRow {
   id: string;
   hotel_id: string;
-  month: number;
-  year: number;
-  anticipated_amount: number;
-  anticipation_rate: number;
+  anticipated_amount: number | null;
+  valor_liquido: number | null;
+  valor_descontado: number | null;
+  data_antecipacao: string | null;
 }
 
-function AnticipationCards({
+function AnticipationSection({
   hotelId,
-  year,
-  month,
   canEdit,
   userId,
+  dateFrom,
+  dateTo,
+  jurosPagos,
 }: {
   hotelId: string | null;
-  year: number;
-  month: number;
   canEdit: boolean;
   userId: string | null;
+  dateFrom: string;
+  dateTo: string;
+  jurosPagos: number;
 }) {
   const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [amountInput, setAmountInput] = useState("");
-  const [rateInput, setRateInput] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    anticipated_amount: "",
+    valor_liquido: "",
+    valor_descontado: "",
+    data_antecipacao: "",
+  });
 
   const { data: rows = [] } = useQuery({
-    queryKey: ["ap-anticipation", year, month, hotelId],
+    queryKey: ["ap-anticipation-list", hotelId],
+    enabled: !!hotelId,
     queryFn: async (): Promise<ApAnticipationRow[]> => {
-      let q = supabase
-        .from("ap_anticipation" as never)
-        .select("*")
-        .eq("year", year)
-        .eq("month", month);
-      if (hotelId) q = q.eq("hotel_id", hotelId);
-      const { data, error } = await q;
+      const { data, error } = await supabase
+        .from("ap_anticipation")
+        .select("id,hotel_id,anticipated_amount,valor_liquido,valor_descontado,data_antecipacao")
+        .eq("hotel_id", hotelId!)
+        .order("data_antecipacao", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as ApAnticipationRow[];
+      return (data ?? []) as unknown as ApAnticipationRow[];
     },
   });
 
-  const totalAmount = rows.reduce((s, r) => s + Number(r.anticipated_amount ?? 0), 0);
-  const avgRate =
-    rows.length > 0
-      ? rows.reduce((s, r) => s + Number(r.anticipation_rate ?? 0), 0) / rows.length
-      : 0;
+  const filtered = useMemo(
+    () =>
+      rows.filter((r) => {
+        const d = r.data_antecipacao;
+        if (dateFrom && (!d || d < dateFrom)) return false;
+        if (dateTo && (!d || d > dateTo)) return false;
+        return true;
+      }),
+    [rows, dateFrom, dateTo],
+  );
 
-  const upsert = useMutation({
+  const totalAntecipado = filtered.reduce(
+    (s, r) => s + Number(r.anticipated_amount ?? 0),
+    0,
+  );
+  const totalDescontado = filtered.reduce(
+    (s, r) => s + Number(r.valor_descontado ?? 0),
+    0,
+  );
+
+  const insert = useMutation({
     mutationFn: async () => {
       if (!hotelId || !userId) throw new Error("Selecione um hotel.");
+      if (!form.data_antecipacao) throw new Error("Informe a data da antecipação.");
+      const d = new Date(form.data_antecipacao + "T00:00:00");
       const payload = {
         hotel_id: hotelId,
-        month,
-        year,
-        anticipated_amount: parseFloat(amountInput || "0"),
-        anticipation_rate: parseFloat(rateInput || "0"),
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        anticipated_amount: parseFloat(form.anticipated_amount || "0"),
+        valor_liquido: parseFloat(form.valor_liquido || "0"),
+        valor_descontado: parseFloat(form.valor_descontado || "0"),
+        data_antecipacao: form.data_antecipacao,
         informed_by: userId,
       };
       const { error } = await supabase
-        .from("ap_anticipation" as never)
-        .upsert(payload as never, { onConflict: "hotel_id,month,year" });
+        .from("ap_anticipation")
+        .insert(payload as never);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ap-anticipation"] });
-      toast.success("Antecipação atualizada");
-      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["ap-anticipation-list"] });
+      toast.success("Antecipação registrada");
+      setOpen(false);
+      setForm({
+        anticipated_amount: "",
+        valor_liquido: "",
+        valor_descontado: "",
+        data_antecipacao: "",
+      });
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Erro ao salvar"),
   });
 
-  const startEdit = () => {
-    const current = rows[0];
-    setAmountInput(current ? String(current.anticipated_amount ?? "") : "");
-    setRateInput(current ? String(current.anticipation_rate ?? "") : "");
-    setEditing(true);
-  };
-
-  const canEditThis = canEdit && !!hotelId;
-
   return (
-    <>
-      <Card className="p-4 shadow-soft space-y-2">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-          <CreditCard className="h-4 w-4" /> Antecipação de recebíveis
-          {canEditThis && !editing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto h-6 px-2 text-xs gap-1"
-              onClick={startEdit}
-            >
-              <Pencil className="h-3 w-3" /> Editar
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryCard
+          icon={<CreditCard className="h-4 w-4" />}
+          label="Total antecipado"
+          value={fmtBRL(totalAntecipado)}
+          tone="default"
+        />
+        <SummaryCard
+          icon={<AlertTriangle className="h-4 w-4" />}
+          label="Valor descontado"
+          value={fmtBRL(totalDescontado)}
+          tone={totalDescontado > 0 ? "warning" : "default"}
+        />
+        <SummaryCard
+          icon={<Clock className="h-4 w-4" />}
+          label="Juros pagos"
+          value={fmtBRL(jurosPagos)}
+          tone={jurosPagos > 0 ? "warning" : "default"}
+        />
+      </div>
+
+      {canEdit && hotelId && (
+        <div>
+          {!open ? (
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+              <Pencil className="h-3 w-3 mr-1" /> Nova antecipação
             </Button>
+          ) : (
+            <Card className="p-4 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase text-muted-foreground">
+                    Valor antecipado (R$)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.anticipated_amount}
+                    onChange={(e) =>
+                      setForm({ ...form, anticipated_amount: e.target.value })
+                    }
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-muted-foreground">
+                    Valor líquido (R$)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.valor_liquido}
+                    onChange={(e) =>
+                      setForm({ ...form, valor_liquido: e.target.value })
+                    }
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-muted-foreground">
+                    Valor descontado (R$)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.valor_descontado}
+                    onChange={(e) =>
+                      setForm({ ...form, valor_descontado: e.target.value })
+                    }
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-muted-foreground">
+                    Data da antecipação
+                  </label>
+                  <Input
+                    type="date"
+                    value={form.data_antecipacao}
+                    onChange={(e) =>
+                      setForm({ ...form, data_antecipacao: e.target.value })
+                    }
+                    className="h-8"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => insert.mutate()} disabled={insert.isPending}>
+                  Salvar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Cada registro é acumulado — não substitui os anteriores.
+                Estes valores são informativos e não entram no saldo líquido.
+              </p>
+            </Card>
           )}
         </div>
-        {editing ? (
-          <div className="space-y-2">
-            <div>
-              <label className="text-[10px] uppercase text-muted-foreground">
-                Valor antecipado
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                placeholder="0,00"
-                className="h-8"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase text-muted-foreground">
-                Taxa (ex: 0.0235 = 2,35%)
-              </label>
-              <Input
-                type="number"
-                step="0.0001"
-                value={rateInput}
-                onChange={(e) => setRateInput(e.target.value)}
-                placeholder="0.0000"
-                className="h-8"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => upsert.mutate()}
-                disabled={upsert.isPending}
-              >
-                Salvar
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditing(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-1 text-2xl font-semibold">{fmtBRL(totalAmount)}</p>
-        )}
-        <p className="text-[10px] text-muted-foreground">
-          Período: {String(month).padStart(2, "0")}/{year}
-          {!hotelId && " · todos os hotéis (soma)"}
-        </p>
-      </Card>
-
-      <Card className="p-4 shadow-soft space-y-2">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-          <TrendingUp className="h-4 w-4" /> Taxa de antecipação
-        </div>
-        <p className="mt-1 text-2xl font-semibold">
-          {(avgRate * 100).toFixed(2)}%
-        </p>
-        <p className="text-[10px] text-muted-foreground">
-          {hotelId
-            ? "Taxa cobrada no período"
-            : "Taxa média entre os hotéis no período"}
-        </p>
-      </Card>
-    </>
+      )}
+    </div>
   );
 }
 
@@ -453,6 +565,7 @@ function SummaryCard({
   tone,
   subtitle,
   onClick,
+  bold,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -460,6 +573,7 @@ function SummaryCard({
   tone: "default" | "destructive" | "warning";
   subtitle?: string;
   onClick?: () => void;
+  bold?: boolean;
 }) {
   const toneClass =
     tone === "destructive"
@@ -467,7 +581,7 @@ function SummaryCard({
       : tone === "warning"
         ? "border-amber-500/30 bg-amber-500/5"
         : "";
-  const valueClass = tone === "destructive" ? "text-destructive" : "";
+  const valueClass = `${tone === "destructive" ? "text-destructive" : ""} ${bold ? "font-bold" : "font-semibold"}`;
   const Wrapper: React.ElementType = onClick ? "button" : "div";
   return (
     <Wrapper
@@ -477,7 +591,7 @@ function SummaryCard({
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
         {icon} {label}
       </div>
-      <p className={`mt-2 text-2xl font-semibold ${valueClass}`}>{value}</p>
+      <p className={`mt-2 text-2xl ${valueClass}`}>{value}</p>
       {subtitle && (
         <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>
       )}
