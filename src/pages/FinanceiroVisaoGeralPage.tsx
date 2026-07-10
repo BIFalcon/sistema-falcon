@@ -18,11 +18,10 @@ import {
   ArrowDownCircle,
   AlertTriangle,
   Wallet,
-  Hourglass,
   TrendingUp,
   CreditCard,
-  Sparkles,
   Clock,
+  Hourglass,
   Pencil,
 } from "lucide-react";
 import { fmtBRL } from "@/lib/formatters";
