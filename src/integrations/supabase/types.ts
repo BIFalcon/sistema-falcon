@@ -19,33 +19,48 @@ export type Database = {
           anticipated_amount: number
           anticipation_rate: number
           created_at: string
+          data_antecipacao: string | null
           hotel_id: string
           id: string
           informed_by: string | null
           month: number
+          period_end: string | null
+          period_start: string | null
           updated_at: string
+          valor_descontado: number | null
+          valor_liquido: number | null
           year: number
         }
         Insert: {
           anticipated_amount?: number
           anticipation_rate?: number
           created_at?: string
+          data_antecipacao?: string | null
           hotel_id: string
           id?: string
           informed_by?: string | null
           month: number
+          period_end?: string | null
+          period_start?: string | null
           updated_at?: string
+          valor_descontado?: number | null
+          valor_liquido?: number | null
           year: number
         }
         Update: {
           anticipated_amount?: number
           anticipation_rate?: number
           created_at?: string
+          data_antecipacao?: string | null
           hotel_id?: string
           id?: string
           informed_by?: string | null
           month?: number
+          period_end?: string | null
+          period_start?: string | null
           updated_at?: string
+          valor_descontado?: number | null
+          valor_liquido?: number | null
           year?: number
         }
         Relationships: [
