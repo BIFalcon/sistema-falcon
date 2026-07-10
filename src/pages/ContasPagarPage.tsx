@@ -385,7 +385,12 @@ export default function ContasPagarPage() {
         const matchText =
           e.supplier?.toLowerCase().includes(q) ||
           e.cnpj?.toLowerCase().includes(q) ||
-          e.document_number?.toLowerCase().includes(q);
+          e.document_number?.toLowerCase().includes(q) ||
+          e.bank_account?.toLowerCase().includes(q) ||
+          ((q.includes("itau") || q.includes("itaú")) &&
+            e.bank_account?.toLowerCase().includes("itau")) ||
+          (q.includes("santander") &&
+            e.bank_account?.toLowerCase().includes("santander"));
         if (!matchText) {
           const candidates = [
             Number(e.amount ?? 0),
