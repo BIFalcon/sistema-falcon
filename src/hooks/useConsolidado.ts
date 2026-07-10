@@ -96,6 +96,9 @@ const TAXA_SUCESSO_PATTERNS = [
   /taxa\s+(de\s+)?sucesso/i,
   /incentive\s+fee/i,
   /taxa\s+(de\s+)?administra[çc][ãa]o\s+s\/\s*gop/i,
+  /taxa\s+de\s+administra[çc][ãa]o\s+s[\/\\]\s*gop/i,
+  /taxa.*adm.*gop/i,
+  /5010209006/i,
 ];
 
 const FUNDO_RESERVA_PATTERNS = [
