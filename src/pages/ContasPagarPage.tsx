@@ -1482,7 +1482,7 @@ export default function ContasPagarPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 className="pl-9"
-                placeholder="Buscar fornecedor, CNPJ, nº documento ou valor..."
+                placeholder="Buscar fornecedor, CNPJ, nº doc, valor ou banco..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
               />
