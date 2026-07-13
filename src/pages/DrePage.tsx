@@ -8,7 +8,7 @@ import {
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
-import { useDreVersions, useUploadDre, getDreSignedUrl } from "@/hooks/useDre";
+import { useDreVersions, useUploadDre, getDreSignedUrl, logDreDownload, useDreDownloadLog } from "@/hooks/useDre";
 import { CommentsThread } from "@/components/closings/CommentsThread";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { DreStageStepper } from "@/components/closings/DreStageStepper";
@@ -62,6 +62,10 @@ export default function DrePage() {
   const { data: closing } = useClosing(resolvedId);
   const { data: versions = [] } = useDreVersions(resolvedId);
 
+  // Somente Master/Controladoria/Patronos/Viewer conseguem consultar (via RLS).
+  const canSeeDownloaders = isMaster || hasRole("controladoria") || hasRole("patronos") || hasRole("viewer");
+  const { data: downloadLog = [] } = useDreDownloadLog(canSeeDownloaders ? resolvedId : null);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const canUpload = isMaster || hasRole("controladoria") || hasRole("gop");
   // ADM tem acesso apenas de leitura: baixar/visualizar DRE e comentar.
@@ -112,6 +116,15 @@ export default function DrePage() {
     if (!url) {
       toast.error("Não foi possível gerar link");
       return;
+    }
+    const v = versions.find((x) => x.file_url === path);
+    if (v && resolvedId) {
+      void logDreDownload({
+        dreVersionId: v.id,
+        closingId: resolvedId,
+        fileName: name,
+        versionNumber: v.version_number,
+      });
     }
     const a = document.createElement("a");
     a.href = url;
