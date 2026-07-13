@@ -2526,6 +2526,7 @@ export type Database = {
         }
         Returns: number
       }
+      enqueue_dre_sla_reminders: { Args: never; Returns: number }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
