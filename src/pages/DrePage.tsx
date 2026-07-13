@@ -268,6 +268,49 @@ export default function DrePage() {
               />
             </Card>
           )}
+
+          {canSeeDownloaders && (
+            <Card className="p-5 shadow-soft">
+              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
+                Quem baixou a DRE
+              </h3>
+              {downloadLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Ninguém baixou nenhuma versão desta DRE ainda.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                      <TableHead className="text-xs uppercase tracking-wider">Usuário</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Versão</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Baixado em</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {downloadLog.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="text-sm">
+                          <div className="font-medium">
+                            {d.user_display_name || d.user_email || "—"}
+                          </div>
+                          {d.user_display_name && d.user_email && (
+                            <div className="text-xs text-muted-foreground">{d.user_email}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {d.version_number != null ? `v${d.version_number}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(d.downloaded_at).toLocaleString("pt-BR")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          )}
         </div>
 
         {/* COL 3: Comentários */}
