@@ -963,3 +963,70 @@ export async function getDreSignedUrl(path: string, expiresInSeconds = 60 * 60):
   if (error) return null;
   return data?.signedUrl ?? null;
 }
+
+/**
+ * Registra que o usuário atual baixou uma versão da DRE. Falhas são silenciosas
+ * para não impedir o download em si.
+ */
+export async function logDreDownload(params: {
+  dreVersionId: string;
+  closingId: string;
+  fileName?: string;
+  versionNumber?: number;
+}): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email, display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    await supabase.from("dre_download_log").insert({
+      dre_version_id: params.dreVersionId,
+      closing_id: params.closingId,
+      user_id: user.id,
+      user_email: prof?.email ?? user.email ?? null,
+      user_display_name: prof?.display_name ?? null,
+      file_name: params.fileName ?? null,
+      version_number: params.versionNumber ?? null,
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+export interface DreDownloadLogRow {
+  id: string;
+  dre_version_id: string;
+  version_number: number | null;
+  file_name: string | null;
+  user_id: string;
+  user_email: string | null;
+  user_display_name: string | null;
+  downloaded_at: string;
+}
+
+/**
+ * Lista quem baixou versões da DRE de um fechamento (visível apenas para
+ * master/controladoria/patronos/viewer via RLS).
+ */
+export function useDreDownloadLog(closingId?: string | null) {
+  return useQuery({
+    enabled: !!closingId,
+    queryKey: ["dre-download-log", closingId],
+    queryFn: async (): Promise<DreDownloadLogRow[]> => {
+      const { data, error } = await supabase
+        .from("dre_download_log")
+        .select("id, dre_version_id, version_number, file_name, user_id, user_email, user_display_name, downloaded_at")
+        .eq("closing_id", closingId!)
+        .order("downloaded_at", { ascending: false });
+      if (error) {
+        // RLS pode negar para papéis sem permissão; devolve vazio silenciosamente.
+        return [];
+      }
+      return (data ?? []) as DreDownloadLogRow[];
+    },
+    staleTime: 30 * 1000,
+  });
+}

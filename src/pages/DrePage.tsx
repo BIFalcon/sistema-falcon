@@ -8,7 +8,7 @@ import {
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
-import { useDreVersions, useUploadDre, getDreSignedUrl } from "@/hooks/useDre";
+import { useDreVersions, useUploadDre, getDreSignedUrl, logDreDownload, useDreDownloadLog } from "@/hooks/useDre";
 import { CommentsThread } from "@/components/closings/CommentsThread";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { DreStageStepper } from "@/components/closings/DreStageStepper";
@@ -62,6 +62,10 @@ export default function DrePage() {
   const { data: closing } = useClosing(resolvedId);
   const { data: versions = [] } = useDreVersions(resolvedId);
 
+  // Somente Master/Controladoria/Patronos/Viewer conseguem consultar (via RLS).
+  const canSeeDownloaders = isMaster || hasRole("controladoria") || hasRole("patronos") || hasRole("viewer");
+  const { data: downloadLog = [] } = useDreDownloadLog(canSeeDownloaders ? resolvedId : null);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const canUpload = isMaster || hasRole("controladoria") || hasRole("gop");
   // ADM tem acesso apenas de leitura: baixar/visualizar DRE e comentar.
@@ -112,6 +116,15 @@ export default function DrePage() {
     if (!url) {
       toast.error("Não foi possível gerar link");
       return;
+    }
+    const v = versions.find((x) => x.file_url === path);
+    if (v && resolvedId) {
+      void logDreDownload({
+        dreVersionId: v.id,
+        closingId: resolvedId,
+        fileName: name,
+        versionNumber: v.version_number,
+      });
     }
     const a = document.createElement("a");
     a.href = url;
@@ -253,6 +266,49 @@ export default function DrePage() {
                 stage="dre"
                 currentStatus={closing.status_dre}
               />
+            </Card>
+          )}
+
+          {canSeeDownloaders && (
+            <Card className="p-5 shadow-soft">
+              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
+                Quem baixou a DRE
+              </h3>
+              {downloadLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Ninguém baixou nenhuma versão desta DRE ainda.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                      <TableHead className="text-xs uppercase tracking-wider">Usuário</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Versão</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Baixado em</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {downloadLog.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="text-sm">
+                          <div className="font-medium">
+                            {d.user_display_name || d.user_email || "—"}
+                          </div>
+                          {d.user_display_name && d.user_email && (
+                            <div className="text-xs text-muted-foreground">{d.user_email}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {d.version_number != null ? `v${d.version_number}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(d.downloaded_at).toLocaleString("pt-BR")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </Card>
           )}
         </div>

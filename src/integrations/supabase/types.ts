@@ -1279,6 +1279,57 @@ export type Database = {
           },
         ]
       }
+      dre_download_log: {
+        Row: {
+          closing_id: string
+          downloaded_at: string
+          dre_version_id: string
+          file_name: string | null
+          id: string
+          user_display_name: string | null
+          user_email: string | null
+          user_id: string
+          version_number: number | null
+        }
+        Insert: {
+          closing_id: string
+          downloaded_at?: string
+          dre_version_id: string
+          file_name?: string | null
+          id?: string
+          user_display_name?: string | null
+          user_email?: string | null
+          user_id: string
+          version_number?: number | null
+        }
+        Update: {
+          closing_id?: string
+          downloaded_at?: string
+          dre_version_id?: string
+          file_name?: string | null
+          id?: string
+          user_display_name?: string | null
+          user_email?: string | null
+          user_id?: string
+          version_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_download_log_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_download_log_dre_version_id_fkey"
+            columns: ["dre_version_id"]
+            isOneToOne: false
+            referencedRelation: "dre_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_parsed_lines: {
         Row: {
           closing_id: string
@@ -1778,6 +1829,7 @@ export type Database = {
           recipient_role: string | null
           recipient_user_id: string
           scheduled_at: string
+          sla_reminder_sent_at: string | null
           status: Database["public"]["Enums"]["notification_status"]
           subject: string
         }
@@ -1796,6 +1848,7 @@ export type Database = {
           recipient_role?: string | null
           recipient_user_id: string
           scheduled_at?: string
+          sla_reminder_sent_at?: string | null
           status?: Database["public"]["Enums"]["notification_status"]
           subject: string
         }
@@ -1814,6 +1867,7 @@ export type Database = {
           recipient_role?: string | null
           recipient_user_id?: string
           scheduled_at?: string
+          sla_reminder_sent_at?: string | null
           status?: Database["public"]["Enums"]["notification_status"]
           subject?: string
         }
@@ -2472,6 +2526,7 @@ export type Database = {
         }
         Returns: number
       }
+      enqueue_dre_sla_reminders: { Args: never; Returns: number }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -2722,6 +2777,7 @@ export type Database = {
         | "ar_controladoria_action_to_hotel"
         | "ar_open_folio_upload_to_hotel"
         | "ar_to_invoice_upload_to_hotel"
+        | "dre_sla_reminder"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -2924,6 +2980,7 @@ export const Constants = {
         "ar_controladoria_action_to_hotel",
         "ar_open_folio_upload_to_hotel",
         "ar_to_invoice_upload_to_hotel",
+        "dre_sla_reminder",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
