@@ -963,3 +963,35 @@ export async function getDreSignedUrl(path: string, expiresInSeconds = 60 * 60):
   if (error) return null;
   return data?.signedUrl ?? null;
 }
+
+/**
+ * Registra que o usuário atual baixou uma versão da DRE. Falhas são silenciosas
+ * para não impedir o download em si.
+ */
+export async function logDreDownload(params: {
+  dreVersionId: string;
+  closingId: string;
+  fileName?: string;
+  versionNumber?: number;
+}): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email, display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    await supabase.from("dre_download_log").insert({
+      dre_version_id: params.dreVersionId,
+      closing_id: params.closingId,
+      user_id: user.id,
+      user_email: prof?.email ?? user.email ?? null,
+      user_display_name: prof?.display_name ?? null,
+      file_name: params.fileName ?? null,
+      version_number: params.versionNumber ?? null,
+    });
+  } catch {
+    /* ignore */
+  }
+}
