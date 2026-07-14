@@ -27,6 +27,7 @@ import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
+import ConferenciaNotasFiscaisPage from "./pages/ConferenciaNotasFiscaisPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
 import TreinamentosPage from "./pages/rh/TreinamentosPage";
@@ -168,6 +169,7 @@ const App = () => (
               <Route path="/marketing/padroes-marca" element={<RoleGuard roles={["controladoria","patronos","marketing","gop","gg","ri","fernando","operacoes","rh","viewer"]}><PadroesMarcaPage /></RoleGuard>} />
               <Route path="/controladoria" element={<EmBreve />} />
               <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConciliacaoPage /></RoleGuard>} />
+              <Route path="/controladoria/conferencia-notas-fiscais" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConferenciaNotasFiscaisPage /></RoleGuard>} />
 
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />

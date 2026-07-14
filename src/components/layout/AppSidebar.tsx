@@ -19,6 +19,7 @@ import {
   Gauge,
   Home,
   GitCompare,
+  FileCheck2,
   TrendingDown,
   CalendarDays,
   Network,
@@ -119,6 +120,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         allowedRoles: ["controladoria","viewer"] as AppRole[],
         children: [
           { title: "Conciliação TOTVS × Opera", url: "/controladoria/conciliacao", icon: GitCompare },
+          { title: "Conferência de Notas Fiscais", url: "/controladoria/conferencia-notas-fiscais", icon: FileCheck2 },
         ],
       },
     ],
