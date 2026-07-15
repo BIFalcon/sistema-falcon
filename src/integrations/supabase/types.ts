@@ -2589,6 +2589,14 @@ export type Database = {
           version_number: number
         }[]
       }
+      get_profile_names: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          display_name: string
+          email: string
+          user_id: string
+        }[]
+      }
       get_rh_employees_for_user: {
         Args: {
           _hotel_id?: string
