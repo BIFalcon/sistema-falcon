@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
-import * as XLSX from "xlsx";
-import DOMPurify from "dompurify";
 import { getDreSignedUrl } from "@/hooks/useDre";
 
 interface Props {
@@ -16,67 +13,38 @@ interface Props {
   onDownload?: () => void;
 }
 
-interface SheetHtml {
-  name: string;
-  html: string;
-}
-
-const SIZE_WARN_BYTES = 10 * 1024 * 1024;
-
 export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, versionLabel, onDownload }: Props) {
-  const [sheets, setSheets] = useState<SheetHtml[]>([]);
-  const [active, setActive] = useState<string>("");
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warnLarge, setWarnLarge] = useState(false);
 
   useEffect(() => {
     if (!open || !filePath) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setSheets([]);
-    setWarnLarge(false);
-
+    setSignedUrl(null);
     (async () => {
       try {
         const url = await getDreSignedUrl(filePath);
         if (!url) throw new Error("Não foi possível gerar link de leitura.");
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Falha ao baixar arquivo.");
-        const blob = await res.blob();
-        if (blob.size >= SIZE_WARN_BYTES) setWarnLarge(true);
-        const buf = await blob.arrayBuffer();
-        const wb = XLSX.read(buf, {
-          type: "array",
-          cellStyles: true,
-          cellHTML: true,
-        });
-        const out: SheetHtml[] = wb.SheetNames.map((name) => ({
-          name,
-          // SheetJS sheet_to_html não escapa o conteúdo das células — um
-          // .xlsx malicioso poderia injetar HTML/JS. Sanitizamos com
-          // DOMPurify antes de renderizar com dangerouslySetInnerHTML.
-          html: DOMPurify.sanitize(
-            XLSX.utils.sheet_to_html(wb.Sheets[name], {
-              editable: false,
-              id: `sheet-${name.replace(/\s+/g, "-")}`,
-            }),
-            { USE_PROFILES: { html: true } },
-          ),
-        }));
         if (cancelled) return;
-        setSheets(out);
-        setActive(out[0]?.name ?? "");
+        setSignedUrl(url);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao abrir planilha.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => { cancelled = true; };
   }, [open, filePath]);
+
+  // Office Online Viewer renderiza o .xlsx com a formatação original
+  // (cores, mesclagens, gráficos, cabeçalhos coloridos) muito mais rápido
+  // do que fazer parse + sheet_to_html no navegador.
+  const officeUrl = signedUrl
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(signedUrl)}`
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,7 +55,8 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
             {fileName && <span className="ml-2 text-xs font-normal text-muted-foreground">{fileName}</span>}
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Visualização de dados e formatação. Imagens e gráficos do arquivo original não são exibidos neste modo.
+            Visualização fiel da planilha via Office Online. Se demorar a
+            carregar, use "Baixar planilha" para abrir localmente no Excel.
           </p>
         </DialogHeader>
 
@@ -95,7 +64,7 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
           {loading && (
             <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {warnLarge ? "Arquivo grande, renderizando…" : "Carregando planilha…"}
+              Preparando planilha…
             </div>
           )}
           {error && (
@@ -103,27 +72,14 @@ export function DreExcelViewerDialog({ open, onOpenChange, filePath, fileName, v
               {error}
             </div>
           )}
-          {!loading && !error && sheets.length > 0 && (
-            <Tabs value={active} onValueChange={setActive} className="flex-1 min-h-0 flex flex-col">
-              <div className="px-4 pt-3 border-b overflow-x-auto">
-                <TabsList>
-                  {sheets.map((s) => (
-                    <TabsTrigger key={s.name} value={s.name} className="text-xs">
-                      {s.name}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
-              {sheets.map((s) => (
-                <TabsContent
-                  key={s.name}
-                  value={s.name}
-                  className="flex-1 min-h-0 m-0 overflow-auto p-4 dre-excel-viewer"
-                >
-                  <div dangerouslySetInnerHTML={{ __html: s.html }} />
-                </TabsContent>
-              ))}
-            </Tabs>
+          {!loading && !error && officeUrl && (
+            <iframe
+              key={officeUrl}
+              src={officeUrl}
+              title="Visualizador DRE"
+              className="flex-1 min-h-0 w-full border-0 bg-white"
+              allow="fullscreen"
+            />
           )}
         </div>
 
