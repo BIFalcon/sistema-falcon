@@ -30,11 +30,16 @@ export function useComments(closingId: string | null | undefined, stage: Closing
       const rows = (data ?? []) as CommentRow[];
       const ids = Array.from(new Set(rows.map((r) => r.author_id)));
       if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id, display_name, email")
-          .in("user_id", ids);
-        const map = new Map((profs ?? []).map((p) => [p.user_id, p]));
+        // Usa RPC security-definer para que TODOS os autenticados enxerguem
+        // o nome do autor (RLS de profiles restringe SELECT a poucos papéis).
+        const { data: profs } = await supabase.rpc("get_profile_names", {
+          _user_ids: ids,
+        });
+        const map = new Map(
+          ((profs ?? []) as Array<{ user_id: string; display_name: string | null; email: string | null }>).map(
+            (p) => [p.user_id, p],
+          ),
+        );
         for (const r of rows) {
           const p = map.get(r.author_id);
           r.author = p ? { display_name: p.display_name, email: p.email } : null;
