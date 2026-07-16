@@ -466,25 +466,9 @@ export default function CartaPage() {
                     inputMode="decimal"
                     value={draft.reserve_fund}
                     disabled={!canEdit && !canEditReserveFund}
-                    onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: e.target.value }))}
-                    onBlur={() => {
-                      const n = parseBRLLoose(draft.reserve_fund);
-                      if (Number.isFinite(n)) {
-                        setDraft((d) => ({ ...d, reserve_fund: brlFmt.format(n) }));
-                      }
-                    }}
-                    placeholder="Ex.: 25.000,00 ou 25000"
+                    onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: maskBRLLive(e.target.value) }))}
+                    placeholder="R$ 0,00"
                   />
-                  {draft.reserve_fund.trim() && (() => {
-                    const n = parseBRLLoose(draft.reserve_fund);
-                    return Number.isFinite(n) ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        Valor reconhecido: <span className="font-medium text-foreground">{brlFmt.format(n)}</span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-destructive">Não consegui interpretar este valor.</p>
-                    );
-                  })()}
                   {canEditReserveFund && (
                     <Button
                       size="sm"
@@ -492,7 +476,7 @@ export default function CartaPage() {
                       className="mt-1 h-7 text-xs"
                       onClick={async () => {
                         if (!letter) return;
-                        const n = parseBRLLoose(draft.reserve_fund);
+                        const n = unmaskBRL(draft.reserve_fund);
                         if (!Number.isFinite(n)) {
                           toast.error("Fundo de Reserva inválido");
                           return;
@@ -520,8 +504,8 @@ export default function CartaPage() {
                     inputMode="decimal"
                     value={draft.rps_score}
                     disabled={!canEdit}
-                    onChange={(e) => setDraft((d) => ({ ...d, rps_score: e.target.value }))}
-                    placeholder="Ex.: 8.7"
+                    onChange={(e) => setDraft((d) => ({ ...d, rps_score: maskPctLive(e.target.value) }))}
+                    placeholder="0%"
                   />
                 </div>
               </div>
@@ -560,6 +544,17 @@ export default function CartaPage() {
                     <Save className="h-4 w-4" />
                   )}
                   {genAi.isPending ? "Gerando narrativa…" : "Salvar e gerar narrativa"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSaveOnly}
+                  disabled={!canEdit || !letter || genAi.isPending || updateLetter.isPending}
+                  className="gap-2"
+                  title="Salva as alterações do formulário sem gerar nova narrativa"
+                >
+                  {updateLetter.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar alterações
                 </Button>
                 <Button
                   size="sm"
