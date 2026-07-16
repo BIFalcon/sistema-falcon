@@ -245,8 +245,8 @@ export default function CartaPage() {
   useEffect(() => {
     if (letter) {
       setDraft({
-        reserve_fund: letter.reserve_fund != null ? String(letter.reserve_fund) : "",
-        rps_score: letter.rps_score != null ? String(letter.rps_score) : "",
+        reserve_fund: initialBRL(letter.reserve_fund),
+        rps_score: initialPct(letter.rps_score),
         operational_comment: letter.operational_comment ?? "",
       });
     }
@@ -274,8 +274,8 @@ export default function CartaPage() {
   }
 
   function validate(): string | null {
-    const reserve = parseBRLLoose(draft.reserve_fund);
-    const rps = parseBRLLoose(draft.rps_score);
+    const reserve = unmaskBRL(draft.reserve_fund);
+    const rps = unmaskPct(draft.rps_score);
     if (!draft.reserve_fund.trim()) return "Informe o Fundo de Reserva";
     if (!Number.isFinite(reserve)) return "Fundo de Reserva inválido";
     if (!draft.rps_score.trim()) return "Informe a Nota RPS";
@@ -298,8 +298,8 @@ export default function CartaPage() {
         id: letter.id,
         closingId: resolvedId,
         patch: {
-          reserve_fund: parseBRLLoose(draft.reserve_fund),
-          rps_score: parseBRLLoose(draft.rps_score),
+          reserve_fund: unmaskBRL(draft.reserve_fund),
+          rps_score: unmaskPct(draft.rps_score),
           operational_comment: draft.operational_comment || null,
         },
       });
@@ -308,6 +308,29 @@ export default function CartaPage() {
       toast.success(`Narrativa v${r.version} gerada (${r.model})`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar/gerar");
+    }
+  }
+
+  async function handleSaveOnly() {
+    if (!letter || !resolvedId) return;
+    const err = validate();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    try {
+      await updateLetter.mutateAsync({
+        id: letter.id,
+        closingId: resolvedId,
+        patch: {
+          reserve_fund: unmaskBRL(draft.reserve_fund),
+          rps_score: unmaskPct(draft.rps_score),
+          operational_comment: draft.operational_comment || null,
+        },
+      });
+      toast.success("Alterações salvas");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
     }
   }
 
