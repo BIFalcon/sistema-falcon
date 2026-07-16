@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       : "Nenhum destaque informado.";
 
     const reserveFund = letter.data.reserve_fund != null ? `R$ ${Number(letter.data.reserve_fund).toLocaleString("pt-BR")}` : "—";
-    const rps = letter.data.rps_score != null ? String(letter.data.rps_score) : "—";
+    const rps = letter.data.rps_score != null ? `${String(letter.data.rps_score).replace(".", ",")}%` : "—";
 
     const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}).
 Escreva em português do Brasil, tom executivo, sóbrio, direto e SUCINTO, voltado a investidores.

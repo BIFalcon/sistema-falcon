@@ -92,6 +92,51 @@ const brlFmt = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 2,
 });
 
+/** Máscara BRL "ao vivo" (estilo caixa eletrônico): dígitos representam centavos. */
+function maskBRLLive(input: string): string {
+  const digits = String(input ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  const n = Number(digits) / 100;
+  return brlFmt.format(n);
+}
+function unmaskBRL(masked: string): number {
+  const digits = String(masked ?? "").replace(/\D/g, "");
+  if (!digits) return NaN;
+  return Number(digits) / 100;
+}
+function initialBRL(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return brlFmt.format(n);
+}
+
+/** Máscara % "ao vivo": mantém dígitos e uma vírgula, sufixo "%". */
+function maskPctLive(input: string): string {
+  let s = String(input ?? "").replace(/%/g, "");
+  s = s.replace(/\./g, ",");
+  s = s.replace(/[^\d,]/g, "");
+  const firstComma = s.indexOf(",");
+  if (firstComma !== -1) {
+    s = s.slice(0, firstComma + 1) + s.slice(firstComma + 1).replace(/,/g, "");
+  }
+  // limita casas decimais a 2
+  if (firstComma !== -1) {
+    const [intPart, dec = ""] = s.split(",");
+    s = intPart + "," + dec.slice(0, 2);
+  }
+  if (!s) return "";
+  return `${s}%`;
+}
+function unmaskPct(masked: string): number {
+  const s = String(masked ?? "").replace(/%/g, "").replace(",", ".").trim();
+  if (!s) return NaN;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function initialPct(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return `${String(n).replace(".", ",")}%`;
+}
+
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -200,8 +245,8 @@ export default function CartaPage() {
   useEffect(() => {
     if (letter) {
       setDraft({
-        reserve_fund: letter.reserve_fund != null ? String(letter.reserve_fund) : "",
-        rps_score: letter.rps_score != null ? String(letter.rps_score) : "",
+        reserve_fund: initialBRL(letter.reserve_fund),
+        rps_score: initialPct(letter.rps_score),
         operational_comment: letter.operational_comment ?? "",
       });
     }
@@ -229,8 +274,8 @@ export default function CartaPage() {
   }
 
   function validate(): string | null {
-    const reserve = parseBRLLoose(draft.reserve_fund);
-    const rps = parseBRLLoose(draft.rps_score);
+    const reserve = unmaskBRL(draft.reserve_fund);
+    const rps = unmaskPct(draft.rps_score);
     if (!draft.reserve_fund.trim()) return "Informe o Fundo de Reserva";
     if (!Number.isFinite(reserve)) return "Fundo de Reserva inválido";
     if (!draft.rps_score.trim()) return "Informe a Nota RPS";
@@ -253,8 +298,8 @@ export default function CartaPage() {
         id: letter.id,
         closingId: resolvedId,
         patch: {
-          reserve_fund: parseBRLLoose(draft.reserve_fund),
-          rps_score: parseBRLLoose(draft.rps_score),
+          reserve_fund: unmaskBRL(draft.reserve_fund),
+          rps_score: unmaskPct(draft.rps_score),
           operational_comment: draft.operational_comment || null,
         },
       });
@@ -263,6 +308,29 @@ export default function CartaPage() {
       toast.success(`Narrativa v${r.version} gerada (${r.model})`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar/gerar");
+    }
+  }
+
+  async function handleSaveOnly() {
+    if (!letter || !resolvedId) return;
+    const err = validate();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    try {
+      await updateLetter.mutateAsync({
+        id: letter.id,
+        closingId: resolvedId,
+        patch: {
+          reserve_fund: unmaskBRL(draft.reserve_fund),
+          rps_score: unmaskPct(draft.rps_score),
+          operational_comment: draft.operational_comment || null,
+        },
+      });
+      toast.success("Alterações salvas");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
     }
   }
 
@@ -398,25 +466,9 @@ export default function CartaPage() {
                     inputMode="decimal"
                     value={draft.reserve_fund}
                     disabled={!canEdit && !canEditReserveFund}
-                    onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: e.target.value }))}
-                    onBlur={() => {
-                      const n = parseBRLLoose(draft.reserve_fund);
-                      if (Number.isFinite(n)) {
-                        setDraft((d) => ({ ...d, reserve_fund: brlFmt.format(n) }));
-                      }
-                    }}
-                    placeholder="Ex.: 25.000,00 ou 25000"
+                    onChange={(e) => setDraft((d) => ({ ...d, reserve_fund: maskBRLLive(e.target.value) }))}
+                    placeholder="R$ 0,00"
                   />
-                  {draft.reserve_fund.trim() && (() => {
-                    const n = parseBRLLoose(draft.reserve_fund);
-                    return Number.isFinite(n) ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        Valor reconhecido: <span className="font-medium text-foreground">{brlFmt.format(n)}</span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-destructive">Não consegui interpretar este valor.</p>
-                    );
-                  })()}
                   {canEditReserveFund && (
                     <Button
                       size="sm"
@@ -424,7 +476,7 @@ export default function CartaPage() {
                       className="mt-1 h-7 text-xs"
                       onClick={async () => {
                         if (!letter) return;
-                        const n = parseBRLLoose(draft.reserve_fund);
+                        const n = unmaskBRL(draft.reserve_fund);
                         if (!Number.isFinite(n)) {
                           toast.error("Fundo de Reserva inválido");
                           return;
@@ -452,8 +504,8 @@ export default function CartaPage() {
                     inputMode="decimal"
                     value={draft.rps_score}
                     disabled={!canEdit}
-                    onChange={(e) => setDraft((d) => ({ ...d, rps_score: e.target.value }))}
-                    placeholder="Ex.: 8.7"
+                    onChange={(e) => setDraft((d) => ({ ...d, rps_score: maskPctLive(e.target.value) }))}
+                    placeholder="0%"
                   />
                 </div>
               </div>
@@ -492,6 +544,17 @@ export default function CartaPage() {
                     <Save className="h-4 w-4" />
                   )}
                   {genAi.isPending ? "Gerando narrativa…" : "Salvar e gerar narrativa"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSaveOnly}
+                  disabled={!canEdit || !letter || genAi.isPending || updateLetter.isPending}
+                  className="gap-2"
+                  title="Salva as alterações do formulário sem gerar nova narrativa"
+                >
+                  {updateLetter.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar alterações
                 </Button>
                 <Button
                   size="sm"
