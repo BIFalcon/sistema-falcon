@@ -92,6 +92,51 @@ const brlFmt = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 2,
 });
 
+/** Máscara BRL "ao vivo" (estilo caixa eletrônico): dígitos representam centavos. */
+function maskBRLLive(input: string): string {
+  const digits = String(input ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  const n = Number(digits) / 100;
+  return brlFmt.format(n);
+}
+function unmaskBRL(masked: string): number {
+  const digits = String(masked ?? "").replace(/\D/g, "");
+  if (!digits) return NaN;
+  return Number(digits) / 100;
+}
+function initialBRL(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return brlFmt.format(n);
+}
+
+/** Máscara % "ao vivo": mantém dígitos e uma vírgula, sufixo "%". */
+function maskPctLive(input: string): string {
+  let s = String(input ?? "").replace(/%/g, "");
+  s = s.replace(/\./g, ",");
+  s = s.replace(/[^\d,]/g, "");
+  const firstComma = s.indexOf(",");
+  if (firstComma !== -1) {
+    s = s.slice(0, firstComma + 1) + s.slice(firstComma + 1).replace(/,/g, "");
+  }
+  // limita casas decimais a 2
+  if (firstComma !== -1) {
+    const [intPart, dec = ""] = s.split(",");
+    s = intPart + "," + dec.slice(0, 2);
+  }
+  if (!s) return "";
+  return `${s}%`;
+}
+function unmaskPct(masked: string): number {
+  const s = String(masked ?? "").replace(/%/g, "").replace(",", ".").trim();
+  if (!s) return NaN;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function initialPct(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return `${String(n).replace(".", ",")}%`;
+}
+
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
