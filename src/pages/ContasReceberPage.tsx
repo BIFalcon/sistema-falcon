@@ -79,7 +79,7 @@ function fullName(e: { first_name: string | null; last_name: string | null }) {
 /* ──────────────── Export Open Folio para Excel ──────────────── */
 function exportOpenFolioToExcel(
   entries: OpenFolioEntry[],
-  notesByConf: Map<string, { note: string; expected_payment_date?: string | null; updated_at?: string; created_at: string }[]>,
+  notes: { hotel_id: string; confirmation_number: string; note: string; expected_payment_date?: string | null; updated_at?: string; created_at: string }[],
   fileLabel: string,
 ) {
   if (!entries.length) {
@@ -91,9 +91,20 @@ function exportOpenFolioToExcel(
   const fmtDateTime = (iso: string | null | undefined) =>
     iso ? format(new Date(iso), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "";
 
+  // Agrupa notas por hotel+confirmation_number (mais recente primeiro)
+  const notesByKey = new Map<string, typeof notes>();
+  const sorted = [...notes].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  for (const n of sorted) {
+    const key = `${n.hotel_id ?? ""}::${n.confirmation_number ?? ""}`;
+    const list = notesByKey.get(key) ?? [];
+    list.push(n);
+    notesByKey.set(key, list);
+  }
+
   const rows = entries.map((e) => {
     const cn = e.confirmation_number ?? "";
-    const cnNotes = notesByConf.get(cn) ?? [];
+    const key = `${e.hotel_id ?? ""}::${cn}`;
+    const cnNotes = notesByKey.get(key) ?? [];
     const last = cnNotes[0];
     const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
     const lastUpdate = last?.updated_at ?? last?.created_at ?? null;
@@ -1882,7 +1893,7 @@ function OpenFolioSection({
                 size="sm"
                 className="gap-2"
                 disabled={visibleEntries.length === 0}
-                onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
+                onClick={() => exportOpenFolioToExcel(visibleEntries, allNotes, "consolidado")}
               >
                 <FileDown className="h-4 w-4" />
                 Exportar para Excel
@@ -2064,7 +2075,7 @@ function HotelOpenFolioDetail({
             size="sm"
             className="gap-2"
             disabled={entries.length === 0}
-            onClick={() => exportOpenFolioToExcel(entries, notesByConf, hotelName)}
+            onClick={() => exportOpenFolioToExcel(entries, notes, hotelName)}
           >
             <FileDown className="h-4 w-4" />
             Exportar Excel
