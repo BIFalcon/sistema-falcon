@@ -2,11 +2,18 @@
  * Consolidado de Resultados — visão por hotel para o mês/ano selecionado.
  * Acessível apenas a quem tem acesso a todos os hotéis (não para GG).
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { LayoutGrid, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -41,7 +48,25 @@ export default function ConsolidadoPage() {
     [allowedHotels],
   );
 
-  const { data: rows = [], isLoading } = useConsolidadoData({ hotelIds, year, month });
+  const { data: allRows = [], isLoading } = useConsolidadoData({ hotelIds, year, month });
+
+  // Filtro por estágio de aprovação da DRE.
+  // - "aprov_controladoria": DREs já aprovadas pela Controladoria → aguardando GOP
+  // - "aprov_gop":           DREs já aprovadas pelo GOP → aguardando Fernando
+  // - "aprov_fernando":      DREs já aprovadas pelo Fernando (fechadas)
+  type ApprovalFilter = "all" | "aprov_controladoria" | "aprov_gop" | "aprov_fernando";
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
+
+  const rows = useMemo(() => {
+    if (approvalFilter === "all") return allRows;
+    const targetStatus =
+      approvalFilter === "aprov_controladoria"
+        ? "aguardando_gop"
+        : approvalFilter === "aprov_gop"
+          ? "aguardando_fernando"
+          : "aprovado";
+    return allRows.filter((r) => r.statusDre === targetStatus);
+  }, [allRows, approvalFilter]);
 
   // Linha de totais — somas para valores absolutos, médias ponderadas para taxas
   const totals = useMemo(() => {
