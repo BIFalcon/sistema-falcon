@@ -18,7 +18,10 @@ const STATUS_MAP: Record<string, string> = {
 
 // Status que significam que o lançamento não deve entrar no Contas a Pagar
 // de jeito nenhum — não é "pendente", é "não vai acontecer".
-const SKIP_STATUS = new Set(["CANCELADO"]);
+// Só importa o que está em aberto — pago e cancelado não sobem, porque não
+// são pendência. "PAGO" entrou aqui a pedido: a sincronização deve refletir
+// só contas a pagar de verdade, não histórico de pagamento.
+const SKIP_STATUS = new Set(["CANCELADO", "PAGO"]);
 
 function toIsoDate(br: string | null | undefined): string | null {
   if (!br) return null;
