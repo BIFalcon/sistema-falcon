@@ -333,11 +333,16 @@ Deno.serve(async (req) => {
       // Upsert preservando justificativas/datas (entry_key composto).
       const withKey = result.entries.filter((e: any) => e.confirmation_number);
       const noKey = result.entries.filter((e: any) => !e.confirmation_number);
-      const seenKeys = new Set<string>(withKey.map((e: any) => e.entry_key));
-      if (withKey.length) {
+      // Dedup within file by entry_key to avoid Postgres
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time".
+      const dedupMap = new Map<string, any>();
+      for (const e of withKey) dedupMap.set(e.entry_key, e);
+      const withKeyDedup = Array.from(dedupMap.values());
+      const seenKeys = new Set<string>(withKeyDedup.map((e: any) => e.entry_key));
+      if (withKeyDedup.length) {
         const chunkSize = 500;
-        for (let i = 0; i < withKey.length; i += chunkSize) {
-          const chunk = withKey.slice(i, i + chunkSize);
+        for (let i = 0; i < withKeyDedup.length; i += chunkSize) {
+          const chunk = withKeyDedup.slice(i, i + chunkSize);
           const { error: insErr } = await admin
             .from("ar_open_folio_entries")
             .upsert(chunk, { onConflict: "entry_key" });
