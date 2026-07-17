@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const BUCKET = "system-assets";
-const FOLDER = "avatars";
+const BUCKET = "user-avatars";
+const SIGNED_URL_TTL = 60 * 60; // 1 hour
 
-function publicUrl(path: string, bust?: string | number) {
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return bust ? `${data.publicUrl}?t=${bust}` : data.publicUrl;
+async function signedUrl(path: string, bust?: string | number) {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, SIGNED_URL_TTL);
+  if (error || !data?.signedUrl) return null;
+  return bust ? `${data.signedUrl}${data.signedUrl.includes("?") ? "&" : "?"}t=${bust}` : data.signedUrl;
 }
 
 export function useAvatarUrl(userId: string | null | undefined) {
@@ -17,12 +20,12 @@ export function useAvatarUrl(userId: string | null | undefined) {
       if (!userId) return null;
       const { data, error } = await supabase.storage
         .from(BUCKET)
-        .list(FOLDER, { search: userId });
+        .list("", { search: userId });
       if (error) return null;
       const file = data?.find((f) => f.name.startsWith(userId));
       if (!file) return null;
       const updated = file.updated_at ?? file.created_at ?? "";
-      return publicUrl(`${FOLDER}/${file.name}`, new Date(updated).getTime() || Date.now());
+      return await signedUrl(file.name, new Date(updated).getTime() || Date.now());
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -33,15 +36,15 @@ export function useUploadAvatar() {
   return useMutation({
     mutationFn: async ({ userId, file }: { userId: string; file: File }) => {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `${FOLDER}/${userId}.${ext}`;
+      const path = `${userId}.${ext}`;
 
       // Limpa eventuais arquivos anteriores com extensão diferente
       const { data: existing } = await supabase.storage
         .from(BUCKET)
-        .list(FOLDER, { search: userId });
+        .list("", { search: userId });
       const toRemove = (existing ?? [])
         .filter((f) => f.name.startsWith(userId) && f.name !== `${userId}.${ext}`)
-        .map((f) => `${FOLDER}/${f.name}`);
+        .map((f) => f.name);
       if (toRemove.length) {
         await supabase.storage.from(BUCKET).remove(toRemove);
       }
@@ -50,7 +53,7 @@ export function useUploadAvatar() {
         .from(BUCKET)
         .upload(path, file, { upsert: true, contentType: file.type });
       if (error) throw error;
-      return publicUrl(path, Date.now());
+      return await signedUrl(path, Date.now());
     },
     onSuccess: (_url, { userId }) => {
       qc.invalidateQueries({ queryKey: ["avatar-url", userId] });
