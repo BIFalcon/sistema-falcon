@@ -151,6 +151,7 @@ function exportToInvoiceToExcel(
       : "Pendente";
     return {
       "Hotel": hotelName(e.hotel_id),
+      "Data": fmt(e.transaction_date),
       "Hóspede": e.account_name ?? "",
       "Nº Nota": e.nota_number ?? "",
       "Nº Boleto": e.boleto_number ?? "",
@@ -168,7 +169,7 @@ function exportToInvoiceToExcel(
   });
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 28 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
+    { wch: 28 }, { wch: 12 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
     { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 40 },
     { wch: 18 }, { wch: 14 },
   ];
@@ -332,14 +333,14 @@ function ToInvoiceSection({
   }, [entries, seesAllHotels, restrictedHotelIds]);
 
   const pendingCount = useMemo(
-    () => visibleEntries.filter((e) => e.gg_status === "pendente").length,
+    () => visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date).length,
     [visibleEntries],
   );
 
   const filteredToInvoice = useMemo(
     () =>
       showOnlyPending
-        ? visibleEntries.filter((e) => e.gg_status === "pendente")
+        ? visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date)
         : visibleEntries,
     [visibleEntries, showOnlyPending],
   );
@@ -361,6 +362,8 @@ function ToInvoiceSection({
     if (faturamentoFilter !== "todos") {
       if (faturamentoFilter === "pago") {
         arr = arr.filter((e) => !!e.paid_date);
+      } else if (faturamentoFilter === "pendente") {
+        arr = arr.filter((e) => e.gg_status !== "faturado" && !e.paid_date);
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
@@ -834,19 +837,6 @@ function DayBreakdown({
                           onClick={() => setInvoiceFor({ entry: e, term })}
                         >
                           Faturado
-                        </Button>
-                        )}
-                        {canConfirm && (
-                        <Button
-                          size="sm"
-                          variant={e.gg_status === "nao_faturado" ? "default" : "outline"}
-                          className="h-6 px-2 text-[11px]"
-                          onClick={() => {
-                            setEditingId(e.id);
-                            setNoteDraft(e.gg_note ?? "");
-                          }}
-                        >
-                          Não faturado
                         </Button>
                         )}
                         <Button
@@ -1808,7 +1798,9 @@ function OpenFolioSection({
           const name = `${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase();
           return (
             name.includes(q) ||
-            (e.confirmation_number ?? "").toLowerCase().includes(q)
+            (e.confirmation_number ?? "").toLowerCase().includes(q) ||
+            (e.company ?? "").toLowerCase().includes(q) ||
+            (e.travel_agent ?? "").toLowerCase().includes(q)
           );
         })
       : base;
@@ -2083,7 +2075,7 @@ function HotelOpenFolioDetail({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           className="pl-9"
-          placeholder="Buscar hóspede ou nº de confirmação..."
+          placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
