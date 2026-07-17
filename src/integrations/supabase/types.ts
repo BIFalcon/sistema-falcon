@@ -2697,6 +2697,10 @@ export type Database = {
       }
       can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
+      can_read_dre_hotel: {
+        Args: { _hotel_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_view_hotel_data: {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
