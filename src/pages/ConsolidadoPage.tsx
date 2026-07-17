@@ -197,15 +197,33 @@ export default function ConsolidadoPage() {
             {MONTHS_PT[month - 1]} de {year} — visão consolidada de todos os hotéis
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDownloadXlsx}
-          disabled={isLoading || rows.length === 0}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Baixar Excel
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select
+            value={approvalFilter}
+            onValueChange={(v) => setApprovalFilter(v as typeof approvalFilter)}
+          >
+            <SelectTrigger className="h-9 w-[260px]">
+              <SelectValue placeholder="Filtrar por aprovação" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os hotéis</SelectItem>
+              <SelectItem value="aprov_controladoria">
+                Aprovadas pela Controladoria
+              </SelectItem>
+              <SelectItem value="aprov_gop">Aprovadas pelo GOP</SelectItem>
+              <SelectItem value="aprov_fernando">Aprovadas pelo Fernando</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadXlsx}
+            disabled={isLoading || rows.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Baixar Excel
+          </Button>
+        </div>
       </div>
 
       <Card className="p-5 shadow-soft">
