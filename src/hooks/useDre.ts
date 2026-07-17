@@ -467,13 +467,32 @@ export function useDreIndicators(closingId: string | null | undefined) {
       matchSeries(yearLines, "cur");
       matchSeries(yearLines, "prev");
       matchSeries(yearLines, "budget");
-      // 2) Fallback para indicadores antigos (apenas chaves ainda não cobertas).
-      for (const r of closingLines) {
-        if (r.line_type !== "indicator") continue;
-        const lbl = r.line_label;
-        if (lbl.startsWith("[series_")) continue;
-        const cur = lbl.match(/^\[([^\]\s]+)\]/);
-        if (cur) {
+      // 2) Fallback: se a série do mês-alvo veio zerada/incompleta,
+      //    aproveitamos os indicadores "planos" ([key]) — primeiro do
+      //    próprio closing, depois da última DRE do ano (última prévia
+      //    anexada). Isso garante que a Carta sempre reflita a última
+      //    prévia disponível, mesmo quando o mês corrente ainda não tem
+      //    DRE própria enviada.
+      //
+      //    Além disso, se uma chave 'cur' foi capturada pela série mas
+      //    veio com valor 0/nulo (mês futuro sem lançamentos reais),
+      //    substituímos pelo valor plano do closing atual, quando houver.
+      const zeroCurKeys = new Set<string>();
+      for (const row of out) {
+        const m = row.line_label.match(/^\[([^\]\s]+)\]/);
+        if (!m) continue;
+        const k = m[1];
+        if (k.startsWith("prev_") || k.startsWith("budget_")) continue;
+        const v = row.line_value;
+        if (v == null || v === 0) zeroCurKeys.add(k);
+      }
+      const applyFallback = (rows: DreParsedLineRecord[]) => {
+        for (const r of rows) {
+          if (r.line_type !== "indicator") continue;
+          const lbl = r.line_label;
+          if (lbl.startsWith("[series_")) continue;
+          const cur = lbl.match(/^\[([^\]\s]+)\]/);
+          if (!cur) continue;
           const k = cur[1];
           if (k.startsWith("prev_")) {
             const key = k.slice(5);
@@ -484,10 +503,31 @@ export function useDreIndicators(closingId: string | null | undefined) {
             if (seenBudget.has(key)) continue;
             seenBudget.add(key);
           } else {
-            if (seenKeys.has(k)) continue;
+            if (seenKeys.has(k) && !zeroCurKeys.has(k)) continue;
+            if (zeroCurKeys.has(k)) {
+              // Substitui a linha zerada da série pelo valor plano.
+              const idx = out.findIndex((o) => o.line_label.startsWith(`[${k}]`));
+              if (idx >= 0) out.splice(idx, 1);
+              zeroCurKeys.delete(k);
+            }
             seenKeys.add(k);
           }
+          out.push({
+            line_label: lbl,
+            line_value: r.line_value ?? null,
+            version_number: r.version_number,
+          });
         }
+      };
+      applyFallback(closingLines);
+      applyFallback(yearLines);
+      // Legacy: caso restem linhas indicator não-planas no closing atual,
+      // preserva comportamento antigo (apenas empurra as demais).
+      for (const r of closingLines) {
+        if (r.line_type !== "indicator") continue;
+        const lbl = r.line_label;
+        if (lbl.startsWith("[series_")) continue;
+        if (lbl.match(/^\[([^\]\s]+)\]/)) continue; // já tratado
         out.push({
           line_label: lbl,
           line_value: r.line_value ?? null,
