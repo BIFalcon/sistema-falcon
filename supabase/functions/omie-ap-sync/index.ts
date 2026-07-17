@@ -210,9 +210,7 @@ Deno.serve(async (req) => {
           appKey,
           appSecret,
           {
-            clientesPorCodigo: {
-              clientesPorCodigo: codigosFaltantes.map((c) => ({ codigo_cliente_omie: c })),
-            },
+            clientesPorCodigo: codigosFaltantes.map((c) => ({ codigo_cliente_omie: c })),
           },
           "clientes_cadastro_resumido",
         );
