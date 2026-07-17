@@ -333,14 +333,14 @@ function ToInvoiceSection({
   }, [entries, seesAllHotels, restrictedHotelIds]);
 
   const pendingCount = useMemo(
-    () => visibleEntries.filter((e) => e.gg_status === "pendente").length,
+    () => visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date).length,
     [visibleEntries],
   );
 
   const filteredToInvoice = useMemo(
     () =>
       showOnlyPending
-        ? visibleEntries.filter((e) => e.gg_status === "pendente")
+        ? visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date)
         : visibleEntries,
     [visibleEntries, showOnlyPending],
   );
@@ -362,6 +362,8 @@ function ToInvoiceSection({
     if (faturamentoFilter !== "todos") {
       if (faturamentoFilter === "pago") {
         arr = arr.filter((e) => !!e.paid_date);
+      } else if (faturamentoFilter === "pendente") {
+        arr = arr.filter((e) => e.gg_status !== "faturado" && !e.paid_date);
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
