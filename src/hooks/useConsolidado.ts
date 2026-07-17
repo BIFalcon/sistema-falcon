@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ConsolidadoRow {
   hotelId: string;
   closingId: string | null;
+  statusDre: string | null;
   ocupacao: number | null;          // 0..1 ou %
   adr: number | null;
   revpar: number | null;
@@ -162,7 +163,7 @@ export function useConsolidadoData(input: {
       const [{ data: closings, error: cErr }, { data: hotelRows }] = await Promise.all([
         supabase
         .from("closings")
-        .select("id, hotel_id, final_distribution, estimated_distribution")
+        .select("id, hotel_id, status_dre, final_distribution, estimated_distribution")
         .in("hotel_id", input.hotelIds)
         .eq("year", input.year)
         .eq("month", input.month),
@@ -281,6 +282,7 @@ export function useConsolidadoData(input: {
         return {
           hotelId,
           closingId: closing?.id ?? null,
+          statusDre: (closing?.status_dre as string | null | undefined) ?? null,
           ocupacao,
           adr,
           revpar,
