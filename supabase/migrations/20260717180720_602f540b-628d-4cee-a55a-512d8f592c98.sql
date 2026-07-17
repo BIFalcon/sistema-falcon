@@ -1,0 +1,1 @@
+ALTER TABLE public.omie_sync_logs ADD COLUMN IF NOT EXISTS entries_cancelados_ignorados int NOT NULL DEFAULT 0;

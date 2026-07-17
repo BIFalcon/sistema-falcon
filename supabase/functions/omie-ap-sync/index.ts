@@ -13,7 +13,12 @@ const STATUS_MAP: Record<string, string> = {
   "PAGO": "pago",
   "ATRASADO": "nao_aprovado_gg",
   "VENCE HOJE": "nao_aprovado_gg",
+  "A VENCER": "nao_aprovado_gg",
 };
+
+// Status que significam que o lançamento não deve entrar no Contas a Pagar
+// de jeito nenhum — não é "pendente", é "não vai acontecer".
+const SKIP_STATUS = new Set(["CANCELADO"]);
 
 function toIsoDate(br: string | null | undefined): string | null {
   if (!br) return null;
@@ -94,6 +99,7 @@ Deno.serve(async (req) => {
       status: "success" as "success" | "error",
       entries_fetched: 0,
       entries_written: 0,
+      entries_cancelados_ignorados: 0,
       fornecedores_nao_encontrados: 0,
       status_desconhecidos: new Set<string>(),
       categorias_nao_encontradas: new Set<string>(),
@@ -180,7 +186,7 @@ Deno.serve(async (req) => {
       const dataDe = fmtBr(inicio);
       const dataAte = fmtBr(ultimoDiaMesCorrente);
 
-      const lancamentos = await omieListAll(
+      const lancamentosBrutos = await omieListAll(
         "ListarContasPagar",
         "financas/contapagar",
         appKey,
@@ -193,6 +199,10 @@ Deno.serve(async (req) => {
         },
         "conta_pagar_cadastro",
       );
+      const lancamentos = lancamentosBrutos.filter(
+        (l: any) => !SKIP_STATUS.has(String(l.status_titulo ?? "").trim().toUpperCase()),
+      );
+      log.entries_cancelados_ignorados = lancamentosBrutos.length - lancamentos.length;
       log.entries_fetched = lancamentos.length;
 
       // Preenche cache de fornecedores faltantes
@@ -327,6 +337,7 @@ Deno.serve(async (req) => {
       status: log.status,
       entries_fetched: log.entries_fetched,
       entries_written: log.entries_written,
+      entries_cancelados_ignorados: log.entries_cancelados_ignorados,
       fornecedores_nao_encontrados: log.fornecedores_nao_encontrados,
       status_desconhecidos: [...log.status_desconhecidos],
       categorias_nao_encontradas: [...log.categorias_nao_encontradas],
