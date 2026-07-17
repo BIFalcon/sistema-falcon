@@ -824,7 +824,7 @@ function useDreAnalyticsImpl(input: {
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             // remove marcadores tipo (=) (+) (-) no início
-            .replace(/^\s*\(\s*[=+\-]\s*\)\s*/, "")
+            .replace(/^\s*\(\s*[=+-]\s*\)\s*/, "")
             // remove qualquer grupo entre parênteses
             .replace(/\s*\([^)]*\)/g, "")
             // troca pontuação por espaço
