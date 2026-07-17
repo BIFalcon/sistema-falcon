@@ -2649,6 +2649,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hotel_slug: { Args: { _name: string }; Returns: string }
       is_ap_manager: { Args: { _user_id: string }; Returns: boolean }
       is_ar_manager: { Args: { _user_id: string }; Returns: boolean }
       is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
