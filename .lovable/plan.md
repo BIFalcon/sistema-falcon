@@ -1,40 +1,33 @@
-# Recomendação: opção 2 (upload com deduplicação)
+Sim — as validações de nome, check-in e valor continuam ativas, mas com uma ressalva importante na planilha do Serra Talhada.
 
-Recomendo fortemente a **segunda opção**. É mais segura, reaproveitável (serve para qualquer mês futuro em que faltem registros) e elimina o risco de apagar trabalho dos hotéis/matriz.
+## Como está hoje (após o último ajuste)
 
-A primeira opção (substituir tudo de uma vez) é arriscada: qualquer documento anexado, marcação de pago, status de cobrança ou nota feita pelos hotéis seria perdida — e ainda exigiria um "modo de emergência" que precisaríamos travar depois, o que é frágil.
+O cruzamento acontece em duas etapas:
 
-## O que vai ser feito
+1. **Pareamento (quem bate com quem)**: agora usa **RPS = Fiscal Bill Number** como chave principal, com fallback por Confirmation Number quando a descrição da nota trouxer.
+2. **Validação de conteúdo** (dentro de `useNfConference`): para cada nota pareada, ainda comparamos:
+   - **Nome do hóspede** — extraído do texto "HÓSPEDE: ..." da descrição.
+   - **Check-in** — extraído de "CHECK-IN: ..." da descrição.
+   - **Valor** — comparado com `netAmount` ou `paymentAmount` das linhas do Opera (tolerância R$ 1,00).
+   - Check-out não é validado hoje (só extraído, nunca comparado).
 
-### 1. Chave de deduplicação (no parser/import)
-Considerar um registro como "já existe" quando todos esses campos baterem:
-- `property name` (hotel)
-- `transaction date`
-- `confirmation number`
-- `amount` (valor)
-- `account name`
-- `account number`
+Se qualquer uma falhar, a reserva vai para **Divergências** com o motivo específico.
 
-Essa combinação vira a chave única do registro durante o import.
+## O problema com Serra Talhada
 
-### 2. Comportamento do upload
-- Lê o arquivo completo normalmente.
-- Para cada linha:
-  - **Se já existe** registro com a mesma chave → **ignora** (não toca em nada: nem status, nem documentos, nem pagamento, nem notas).
-  - **Se não existe** → **insere** como novo registro pendente.
-- No final, mostra um resumo: X linhas lidas · Y inseridas · Z já existentes (puladas).
+A planilha da Prefeitura do Serra Talhada **não tem coluna "Descrição do Serviço"** — só DPS Nº, valor, tomador etc. Sem descrição, não há como extrair nome do hóspede nem check-in da nota. Resultado prático:
 
-### 3. Onde mudar
-- `supabase/functions/parse-ar-report/index.ts` — adicionar checagem por chave composta antes de inserir cada linha, em vez do upsert atual por `entry_key`.
-- `src/lib/arReportParser.ts` — garantir que `entry_key` seja gerada a partir exatamente desses 6 campos normalizados (sem acento, trim, valor com 2 casas) para casar 1:1 com o que já está no banco.
-- `src/pages/ContasReceberPage.tsx` — ajustar o toast/resumo pós-upload para mostrar "inseridos" e "ignorados (já existentes)".
+- **Valor**: continua sendo validado normalmente (vem da coluna "Valor do Serviço").
+- **Nome e Check-in**: são pulados silenciosamente (o código já trata como "sem informação para comparar", não gera falso-positivo).
 
-### 4. Sem mudança de schema
-Não precisa de migração. A `entry_key` já existe em `ar_to_invoice_entries` e a tabela tem as colunas necessárias. Só precisamos garantir que a chave seja determinística pelos 6 campos acima.
+Ou seja: para Serra Talhada, o cruzamento passa a ser essencialmente **RPS + Valor**. Para hotéis cuja prefeitura devolve a descrição completa (padrão que já existia antes), continua sendo **RPS/Confirmação + Nome + Check-in + Valor**.
 
-## Observações
-- O escopo é a aba **Faturamento (To Invoice)**. Se quiser o mesmo para **Open Folio**, me confirma que aplico a mesma lógica lá.
-- Operações manuais já feitas (pago, documento, nota, status) ficam **intocadas**.
-- Se algum mês tiver linhas com valor corrigido em relação à planilha (ex.: hotel atualizou), o sistema **não sobrescreve** — mantém o que está no banco. Isso é o comportamento desejado pelo seu pedido.
+## O que você quer que eu faça
 
-Posso seguir com essa implementação?
+Preciso confirmar antes de mexer:
+
+- **(A) Manter como está** — RPS + valor onde não houver descrição; RPS/conf + nome + check-in + valor onde houver.
+- **(B) Reforçar** — validar também check-out quando a descrição existir.
+- **(C) Outra regra** — por exemplo, comparar nome do tomador (que existe na planilha do Serra Talhada, coluna "Nome Tomador") com o nome do hóspede do Opera, para ter mais uma checagem mesmo sem descrição.
+
+Me diga qual caminho seguir e eu ajusto.
