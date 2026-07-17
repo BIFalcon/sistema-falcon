@@ -1679,13 +1679,19 @@ function OpenFolioSection({
   restrictedHotelIds: string[] | null;
   isGgOnly: boolean;
 }) {
+  const { isMaster, isPatronos } = useAuth();
+  const canSeeHiddenHotels = isMaster || isPatronos;
   const { data: hotels = [] } = useAllHotels();
   const { data: entries = [], isLoading } = useOpenFolioEntries();
   const { data: lastUpload } = useLatestArUpload("open_folio");
   const { data: allNotes = [] } = useAllOpenFolioNotes();
   // Filtro global do header (Hotel) é a única fonte de verdade.
   const { hotelId: globalHotelId, setHotelId } = useModuleFilters("financeiro");
-  const selectedHotel = globalHotelId;
+  // Override local para hotéis inativos (que não estão em allowedHotels do header
+  // e por isso seriam redirecionados). Só master/patronos usam este caminho.
+  const [localHiddenHotel, setLocalHiddenHotel] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const selectedHotel = localHiddenHotel ?? globalHotelId;
   const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
   const [notifying, setNotifying] = useState<string | null>(null);
@@ -1741,7 +1747,12 @@ function OpenFolioSection({
     [entries, allowedSet],
   );
 
-  const summaries = useMemo(() => {
+  const inactiveHotelIds = useMemo(
+    () => new Set(hotels.filter((h) => (h as any).is_active === false).map((h) => h.id)),
+    [hotels],
+  );
+
+  const allSummaries = useMemo(() => {
     const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number }>();
     for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
@@ -1760,13 +1771,23 @@ function OpenFolioSection({
       .map(([id, v]) => ({
         id,
         name: hotelById.get(id)?.name ?? id,
+        inactive: inactiveHotelIds.has(id),
         count: v.count,
         total: v.total,
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
         unjustified: v.unjustified,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [visibleEntries, hotels, justifiedByHotel]);
+  }, [visibleEntries, hotels, justifiedByHotel, inactiveHotelIds]);
+
+  const summaries = useMemo(
+    () => allSummaries.filter((s) => !s.inactive),
+    [allSummaries],
+  );
+  const hiddenSummaries = useMemo(
+    () => allSummaries.filter((s) => s.inactive),
+    [allSummaries],
+  );
 
   const filteredEntries = useMemo(() => {
     if (!selectedHotel) return [];
@@ -1839,11 +1860,11 @@ function OpenFolioSection({
           setAgingFilter={setAgingFilter}
           unjustifiedOnly={unjustifiedOnly}
           setUnjustifiedOnly={setUnjustifiedOnly}
-          unjustifiedCount={summaries.find((s) => s.id === selectedHotel)?.unjustified ?? 0}
-          totalCount={summaries.find((s) => s.id === selectedHotel)?.count ?? 0}
+          unjustifiedCount={allSummaries.find((s) => s.id === selectedHotel)?.unjustified ?? 0}
+          totalCount={allSummaries.find((s) => s.id === selectedHotel)?.count ?? 0}
           onNotifyGg={isManager ? () => notifyGgForHotel(selectedHotel, hotels.find((h) => h.id === selectedHotel)?.name ?? selectedHotel) : undefined}
           notifying={notifying === selectedHotel}
-          onBack={() => setHotelId(null)}
+          onBack={() => { setLocalHiddenHotel(null); setHotelId(null); }}
           hideBack={isGgOnly}
           searchText={ofSearchText}
           setSearchText={setOfSearchText}
@@ -1854,16 +1875,27 @@ function OpenFolioSection({
         <Card className="p-5 shadow-soft space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-semibold uppercase tracking-wider">Folios em aberto por hotel</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={visibleEntries.length === 0}
-              onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
-            >
-              <FileDown className="h-4 w-4" />
-              Exportar para Excel
-            </Button>
+            <div className="flex items-center gap-2">
+              {canSeeHiddenHotels && hiddenSummaries.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowHidden((v) => !v)}
+                >
+                  {showHidden ? "Ocultar" : "Ver"} hotéis inativos ({hiddenSummaries.length})
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={visibleEntries.length === 0}
+                onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
+              >
+                <FileDown className="h-4 w-4" />
+                Exportar para Excel
+              </Button>
+            </div>
           </div>
           {summaries.length === 0 ? (
             <EmptyState text="Nenhum folio em aberto." />
@@ -1901,6 +1933,40 @@ function OpenFolioSection({
                   </div>
                 );
               })}
+              {canSeeHiddenHotels && showHidden && hiddenSummaries.length > 0 && (
+                <div className="pt-3 mt-2 border-t border-dashed border-border space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Hotéis inativos (visível apenas para Master e Patronos)
+                  </p>
+                  {hiddenSummaries.map((s) => (
+                    <div
+                      key={s.id}
+                      className="w-full text-left p-4 rounded-lg border border-dashed opacity-80 hover:opacity-100 hover:border-accent transition-all flex items-center gap-4"
+                    >
+                      <button
+                        onClick={() => setLocalHiddenHotel(s.id)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <p className="font-semibold truncate flex items-center gap-2">
+                          {s.name}
+                          <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">
+                            inativo
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {s.count} folio(s) em aberto
+                          {s.unjustified > 0 && (
+                            <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
+                          )}
+                        </p>
+                      </button>
+                      <div className="text-right">
+                        <p className="text-lg font-semibold">{fmtBRL(s.total)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </Card>
