@@ -180,7 +180,7 @@ export function AppHeader() {
               <SelectValue placeholder="Hotel" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              {(isMaster || hasRole("financeiro") || hasRole("viewer") || hasRole("controladoria") || hasRole("patronos") || hasRole("ri") || hasRole("operacoes") || hasRole("rh")) && (
+              {(isMaster || hasRole("financeiro") || hasRole("viewer") || hasRole("controladoria") || hasRole("patronos") || hasRole("ri") || hasRole("operacoes") || hasRole("rh") || hasRole("gop")) && (
                 <SelectItem value="__all__">
                   {selectedGop ? `Todos da carteira (${visibleHotels.length})` : "Todos os hotéis"}
                 </SelectItem>
