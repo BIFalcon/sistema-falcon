@@ -192,7 +192,7 @@ export default function CartaPage() {
   const { data: letter } = useLetter(resolvedId);
   const { data: highlights = [] } = useLetterHighlights(letter?.id);
   const { data: versions = [] } = useLetterVersions(letter?.id);
-  const { data: indicators = [] } = useDreIndicators(resolvedId);
+  const { data: indicators = [], isLoading: indicatorsLoading, isFetched: indicatorsFetched } = useDreIndicators(resolvedId);
   const { data: hotelRow } = useHotel(closing?.hotel_id);
   const { data: falconLogoUrl } = useFalconLogo();
 
@@ -223,6 +223,9 @@ export default function CartaPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const hasDreData = indicators.length > 0;
+  // Só mostra o aviso "DRE não importada" depois que a query terminou:
+  // durante o carregamento inicial indicators=[] e o aviso piscava indevidamente.
+  const showNoDreWarning = !hasDreData && indicatorsFetched && !indicatorsLoading;
 
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
@@ -434,7 +437,7 @@ export default function CartaPage() {
         <CartaStageStepper status={closing.status_carta} />
       </Card>
 
-      {!hasDreData && closing && (
+      {showNoDreWarning && closing && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           ⚠️ A DRE deste hotel ainda não foi importada para este mês. Os dados dos indicadores aparecerão automaticamente após a Controladoria fazer o upload da DRE.
         </div>
