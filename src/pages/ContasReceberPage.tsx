@@ -2075,7 +2075,7 @@ function HotelOpenFolioDetail({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           className="pl-9"
-          placeholder="Buscar hóspede ou nº de confirmação..."
+          placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
