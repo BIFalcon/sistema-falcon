@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       .eq("letter_id", letter_id)
       .order("sort_order", { ascending: true });
 
-    // Descobre a última versão da DRE deste fechamento
+    // 1) Tenta ler a DRE do próprio fechamento (última versão)
     const topRes = await supabase
       .from("dre_parsed_lines")
       .select("version_number")
@@ -123,28 +123,65 @@ Deno.serve(async (req) => {
       .order("version_number", { ascending: false })
       .limit(1);
     const top = topRes.data?.[0]?.version_number ?? null;
-    if (top == null) {
-      return json({ error: "Nenhuma DRE encontrada para este fechamento. Anexe a DRE antes de gerar a Carta." }, 400);
-    }
-    // Busca TODOS os indicadores da última versão (sem cair no limite default de 1000)
-    const indicators = await supabase
-      .from("dre_parsed_lines")
-      .select("line_label, line_value, version_number")
-      .eq("closing_id", closing_id)
-      .eq("line_type", "indicator")
-      .eq("version_number", top)
-      .range(0, 9999);
-    const inds = (indicators.data ?? []);
-    // Separa correntes ([key]) de previous ([prev_key]) e ignora séries mensais
     type Row = { line_label: string; line_value: number | null };
+    let inds: Row[] = [];
+    if (top != null) {
+      const indicators = await supabase
+        .from("dre_parsed_lines")
+        .select("line_label, line_value, version_number")
+        .eq("closing_id", closing_id)
+        .eq("line_type", "indicator")
+        .eq("version_number", top)
+        .range(0, 9999);
+      inds = (indicators.data ?? []) as Row[];
+    }
+    // 2) Fallback: se este fechamento ainda não tem DRE anexada, usa a
+    //    última prévia enviada para qualquer fechamento do mesmo hotel/ano.
+    let yearInds: Row[] = [];
+    if (inds.length === 0) {
+      const yr = await supabase.rpc("get_year_latest_dre_lines", {
+        _hotel_id: closing.data.hotel_id,
+        _year: closing.data.year,
+      });
+      if (yr.error) return json({ error: "Nenhuma DRE encontrada para este fechamento. Anexe a DRE antes de gerar a Carta." }, 400);
+      yearInds = ((yr.data ?? []) as Row[]).filter((r: unknown) => (r as { line_type?: string }).line_type === "indicator");
+      if (yearInds.length === 0) {
+        return json({ error: "Nenhuma DRE encontrada para este hotel neste ano. Anexe a DRE antes de gerar a Carta." }, 400);
+      }
+    }
     const cur = new Map<string, Row>();
     const prev = new Map<string, Row>();
-    for (const r of inds as Row[]) {
+    const source = inds.length > 0 ? inds : yearInds;
+    const targetMonth = closing.data.month;
+    // 2a) Se estamos usando série do ano, primeiro tentamos reconstruir
+    //     valores do mês-alvo via [series_cur_<key>_<mes>] / [series_prev_...].
+    for (const r of source) {
+      const sc = /^\[series_cur_(.+)_(\d+)\]$/.exec(r.line_label);
+      if (sc) {
+        const key = sc[1];
+        const mo = parseInt(sc[2], 10);
+        if (mo === targetMonth && r.line_value != null && r.line_value !== 0) {
+          cur.set(key, { line_label: `[${key}]`, line_value: r.line_value });
+        }
+        continue;
+      }
+      const sp = /^\[series_prev_(.+)_(\d+)\]$/.exec(r.line_label);
+      if (sp) {
+        const key = sp[1];
+        const mo = parseInt(sp[2], 10);
+        if (mo === targetMonth && r.line_value != null && r.line_value !== 0) {
+          prev.set(key, { line_label: `[prev_${key}]`, line_value: r.line_value });
+        }
+        continue;
+      }
+    }
+    // 2b) Fallback pelos indicadores "planos" ([key] / [prev_key]).
+    for (const r of source) {
       if (r.line_label.startsWith("[series_")) continue;
       const mp = /^\[prev_(\w+)\]/.exec(r.line_label);
-      if (mp) { prev.set(mp[1], r); continue; }
+      if (mp) { if (!prev.has(mp[1])) prev.set(mp[1], r); continue; }
       const m = /^\[(\w+)\]/.exec(r.line_label);
-      if (m) cur.set(m[1], r);
+      if (m && !cur.has(m[1])) cur.set(m[1], r);
     }
     const fmt = (v: number | null) => v == null ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
     const pct = (a: number | null, b: number | null) => {
