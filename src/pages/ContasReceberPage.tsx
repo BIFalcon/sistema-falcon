@@ -1798,7 +1798,9 @@ function OpenFolioSection({
           const name = `${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase();
           return (
             name.includes(q) ||
-            (e.confirmation_number ?? "").toLowerCase().includes(q)
+            (e.confirmation_number ?? "").toLowerCase().includes(q) ||
+            (e.company ?? "").toLowerCase().includes(q) ||
+            (e.travel_agent ?? "").toLowerCase().includes(q)
           );
         })
       : base;
