@@ -1902,6 +1902,200 @@ export type Database = {
         }
         Relationships: []
       }
+      omie_categorias_cache: {
+        Row: {
+          codigo: string
+          conta_despesa: boolean | null
+          conta_receita: boolean | null
+          descricao: string | null
+          hotel_id: string
+          updated_at: string
+        }
+        Insert: {
+          codigo: string
+          conta_despesa?: boolean | null
+          conta_receita?: boolean | null
+          descricao?: string | null
+          hotel_id: string
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          conta_despesa?: boolean | null
+          conta_receita?: boolean | null
+          descricao?: string | null
+          hotel_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omie_categorias_cache_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omie_contas_correntes_cache: {
+        Row: {
+          descricao: string | null
+          hotel_id: string
+          inativo: boolean | null
+          n_cod_cc: number
+          updated_at: string
+        }
+        Insert: {
+          descricao?: string | null
+          hotel_id: string
+          inativo?: boolean | null
+          n_cod_cc: number
+          updated_at?: string
+        }
+        Update: {
+          descricao?: string | null
+          hotel_id?: string
+          inativo?: boolean | null
+          n_cod_cc?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omie_contas_correntes_cache_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omie_fornecedores_cache: {
+        Row: {
+          cnpj_cpf: string | null
+          codigo_cliente_omie: number
+          hotel_id: string
+          nome_fantasia: string | null
+          razao_social: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj_cpf?: string | null
+          codigo_cliente_omie: number
+          hotel_id: string
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj_cpf?: string | null
+          codigo_cliente_omie?: number
+          hotel_id?: string
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omie_fornecedores_cache_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omie_sync_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          dry_run: boolean
+          hotel_id: string
+          id: string
+          janela_data_inicio: string
+          last_error: string | null
+          last_status: string | null
+          last_synced_at: string | null
+          secret_app_key_env: string
+          secret_app_secret_env: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          dry_run?: boolean
+          hotel_id: string
+          id?: string
+          janela_data_inicio?: string
+          last_error?: string | null
+          last_status?: string | null
+          last_synced_at?: string | null
+          secret_app_key_env: string
+          secret_app_secret_env: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          dry_run?: boolean
+          hotel_id?: string
+          id?: string
+          janela_data_inicio?: string
+          last_error?: string | null
+          last_status?: string | null
+          last_synced_at?: string | null
+          secret_app_key_env?: string
+          secret_app_secret_env?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omie_sync_config_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: true
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omie_sync_logs: {
+        Row: {
+          categorias_nao_encontradas: Json | null
+          dry_run: boolean
+          entries_fetched: number | null
+          entries_written: number | null
+          error_message: string | null
+          fornecedores_nao_encontrados: number | null
+          hotel_id: string
+          id: string
+          run_at: string
+          status: string
+          status_desconhecidos: Json | null
+        }
+        Insert: {
+          categorias_nao_encontradas?: Json | null
+          dry_run: boolean
+          entries_fetched?: number | null
+          entries_written?: number | null
+          error_message?: string | null
+          fornecedores_nao_encontrados?: number | null
+          hotel_id: string
+          id?: string
+          run_at?: string
+          status: string
+          status_desconhecidos?: Json | null
+        }
+        Update: {
+          categorias_nao_encontradas?: Json | null
+          dry_run?: boolean
+          entries_fetched?: number | null
+          entries_written?: number | null
+          error_message?: string | null
+          fornecedores_nao_encontrados?: number | null
+          hotel_id?: string
+          id?: string
+          run_at?: string
+          status?: string
+          status_desconhecidos?: Json | null
+        }
+        Relationships: []
+      }
       password_setup_tokens: {
         Row: {
           created_at: string
