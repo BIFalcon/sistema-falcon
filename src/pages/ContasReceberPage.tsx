@@ -1893,7 +1893,7 @@ function OpenFolioSection({
                 size="sm"
                 className="gap-2"
                 disabled={visibleEntries.length === 0}
-                onClick={() => exportOpenFolioToExcel(visibleEntries, new Map(), "consolidado")}
+                onClick={() => exportOpenFolioToExcel(visibleEntries, allNotes, "consolidado")}
               >
                 <FileDown className="h-4 w-4" />
                 Exportar para Excel
