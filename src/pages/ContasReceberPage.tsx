@@ -151,6 +151,7 @@ function exportToInvoiceToExcel(
       : "Pendente";
     return {
       "Hotel": hotelName(e.hotel_id),
+      "Data": fmt(e.transaction_date),
       "Hóspede": e.account_name ?? "",
       "Nº Nota": e.nota_number ?? "",
       "Nº Boleto": e.boleto_number ?? "",
@@ -168,7 +169,7 @@ function exportToInvoiceToExcel(
   });
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 28 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
+    { wch: 28 }, { wch: 12 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
     { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 40 },
     { wch: 18 }, { wch: 14 },
   ];
