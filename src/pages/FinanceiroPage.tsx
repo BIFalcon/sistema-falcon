@@ -32,12 +32,11 @@ function lucroFromLines(lines: unknown): { value: number | null; source: string 
 
 export default function FinanceiroPage() {
   const { hotelId, month, year } = useModuleFilters("fechamento");
-  const { user, allowedHotels, hasRole, isMaster, isFinanceiroCoordenadora, isFernando } = useAuth();
+  const { user, allowedHotels, hasRole, isMaster, isFinanceiroCoordenadora, isFernando, isPatronos } = useAuth();
   const { data: rows = [], isLoading } = useFinanceiroQueue({ month, year, hotelId });
   const record = useRecordDistribution();
 
-  const canActOnFechamento = isMaster || !isFinanceiroCoordenadora;
-  const canDecide = !isFernando && (isMaster || hasRole("financeiro")) && canActOnFechamento;
+  const canDecide = !isFernando && (isMaster || isPatronos || hasRole("financeiro"));
   const [openRow, setOpenRow] = useState<FinanceiroRow | null>(null);
   const [decision, setDecision] = useState<DistributionDecision>("enviado");
   const [valueStr, setValueStr] = useState("");
