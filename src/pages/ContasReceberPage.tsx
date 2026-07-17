@@ -2075,7 +2075,7 @@ function HotelOpenFolioDetail({
             size="sm"
             className="gap-2"
             disabled={entries.length === 0}
-            onClick={() => exportOpenFolioToExcel(entries, notesByConf, hotelName)}
+            onClick={() => exportOpenFolioToExcel(entries, notes, hotelName)}
           >
             <FileDown className="h-4 w-4" />
             Exportar Excel
