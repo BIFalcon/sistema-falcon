@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.be-eight-export]
 verify_jwt = false
+
+[functions.omie-ap-sync]
+verify_jwt = true
