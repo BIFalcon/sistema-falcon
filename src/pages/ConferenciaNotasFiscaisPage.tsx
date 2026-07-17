@@ -156,12 +156,16 @@ export default function ConferenciaNotasFiscaisPage() {
   const handleExport = () => {
     if (!result) return;
     const rows: unknown[][] = [
-      ["Status", "Confirmação", "Hóspede (Opera)", "Check-in", "Check-out", "Valor (R$)", "Motivo"],
+      ["Status", "Confirmação", "RPS", "Nota", "Hóspede (Opera)", "Check-in", "Check-out", "Valor (R$)", "Motivo"],
     ];
     for (const item of [...result.semNota, ...result.divergencias]) {
+      const rps = item.reservation?.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") ?? "";
+      const nfs = item.notas.map((n) => n.numeroNfse).join(", ");
       rows.push([
         item.status === "sem_nota" ? "Sem nota emitida" : "Divergência",
         item.reservation?.confirmationNumber ?? "—",
+        rps || "—",
+        nfs || "—",
         item.reservation?.guestName ?? "—",
         item.reservation?.arrival ?? "—",
         item.reservation?.departure ?? "—",
@@ -173,6 +177,8 @@ export default function ConferenciaNotasFiscaisPage() {
       rows.push([
         "Revisão manual",
         "—",
+        nota.rps ?? "—",
+        nota.numeroNfse,
         nota.descricao.slice(0, 60),
         "—",
         "—",
@@ -234,6 +240,37 @@ export default function ConferenciaNotasFiscaisPage() {
         </Card>
       ) : (
         <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="p-4 shadow-soft">
+              <p className="text-xs text-muted-foreground">Conciliadas</p>
+              <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                {result?.conciliados.length ?? 0}
+              </p>
+              <p className="text-xs font-medium">{fmtBRL(result?.totals.conciliadosTotal ?? 0)}</p>
+            </Card>
+            <Card className="p-4 shadow-soft">
+              <p className="text-xs text-muted-foreground">Divergências</p>
+              <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
+                {result?.divergencias.length ?? 0}
+              </p>
+              <p className="text-xs font-medium">{fmtBRL(result?.totals.divergenciasTotal ?? 0)}</p>
+            </Card>
+            <Card className="p-4 shadow-soft">
+              <p className="text-xs text-muted-foreground">Sem nota emitida</p>
+              <p className="text-lg font-semibold text-destructive">
+                {result?.semNota.length ?? 0}
+              </p>
+              <p className="text-xs font-medium">{fmtBRL(result?.totals.semNotaTotal ?? 0)}</p>
+            </Card>
+            <Card className="p-4 shadow-soft">
+              <p className="text-xs text-muted-foreground">Notas sem reserva</p>
+              <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                {result?.semReservaOpera.length ?? 0}
+              </p>
+              <p className="text-xs font-medium">{fmtBRL(result?.totals.semReservaTotal ?? 0)}</p>
+            </Card>
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {result && (result.semNota.length > 0 || result.divergencias.length > 0) ? (
@@ -272,6 +309,7 @@ export default function ConferenciaNotasFiscaisPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Confirmação</TableHead>
+                    <TableHead>RPS</TableHead>
                     <TableHead>Hóspede</TableHead>
                     <TableHead>Check-in</TableHead>
                     <TableHead>Check-out</TableHead>
@@ -286,6 +324,9 @@ export default function ConferenciaNotasFiscaisPage() {
                     >
                       <TableCell className="font-mono text-xs">
                         {item.reservation!.confirmationNumber}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
                       </TableCell>
                       <TableCell>{item.reservation!.guestName}</TableCell>
                       <TableCell>{item.reservation!.arrival}</TableCell>
@@ -314,6 +355,11 @@ export default function ConferenciaNotasFiscaisPage() {
                     <p className="font-medium">
                       {item.reservation!.confirmationNumber} · {item.reservation!.guestName}
                     </p>
+                    <p className="text-xs text-muted-foreground">
+                      RPS: {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
+                      {" · Nota: "}
+                      {item.notas.map((n) => n.numeroNfse).join(", ") || "—"}
+                    </p>
                     <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
                       {item.motivos.map((m, i) => (
                         <li key={i}>{m}</li>
@@ -323,6 +369,20 @@ export default function ConferenciaNotasFiscaisPage() {
                 ))}
               </div>
             </SectionCard>
+
+            {(result?.conciliados.length ?? 0) > 0 && (
+              <Card className="p-4 shadow-soft flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                    Conciliadas corretamente
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {result?.conciliados.length} reserva(s) · total {fmtBRL(result?.totals.conciliadosTotal ?? 0)}
+                  </p>
+                </div>
+              </Card>
+            )}
 
             <SectionCard
               title="Notas sem confirmação identificável (revisão manual)"
@@ -334,6 +394,7 @@ export default function ConferenciaNotasFiscaisPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nota</TableHead>
+                    <TableHead>RPS</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                   </TableRow>
@@ -342,6 +403,7 @@ export default function ConferenciaNotasFiscaisPage() {
                   {(result?.semConfirmacaoIdentificada ?? []).map((nota) => (
                     <TableRow key={nota.numeroNfse}>
                       <TableCell className="font-mono text-xs">{nota.numeroNfse}</TableCell>
+                      <TableCell className="font-mono text-xs">{nota.rps ?? "—"}</TableCell>
                       <TableCell className="text-xs">{nota.descricao}</TableCell>
                       <TableCell className="text-right font-semibold">
                         {fmtBRL(nota.valorServico)}
@@ -353,7 +415,7 @@ export default function ConferenciaNotasFiscaisPage() {
             </SectionCard>
 
             <SectionCard
-              title="Notas com confirmação fora do arquivo do Opera enviado"
+              title="Notas sem reserva correspondente no Opera"
               icon={<HelpCircle className="h-5 w-5 text-muted-foreground shrink-0" />}
               colorClass="text-muted-foreground"
               count={result?.semReservaOpera.length ?? 0}
@@ -361,7 +423,7 @@ export default function ConferenciaNotasFiscaisPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Confirmação</TableHead>
+                    <TableHead>RPS / Confirmação</TableHead>
                     <TableHead>Nota(s)</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                   </TableRow>
@@ -370,7 +432,7 @@ export default function ConferenciaNotasFiscaisPage() {
                   {(result?.semReservaOpera ?? []).map((item) => (
                     <TableRow key={item.motivos[0]}>
                       <TableCell className="font-mono text-xs">
-                        {item.notas[0]?.confirmationNumber}
+                        {item.notas[0]?.rps ?? item.notas[0]?.confirmationNumber ?? "—"}
                       </TableCell>
                       <TableCell className="text-xs">
                         {item.notas.map((n) => n.numeroNfse).join(", ")}

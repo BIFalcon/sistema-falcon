@@ -29,6 +29,7 @@ export interface PrefeituraNota {
   situacao: string;
   valorServico: number;
   descricao: string;
+  rps: string | null;
   confirmationNumber: string | null;
   guestNameExtracted: string | null;
   checkIn: string | null;
@@ -206,6 +207,8 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
         const iSituacao = col("situação nfs-e", "situacao nfs-e");
         const iValor = col("valor do serviço", "valor do servico");
         const iDescricao = col("descrição do serviço", "descricao do servico");
+        const iDps = col("dps nº", "dps n", "dps");
+        const iRps = col("rps nº", "rps n", "rps");
 
         const notas: PrefeituraNota[] = [];
         for (const row of rows.slice(1)) {
@@ -215,7 +218,13 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
           const situacao = String(row[iSituacao] ?? "").trim();
           if (!situacao.includes("Gerada")) continue;
 
-          const descricao = String(row[iDescricao] ?? "").trim();
+          const descricao = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
+          const rpsRaw =
+            iRps >= 0 ? row[iRps] : iDps >= 0 ? row[iDps] : null;
+          const rps =
+            rpsRaw != null && String(rpsRaw).trim() !== ""
+              ? String(rpsRaw).trim().replace(/^0+/, "")
+              : null;
 
           notas.push({
             numeroNfse: numero,
@@ -224,6 +233,7 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
             situacao,
             valorServico: parseMoney(row[iValor]),
             descricao,
+            rps,
             confirmationNumber: extractConfirmationNumber(descricao),
             guestNameExtracted: extractGuestName(descricao),
             checkIn: extractCheckDate(descricao, CHECKIN_RE),
