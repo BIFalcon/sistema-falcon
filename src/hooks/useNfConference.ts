@@ -19,11 +19,20 @@ export interface NfConferenceResult {
   semNota: NfMatchDetail[];
   semReservaOpera: NfMatchDetail[];
   semConfirmacaoIdentificada: PrefeituraNota[];
+  totals: {
+    reservationsTotal: number;
+    notasTotal: number;
+    conciliadosTotal: number;
+    divergenciasTotal: number;
+    semNotaTotal: number;
+    semReservaTotal: number;
+  };
 }
 
 const VALUE_TOLERANCE = 1;
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const normKey = (s: string | null | undefined) => String(s ?? "").trim().replace(/^0+/, "");
 
 function namesMatch(extracted: string | null, operaName: string): boolean | null {
   if (!extracted) return null;
@@ -54,22 +63,57 @@ export function useNfConference(
   return useMemo(() => {
     if (!reservations.length && !notas.length) return null;
 
-    const notasComConfirmacao = notas.filter((n) => n.confirmationNumber);
-    const semConfirmacaoIdentificada = notas.filter((n) => !n.confirmationNumber);
-
+    // Indexa notas por RPS (chave primária) e por confirmação (fallback).
+    const notasByRps = new Map<string, PrefeituraNota[]>();
     const notasByConf = new Map<string, PrefeituraNota[]>();
-    for (const n of notasComConfirmacao) {
-      const arr = notasByConf.get(n.confirmationNumber!) ?? [];
-      arr.push(n);
-      notasByConf.set(n.confirmationNumber!, arr);
+    const notasSemChave: PrefeituraNota[] = [];
+    for (const n of notas) {
+      const rpsKey = normKey(n.rps);
+      const confKey = normKey(n.confirmationNumber);
+      if (rpsKey) {
+        const arr = notasByRps.get(rpsKey) ?? [];
+        arr.push(n);
+        notasByRps.set(rpsKey, arr);
+      } else if (confKey) {
+        const arr = notasByConf.get(confKey) ?? [];
+        arr.push(n);
+        notasByConf.set(confKey, arr);
+      } else {
+        notasSemChave.push(n);
+      }
     }
+    const usedNota = new Set<string>();
 
     const conciliados: NfMatchDetail[] = [];
     const divergencias: NfMatchDetail[] = [];
     const semNota: NfMatchDetail[] = [];
 
     for (const reservation of reservations) {
-      const notasDaReserva = notasByConf.get(reservation.confirmationNumber) ?? [];
+      // 1) Match por RPS = Fiscal Bill Number das linhas do Opera.
+      const notasDaReserva: PrefeituraNota[] = [];
+      const seen = new Set<string>();
+      for (const line of reservation.lines) {
+        const k = normKey(line.fiscalBillNumber);
+        if (!k) continue;
+        const found = notasByRps.get(k);
+        if (!found) continue;
+        for (const n of found) {
+          if (seen.has(n.numeroNfse)) continue;
+          seen.add(n.numeroNfse);
+          usedNota.add(`rps:${k}:${n.numeroNfse}`);
+          notasDaReserva.push(n);
+        }
+      }
+      // 2) Fallback por confirmação (quando a Prefeitura tem descrição).
+      const confKey = normKey(reservation.confirmationNumber);
+      const byConf = confKey ? notasByConf.get(confKey) ?? [] : [];
+      for (const n of byConf) {
+        if (seen.has(n.numeroNfse)) continue;
+        seen.add(n.numeroNfse);
+        usedNota.add(`conf:${confKey}:${n.numeroNfse}`);
+        notasDaReserva.push(n);
+      }
+      if (confKey) notasByConf.delete(confKey);
 
       if (notasDaReserva.length === 0) {
         semNota.push({
@@ -131,20 +175,57 @@ export function useNfConference(
         detail.status = "divergencia";
         divergencias.push(detail);
       }
-
-      notasByConf.delete(reservation.confirmationNumber);
     }
 
-    const semReservaOpera: NfMatchDetail[] = [...notasByConf.entries()].map(([conf, ns]) => ({
-      status: "sem_reserva_opera",
-      reservation: null,
-      notas: ns,
-      nameOk: null,
-      dateOk: null,
-      valueOk: null,
-      motivos: [`Confirmação ${conf} não encontrada no arquivo do Opera enviado`],
-    }));
+    // Notas remanescentes: sobrou RPS não encontrado no Opera OU confirmação sobrando.
+    const semReservaOpera: NfMatchDetail[] = [];
+    for (const [rps, ns] of notasByRps.entries()) {
+      const remaining = ns.filter(
+        (n) => !usedNota.has(`rps:${rps}:${n.numeroNfse}`),
+      );
+      if (remaining.length === 0) continue;
+      semReservaOpera.push({
+        status: "sem_reserva_opera",
+        reservation: null,
+        notas: remaining,
+        nameOk: null,
+        dateOk: null,
+        valueOk: null,
+        motivos: [`RPS ${rps} não encontrado como Fiscal Bill Number no Opera`],
+      });
+    }
+    for (const [conf, ns] of notasByConf.entries()) {
+      semReservaOpera.push({
+        status: "sem_reserva_opera",
+        reservation: null,
+        notas: ns,
+        nameOk: null,
+        dateOk: null,
+        valueOk: null,
+        motivos: [`Confirmação ${conf} não encontrada no Opera`],
+      });
+    }
+    const semConfirmacaoIdentificada = notasSemChave;
 
-    return { conciliados, divergencias, semNota, semReservaOpera, semConfirmacaoIdentificada };
+    const sumRes = (arr: NfMatchDetail[]) =>
+      arr.reduce((s, d) => s + (d.reservation?.totalNet ?? 0), 0);
+    const sumNotas = (arr: NfMatchDetail[]) =>
+      arr.reduce((s, d) => s + d.notas.reduce((ss, n) => ss + n.valorServico, 0), 0);
+
+    return {
+      conciliados,
+      divergencias,
+      semNota,
+      semReservaOpera,
+      semConfirmacaoIdentificada,
+      totals: {
+        reservationsTotal: reservations.reduce((s, r) => s + r.totalNet, 0),
+        notasTotal: notas.reduce((s, n) => s + n.valorServico, 0),
+        conciliadosTotal: sumNotas(conciliados),
+        divergenciasTotal: sumNotas(divergencias) || sumRes(divergencias),
+        semNotaTotal: sumRes(semNota),
+        semReservaTotal: sumNotas(semReservaOpera),
+      },
+    };
   }, [reservations, notas]);
 }
