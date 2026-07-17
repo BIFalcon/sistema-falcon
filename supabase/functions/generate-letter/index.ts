@@ -135,23 +135,12 @@ Deno.serve(async (req) => {
         .range(0, 9999);
       inds = (indicators.data ?? []) as Row[];
     }
-    // 2) Fallback: se este fechamento ainda não tem DRE anexada, usa a
-    //    última prévia enviada para qualquer fechamento do mesmo hotel/ano.
-    let yearInds: Row[] = [];
     if (inds.length === 0) {
-      const yr = await supabase.rpc("get_year_latest_dre_lines", {
-        _hotel_id: closing.data.hotel_id,
-        _year: closing.data.year,
-      });
-      if (yr.error) return json({ error: "Nenhuma DRE encontrada para este fechamento. Anexe a DRE antes de gerar a Carta." }, 400);
-      yearInds = ((yr.data ?? []) as Row[]).filter((r: unknown) => (r as { line_type?: string }).line_type === "indicator");
-      if (yearInds.length === 0) {
-        return json({ error: "Nenhuma DRE encontrada para este hotel neste ano. Anexe a DRE antes de gerar a Carta." }, 400);
-      }
+      return json({ error: "Nenhuma DRE encontrada para este fechamento/mês. Anexe a DRE do mês filtrado antes de gerar a Carta." }, 400);
     }
     const cur = new Map<string, Row>();
     const prev = new Map<string, Row>();
-    const source = inds.length > 0 ? inds : yearInds;
+    const source = inds;
     const targetMonth = closing.data.month;
     // 2a) Se estamos usando série do ano, primeiro tentamos reconstruir
     //     valores do mês-alvo via [series_cur_<key>_<mes>] / [series_prev_...].
