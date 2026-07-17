@@ -2058,6 +2058,7 @@ export type Database = {
         Row: {
           categorias_nao_encontradas: Json | null
           dry_run: boolean
+          entries_cancelados_ignorados: number
           entries_fetched: number | null
           entries_written: number | null
           error_message: string | null
@@ -2071,6 +2072,7 @@ export type Database = {
         Insert: {
           categorias_nao_encontradas?: Json | null
           dry_run: boolean
+          entries_cancelados_ignorados?: number
           entries_fetched?: number | null
           entries_written?: number | null
           error_message?: string | null
@@ -2084,6 +2086,7 @@ export type Database = {
         Update: {
           categorias_nao_encontradas?: Json | null
           dry_run?: boolean
+          entries_cancelados_ignorados?: number
           entries_fetched?: number | null
           entries_written?: number | null
           error_message?: string | null
