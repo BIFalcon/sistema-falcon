@@ -210,12 +210,11 @@ export default function CartaPage() {
   const canEdit =
     isMaster ||
     hasRole("controladoria") ||
+    hasRole("fernando") ||
     // GG edita enquanto a carta ainda não foi aprovada pelo GOP
     (hasRole("gg") && (stage === "aguardando_gg" || stage === "aguardando_gop")) ||
     // GOP edita do início até a aprovação final do Fernando
-    (hasRole("gop") && (stage === "aguardando_gg" || stage === "aguardando_gop" || stage === "aguardando_fernando")) ||
-    // Fernando pode editar enquanto faz a revisão final
-    (hasRole("fernando") && stage === "aguardando_fernando");
+    (hasRole("gop") && (stage === "aguardando_gg" || stage === "aguardando_gop" || stage === "aguardando_fernando"));
   const canEditReserveFund =
     !canEdit &&
     hasRole("financeiro") &&
