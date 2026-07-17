@@ -158,19 +158,33 @@ export default function ConferenciaNotasFiscaisPage() {
     const rows: unknown[][] = [
       ["Status", "Confirmação", "RPS", "Nota", "Hóspede (Opera)", "Check-in", "Check-out", "Valor (R$)", "Motivo"],
     ];
-    for (const item of [...result.semNota, ...result.divergencias]) {
+    const statusLabel: Record<string, string> = {
+      conciliado: "Conciliado",
+      divergencia: "Divergência",
+      sem_nota: "Sem nota emitida",
+      sem_reserva_opera: "Sem reserva no Opera",
+    };
+    for (const item of [
+      ...result.conciliados,
+      ...result.divergencias,
+      ...result.semNota,
+      ...result.semReservaOpera,
+    ]) {
       const rps = item.reservation?.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") ?? "";
       const nfs = item.notas.map((n) => n.numeroNfse).join(", ");
+      const rpsFromNotas = item.notas.map((n) => n.rps).filter(Boolean).join(", ");
+      const valor = item.reservation?.totalNet
+        ?? item.notas.reduce((s, n) => s + n.valorServico, 0);
       rows.push([
-        item.status === "sem_nota" ? "Sem nota emitida" : "Divergência",
+        statusLabel[item.status] ?? item.status,
         item.reservation?.confirmationNumber ?? "—",
-        rps || "—",
+        rps || rpsFromNotas || "—",
         nfs || "—",
         item.reservation?.guestName ?? "—",
         item.reservation?.arrival ?? "—",
         item.reservation?.departure ?? "—",
-        item.reservation?.totalNet ?? 0,
-        item.motivos.join(" | "),
+        valor,
+        item.motivos.join(" | ") || (item.status === "conciliado" ? "OK" : ""),
       ]);
     }
     for (const nota of result.semConfirmacaoIdentificada) {
