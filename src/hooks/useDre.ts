@@ -414,18 +414,16 @@ export function useDreIndicators(closingId: string | null | undefined) {
         .maybeSingle();
       if (closingErr) throw closingErr;
       if (!closing) return [];
-      // Fonte preferida: última DRE do ano (planilha mais recente carrega
-      // valores atualizados de todos os meses anteriores).
-      const yearLines = await fetchYearLatestDreLines(closing.hotel_id, closing.year);
-      // Fallback: linhas do próprio closing (caso ainda não exista série
-      // [series_…] persistida ou outro motivo).
+      // Fonte única da Carta: DRE anexada ao fechamento do mês filtrado.
+      // Não usamos DRE de outro mês como fallback, para evitar que a Carta
+      // puxe dados de um período diferente do selecionado no filtro.
       const closingLines = await fetchLatestDreParsedLines(closingId);
       const targetMonth = closing.month;
       const out: DreIndicatorRow[] = [];
       const seenKeys = new Set<string>(); // current
       const seenPrev = new Set<string>();
       const seenBudget = new Set<string>();
-      // 1) Reconstroi indicadores do mês a partir das séries da última DRE.
+      // 1) Reconstroi indicadores do mês a partir das séries da DRE deste fechamento.
       const matchSeries = (
         rows: DreParsedLineRecord[],
         prefix: "cur" | "prev" | "budget",
@@ -464,15 +462,11 @@ export function useDreIndicators(closingId: string | null | undefined) {
           }
         }
       };
-      matchSeries(yearLines, "cur");
-      matchSeries(yearLines, "prev");
-      matchSeries(yearLines, "budget");
+      matchSeries(closingLines, "cur");
+      matchSeries(closingLines, "prev");
+      matchSeries(closingLines, "budget");
       // 2) Fallback: se a série do mês-alvo veio zerada/incompleta,
-      //    aproveitamos os indicadores "planos" ([key]) — primeiro do
-      //    próprio closing, depois da última DRE do ano (última prévia
-      //    anexada). Isso garante que a Carta sempre reflita a última
-      //    prévia disponível, mesmo quando o mês corrente ainda não tem
-      //    DRE própria enviada.
+      //    aproveitamos os indicadores "planos" ([key]) do próprio fechamento.
       //
       //    Além disso, se uma chave 'cur' foi capturada pela série mas
       //    veio com valor 0/nulo (mês futuro sem lançamentos reais),
@@ -520,7 +514,6 @@ export function useDreIndicators(closingId: string | null | undefined) {
         }
       };
       applyFallback(closingLines);
-      applyFallback(yearLines);
       // Legacy: caso restem linhas indicator não-planas no closing atual,
       // preserva comportamento antigo (apenas empurra as demais).
       for (const r of closingLines) {
@@ -831,7 +824,7 @@ function useDreAnalyticsImpl(input: {
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             // remove marcadores tipo (=) (+) (-) no início
-            .replace(/^\s*\(\s*[=+\-]\s*\)\s*/, "")
+            .replace(/^\s*\(\s*[=+-]\s*\)\s*/, "")
             // remove qualquer grupo entre parênteses
             .replace(/\s*\([^)]*\)/g, "")
             // troca pontuação por espaço

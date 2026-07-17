@@ -223,32 +223,29 @@ export default function CartaPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const hasDreData = indicators.length > 0;
-  // Verificação leve: existe QUALQUER DRE anexada para este hotel/ano?
-  // Se sim, jamais mostramos "DRE não importada" — a Carta puxa da última
-  // prévia do ano via fallback do useDreIndicators, mesmo que o mês atual
-  // ainda não tenha upload próprio.
-  const { data: yearHasDre } = useQuery({
-    enabled: !!closing?.hotel_id && !!closing?.year,
-    queryKey: ["year-has-dre", closing?.hotel_id, closing?.year],
+  // Verificação leve: existe DRE anexada exatamente neste fechamento/mês?
+  // Não considera outros meses do ano, para respeitar o filtro atual.
+  const { data: currentClosingHasDre } = useQuery({
+    enabled: !!closing?.id,
+    queryKey: ["current-closing-has-dre", closing?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dre_versions")
-        .select("id, closings!inner(hotel_id, year)")
-        .eq("closings.hotel_id", closing!.hotel_id)
-        .eq("closings.year", closing!.year)
+        .select("id")
+        .eq("closing_id", closing!.id)
         .limit(1);
       if (error) return false;
       return (data?.length ?? 0) > 0;
     },
     staleTime: 5 * 60 * 1000,
   });
-  // Só mostra o aviso "DRE não importada" depois que a query terminou e
-  // quando realmente não existe nenhuma DRE do ano.
+  // Só mostra o aviso "DRE não importada" depois que as queries terminaram e
+  // quando realmente não existe DRE no fechamento do mês filtrado.
   const showNoDreWarning =
     !hasDreData &&
     indicatorsFetched &&
     !indicatorsLoading &&
-    yearHasDre === false;
+    currentClosingHasDre === false;
 
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
