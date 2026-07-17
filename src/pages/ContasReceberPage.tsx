@@ -839,19 +839,6 @@ function DayBreakdown({
                           Faturado
                         </Button>
                         )}
-                        {canConfirm && (
-                        <Button
-                          size="sm"
-                          variant={e.gg_status === "nao_faturado" ? "default" : "outline"}
-                          className="h-6 px-2 text-[11px]"
-                          onClick={() => {
-                            setEditingId(e.id);
-                            setNoteDraft(e.gg_note ?? "");
-                          }}
-                        >
-                          Não faturado
-                        </Button>
-                        )}
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
