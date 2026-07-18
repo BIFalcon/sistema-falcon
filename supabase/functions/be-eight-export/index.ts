@@ -455,10 +455,23 @@ async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; r
   for (const t of tableNames) {
     const cols: string[] = discovered.get(t) ?? [];
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
+    const resStart = Date.now();
     const [rowCount, latest] = await Promise.all([
-      approxRowCount(ctx.supabase, t),
+      exactRowCount(ctx.supabase, t),
       latestUpdatedAt(ctx.supabase, t, incrementalCol),
     ]);
+    // Per-resource audit line so we can correlate a /watermarks response
+    // with what each individual export would see. Emitted before the
+    // aggregate audit at the request level.
+    console.log(JSON.stringify({
+      kind: "be_eight_watermarks_resource",
+      request_id: ctx.requestId,
+      resource: t,
+      incremental_column: incrementalCol,
+      record_count: rowCount,
+      latest_updated_at: latest,
+      duration_ms: Date.now() - resStart,
+    }));
     resources.push({
       resource: t,
       incremental_column: incrementalCol,
