@@ -387,7 +387,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
-    const rowCount = await approxRowCount(ctx.supabase, t);
+    const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
     // In privileged + include_sensitive mode, no columns are blocked from the
     // payload, but the manifest still flags them as sensitive for auditing.
