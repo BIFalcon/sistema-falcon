@@ -339,6 +339,23 @@ async function approxRowCount(
   return count ?? null;
 }
 
+// Exact row count that mirrors the base export query for a table: same
+// `from(table).select("*")` shape, no filters, no cursor, no `updated_since`.
+// `include_sensitive` only controls which columns are stripped from row
+// payloads — it never restricts rows — so the count is identical for both
+// scopes. Used by /watermarks so callers can detect real source changes
+// instead of tracking pg_class estimates that drift after every VACUUM.
+async function exactRowCount(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+): Promise<number | null> {
+  const { count, error } = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true });
+  if (error) return null;
+  return count ?? null;
+}
+
 async function latestUpdatedAt(
   supabase: ReturnType<typeof createClient>,
   table: string,
@@ -370,7 +387,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
-    const rowCount = await approxRowCount(ctx.supabase, t);
+    const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
     // In privileged + include_sensitive mode, no columns are blocked from the
     // payload, but the manifest still flags them as sensitive for auditing.
@@ -438,10 +455,23 @@ async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; r
   for (const t of tableNames) {
     const cols: string[] = discovered.get(t) ?? [];
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
+    const resStart = Date.now();
     const [rowCount, latest] = await Promise.all([
-      approxRowCount(ctx.supabase, t),
+      exactRowCount(ctx.supabase, t),
       latestUpdatedAt(ctx.supabase, t, incrementalCol),
     ]);
+    // Per-resource audit line so we can correlate a /watermarks response
+    // with what each individual export would see. Emitted before the
+    // aggregate audit at the request level.
+    console.log(JSON.stringify({
+      kind: "be_eight_watermarks_resource",
+      request_id: ctx.requestId,
+      resource: t,
+      incremental_column: incrementalCol,
+      record_count: rowCount,
+      latest_updated_at: latest,
+      duration_ms: Date.now() - resStart,
+    }));
     resources.push({
       resource: t,
       incremental_column: incrementalCol,
