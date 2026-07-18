@@ -126,6 +126,17 @@ Deno.serve(async (req) => {
     const { data: allowed } = await admin.rpc("is_hotel_allowed", { _user_id: user.id, _hotel_id: entry.hotel_id });
     if (!allowed) return json({ error: "forbidden" }, 403);
 
+    // Match ar_to_invoice_entries UPDATE policy: only AR managers, gg, adm (or master) may write.
+    const [{ data: isArManager }, { data: isGg }, { data: isAdm }, { data: isMaster }] = await Promise.all([
+      admin.rpc("is_ar_manager", { _user_id: user.id }),
+      admin.rpc("has_role", { _user_id: user.id, _role: "gg" }),
+      admin.rpc("has_role", { _user_id: user.id, _role: "adm" }),
+      admin.rpc("is_master", { _user_id: user.id }),
+    ]);
+    if (!isArManager && !isGg && !isAdm && !isMaster) {
+      return json({ error: "forbidden" }, 403);
+    }
+
     if (!aiKey) {
       await admin.from("ar_to_invoice_entries").update({
         doc_extraction_status: "pending",
