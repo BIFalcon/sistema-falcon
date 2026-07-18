@@ -339,6 +339,23 @@ async function approxRowCount(
   return count ?? null;
 }
 
+// Exact row count that mirrors the base export query for a table: same
+// `from(table).select("*")` shape, no filters, no cursor, no `updated_since`.
+// `include_sensitive` only controls which columns are stripped from row
+// payloads — it never restricts rows — so the count is identical for both
+// scopes. Used by /watermarks so callers can detect real source changes
+// instead of tracking pg_class estimates that drift after every VACUUM.
+async function exactRowCount(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+): Promise<number | null> {
+  const { count, error } = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true });
+  if (error) return null;
+  return count ?? null;
+}
+
 async function latestUpdatedAt(
   supabase: ReturnType<typeof createClient>,
   table: string,
