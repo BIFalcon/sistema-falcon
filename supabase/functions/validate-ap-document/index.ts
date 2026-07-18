@@ -67,13 +67,12 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
-    // Block viewer/ri roles explicitly (is_hotel_allowed returns true for them).
-    const { data: roleRows } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const roleSet = new Set((roleRows ?? []).map((r: any) => r.role));
-    if (roleSet.has("viewer") || roleSet.has("ri")) {
+    // Match ap_documents RLS: only AP managers (or master) can write.
+    const [{ data: isApManager }, { data: isMaster }] = await Promise.all([
+      admin.rpc("is_ap_manager", { _user_id: userId }),
+      admin.rpc("is_master", { _user_id: userId }),
+    ]);
+    if (!isApManager && !isMaster) {
       return json({ error: "forbidden" }, 403);
     }
 
