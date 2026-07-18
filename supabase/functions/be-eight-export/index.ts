@@ -547,11 +547,23 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
       if (batch.length === 0) { exhausted = true; break; }
 
       const ids = batch.map((c) => c.id);
-      const { data: linesData, error: lErr } = await ctx.supabase
-        .rpc("get_latest_dre_lines_by_closings", { _closing_ids: ids });
-      if (lErr) return errorResponse(500, "rpc_failed", lErr.message, ctx.requestId);
-
-      let lines = (linesData ?? []) as Array<{ closing_id: string; line_type: string }>;
+      // Use service-role direct query instead of the SECURITY DEFINER RPC,
+      // which requires auth.uid() and rejects service-role callers. The Be
+      // Eight external token is already validated above; scoping is enforced
+      // at the HTTP layer, not via app-user RLS.
+      const { data: allLines, error: lErr } = await ctx.supabase
+        .from("dre_parsed_lines")
+        .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
+        .in("closing_id", ids);
+      if (lErr) return errorResponse(500, "query_failed", lErr.message, ctx.requestId);
+      // Keep only the latest version_number per closing.
+      const maxVersion = new Map<string, number>();
+      for (const r of (allLines ?? []) as Array<{ closing_id: string; version_number: number }>) {
+        const cur = maxVersion.get(r.closing_id) ?? -Infinity;
+        if (r.version_number > cur) maxVersion.set(r.closing_id, r.version_number);
+      }
+      let lines = ((allLines ?? []) as Array<{ closing_id: string; version_number: number; line_type: string }>)
+        .filter((r) => r.version_number === maxVersion.get(r.closing_id));
       if (resource === "dre_latest_indicators") {
         lines = lines.filter((r) => r.line_type === "indicator");
       }
