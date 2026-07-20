@@ -68,7 +68,11 @@ function hasLineMatching(lines: ParsedLine[], patterns: RegExp[]): boolean {
  * `[pline_*]` (ano anterior) — esses representam projeções/comparativos,
  * não o valor real do mês corrente.
  */
-function findIndicatorByPattern(lines: ParsedLine[], patterns: RegExp[]): number | null {
+function findIndicatorByPattern(
+  lines: ParsedLine[],
+  patterns: RegExp[],
+  targetMonth?: number,
+): number | null {
   for (const p of patterns) {
     const hits = lines.filter((l) => {
       if (l.line_type !== "indicator") return false;
@@ -76,6 +80,13 @@ function findIndicatorByPattern(lines: ParsedLine[], patterns: RegExp[]): number
       const key = prefixMatch?.[1] ?? "";
       // Ignora projeções de orçamento (bline_*) e ano anterior (pline_*).
       if (/^(bline|pline)_/i.test(key)) return false;
+      // Série mensal do ano corrente: só aceita o mês alvo (evita cair
+      // no primeiro mês não-zero, tipicamente janeiro).
+      const cm = /^cline_(\d{1,2})$/i.exec(key);
+      if (cm) {
+        if (!targetMonth) return false;
+        if (Number(cm[1]) !== targetMonth) return false;
+      }
       const label = l.line_label.replace(/^\s*\[[^\]]+\]\s*/, "");
       return p.test(label);
     });
@@ -258,7 +269,7 @@ export function useConsolidadoData(input: {
         // o valor real é zero — não substituir por projeção de orçamento.
         const incentiveFee = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
           ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
-          : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
+          : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS, input.month);
         const fundoReserva = findLineByPattern(lines, FUNDO_RESERVA_PATTERNS);
         // Prioriza a linha explícita da DRE; só cai para o valor salvo no
         // closing (que vem do lucro_liquido do estimador) quando a linha
@@ -311,6 +322,12 @@ export function useClosingFinanceMetrics(closingId: string | null) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!closingId) return null;
+      const { data: closingRow } = await supabase
+        .from("closings")
+        .select("month")
+        .eq("id", closingId)
+        .maybeSingle();
+      const closingMonth = (closingRow?.month as number | undefined) ?? undefined;
       const lines: ParsedLine[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -326,7 +343,7 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
       const taxaSucesso = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
         ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
-        : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS, closingMonth);
       return {
         uhsDisponiveis,
         taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
