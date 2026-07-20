@@ -1091,7 +1091,7 @@ function drawDreTable(
     { kind: "section", label: "RESULTADO" },
     { kind: "total", label: "Resultado Operacional Bruto (GOP)", rx: [/^resultado\s+operacional\s+bruto/i, /^gop$/i, /^lucro\s+operacional\s+bruto/i] },
     { kind: "total", label: "Lucro / Prejuízo a Distribuir no Período", rx: [/^lucro\s*\/?\s*preju[íi]zo\s+a\s+distribuir/i, /^lucro\s+a\s+distribuir(\s+do\s+per[íi]odo)?$/i, /^lucro\s+l[íi]quido\s*\/?\s*preju[íi]zo\s+do\s+exerc/i, /^lucro\s+l[íi]quido$/i, /^resultado\s+l[íi]quido(\s+do\s+exerc[íi]cio)?$/i] },
-    { kind: "highlight", label: "Distribuição por UH", rx: [/^por\s+uh$/i, /^distribui[çc][ãa]o\s+por\s+uh$/i, /^distribui[çc][ãa]o\s+\/\s*uh$/i, /^resultado\s+por\s+uh$/i] },
+    { kind: "highlight", label: "Distribuição por UH", rx: [/^por\s+uh$/i, /^distribui[çc][ãa]o\s+por\s+uh$/i, /^distribui[çc][ãa]o\s+\/\s*uh$/i, /^resultado\s+por\s+uh$/i, /^dividendo\s+efetivamente\s+distribu[íi]do/i, /^distribui[çc][ãa]o\s+linear/i] },
   ];
 
   const findValue = (rxs: RegExp[]): number | null => {
