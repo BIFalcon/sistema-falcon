@@ -108,7 +108,12 @@ export async function fetchLetterHistory(
       }
     }
   };
-  scrubOutliers(current);
+   // O bug de parser que essa limpeza protege (coluna "Acumulado/Total"
+  // sendo lida como se fosse de um mês) só acontece na aba "Ano Anterior"
+  // do template de DRE — por isso a limpeza roda só em `previous`.
+  // Aplicar isso no ano corrente também estava apagando meses legítimos
+  // com resultado bem acima da média (ex.: um mês forte de verdade batendo
+  // 4x a mediana), tratando bom desempenho como se fosse erro.
   scrubOutliers(previous);
 
   // ───── Ajustes específicos por hotel ─────
