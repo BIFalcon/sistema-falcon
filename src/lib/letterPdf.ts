@@ -759,11 +759,22 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // Hotéis sem ano anterior comparável (ex.: Arcoverde abriu em ago/2025) —
   // remove junho dos gráficos para não exibir uma coluna/ponto solitário sem
   // comparativo do ano anterior, preservando maio quando há dados.
-  const hotelNameLower = (hotel?.name ?? "").toLowerCase();
-  const arcoverdeChartMonthToHide = null; // ajuste temporário: não esconder mais o mês corrente do gráfico;
+ const hotelNameLower = (hotel?.name ?? "").toLowerCase();
+
+  // Meses a esconder do gráfico "Indicadores do mês", por hotel — usado
+  // quando o hotel não tem dado comparável em determinados meses (ex.:
+  // abriu depois da data, ou algum outro motivo pontual). Pra esconder
+  // mês(es) de outro hotel no futuro, é só adicionar uma linha nova aqui,
+  // sem precisar mexer no resto da lógica.
+  const HIDDEN_MONTHS_BY_HOTEL: { match: string; months: number[] }[] = [
+    { match: "caruaru", months: [1, 2] }, // Jan e Fev não aparecem no gráfico do Caruaru
+  ];
+  const monthsToHideForThisHotel =
+    HIDDEN_MONTHS_BY_HOTEL.find((r) => hotelNameLower.includes(r.match))?.months ?? [];
+
   const baseCurrent = history.current.slice(0, visibleMonths);
-  const baseCurrentFiltered = arcoverdeChartMonthToHide
-    ? baseCurrent.filter((d) => d.month !== arcoverdeChartMonthToHide)
+  const baseCurrentFiltered = monthsToHideForThisHotel.length
+    ? baseCurrent.filter((d) => !monthsToHideForThisHotel.includes(d.month))
     : baseCurrent;
   const trimmedCurrent = baseCurrentFiltered.map((d) => ({
     ...d,
@@ -772,8 +783,8 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     receita_bruta_total: d.month <= closing.month ? d.receita_bruta_total : null,
   }));
   const basePrevious = history.previous.slice(0, visibleMonths);
-  const trimmedPrevious = arcoverdeChartMonthToHide
-    ? basePrevious.filter((d) => d.month !== arcoverdeChartMonthToHide)
+  const trimmedPrevious = monthsToHideForThisHotel.length
+    ? basePrevious.filter((d) => !monthsToHideForThisHotel.includes(d.month))
     : basePrevious;
 
   // Linhas DRE para a tabela
