@@ -930,32 +930,69 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
     lineHeightFactor: 1.45,
     minFillRatio: 0.92,
   };
+  const pageY = HEADER_CONTENT_Y + 2;
+  const pageH = SIZE - (HEADER_CONTENT_Y + 2) - 10;
 
   if (totalChars <= SPLIT_THRESHOLD_CHARS || blocks.length <= 1) {
     // Comportamento de sempre: tudo numa página só.
-    drawDynamicTextBlock(doc, body, {
-      ...textBlockOpts,
-      y: HEADER_CONTENT_Y + 2,
-      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
-    });
+    drawDynamicTextBlock(doc, body, { ...textBlockOpts, y: pageY, height: pageH });
   } else {
-    // Divide os parágrafos em 2 metades (por quantidade de caracteres, não
-    // por quantidade de parágrafos, pra ficar mais equilibrado visualmente).
-    let acc = 0;
+    // Mede quanto espaço (mm) um conjunto de parágrafos ocupa, num tamanho
+    // de fonte específico — usa a mesma lógica de quebra de linha do
+    // drawDynamicTextBlock (doc.splitTextToSize), só que sem desenhar nada.
+    const measureBlocksHeight = (paras: string[], size: number, lhf: number): number => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(size);
+      const lineH = (size * lhf) / doc.internal.scaleFactor;
+      let total = 0;
+      for (let p = 0; p < paras.length; p++) {
+        const para = paras[p].replace(/\n/g, " ").trim();
+        if (!para) { total += lineH * 0.55; continue; }
+        const lines = doc.splitTextToSize(para, textBlockOpts.width) as string[];
+        total += lines.length * lineH;
+        if (p < paras.length - 1) total += lineH * 0.55;
+      }
+      return total + (size / doc.internal.scaleFactor) * 0.35;
+    };
+
+    // Acha o MAIOR tamanho de fonte em que o texto inteiro cabe somando as
+    // duas páginas — esse tamanho vale igual pras duas, garantindo
+    // consistência visual entre elas.
+    let splitSize = textBlockOpts.minSize;
+    for (let size = textBlockOpts.maxSize; size >= textBlockOpts.minSize; size -= 0.1) {
+      if (measureBlocksHeight(blocks, size, textBlockOpts.lineHeightFactor) <= pageH * 2) {
+        splitSize = size;
+        break;
+      }
+    }
+
+    // Acha em qual parágrafo cortar: o último que ainda cabe na página 1
+    // nesse tamanho de fonte já decidido.
     let splitIndex = blocks.length - 1;
     for (let i = 0; i < blocks.length; i++) {
-      acc += blocks[i].length;
-      if (acc >= totalChars / 2) { splitIndex = i; break; }
+      const h = measureBlocksHeight(blocks.slice(0, i + 1), splitSize, textBlockOpts.lineHeightFactor);
+      if (h > pageH) { splitIndex = Math.max(0, i - 1); break; }
+      splitIndex = i;
     }
+
     const firstHalf = blocks.slice(0, splitIndex + 1).join("\n\n");
     const secondHalf = blocks.slice(splitIndex + 1).join("\n\n");
 
+    // minSize = maxSize = splitSize força as DUAS páginas a usarem
+    // exatamente o mesmo tamanho de fonte, em vez de cada uma escolher
+    // sozinha tentando preencher a própria altura.
     drawDynamicTextBlock(doc, firstHalf, {
-      ...textBlockOpts,
-      y: HEADER_CONTENT_Y + 2,
-      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
+      ...textBlockOpts, y: pageY, height: pageH, minSize: splitSize, maxSize: splitSize,
     });
 
+    addPage(doc);
+    drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
+    drawPageHeader(doc, "Comentários do mês (continuação)", falconData, brandData);
+    doc.setTextColor(TEXT);
+    drawDynamicTextBlock(doc, secondHalf || "—", {
+      ...textBlockOpts, y: pageY, height: pageH, minSize: splitSize, maxSize: splitSize,
+    });
+  }
     addPage(doc);
     drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
     drawPageHeader(doc, "Comentários do mês (continuação)", falconData, brandData);
