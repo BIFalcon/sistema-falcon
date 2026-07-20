@@ -913,20 +913,59 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   push(letter.ai_financial);
   push(letter.ai_outlook);
   push(letter.ai_closing);
-  const body = blocks.join("\n\n") || "—";
-  drawDynamicTextBlock(doc, body, {
+ const body = blocks.join("\n\n") || "—";
+
+  // Cartas com texto muito longo ficavam com fonte minúscula pra caber tudo
+  // numa página só. Acima desse limite de caracteres, divide em 2 páginas
+  // em vez de espremer a fonte. Cartas normais (abaixo do limite) continuam
+  // exatamente como sempre foram — só 1 página, sem nenhuma mudança.
+  const SPLIT_THRESHOLD_CHARS = 2400;
+  const totalChars = blocks.reduce((n, b) => n + b.length, 0);
+
+  const textBlockOpts = {
     x: 16,
-    y: HEADER_CONTENT_Y + 2,
     width: SIZE - 32,
-    height: SIZE - (HEADER_CONTENT_Y + 2) - 10, // até ~10mm da base
-    // O tamanho da fonte NÃO é fixo: o algoritmo procura o maior tamanho que
-    // cabe na página, para que o texto sempre ocupe toda a área disponível.
-    // Só reduz a fonte quando o texto é grande demais e não caberia.
     minSize: 4.8,
     maxSize: 22,
     lineHeightFactor: 1.45,
     minFillRatio: 0.92,
-  });
+  };
+
+  if (totalChars <= SPLIT_THRESHOLD_CHARS || blocks.length <= 1) {
+    // Comportamento de sempre: tudo numa página só.
+    drawDynamicTextBlock(doc, body, {
+      ...textBlockOpts,
+      y: HEADER_CONTENT_Y + 2,
+      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
+    });
+  } else {
+    // Divide os parágrafos em 2 metades (por quantidade de caracteres, não
+    // por quantidade de parágrafos, pra ficar mais equilibrado visualmente).
+    let acc = 0;
+    let splitIndex = blocks.length - 1;
+    for (let i = 0; i < blocks.length; i++) {
+      acc += blocks[i].length;
+      if (acc >= totalChars / 2) { splitIndex = i; break; }
+    }
+    const firstHalf = blocks.slice(0, splitIndex + 1).join("\n\n");
+    const secondHalf = blocks.slice(splitIndex + 1).join("\n\n");
+
+    drawDynamicTextBlock(doc, firstHalf, {
+      ...textBlockOpts,
+      y: HEADER_CONTENT_Y + 2,
+      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
+    });
+
+    addPage(doc);
+    drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
+    drawPageHeader(doc, "Comentários do mês (continuação)", falconData, brandData);
+    doc.setTextColor(TEXT);
+    drawDynamicTextBlock(doc, secondHalf || "—", {
+      ...textBlockOpts,
+      y: HEADER_CONTENT_Y + 2,
+      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
+    });
+  }
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
