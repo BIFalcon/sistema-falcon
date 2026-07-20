@@ -1249,7 +1249,7 @@ function drawDynamicTextBlock(
     const firstBaseline = size / doc.internal.scaleFactor;
     let cursorOffset = firstBaseline;
     let linesCount = 0;
-    const lines: Array<{ text: string; y: number }> = [];
+    const lines: Array<{ text: string; y: number; isLast: boolean }> = [];
 
     for (let p = 0; p < paragraphs.length; p++) {
       const para = paragraphs[p].replace(/\n/g, " ").trim();
@@ -1258,8 +1258,12 @@ function drawDynamicTextBlock(
         continue;
       }
       const paraLines = doc.splitTextToSize(para, width) as string[];
-      for (const line of paraLines) {
-        lines.push({ text: line, y: y + cursorOffset });
+      for (let i = 0; i < paraLines.length; i++) {
+        lines.push({
+          text: paraLines[i],
+          y: y + cursorOffset,
+          isLast: i === paraLines.length - 1,
+        });
         cursorOffset += lineH;
         linesCount += 1;
       }
@@ -1276,14 +1280,23 @@ function drawDynamicTextBlock(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(size);
     for (const item of layout.lines) {
-      // Regra: justifica TODAS as linhas, EXCETO as que tiverem 5
-      // palavras ou menos. Artigos isolados de 1 letra não contam para
-      // evitar linhas curtas como "firmando a tendência..." muito abertas.
+      // Justificação estilo Word: NUNCA justifica a última linha do
+      // parágrafo (ficaria com espaços gigantes entre palavras curtas).
+      // Também evita justificar linhas cujo texto já ocupa quase toda a
+      // largura disponível — nesse caso o espaçamento nativo basta.
       const line = item.text;
-      const wordCount = line.trim().split(/\s+/).filter((word) => word.length > 1).length;
-      const shouldJustify = wordCount > 5;
-      if (shouldJustify) drawJustifiedTextLine(doc, line, x, item.y, width);
-      else doc.text(line, x, item.y);
+      if (item.isLast) {
+        doc.text(line, x, item.y);
+        continue;
+      }
+      const lineWidth = doc.getTextWidth(line);
+      // Só justifica se sobrar espaço significativo (>0.5mm), evitando
+      // "esticar" linhas que já estão praticamente cheias.
+      if (width - lineWidth > 0.5) {
+        drawJustifiedTextLine(doc, line, x, item.y, width);
+      } else {
+        doc.text(line, x, item.y);
+      }
     }
   };
 
