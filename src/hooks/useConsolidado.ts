@@ -322,6 +322,12 @@ export function useClosingFinanceMetrics(closingId: string | null) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!closingId) return null;
+      const { data: closingRow } = await supabase
+        .from("closings")
+        .select("month")
+        .eq("id", closingId)
+        .maybeSingle();
+      const closingMonth = (closingRow?.month as number | undefined) ?? undefined;
       const lines: ParsedLine[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -337,7 +343,7 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
       const taxaSucesso = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
         ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
-        : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS);
+        : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS, closingMonth);
       return {
         uhsDisponiveis,
         taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
