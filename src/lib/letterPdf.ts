@@ -993,16 +993,6 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
       ...textBlockOpts, y: pageY, height: pageH, minSize: splitSize, maxSize: splitSize,
     });
   }
-    addPage(doc);
-    drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
-    drawPageHeader(doc, "Comentários do mês (continuação)", falconData, brandData);
-    doc.setTextColor(TEXT);
-    drawDynamicTextBlock(doc, secondHalf || "—", {
-      ...textBlockOpts,
-      y: HEADER_CONTENT_Y + 2,
-      height: SIZE - (HEADER_CONTENT_Y + 2) - 10,
-    });
-  }
 
   /* ───── 5. DESTAQUES ───── */
   addPage(doc);
