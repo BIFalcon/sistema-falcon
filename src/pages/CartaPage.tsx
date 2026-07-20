@@ -211,6 +211,8 @@ export default function CartaPage() {
     isMaster ||
     hasRole("controladoria") ||
     hasRole("fernando") ||
+    // RI edita a Carta em qualquer estágio (inclusive aguardando_fernando)
+    hasRole("ri") ||
     // GG edita enquanto a carta ainda não foi aprovada pelo GOP
     (hasRole("gg") && (stage === "aguardando_gg" || stage === "aguardando_gop")) ||
     // GOP edita do início até a aprovação final do Fernando
