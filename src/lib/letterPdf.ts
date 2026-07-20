@@ -760,7 +760,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   // remove junho dos gráficos para não exibir uma coluna/ponto solitário sem
   // comparativo do ano anterior, preservando maio quando há dados.
   const hotelNameLower = (hotel?.name ?? "").toLowerCase();
-  const arcoverdeChartMonthToHide = closing.hotel_id === "ibis-arcoverde" || hotelNameLower.includes("arcoverde") ? 6 : null;
+  const arcoverdeChartMonthToHide = null; // ajuste temporário: não esconder mais o mês corrente do gráfico;
   const baseCurrent = history.current.slice(0, visibleMonths);
   const baseCurrentFiltered = arcoverdeChartMonthToHide
     ? baseCurrent.filter((d) => d.month !== arcoverdeChartMonthToHide)
