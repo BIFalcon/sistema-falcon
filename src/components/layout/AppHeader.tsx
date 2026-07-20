@@ -108,11 +108,27 @@ export function AppHeader() {
           Filtros
         </span>
 
-        {isGg ? (
+        {isGg && allowedHotels.length <= 1 ? (
           <div className="h-9 px-3 flex items-center gap-2 rounded-md border border-input bg-muted/50 text-sm font-medium min-w-[180px]">
             <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
           </div>
+        ) : isGg && allowedHotels.length > 1 ? (
+          <Select
+            value={hotelId ?? undefined}
+            onValueChange={(v) => setHotelId(v)}
+          >
+            <SelectTrigger className="w-[220px] h-9">
+              <SelectValue placeholder="Selecionar hotel" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              {allowedHotels.map((h) => (
+                <SelectItem key={h.id} value={h.id}>
+                  {h.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : isIndicadores ? (
           <Popover>
             <PopoverTrigger asChild>
