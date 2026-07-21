@@ -22,7 +22,7 @@ import { MONTHS_PT, formatBRL } from "@/lib/constants";
 import { Wallet, CheckCircle2, XCircle, Clock, AlertTriangle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { EstimatedLine } from "@/lib/dreEstimator";
-import { useClosingFinanceMetrics } from "@/hooks/useConsolidado";
+import { useClosingFinanceMetrics, useConsolidadoData } from "@/hooks/useConsolidado";
 
 function lucroFromLines(lines: unknown): { value: number | null; source: string } {
   if (!Array.isArray(lines)) return { value: null, source: "no_history" };
@@ -35,6 +35,19 @@ export default function FinanceiroPage() {
   const { user, allowedHotels, hasRole, isMaster, isFinanceiroCoordenadora, isFernando, isPatronos } = useAuth();
   const { data: rows = [], isLoading } = useFinanceiroQueue({ month, year, hotelId });
   const record = useRecordDistribution();
+  const hotelIdsInQueue = useMemo(() => rows.map((r) => r.hotel_id), [rows]);
+  const { data: consolidado = [] } = useConsolidadoData({
+    hotelIds: hotelIdsInQueue,
+    year,
+    month,
+  });
+  const distribByHotel = useMemo(() => {
+    const m = new Map<string, { total: number | null; perUh: number | null }>();
+    for (const c of consolidado) {
+      m.set(c.hotelId, { total: c.distribuicaoTotal, perUh: c.distribuicaoPorUh });
+    }
+    return m;
+  }, [consolidado]);
 
   const canDecide = !isFernando && (isMaster || isPatronos || hasRole("financeiro"));
   const [openRow, setOpenRow] = useState<FinanceiroRow | null>(null);
@@ -50,7 +63,12 @@ export default function FinanceiroPage() {
 
   function openDialog(row: FinanceiroRow) {
     setOpenRow(row);
-    const def = row.estimated_distribution ?? 0;
+    const consolidatedTotal = distribByHotel.get(row.hotel_id)?.total ?? null;
+    const def =
+      row.final_distribution ??
+      consolidatedTotal ??
+      row.estimated_distribution ??
+      0;
     setDecision(def > 0 ? "enviado" : "sem_distribuicao");
     setValueStr(def > 0 ? String(def) : "");
     setNotes(row.distribution_notes ?? "");
@@ -112,7 +130,9 @@ export default function FinanceiroPage() {
               {rows.map((row) => {
                 const hotel = hotelById.get(row.hotel_id);
                 const { value: lucro, source } = lucroFromLines(row.estimated_lines);
-                const distribution = row.final_distribution ?? row.estimated_distribution ?? 0;
+                const consolidatedTotal = distribByHotel.get(row.hotel_id)?.total ?? null;
+                const distribution =
+                  row.final_distribution ?? consolidatedTotal ?? row.estimated_distribution ?? 0;
                 const decisionLabel: Record<DistributionDecision, { label: string; tone: string; icon: React.ElementType }> = {
                   enviado: { label: "Enviado", tone: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },
                   sem_distribuicao: { label: "Sem Distribuição", tone: "bg-muted text-muted-foreground border-border", icon: XCircle },
@@ -226,11 +246,23 @@ export default function FinanceiroPage() {
               const finalValue =
                 decision === "enviado"
                   ? Number((valueStr || "0").replace(",", "."))
-                  : openRow?.final_distribution ?? openRow?.estimated_distribution ?? 0;
-              const distribPorUh =
-                metrics?.uhsDisponiveis && metrics.uhsDisponiveis > 0 && finalValue
-                  ? finalValue / metrics.uhsDisponiveis
-                  : null;
+                  : openRow?.final_distribution ??
+                    metrics?.distribuicaoTotal ??
+                    openRow?.estimated_distribution ??
+                    0;
+              // Se o usuário editou o valor, recalcula por UH proporcionalmente
+              // à razão do Consolidado; caso contrário, usa exatamente o mesmo
+              // valor por UH exibido no Consolidado de Resultados.
+              let distribPorUh: number | null = metrics?.distribuicaoPorUh ?? null;
+              if (
+                decision === "enviado" &&
+                metrics?.distribuicaoTotal &&
+                metrics.distribuicaoTotal !== 0 &&
+                distribPorUh != null &&
+                finalValue
+              ) {
+                distribPorUh = (distribPorUh * finalValue) / metrics.distribuicaoTotal;
+              }
               return (
                 <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/30 p-3">
                   <div>
