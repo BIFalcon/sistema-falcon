@@ -22,7 +22,7 @@ import { MONTHS_PT, formatBRL } from "@/lib/constants";
 import { Wallet, CheckCircle2, XCircle, Clock, AlertTriangle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { EstimatedLine } from "@/lib/dreEstimator";
-import { useClosingFinanceMetrics, useConsolidadoData } from "@/hooks/useConsolidado";
+import { useConsolidadoData } from "@/hooks/useConsolidado";
 
 function lucroFromLines(lines: unknown): { value: number | null; source: string } {
   if (!Array.isArray(lines)) return { value: null, source: "no_history" };
@@ -35,17 +35,19 @@ export default function FinanceiroPage() {
   const { user, allowedHotels, hasRole, isMaster, isFinanceiroCoordenadora, isFernando, isPatronos } = useAuth();
   const { data: rows = [], isLoading } = useFinanceiroQueue({ month, year, hotelId });
   const record = useRecordDistribution();
-  const hotelIdsInQueue = useMemo(() => rows.map((r) => r.hotel_id), [rows]);
-  const { data: consolidado = [] } = useConsolidadoData({
-    hotelIds: hotelIdsInQueue,
-    year,
-    month,
-  });
-  const distribByHotel = useMemo(() => {
-    const m = new Map<string, { total: number | null; perUh: number | null }>();
-    for (const c of consolidado) {
-      m.set(c.hotelId, { total: c.distribuicaoTotal, perUh: c.distribuicaoPorUh });
-    }
+  // Reuse the SAME query key as ConsolidadoPage (all allowed hotels) so the
+  // cache is shared and the numbers are guaranteed to match the Consolidado
+  // de Resultados. This is what makes the Financeiro tab load fast when the
+  // user has just been on the Consolidado page (and vice-versa).
+  const allowedHotelIds = useMemo(
+    () => allowedHotels.map((h) => h.id),
+    [allowedHotels],
+  );
+  const { data: consolidado = [], isLoading: isConsolidadoLoading } =
+    useConsolidadoData({ hotelIds: allowedHotelIds, year, month });
+  const consolidadoByHotel = useMemo(() => {
+    const m = new Map<string, (typeof consolidado)[number]>();
+    for (const c of consolidado) m.set(c.hotelId, c);
     return m;
   }, [consolidado]);
 
@@ -54,7 +56,7 @@ export default function FinanceiroPage() {
   const [decision, setDecision] = useState<DistributionDecision>("enviado");
   const [valueStr, setValueStr] = useState("");
   const [notes, setNotes] = useState("");
-  const { data: metrics } = useClosingFinanceMetrics(openRow?.id ?? null);
+  const openMetrics = openRow ? consolidadoByHotel.get(openRow.hotel_id) ?? null : null;
 
   const hotelById = useMemo(() => {
     const m = new Map(allowedHotels.map((h) => [h.id, h]));
@@ -63,7 +65,10 @@ export default function FinanceiroPage() {
 
   function openDialog(row: FinanceiroRow) {
     setOpenRow(row);
-    const consolidatedTotal = distribByHotel.get(row.hotel_id)?.total ?? null;
+    // Fonte única da verdade = Consolidado. Só cai para o estimado se o
+    // Consolidado ainda não tiver dados (ex.: DRE sem linhas parseadas).
+    const consolidatedTotal =
+      consolidadoByHotel.get(row.hotel_id)?.distribuicaoTotal ?? null;
     const def =
       row.final_distribution ??
       consolidatedTotal ??
@@ -130,9 +135,14 @@ export default function FinanceiroPage() {
               {rows.map((row) => {
                 const hotel = hotelById.get(row.hotel_id);
                 const { value: lucro, source } = lucroFromLines(row.estimated_lines);
-                const consolidatedTotal = distribByHotel.get(row.hotel_id)?.total ?? null;
+                const consolidatedRow = consolidadoByHotel.get(row.hotel_id) ?? null;
+                const consolidatedTotal = consolidatedRow?.distribuicaoTotal ?? null;
+                // Se o Financeiro já registrou o valor final, ele prevalece.
+                // Caso contrário, mostra exatamente o valor do Consolidado.
+                // Não usamos estimated_distribution aqui pra evitar divergência
+                // com o Consolidado (que foi o problema reportado em Arcoverde).
                 const distribution =
-                  row.final_distribution ?? consolidatedTotal ?? row.estimated_distribution ?? 0;
+                  row.final_distribution ?? consolidatedTotal ?? null;
                 const decisionLabel: Record<DistributionDecision, { label: string; tone: string; icon: React.ElementType }> = {
                   enviado: { label: "Enviado", tone: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },
                   sem_distribuicao: { label: "Sem Distribuição", tone: "bg-muted text-muted-foreground border-border", icon: XCircle },
@@ -162,8 +172,10 @@ export default function FinanceiroPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {distribution > 0 ? (
+                      {distribution != null && distribution !== 0 ? (
                         <span className="font-medium text-success">{formatBRL(distribution)}</span>
+                      ) : isConsolidadoLoading ? (
+                        <span className="text-xs text-muted-foreground italic">carregando…</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -247,21 +259,21 @@ export default function FinanceiroPage() {
                 decision === "enviado"
                   ? Number((valueStr || "0").replace(",", "."))
                   : openRow?.final_distribution ??
-                    metrics?.distribuicaoTotal ??
+                    openMetrics?.distribuicaoTotal ??
                     openRow?.estimated_distribution ??
                     0;
               // Se o usuário editou o valor, recalcula por UH proporcionalmente
               // à razão do Consolidado; caso contrário, usa exatamente o mesmo
               // valor por UH exibido no Consolidado de Resultados.
-              let distribPorUh: number | null = metrics?.distribuicaoPorUh ?? null;
+              let distribPorUh: number | null = openMetrics?.distribuicaoPorUh ?? null;
               if (
                 decision === "enviado" &&
-                metrics?.distribuicaoTotal &&
-                metrics.distribuicaoTotal !== 0 &&
+                openMetrics?.distribuicaoTotal &&
+                openMetrics.distribuicaoTotal !== 0 &&
                 distribPorUh != null &&
                 finalValue
               ) {
-                distribPorUh = (distribPorUh * finalValue) / metrics.distribuicaoTotal;
+                distribPorUh = (distribPorUh * finalValue) / openMetrics.distribuicaoTotal;
               }
               return (
                 <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/30 p-3">
@@ -278,7 +290,7 @@ export default function FinanceiroPage() {
                       Taxa Fee (Falcon s/ Receita)
                     </p>
                     <p className="text-sm font-semibold">
-                      {metrics?.taxaFee != null ? formatBRL(metrics.taxaFee) : "—"}
+                      {openMetrics?.taxaFee != null ? formatBRL(openMetrics.taxaFee) : "—"}
                     </p>
                   </div>
                   <div>
@@ -286,7 +298,7 @@ export default function FinanceiroPage() {
                       Taxa de Sucesso
                     </p>
                     <p className="text-sm font-semibold">
-                      {metrics?.taxaSucesso != null ? formatBRL(metrics.taxaSucesso) : "—"}
+                      {openMetrics?.incentiveFee != null ? formatBRL(openMetrics.incentiveFee) : "—"}
                     </p>
                   </div>
                 </div>
