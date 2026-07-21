@@ -324,10 +324,11 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       if (!closingId) return null;
       const { data: closingRow } = await supabase
         .from("closings")
-        .select("month")
+        .select("month, hotel_id, final_distribution, estimated_distribution")
         .eq("id", closingId)
         .maybeSingle();
       const closingMonth = (closingRow?.month as number | undefined) ?? undefined;
+      const hotelId = (closingRow?.hotel_id as string | undefined) ?? undefined;
       const lines: ParsedLine[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -344,10 +345,39 @@ export function useClosingFinanceMetrics(closingId: string | null) {
       const taxaSucesso = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
         ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
         : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS, closingMonth);
+      const patterns =
+        (hotelId && LUCRO_A_DISTRIBUIR_PATTERNS_BY_HOTEL[hotelId]) ||
+        LUCRO_A_DISTRIBUIR_PATTERNS;
+      const lucroADistribuir = findLineByPattern(lines, patterns);
+      const distribuicaoTotal =
+        lucroADistribuir != null
+          ? lucroADistribuir
+          : (closingRow?.final_distribution as number | null | undefined) ??
+            (closingRow?.estimated_distribution as number | null | undefined) ??
+            null;
+      let distribuicaoPorUh: number | null = null;
+      if (hotelId && !NO_DISTRIB_UH_HOTELS.has(hotelId)) {
+        const fromDre = findLineByPattern(lines, DISTRIBUICAO_POR_UH_PATTERNS);
+        if (fromDre != null) {
+          distribuicaoPorUh = Math.abs(fromDre);
+        } else {
+          const { data: hotelRow } = await supabase
+            .from("hotels")
+            .select("num_apartments")
+            .eq("id", hotelId)
+            .maybeSingle();
+          const numApartments = (hotelRow?.num_apartments as number | null | undefined) ?? null;
+          if (distribuicaoTotal != null && numApartments && numApartments > 0) {
+            distribuicaoPorUh = distribuicaoTotal / numApartments;
+          }
+        }
+      }
       return {
         uhsDisponiveis,
         taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
         taxaSucesso: taxaSucesso != null ? Math.abs(taxaSucesso) : null,
+        distribuicaoTotal,
+        distribuicaoPorUh,
       };
     },
   });
