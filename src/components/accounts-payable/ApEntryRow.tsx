@@ -18,6 +18,7 @@ import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, u
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
+import { BrDateInput } from "@/components/ui/br-date-input";
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -767,7 +768,7 @@ function EditManualEntryButton({ entry }: { entry: ApEntry }) {
             </div>
             <div className="space-y-1">
               <Label>Vencimento</Label>
-              <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+              <BrDateInput value={form.dueDate} onChange={(v) => setForm({ ...form, dueDate: v })} />
             </div>
             <div className="space-y-1">
               <Label>Valor *</Label>
