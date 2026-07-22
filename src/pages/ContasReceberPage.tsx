@@ -463,6 +463,19 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
+        ) : clientSearch.trim() ? (
+          <DayBreakdown
+            entries={finalEntries
+              .slice()
+              .sort((a, b) =>
+                (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""),
+              )}
+            day={null}
+            flat
+            contracts={contracts}
+            onBack={() => setClientSearch("")}
+            daysSinceUpload={daysSinceUpload}
+          />
         ) : drillDay ? (
           <DayBreakdown
             entries={finalEntries.filter((e) => e.transaction_date === drillDay)}
