@@ -102,6 +102,7 @@ import { EmptyHotelState } from "@/components/ui/EmptyHotelState";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 import { useMemo } from "react";
+import { BrDateInput } from "@/components/ui/br-date-input";
 
 export default function ContasPagarPage() {
   const {
@@ -1026,11 +1027,11 @@ export default function ContasPagarPage() {
               </div>
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">De</label>
-                <Input type="date" value={cardFrom} onChange={(e) => setCardFrom(e.target.value)} disabled={!canManage} />
+                <BrDateInput value={cardFrom} onChange={setCardFrom} disabled={!canManage} />
               </div>
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Até</label>
-                <Input type="date" value={cardTo} onChange={(e) => setCardTo(e.target.value)} disabled={!canManage} />
+                <BrDateInput value={cardTo} onChange={setCardTo} disabled={!canManage} />
               </div>
               <Button
                 size="sm"
@@ -1067,8 +1068,8 @@ export default function ContasPagarPage() {
                       return (
                         <div key={c.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center border rounded-md px-3 py-2">
                           <Input type="number" step="0.01" value={editCardAmount} onChange={(e) => setEditCardAmount(e.target.value)} className="h-8" />
-                          <Input type="date" value={editCardFrom} onChange={(e) => setEditCardFrom(e.target.value)} className="h-8" />
-                          <Input type="date" value={editCardTo} onChange={(e) => setEditCardTo(e.target.value)} className="h-8" />
+                          <BrDateInput value={editCardFrom} onChange={setEditCardFrom} className="h-8" />
+                          <BrDateInput value={editCardTo} onChange={setEditCardTo} className="h-8" />
                           <div className="flex gap-1 justify-end">
                             <Button size="sm" className="h-8" onClick={saveEditCard} disabled={updateCard.isPending}>Salvar</Button>
                             <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingCardId(null)}>Cancelar</Button>
@@ -1493,23 +1494,19 @@ export default function ContasPagarPage() {
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Data de pagamento (de)
                   </label>
-                  <Input
-                    type="date"
-                    value={paidDateFrom}
-                    onChange={(e) => setPaidDateFrom(e.target.value)}
-                    className="h-9 w-[160px]"
-                  />
+                  <BrDateInput value={paidDateFrom}
+ onChange={setPaidDateFrom}
+ className="h-9 w-[160px]"
+ />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Data de pagamento (até)
                   </label>
-                  <Input
-                    type="date"
-                    value={paidDateTo}
-                    onChange={(e) => setPaidDateTo(e.target.value)}
-                    className="h-9 w-[160px]"
-                  />
+                  <BrDateInput value={paidDateTo}
+ onChange={setPaidDateTo}
+ className="h-9 w-[160px]"
+ />
                 </div>
                 {(paidDateFrom || paidDateTo) && (
                   <Button
@@ -1656,19 +1653,15 @@ export default function ContasPagarPage() {
             <div className="flex flex-wrap items-center gap-4 text-xs">
               <label className="flex items-center gap-2">
                 <span className="text-muted-foreground">Agendado de</span>
-                <Input
-                  type="date"
-                  className="h-7 w-[140px] text-xs"
-                  value={scheduledFrom}
-                  onChange={(e) => setScheduledFrom(e.target.value)}
-                />
+                <BrDateInput className="h-7 w-[140px] text-xs"
+ value={scheduledFrom}
+ onChange={setScheduledFrom}
+ />
                 <span className="text-muted-foreground">até</span>
-                <Input
-                  type="date"
-                  className="h-7 w-[140px] text-xs"
-                  value={scheduledTo}
-                  onChange={(e) => setScheduledTo(e.target.value)}
-                />
+                <BrDateInput className="h-7 w-[140px] text-xs"
+ value={scheduledTo}
+ onChange={setScheduledTo}
+ />
                 {(scheduledFrom || scheduledTo) && (
                   <Button
                     variant="ghost"
@@ -2398,11 +2391,9 @@ export default function ContasPagarPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
                 Data de agendamento
               </label>
-              <Input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-              />
+              <BrDateInput value={scheduledDate}
+ onChange={setScheduledDate}
+ />
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
@@ -2507,11 +2498,9 @@ export default function ContasPagarPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
                 Data de pagamento
               </label>
-              <Input
-                type="date"
-                value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
-              />
+              <BrDateInput value={paidDate}
+ onChange={setPaidDate}
+ />
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
@@ -2604,11 +2593,9 @@ export default function ContasPagarPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
                 Data de pagamento
               </label>
-              <Input
-                type="date"
-                value={removedPaidDate}
-                onChange={(e) => setRemovedPaidDate(e.target.value)}
-              />
+              <BrDateInput value={removedPaidDate}
+ onChange={setRemovedPaidDate}
+ />
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
@@ -2787,11 +2774,9 @@ export default function ContasPagarPage() {
               </div>
               <div>
                 <Label className="text-xs">Vencimento</Label>
-                <Input
-                  type="date"
-                  value={manualForm.dueDate}
-                  onChange={(e) => setManualForm({ ...manualForm, dueDate: e.target.value })}
-                />
+                <BrDateInput value={manualForm.dueDate}
+ onChange={(v) => setManualForm({ ...manualForm, dueDate: v })}
+ />
               </div>
               <div>
                 <Label className="text-xs">Valor</Label>
@@ -2899,11 +2884,9 @@ export default function ContasPagarPage() {
               </div>
               <div>
                 <Label className="text-xs">Data de vencimento</Label>
-                <Input
-                  type="date"
-                  value={transferForm.dueDate}
-                  onChange={(e) => setTransferForm({ ...transferForm, dueDate: e.target.value })}
-                />
+                <BrDateInput value={transferForm.dueDate}
+ onChange={(v) => setTransferForm({ ...transferForm, dueDate: v })}
+ />
               </div>
               <div className="md:col-span-2">
                 <Label className="text-xs">Observação</Label>

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
@@ -462,6 +463,19 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
+        ) : clientSearch.trim() ? (
+          <DayBreakdown
+            entries={finalEntries
+              .slice()
+              .sort((a, b) =>
+                (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""),
+              )}
+            day={null}
+            flat
+            contracts={contracts}
+            onBack={() => setClientSearch("")}
+            daysSinceUpload={daysSinceUpload}
+          />
         ) : drillDay ? (
           <DayBreakdown
             entries={finalEntries.filter((e) => e.transaction_date === drillDay)}
@@ -608,12 +622,14 @@ function DayBreakdown({
   contracts,
   onBack,
   daysSinceUpload,
+  flat = false,
 }: {
   entries: ToInvoiceEntry[];
-  day: string;
+  day: string | null;
   contracts: ClientContract[] | undefined;
   onBack: () => void;
   daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
+  flat?: boolean;
 }) {
   const { isMaster, hasRole } = useAuth();
   const canConfirm =
@@ -673,17 +689,40 @@ function DayBreakdown({
   const toggleAll = () => {
     setSelectedIds(allSelected ? new Set() : new Set(entries.map((e) => e.id)));
   };
+  const selectedSum = useMemo(
+    () =>
+      entries
+        .filter((e) => selectedIds.has(e.id))
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0),
+    [entries, selectedIds],
+  );
+  const monthGroups = useMemo(() => {
+    if (!flat) return null;
+    const map = new Map<string, ToInvoiceEntry[]>();
+    for (const e of entries) {
+      const ym = e.transaction_date ? ymKey(e.transaction_date) : "sem-data";
+      const arr = map.get(ym) ?? [];
+      arr.push(e);
+      map.set(ym, arr);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [flat, entries]);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+          <ArrowLeft className="h-4 w-4" /> {flat ? "Limpar busca" : "Voltar"}
         </Button>
-        <h3 className="text-sm font-semibold">Lançamentos de {formatDay(day)}</h3>
+        <h3 className="text-sm font-semibold">
+          {flat
+            ? `Resultados da busca · ${entries.length} lançamento(s)`
+            : `Lançamentos de ${formatDay(day ?? "")}`}
+        </h3>
         {canShowActions && selectedIds.size > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              {selectedIds.size} selecionado(s)
+              {selectedIds.size} selecionado(s) ·{" "}
+              <strong className="text-foreground">{fmtBRL(selectedSum)}</strong>
             </span>
             <Button size="sm" onClick={() => setBulkPayOpen(true)}>
               Marcar como pago
@@ -694,33 +733,60 @@ function DayBreakdown({
           </div>
         )}
       </div>
-      <div className="rounded-lg border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {canShowActions && (
-                <TableHead className="w-8">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleAll}
-                    aria-label="Selecionar todos"
-                  />
-                </TableHead>
-              )}
-              <TableHead>Cliente</TableHead>
-              <TableHead>Invoice</TableHead>
-              <TableHead>Reserva</TableHead>
-              <TableHead>Nº Nota</TableHead>
-              <TableHead>Nº Boleto</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="text-right">Prazo</TableHead>
-              <TableHead>Vencimento estimado</TableHead>
-              <TableHead className="text-right">Dias pendente</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.map((e) => {
+      {(flat ? monthGroups ?? [] : [["_all", entries] as [string, ToInvoiceEntry[]]]).map(
+        ([groupKey, groupEntries]) => (
+        <div key={groupKey} className="space-y-1">
+          {flat && (
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground capitalize px-1">
+              {groupKey === "sem-data" ? "Sem data" : formatYM(groupKey)}
+              <span className="ml-2 text-muted-foreground/70 normal-case tracking-normal">
+                · {groupEntries.length} lançamento(s) ·{" "}
+                {fmtBRL(groupEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0))}
+              </span>
+            </div>
+          )}
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canShowActions && (
+                    <TableHead className="w-8">
+                      <Checkbox
+                        checked={
+                          groupEntries.length > 0 &&
+                          groupEntries.every((e) => selectedIds.has(e.id))
+                        }
+                        onCheckedChange={() => {
+                          const allInGroup = groupEntries.every((e) => selectedIds.has(e.id));
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (allInGroup) {
+                              for (const e of groupEntries) next.delete(e.id);
+                            } else {
+                              for (const e of groupEntries) next.add(e.id);
+                            }
+                            return next;
+                          });
+                        }}
+                        aria-label="Selecionar todos"
+                      />
+                    </TableHead>
+                  )}
+                  {flat && <TableHead className="w-24">Dia</TableHead>}
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Reserva</TableHead>
+                  <TableHead>Nº Nota</TableHead>
+                  <TableHead>Nº Boleto</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-right">Prazo</TableHead>
+                  <TableHead>Vencimento estimado</TableHead>
+                  <TableHead className="text-right">Dias pendente</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupEntries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
               const dueFromConfirm = term != null && e.gg_confirmed_at
                 ? addDays(e.gg_confirmed_at.slice(0, 10), term)
@@ -754,6 +820,11 @@ function DayBreakdown({
                         onCheckedChange={() => toggleSelected(e.id)}
                         aria-label="Selecionar lançamento"
                       />
+                    </TableCell>
+                  )}
+                  {flat && (
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {e.transaction_date ? formatDay(e.transaction_date) : "—"}
                     </TableCell>
                   )}
                   <TableCell>
@@ -938,9 +1009,12 @@ function DayBreakdown({
                 </TableRow>
               );
             })}
-          </TableBody>
-        </Table>
-      </div>
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+        ),
+      )}
       <PaymentDialog
         entry={payFor}
         onClose={() => setPayFor(null)}
@@ -1290,11 +1364,10 @@ function PaymentDialog({
           {paidChoice === "yes" && (
             <div>
               <Label className="text-xs">Data do pagamento</Label>
-              <input
-                type="date"
+              <BrDateInput
                 value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                onChange={setPaidDate}
+                className="mt-1"
               />
             </div>
           )}
@@ -1362,12 +1435,7 @@ function BulkPaidDialog({
         </DialogHeader>
         <div className="space-y-2">
           <Label className="text-xs">Data do pagamento</Label>
-          <input
-            type="date"
-            value={paidDate}
-            onChange={(e) => setPaidDate(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          />
+          <BrDateInput value={paidDate} onChange={setPaidDate} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
@@ -2238,11 +2306,10 @@ function NoteDialog({
           />
           <div>
             <Label className="text-xs">Data prevista de fechamento (opcional)</Label>
-            <input
-              type="date"
+            <BrDateInput
               value={expectedDate}
-              onChange={(e) => setExpectedDate(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              onChange={setExpectedDate}
+              className="mt-1"
             />
           </div>
         </div>

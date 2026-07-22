@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { DateRange } from "react-day-picker";
+import { BrDateInput } from "@/components/ui/br-date-input";
 
 export type DateFilterMode = "range" | "specific";
 
@@ -113,21 +114,17 @@ export function DateFilterPicker({
             <div className="flex items-center gap-2 text-xs">
               <label className="flex items-center gap-1">
                 <span className="text-muted-foreground">De</span>
-                <Input
-                  type="date"
-                  className="h-8 w-[150px] text-xs"
-                  value={dateFrom}
-                  onChange={(e) => onChangeRange(e.target.value, dateTo || e.target.value)}
-                />
+                <BrDateInput className="h-8 w-[150px] text-xs"
+ value={dateFrom}
+ onChange={(v) => onChangeRange(v, dateTo || v)}
+ />
               </label>
               <label className="flex items-center gap-1">
                 <span className="text-muted-foreground">até</span>
-                <Input
-                  type="date"
-                  className="h-8 w-[150px] text-xs"
-                  value={dateTo}
-                  onChange={(e) => onChangeRange(dateFrom || e.target.value, e.target.value)}
-                />
+                <BrDateInput className="h-8 w-[150px] text-xs"
+ value={dateTo}
+ onChange={(v) => onChangeRange(dateFrom || v, v)}
+ />
               </label>
             </div>
           )}

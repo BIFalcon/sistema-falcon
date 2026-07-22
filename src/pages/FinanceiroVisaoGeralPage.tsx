@@ -25,6 +25,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { fmtBRL } from "@/lib/formatters";
+import { BrDateInput } from "@/components/ui/br-date-input";
 
 export default function FinanceiroVisaoGeralPage() {
   const navigate = useNavigate();
@@ -316,20 +317,16 @@ export default function FinanceiroVisaoGeralPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <Input
-                type="date"
-                placeholder="De"
-                value={anticDateFrom}
-                onChange={(e) => setAnticDateFrom(e.target.value)}
-                className="w-36 h-8 text-xs"
-              />
-              <Input
-                type="date"
-                placeholder="Até"
-                value={anticDateTo}
-                onChange={(e) => setAnticDateTo(e.target.value)}
-                className="w-36 h-8 text-xs"
-              />
+              <BrDateInput placeholder="De"
+ value={anticDateFrom}
+ onChange={setAnticDateFrom}
+ className="w-36 h-8 text-xs"
+ />
+              <BrDateInput placeholder="Até"
+ value={anticDateTo}
+ onChange={setAnticDateTo}
+ className="w-36 h-8 text-xs"
+ />
             </div>
           </div>
           <AnticipationSection
@@ -527,14 +524,11 @@ function AnticipationSection({
                   <label className="text-[10px] uppercase text-muted-foreground">
                     Data da antecipação
                   </label>
-                  <Input
-                    type="date"
-                    value={form.data_antecipacao}
-                    onChange={(e) =>
-                      setForm({ ...form, data_antecipacao: e.target.value })
-                    }
-                    className="h-8"
-                  />
+                  <BrDateInput value={form.data_antecipacao}
+ onChange={(v) => setForm({ ...form, data_antecipacao: v })
+ }
+ className="h-8"
+ />
                 </div>
               </div>
               <div className="flex gap-2">
