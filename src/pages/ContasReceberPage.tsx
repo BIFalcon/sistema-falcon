@@ -1291,11 +1291,10 @@ function PaymentDialog({
           {paidChoice === "yes" && (
             <div>
               <Label className="text-xs">Data do pagamento</Label>
-              <input
-                type="date"
+              <BrDateInput
                 value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                onChange={setPaidDate}
+                className="mt-1"
               />
             </div>
           )}
@@ -1363,12 +1362,7 @@ function BulkPaidDialog({
         </DialogHeader>
         <div className="space-y-2">
           <Label className="text-xs">Data do pagamento</Label>
-          <input
-            type="date"
-            value={paidDate}
-            onChange={(e) => setPaidDate(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          />
+          <BrDateInput value={paidDate} onChange={setPaidDate} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
@@ -2239,11 +2233,10 @@ function NoteDialog({
           />
           <div>
             <Label className="text-xs">Data prevista de fechamento (opcional)</Label>
-            <input
-              type="date"
+            <BrDateInput
               value={expectedDate}
-              onChange={(e) => setExpectedDate(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              onChange={setExpectedDate}
+              className="mt-1"
             />
           </div>
         </div>
