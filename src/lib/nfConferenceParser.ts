@@ -102,7 +102,22 @@ export function parseOperaReservations(file: File): Promise<OperaReservation[]> 
           raw: true,
         });
 
-        const header = (rows[0] ?? []).map((c) => String(c ?? "").toLowerCase().trim());
+        // O relatório do Oracle às vezes traz linhas de título antes do
+        // cabeçalho real (ex.: "Conferência de Notas Fiscais" na linha 1).
+        // Detecta a primeira linha que contém "confirmation" + "property"
+        // ou "fiscal bill".
+        const headerIdx = rows.findIndex((r) => {
+          const cells = (r ?? []).map((c) => String(c ?? "").toLowerCase());
+          const joined = cells.join("|");
+          return (
+            joined.includes("confirmation") &&
+            (joined.includes("property") || joined.includes("fiscal"))
+          );
+        });
+        const headerRowIndex = headerIdx >= 0 ? headerIdx : 0;
+        const header = (rows[headerRowIndex] ?? []).map((c) =>
+          String(c ?? "").toLowerCase().trim(),
+        );
         const col = (...names: string[]) => {
           for (const n of names) {
             const idx = header.findIndex((h) => h === n);
@@ -126,7 +141,7 @@ export function parseOperaReservations(file: File): Promise<OperaReservation[]> 
 
         const byConf = new Map<string, OperaReservation>();
 
-        for (const row of rows.slice(1)) {
+        for (const row of rows.slice(headerRowIndex + 1)) {
           const conf = String(row[iConf] ?? "").trim();
           if (!conf) continue;
 
