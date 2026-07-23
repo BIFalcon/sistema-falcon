@@ -1091,13 +1091,20 @@ function DayBreakdown({
         onClose={() => setSendDocsFor(null)}
         onConfirm={async (notaPath, boletoPath, proof) => {
           if (!sendDocsFor) return;
+          const hasAnyDoc = !!(notaPath || boletoPath || proof);
+          const shouldBill = hasAnyDoc && sendDocsFor.gg_status !== "faturado";
+          const term = findContractTerm(contracts, sendDocsFor.account_number, sendDocsFor.account_name);
+          const estimated = shouldBill && term != null
+            ? addDays(new Date().toISOString().slice(0, 10), term)
+            : sendDocsFor.estimated_due_date ?? null;
           await setStatus.mutateAsync({
             id: sendDocsFor.id,
-            gg_status: "documentos_enviados",
+            gg_status: hasAnyDoc ? "faturado" : sendDocsFor.gg_status,
             gg_note: sendDocsFor.gg_note,
             invoice_file_1: notaPath,
             invoice_file_2: boletoPath,
             proof_file: proof,
+            ...(shouldBill ? { billed_at: new Date().toISOString(), estimated_due_date: estimated } : {}),
           });
           if (notaPath || boletoPath) {
             supabase.functions
@@ -1114,7 +1121,7 @@ function DayBreakdown({
               });
           }
           setSendDocsFor(null);
-          toast.success("Documentos enviados ao Financeiro");
+          toast.success(shouldBill ? "Documentos enviados — marcado como faturado" : "Documentos atualizados");
         }}
       />
       <BulkPaidDialog
