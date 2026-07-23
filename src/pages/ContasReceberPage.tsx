@@ -270,7 +270,6 @@ function ToInvoiceSection({
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<"todos" | "pendente" | "faturado" | "pago">("todos");
   const [clientSearch, setClientSearch] = useState("");
 
