@@ -889,16 +889,6 @@ function DayBreakdown({
                     )}
                     {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
-                        {canConfirm && (
-                        <Button
-                          size="sm"
-                          variant={e.gg_status === "faturado" ? "default" : "outline"}
-                          className="h-6 px-2 text-[11px]"
-                          onClick={() => setInvoiceFor({ entry: e, term })}
-                        >
-                          Faturado
-                        </Button>
-                        )}
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
@@ -937,12 +927,12 @@ function DayBreakdown({
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && e.gg_status === "pendente" && (
+                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && e.gg_status !== "inadimplente" && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-6 px-2 text-[11px]"
-                            onClick={() => setSendDocsFor(e)}
+                            onClick={() => setSendDocsFor({ entry: e, term })}
                           >
                             Enviar docs
                           </Button>
