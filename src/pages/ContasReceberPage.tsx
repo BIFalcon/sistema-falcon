@@ -270,7 +270,6 @@ function ToInvoiceSection({
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<"todos" | "pendente" | "faturado" | "pago">("todos");
   const [clientSearch, setClientSearch] = useState("");
 
@@ -344,18 +343,7 @@ function ToInvoiceSection({
     return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
   }, [entries, seesAllHotels, restrictedHotelIds]);
 
-  const pendingCount = useMemo(
-    () => visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date).length,
-    [visibleEntries],
-  );
-
-  const filteredToInvoice = useMemo(
-    () =>
-      showOnlyPending
-        ? visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date)
-        : visibleEntries,
-    [visibleEntries, showOnlyPending],
-  );
+  const filteredToInvoice = visibleEntries;
 
   const finalEntries = useMemo(() => {
     let arr = filteredToInvoice;
@@ -429,16 +417,6 @@ function ToInvoiceSection({
                 <SelectItem value="pago">Pagos</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant={showOnlyPending ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowOnlyPending(!showOnlyPending)}
-            >
-              {showOnlyPending ? "Ver todos" : "Ver apenas pendentes"}
-              {!showOnlyPending && pendingCount > 0 && (
-                <Badge className="ml-2">{pendingCount}</Badge>
-              )}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -911,16 +889,6 @@ function DayBreakdown({
                     )}
                     {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
-                        {canConfirm && (
-                        <Button
-                          size="sm"
-                          variant={e.gg_status === "faturado" ? "default" : "outline"}
-                          className="h-6 px-2 text-[11px]"
-                          onClick={() => setInvoiceFor({ entry: e, term })}
-                        >
-                          Faturado
-                        </Button>
-                        )}
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
@@ -959,7 +927,7 @@ function DayBreakdown({
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && e.gg_status === "pendente" && (
+                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && e.gg_status !== "inadimplente" && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1123,13 +1091,20 @@ function DayBreakdown({
         onClose={() => setSendDocsFor(null)}
         onConfirm={async (notaPath, boletoPath, proof) => {
           if (!sendDocsFor) return;
+          const hasAnyDoc = !!(notaPath || boletoPath || proof);
+          const shouldBill = hasAnyDoc && sendDocsFor.gg_status !== "faturado";
+          const term = findContractTerm(contracts, sendDocsFor.account_number, sendDocsFor.account_name);
+          const estimated = shouldBill && term != null
+            ? addDays(new Date().toISOString().slice(0, 10), term)
+            : sendDocsFor.estimated_due_date ?? null;
           await setStatus.mutateAsync({
             id: sendDocsFor.id,
-            gg_status: "documentos_enviados",
+            gg_status: hasAnyDoc ? "faturado" : sendDocsFor.gg_status,
             gg_note: sendDocsFor.gg_note,
             invoice_file_1: notaPath,
             invoice_file_2: boletoPath,
             proof_file: proof,
+            ...(shouldBill ? { billed_at: new Date().toISOString(), estimated_due_date: estimated } : {}),
           });
           if (notaPath || boletoPath) {
             supabase.functions
@@ -1146,7 +1121,7 @@ function DayBreakdown({
               });
           }
           setSendDocsFor(null);
-          toast.success("Documentos enviados ao Financeiro");
+          toast.success(shouldBill ? "Documentos enviados — marcado como faturado" : "Documentos atualizados");
         }}
       />
       <BulkPaidDialog
