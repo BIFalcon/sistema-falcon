@@ -18,12 +18,12 @@ import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, u
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
-import { BrDateInput } from "@/components/ui/br-date-input";
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { BrDateInput } from "@/components/ui/br-date-input";
 
 interface EntryRowProps {
   entry: ApEntry;
