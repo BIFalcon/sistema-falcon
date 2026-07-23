@@ -203,7 +203,21 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
           raw: true,
         });
 
-        const header = (rows[0] ?? []).map((c) => String(c ?? "").toLowerCase().trim());
+        const headerIdx = rows.findIndex((r) => {
+          const joined = (r ?? [])
+            .map((c) => String(c ?? "").toLowerCase())
+            .join("|");
+          return (
+            joined.includes("nfs-e") ||
+            joined.includes("valor do servi") ||
+            joined.includes("descrição do servi") ||
+            joined.includes("descricao do servi")
+          );
+        });
+        const headerRowIndex = headerIdx >= 0 ? headerIdx : 0;
+        const header = (rows[headerRowIndex] ?? []).map((c) =>
+          String(c ?? "").toLowerCase().trim(),
+        );
         const col = (...names: string[]) => {
           for (const n of names) {
             const idx = header.findIndex((h) => h === n);
@@ -226,7 +240,7 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
         const iRps = col("rps nº", "rps n", "rps");
 
         const notas: PrefeituraNota[] = [];
-        for (const row of rows.slice(1)) {
+        for (const row of rows.slice(headerRowIndex + 1)) {
           const numero = String(row[iNumero] ?? "").trim();
           if (!numero) continue;
 
