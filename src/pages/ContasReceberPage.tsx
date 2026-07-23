@@ -932,7 +932,7 @@ function DayBreakdown({
                             size="sm"
                             variant="outline"
                             className="h-6 px-2 text-[11px]"
-                            onClick={() => setSendDocsFor({ entry: e, term })}
+                            onClick={() => setSendDocsFor(e)}
                           >
                             Enviar docs
                           </Button>
