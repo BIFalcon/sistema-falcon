@@ -343,18 +343,7 @@ function ToInvoiceSection({
     return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
   }, [entries, seesAllHotels, restrictedHotelIds]);
 
-  const pendingCount = useMemo(
-    () => visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date).length,
-    [visibleEntries],
-  );
-
-  const filteredToInvoice = useMemo(
-    () =>
-      showOnlyPending
-        ? visibleEntries.filter((e) => e.gg_status !== "faturado" && !e.paid_date)
-        : visibleEntries,
-    [visibleEntries, showOnlyPending],
-  );
+  const filteredToInvoice = visibleEntries;
 
   const finalEntries = useMemo(() => {
     let arr = filteredToInvoice;
@@ -428,16 +417,6 @@ function ToInvoiceSection({
                 <SelectItem value="pago">Pagos</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant={showOnlyPending ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowOnlyPending(!showOnlyPending)}
-            >
-              {showOnlyPending ? "Ver todos" : "Ver apenas pendentes"}
-              {!showOnlyPending && pendingCount > 0 && (
-                <Badge className="ml-2">{pendingCount}</Badge>
-              )}
-            </Button>
             <Button
               variant="outline"
               size="sm"
