@@ -1024,6 +1024,21 @@ function DayBreakdown({
           toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
         }}
       />
+      <EditDocDataDialog
+        entry={editDocFor}
+        onClose={() => setEditDocFor(null)}
+        onSave={async (data) => {
+          if (!editDocFor) return;
+          await setStatus.mutateAsync({
+            id: editDocFor.id,
+            gg_status: editDocFor.gg_status,
+            gg_note: editDocFor.gg_note,
+            ...data,
+          });
+          setEditDocFor(null);
+          toast.success("Dados atualizados");
+        }}
+      />
       <InvoiceUploadDialog
         entry={invoiceFor?.entry ?? null}
         onClose={() => setInvoiceFor(null)}
