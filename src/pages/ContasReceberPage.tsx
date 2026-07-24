@@ -1420,6 +1420,76 @@ function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
   return _GgStatusBadgeImpl({ status });
 }
 
+function EditDocDataDialog({
+  entry,
+  onClose,
+  onSave,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onSave: (data: { nota_number: string | null; boleto_number: string | null; boleto_due_date: string | null }) => Promise<void>;
+}) {
+  const [notaNumber, setNotaNumber] = useState("");
+  const [boletoNumber, setBoletoNumber] = useState("");
+  const [boletoDueDate, setBoletoDueDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setNotaNumber(entry?.nota_number ?? "");
+    setBoletoNumber(entry?.boleto_number ?? "");
+    setBoletoDueDate(entry?.boleto_due_date ?? "");
+  }, [entry?.id]);
+
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Corrigir dados do documento</DialogTitle>
+          <DialogDescription>
+            Ajusta manualmente o que a leitura automática do arquivo capturou — útil quando o
+            anexo tem vários documentos juntos (voucher, boleto e nota no mesmo arquivo).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Número da Nota Fiscal</Label>
+            <Input value={notaNumber} onChange={(e) => setNotaNumber(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Número do Boleto</Label>
+            <Input value={boletoNumber} onChange={(e) => setBoletoNumber(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Vencimento do Boleto</Label>
+            <BrDateInput value={boletoDueDate} onChange={setBoletoDueDate} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({
+                  nota_number: notaNumber.trim() || null,
+                  boleto_number: boletoNumber.trim() || null,
+                  boleto_due_date: boletoDueDate || null,
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BulkPaidDialog({
   open,
   count,
