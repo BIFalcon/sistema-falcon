@@ -1724,6 +1724,10 @@ function SendDocsDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Enviar documentos</DialogTitle>
+<p className="text-xs text-muted-foreground -mt-1">
+  O botão "Enviar" confirma que os documentos já foram encaminhados ao cliente — por isso o
+  comprovante de envio é obrigatório, mesmo que Nota Fiscal e Boleto sejam opcionais.
+</p>
           <DialogDescription>
             {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
           </DialogDescription>
@@ -1731,7 +1735,7 @@ function SendDocsDialog({
         <div className="space-y-3">
           {([1, 2, 3] as const).map((slot) => {
             const cur = slot === 1 ? file1 : slot === 2 ? file2 : proof;
-            const label = slot === 1 ? "Nota Fiscal (opcional)" : slot === 2 ? "Boleto (opcional)" : "Comprovante de envio";
+            const label = slot === 1 ? "Nota Fiscal (opcional)" : slot === 2 ? "Boleto (opcional)" : "Comprovante de envio (obrigatório)";
             return (
               <div key={slot} className="space-y-1">
                 <Label className="text-xs">{label}</Label>
