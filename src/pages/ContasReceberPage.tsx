@@ -988,12 +988,21 @@ function DayBreakdown({
         onClose={() => setPayFor(null)}
         onSave={async (paid, dateOrNote) => {
           if (!payFor) return;
+          // Se marcou como Pago, também considera Faturado (a menos que já
+          // esteja explicitamente inadimplente ou não faturável).
+          const preserveStatus =
+            payFor.gg_status === "nao_faturavel" || payFor.gg_status === "inadimplente";
+          const nextStatus = paid && !preserveStatus ? "faturado" : payFor.gg_status;
+          const nextBilledAt = paid && !preserveStatus && !payFor.billed_at
+            ? new Date().toISOString()
+            : payFor.billed_at ?? undefined;
           await setStatus.mutateAsync({
             id: payFor.id,
-            gg_status: payFor.gg_status,
+            gg_status: nextStatus,
             gg_note: payFor.gg_note,
             paid_date: paid ? dateOrNote : null,
             paid_note: paid ? null : dateOrNote,
+            ...(nextBilledAt !== undefined ? { billed_at: nextBilledAt } : {}),
           });
           setPayFor(null);
           toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
