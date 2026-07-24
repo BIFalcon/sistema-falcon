@@ -52,7 +52,7 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -649,6 +649,7 @@ function DayBreakdown({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
+  const [editDocFor, setEditDocFor] = useState<ToInvoiceEntry | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
@@ -811,7 +812,22 @@ function DayBreakdown({
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{e.nota_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <div className="flex items-center gap-1">
+                      <span>{e.nota_number ?? "—"}</span>
+                      {canAdmOrGg && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5"
+                          onClick={() => setEditDocFor(e)}
+                          title="Corrigir número da nota/boleto/vencimento"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{e.boleto_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
@@ -1006,6 +1022,21 @@ function DayBreakdown({
           });
           setPayFor(null);
           toast.success(paid ? "Pagamento registrado" : "Justificativa registrada");
+        }}
+      />
+      <EditDocDataDialog
+        entry={editDocFor}
+        onClose={() => setEditDocFor(null)}
+        onSave={async (data) => {
+          if (!editDocFor) return;
+          await setStatus.mutateAsync({
+            id: editDocFor.id,
+            gg_status: editDocFor.gg_status,
+            gg_note: editDocFor.gg_note,
+            ...data,
+          });
+          setEditDocFor(null);
+          toast.success("Dados atualizados");
         }}
       />
       <InvoiceUploadDialog
@@ -1387,6 +1418,76 @@ function PaymentDialog({
 
 function GgStatusBadge({ status }: { status: ToInvoiceEntry["gg_status"] }) {
   return _GgStatusBadgeImpl({ status });
+}
+
+function EditDocDataDialog({
+  entry,
+  onClose,
+  onSave,
+}: {
+  entry: ToInvoiceEntry | null;
+  onClose: () => void;
+  onSave: (data: { nota_number: string | null; boleto_number: string | null; boleto_due_date: string | null }) => Promise<void>;
+}) {
+  const [notaNumber, setNotaNumber] = useState("");
+  const [boletoNumber, setBoletoNumber] = useState("");
+  const [boletoDueDate, setBoletoDueDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setNotaNumber(entry?.nota_number ?? "");
+    setBoletoNumber(entry?.boleto_number ?? "");
+    setBoletoDueDate(entry?.boleto_due_date ?? "");
+  }, [entry?.id]);
+
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Corrigir dados do documento</DialogTitle>
+          <DialogDescription>
+            Ajusta manualmente o que a leitura automática do arquivo capturou — útil quando o
+            anexo tem vários documentos juntos (voucher, boleto e nota no mesmo arquivo).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Número da Nota Fiscal</Label>
+            <Input value={notaNumber} onChange={(e) => setNotaNumber(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Número do Boleto</Label>
+            <Input value={boletoNumber} onChange={(e) => setBoletoNumber(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Vencimento do Boleto</Label>
+            <BrDateInput value={boletoDueDate} onChange={setBoletoDueDate} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({
+                  nota_number: notaNumber.trim() || null,
+                  boleto_number: boletoNumber.trim() || null,
+                  boleto_due_date: boletoDueDate || null,
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function BulkPaidDialog({
