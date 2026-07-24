@@ -52,7 +52,7 @@ import {
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
