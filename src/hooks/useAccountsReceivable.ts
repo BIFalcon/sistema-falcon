@@ -173,6 +173,9 @@ export function useSetToInvoiceGgStatus() {
       documents_problem_note?: string | null;
       documents_problem_at?: string | null;
       billed_at?: string | null;
+      nota_number?: string | null;
+      boleto_number?: string | null;
+      boleto_due_date?: string | null;
     }) => {
       const { error } = await supabase
         .from("ar_to_invoice_entries")
@@ -196,6 +199,9 @@ export function useSetToInvoiceGgStatus() {
           ...(input.documents_problem_note !== undefined ? { documents_problem_note: input.documents_problem_note } : {}),
           ...(input.documents_problem_at !== undefined ? { documents_problem_at: input.documents_problem_at } : {}),
           ...(input.billed_at !== undefined ? { billed_at: input.billed_at } : {}),
+          ...(input.nota_number !== undefined ? { nota_number: input.nota_number } : {}),
+          ...(input.boleto_number !== undefined ? { boleto_number: input.boleto_number } : {}),
+          ...(input.boleto_due_date !== undefined ? { boleto_due_date: input.boleto_due_date } : {}),
         })
         .eq("id", input.id);
       if (error) throw error;
