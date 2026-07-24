@@ -812,7 +812,22 @@ function DayBreakdown({
                   </TableCell>
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{e.nota_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <div className="flex items-center gap-1">
+                      <span>{e.nota_number ?? "—"}</span>
+                      {canAdmOrGg && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5"
+                          onClick={() => setEditDocFor(e)}
+                          title="Corrigir número da nota/boleto/vencimento"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{e.boleto_number ?? "—"}</TableCell>
                   <TableCell className="text-right font-semibold">{fmtBRL(e.amount)}</TableCell>
                   <TableCell className="text-right text-xs">
