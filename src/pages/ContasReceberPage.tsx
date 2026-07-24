@@ -649,6 +649,7 @@ function DayBreakdown({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [payFor, setPayFor] = useState<ToInvoiceEntry | null>(null);
+  const [editDocFor, setEditDocFor] = useState<ToInvoiceEntry | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
