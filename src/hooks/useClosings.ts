@@ -42,7 +42,7 @@ export function useClosings(params: { month: number; year: number; hotelId?: str
       if (error) throw error;
       return (data ?? []) as ClosingRow[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -106,7 +106,7 @@ export function useClosing(closingId: string | null | undefined) {
       if (error) throw error;
       return (data ?? null) as ClosingRow | null;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

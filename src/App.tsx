@@ -43,9 +43,13 @@ import type { AppRole } from "./lib/constants";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      staleTime: 1000 * 60 * 5,
+      // Antes: cache de 5 min sem revalidação — usuários viam dados antigos
+      // (versões da carta, fotos, etc.) mesmo depois de salvar/atualizar.
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchOnMount: "always",
+      staleTime: 30 * 1000,
+      retry: 1,
     },
   },
 });

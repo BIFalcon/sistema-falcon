@@ -65,7 +65,7 @@ export function useEnvioQueue(params: {
         pdf_generated_at: byClosing.get(c.id)?.pdf_generated_at ?? null,
       }));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
