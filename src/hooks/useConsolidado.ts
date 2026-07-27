@@ -169,7 +169,7 @@ export function useConsolidadoData(input: {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["consolidado", input.hotelIds, input.year, input.month],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     queryFn: async (): Promise<ConsolidadoRow[]> => {
       const [{ data: closings, error: cErr }, { data: hotelRows }] = await Promise.all([
         supabase
@@ -319,7 +319,7 @@ export function useClosingFinanceMetrics(closingId: string | null) {
   return useQuery({
     enabled: !!closingId,
     queryKey: ["closing-finance-metrics", closingId],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     queryFn: async () => {
       if (!closingId) return null;
       const { data: closingRow } = await supabase

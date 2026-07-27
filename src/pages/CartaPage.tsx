@@ -238,7 +238,7 @@ export default function CartaPage() {
       if (error) return false;
       return (data?.length ?? 0) > 0;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
   // Só mostra o aviso "DRE não importada" depois que as queries terminaram e
   // quando realmente não existe DRE no fechamento do mês filtrado.
