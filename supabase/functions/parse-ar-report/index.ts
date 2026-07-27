@@ -361,28 +361,42 @@ Deno.serve(async (req) => {
           inserted += chunk.length;
         }
       }
-      // Arquiva (não deleta) os registros que sumiram do novo upload — preserva
+       // Arquiva (não deleta) os registros que sumiram do novo upload — preserva
       // histórico e justificativas. Paginação manual porque o PostgREST limita
       // a 1000 linhas por request — sem isso, hotéis com >1k folios deixavam
       // registros antigos visíveis mesmo após upload novo.
+      //
+      // IMPORTANTE: restrito aos hotéis presentes NESTE upload — sem isso, subir
+      // o Open Folio de um hotel arquivava por engano os registros em aberto de
+      // TODOS os outros hotéis (bug real, confirmado em produção em 27/07).
+      const archiveHotelIds = Array.from(
+        new Set(
+          result.entries
+            .map((e: any) => e.hotel_id)
+            .filter((id: string | null): id is string => !!id),
+        ),
+      );
       const nowIso = new Date().toISOString();
       const toArchive: string[] = [];
-      const pageSize = 1000;
-      let from = 0;
-      while (true) {
-        const { data: pageRows, error: pageErr } = await admin
-          .from("ar_open_folio_entries")
-          .select("id, entry_key, archived_at, confirmation_number")
-          .is("archived_at", null)
-          .range(from, from + pageSize - 1);
-        if (pageErr) throw pageErr;
-        const rows = pageRows ?? [];
-        for (const f of rows) {
-          if (!f.confirmation_number || !f.entry_key) continue;
-          if (!seenKeys.has(f.entry_key)) toArchive.push(f.id);
+      if (archiveHotelIds.length) {
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data: pageRows, error: pageErr } = await admin
+            .from("ar_open_folio_entries")
+            .select("id, entry_key, archived_at, confirmation_number")
+            .is("archived_at", null)
+            .in("hotel_id", archiveHotelIds)
+            .range(from, from + pageSize - 1);
+          if (pageErr) throw pageErr;
+          const rows = pageRows ?? [];
+          for (const f of rows) {
+            if (!f.confirmation_number || !f.entry_key) continue;
+            if (!seenKeys.has(f.entry_key)) toArchive.push(f.id);
+          }
+          if (rows.length < pageSize) break;
+          from += pageSize;
         }
-        if (rows.length < pageSize) break;
-        from += pageSize;
       }
       if (toArchive.length) {
         const archiveChunk = 500;
