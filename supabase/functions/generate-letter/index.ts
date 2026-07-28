@@ -200,17 +200,19 @@ Deno.serve(async (req) => {
     const rps = letter.data.rps_score != null ? `${String(letter.data.rps_score).replace(".", ",")}%` : "—";
 
     const sysPrompt = `Você é redator institucional do hotel "${hotel.data?.name ?? closing.data.hotel_id}" (bandeira ${hotel.data?.brand ?? "—"}).
-Escreva em português do Brasil, tom executivo, sóbrio, direto e SUCINTO, voltado a investidores.
+Escreva em português do Brasil, tom executivo, sóbrio, direto, voltado a investidores.
 
 REGRAS DE CONTEÚDO (OBRIGATÓRIAS):
-- Devolva no MÁXIMO 3 parágrafos curtos (2 a 4 frases cada). intro/operational/outlook.
+- Devolva no MÁXIMO 5 parágrafos (3 a 6 frases cada). intro/operational/outlook, mais market_context e closing quando houver conteúdo real pra eles — não force parágrafo vazio só pra preencher.
 - O parágrafo "operational" DEVE OBRIGATORIAMENTE incluir comparativos entre o mês atual e o mesmo mês do ano anterior para: Receita Bruta Total, Diária Média (ADR), Taxa de Ocupação e RevPAR — citando o valor absoluto do mês atual e a variação percentual entre parênteses (ex.: "Receita Bruta de R$ 540 mil (+12,4%) frente ao mesmo mês do ano anterior").
-- NÃO repita os mesmos números sem adicionar contexto/análise: explique brevemente o que motivou a variação (eventos, sazonalidade, mix, ações da gestão).
-- O parágrafo "intro" abre o mês com contexto curto. O parágrafo "outlook" traz perspectivas para os próximos meses.
+- NÃO repita os mesmos números sem adicionar contexto/análise: explique o que motivou a variação.
+- **O COMENTÁRIO OPERACIONAL e as OBSERVAÇÕES DOS DESTAQUES DO MÊS, fornecidos abaixo, são a fonte primária de contexto qualitativo — não são material de referência opcional, são para SEREM USADOS de verdade na narrativa.** Sempre que houver conteúdo neles, cite fatos, motivos ou eventos específicos mencionados ali (nomes de ações, parcerias, problemas pontuais, decisões de gestão) em vez de generalizar. Se um número variou e o comentário operacional explica o motivo, esse motivo PRECISA aparecer no texto — não é permitido citar a variação sem a explicação quando ela existir na fonte.
+- Só escreva de forma genérica quando o comentário operacional e os destaques estiverem vazios — nesse caso, não invente motivo nenhum, descreva só o que os números mostram.
+- O parágrafo "intro" abre o mês com contexto curto. O parágrafo "outlook" traz perspectivas para os próximos meses, priorizando o que veio do comentário operacional sobre planos futuros, se houver.
 - Sem markdown, sem listas, sem títulos, sem emojis.
 
 Devolva ESTRITAMENTE um JSON válido com as chaves: intro, market_context, operational, financial, outlook, closing.
-Use intro, operational e outlook como os 3 parágrafos principais. market_context, financial e closing devem ser strings vazias.`;
+intro, operational e outlook são obrigatórios. Use market_context e closing SOMENTE quando houver conteúdo real do comentário operacional ou dos destaques do mês que justifique um parágrafo próprio — senão, deixe como string vazia. financial continua sempre vazio (os números já aparecem no Demonstrativo de Resultados, não repetir aqui).`;
 
     let userPrompt = `Período: ${monthName} de ${closing.data.year}.
 
@@ -224,8 +226,8 @@ INDICADORES ADICIONAIS:
 DESTAQUES DO MÊS (informados pelo GG/GOP):
 ${highlightsText}
 
-COMENTÁRIO OPERACIONAL:
-${letter.data.operational_comment || "—"}
+COMENTÁRIO OPERACIONAL (fonte primária de contexto — use os fatos específicos mencionados aqui na narrativa, não só como pano de fundo):
+${letter.data.operational_comment || "Nenhum comentário informado — não invente motivos, descreva só o que os números mostram."}
 
 Gere o JSON.`;
 
