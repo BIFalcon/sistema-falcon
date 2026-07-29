@@ -1502,6 +1502,62 @@ export type Database = {
         }
         Relationships: []
       }
+      hotel_contexto: {
+        Row: {
+          atrapalha_operacao: string | null
+          created_at: string
+          desconto_frequente: string | null
+          hotel_id: string
+          id: string
+          mudanca_praca: string | null
+          prioridade_3_meses: string | null
+          quem_sustenta_hotel: string | null
+          respondido_em: string | null
+          respondido_por: string | null
+          sem_mudancas_desde_ultima: boolean | null
+          ultima_confirmacao_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          atrapalha_operacao?: string | null
+          created_at?: string
+          desconto_frequente?: string | null
+          hotel_id: string
+          id?: string
+          mudanca_praca?: string | null
+          prioridade_3_meses?: string | null
+          quem_sustenta_hotel?: string | null
+          respondido_em?: string | null
+          respondido_por?: string | null
+          sem_mudancas_desde_ultima?: boolean | null
+          ultima_confirmacao_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          atrapalha_operacao?: string | null
+          created_at?: string
+          desconto_frequente?: string | null
+          hotel_id?: string
+          id?: string
+          mudanca_praca?: string | null
+          prioridade_3_meses?: string | null
+          quem_sustenta_hotel?: string | null
+          respondido_em?: string | null
+          respondido_por?: string | null
+          sem_mudancas_desde_ultima?: boolean | null
+          ultima_confirmacao_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_contexto_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: true
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           active: boolean
@@ -2791,6 +2847,7 @@ export type Database = {
         | "ar_open_folio_upload_to_hotel"
         | "ar_to_invoice_upload_to_hotel"
         | "dre_sla_reminder"
+        | "hotel_contexto_request"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -2994,6 +3051,7 @@ export const Constants = {
         "ar_open_folio_upload_to_hotel",
         "ar_to_invoice_upload_to_hotel",
         "dre_sla_reminder",
+        "hotel_contexto_request",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
