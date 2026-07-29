@@ -30,6 +30,8 @@ import ConciliacaoPage from "./pages/ConciliacaoPage";
 import ConferenciaNotasFiscaisPage from "./pages/ConferenciaNotasFiscaisPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
+import ContextoHotelPage from "./pages/ContextoHotelPage";
+import ContextoHotelExportPage from "./pages/ContextoHotelExportPage";
 import TreinamentosPage from "./pages/rh/TreinamentosPage";
 import PoliticasPage from "./pages/rh/PoliticasPage";
 import MarketingCalendarioPage from "./pages/marketing/CalendarioPage";
@@ -163,6 +165,8 @@ const App = () => (
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
+              <Route path="/perfil-hotel/contexto" element={<RoleGuard roles={["gg","gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelPage /></RoleGuard>} />
+              <Route path="/perfil-hotel/contexto/consolidado" element={<RoleGuard roles={["gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelExportPage /></RoleGuard>} />
               <Route path="/rh/calendario" element={<Navigate to="/marketing/calendario" replace />} />
               <Route path="/rh/organograma" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><OrganogramaPage /></RoleGuard>} />
               <Route path="/rh/treinamentos" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TreinamentosPage /></RoleGuard>} />
