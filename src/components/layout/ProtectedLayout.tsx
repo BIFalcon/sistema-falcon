@@ -7,6 +7,7 @@ import { FilterProvider } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppRole } from "@/lib/constants";
 import { GlobalLoadingBar } from "@/components/ui/GlobalLoadingBar";
+import { HotelContextoBanner } from "@/components/HotelContextoBanner";
 
 function FullScreenLoader() {
   return (
