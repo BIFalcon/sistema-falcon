@@ -247,6 +247,9 @@ ${highlightsText}
 COMENTÁRIO OPERACIONAL (fonte primária de contexto — use os fatos específicos mencionados aqui na narrativa, não só como pano de fundo):
 ${letter.data.operational_comment || "Nenhum comentário informado — não invente motivos, descreva só o que os números mostram."}
 
+CONTEXTO ESTRUTURAL DO HOTEL (respondido pelo Gerente Geral — realidade permanente da operação, use para interpretar os números):
+${contextoText}
+
 Gere o JSON.`;
 
     if (instruction && instruction.trim()) {
