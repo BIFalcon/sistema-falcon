@@ -126,11 +126,6 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
     ],
   },
   {
-    label: "RH",
-    items: [
-  ],
-  },
-  {
     label: "Perfil do Hotel",
     items: [
       {
