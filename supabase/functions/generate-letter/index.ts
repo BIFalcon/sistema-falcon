@@ -192,6 +192,23 @@ Deno.serve(async (req) => {
     const months = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     const monthName = months[(closing.data.month ?? 1) - 1];
 
+    // Contexto estrutural do hotel (respondido pelo GG) — fonte qualitativa de fundo.
+    const contexto = await supabase
+      .from("hotel_contexto")
+      .select("*")
+      .eq("hotel_id", closing.data.hotel_id)
+      .maybeSingle();
+    const ctx = contexto.data as Record<string, string | null> | null;
+    const contextoText = ctx?.respondido_em
+      ? [
+          `- Quem sustenta o hotel hoje: ${ctx.quem_sustenta_hotel || "—"}`,
+          `- O que mudou na praça: ${ctx.mudanca_praca || "—"}`,
+          `- O que atrapalha o resultado e não aparece em número: ${ctx.atrapalha_operacao || "—"}`,
+          `- Quando e por que precisa dar desconto: ${ctx.desconto_frequente || "—"}`,
+          `- Prioridade para os próximos 3 meses: ${ctx.prioridade_3_meses || "—"}`,
+        ].join("\n")
+      : "Nenhum contexto estrutural cadastrado para este hotel.";
+
     const highlightsText = (highlights.data ?? []).length > 0
       ? (highlights.data ?? []).map((h, i) => `${i + 1}. ${h.title}${h.note ? ` — ${h.note}` : ""}`).join("\n")
       : "Nenhum destaque informado.";
@@ -208,6 +225,7 @@ REGRAS DE CONTEÚDO (OBRIGATÓRIAS):
 - NÃO repita os mesmos números sem adicionar contexto/análise: explique o que motivou a variação.
 - **O COMENTÁRIO OPERACIONAL e as OBSERVAÇÕES DOS DESTAQUES DO MÊS, fornecidos abaixo, são a fonte primária de contexto qualitativo — não são material de referência opcional, são para SEREM USADOS de verdade na narrativa.** Sempre que houver conteúdo neles, cite fatos, motivos ou eventos específicos mencionados ali (nomes de ações, parcerias, problemas pontuais, decisões de gestão) em vez de generalizar. Se um número variou e o comentário operacional explica o motivo, esse motivo PRECISA aparecer no texto — não é permitido citar a variação sem a explicação quando ela existir na fonte.
 - Só escreva de forma genérica quando o comentário operacional e os destaques estiverem vazios — nesse caso, não invente motivo nenhum, descreva só o que os números mostram.
+- O CONTEXTO ESTRUTURAL DO HOTEL (respondido pelo Gerente Geral) descreve a realidade permanente da operação: perfil de demanda, praça, limitações e prioridades. Use-o para INTERPRETAR os números do mês (por que a demanda se comporta assim, por que houve desconto, o que limita o resultado) e para embasar o parágrafo de perspectivas. Não o transcreva nem o cite como "questionário" — incorpore como conhecimento do negócio.
 - O parágrafo "intro" abre o mês com contexto curto. O parágrafo "outlook" traz perspectivas para os próximos meses, priorizando o que veio do comentário operacional sobre planos futuros, se houver.
 - Sem markdown, sem listas, sem títulos, sem emojis.
 
@@ -228,6 +246,9 @@ ${highlightsText}
 
 COMENTÁRIO OPERACIONAL (fonte primária de contexto — use os fatos específicos mencionados aqui na narrativa, não só como pano de fundo):
 ${letter.data.operational_comment || "Nenhum comentário informado — não invente motivos, descreva só o que os números mostram."}
+
+CONTEXTO ESTRUTURAL DO HOTEL (respondido pelo Gerente Geral — realidade permanente da operação, use para interpretar os números):
+${contextoText}
 
 Gere o JSON.`;
 

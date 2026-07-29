@@ -7,6 +7,7 @@ import { FilterProvider } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppRole } from "@/lib/constants";
 import { GlobalLoadingBar } from "@/components/ui/GlobalLoadingBar";
+import { HotelContextoBanner } from "@/components/HotelContextoBanner";
 
 function FullScreenLoader() {
   return (
@@ -113,6 +114,7 @@ export function ProtectedLayout({ requireRoles, children }: Props) {
             <AppHeader />
             <main className="flex-1 p-6 overflow-auto">
               <PageErrorBoundary resetKey={location.pathname}>
+                <HotelContextoBanner />
                 {children ?? <Outlet />}
               </PageErrorBoundary>
             </main>
