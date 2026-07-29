@@ -128,6 +128,26 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "RH",
     items: [
+  ],
+  },
+  {
+    label: "Perfil do Hotel",
+    items: [
+      {
+        title: "Perfil do Hotel",
+        url: "/perfil-hotel",
+        icon: Hotel,
+        allowedRoles: ["processos","fernando","controladoria","patronos","gop","gg","ri","viewer"] as AppRole[],
+        children: [
+          { title: "Contexto do Hotel", url: "/perfil-hotel/contexto", icon: ClipboardList },
+          { title: "Contexto — consolidado", url: "/perfil-hotel/contexto/consolidado", icon: FileSpreadsheet },
+        ],
+      },
+    ],
+  },
+  {
+    label: "RH",
+    items: [
       {
         title: "RH & People",
         url: "/rh",
