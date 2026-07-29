@@ -192,6 +192,23 @@ Deno.serve(async (req) => {
     const months = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     const monthName = months[(closing.data.month ?? 1) - 1];
 
+    // Contexto estrutural do hotel (respondido pelo GG) — fonte qualitativa de fundo.
+    const contexto = await supabase
+      .from("hotel_contexto")
+      .select("*")
+      .eq("hotel_id", closing.data.hotel_id)
+      .maybeSingle();
+    const ctx = contexto.data as Record<string, string | null> | null;
+    const contextoText = ctx?.respondido_em
+      ? [
+          `- Quem sustenta o hotel hoje: ${ctx.quem_sustenta_hotel || "—"}`,
+          `- O que mudou na praça: ${ctx.mudanca_praca || "—"}`,
+          `- O que atrapalha o resultado e não aparece em número: ${ctx.atrapalha_operacao || "—"}`,
+          `- Quando e por que precisa dar desconto: ${ctx.desconto_frequente || "—"}`,
+          `- Prioridade para os próximos 3 meses: ${ctx.prioridade_3_meses || "—"}`,
+        ].join("\n")
+      : "Nenhum contexto estrutural cadastrado para este hotel.";
+
     const highlightsText = (highlights.data ?? []).length > 0
       ? (highlights.data ?? []).map((h, i) => `${i + 1}. ${h.title}${h.note ? ` — ${h.note}` : ""}`).join("\n")
       : "Nenhum destaque informado.";
