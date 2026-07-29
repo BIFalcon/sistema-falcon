@@ -39,7 +39,7 @@ export function HotelContextoBanner() {
   };
 
   return (
-    <div className="mx-6 mt-4 rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 flex items-start gap-3">
+    <div className="mb-4 rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 flex items-start gap-3">
       <Sparkles className="h-4 w-4 mt-0.5 text-accent shrink-0" />
       <div className="flex-1 min-w-0">
         {pending ? (
