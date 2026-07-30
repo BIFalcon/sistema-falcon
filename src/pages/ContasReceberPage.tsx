@@ -1624,39 +1624,6 @@ function ProblemDocsDialog({
   );
 }
 
-function DefaultingDialog({
-  entry,
-  onClose,
-  onConfirm,
-}: {
-  entry: ToInvoiceEntry | null;
-  onClose: () => void;
-  onConfirm: (note: string) => Promise<void>;
-}) {
-  const [note, setNote] = useState("");
-  useEffect(() => { setNote(entry?.defaulting_note ?? ""); }, [entry?.id]);
-  return (
-    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Marcar como inadimplente</DialogTitle>
-          <DialogDescription>
-            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label className="text-xs">Justificativa</Label>
-          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalhes da inadimplência" />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Confirmar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 const NOT_BILLABLE_REASONS = [
   "Cortesia",
   "No-show coberto",
