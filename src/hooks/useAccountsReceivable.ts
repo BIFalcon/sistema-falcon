@@ -57,13 +57,13 @@ export function useToInvoiceEntries(filters: {
 }) {
   const isoDay = /^\d{4}-\d{2}-\d{2}$/;
   const dates = (filters.dates ?? []).filter((d) => isoDay.test(d));
-  const from = dates.length === 0 && filters.dateFrom && isoDay.test(filters.dateFrom) ? filters.dateFrom : null;
-  const to = dates.length === 0 && filters.dateTo && isoDay.test(filters.dateTo) ? filters.dateTo : null;
+  const dFrom = dates.length === 0 && filters.dateFrom && isoDay.test(filters.dateFrom) ? filters.dateFrom : null;
+  const dTo = dates.length === 0 && filters.dateTo && isoDay.test(filters.dateTo) ? filters.dateTo : null;
   return useQuery({
     queryKey: [
       "ar-to-invoice",
       filters.hotelId ?? "all",
-      dates.length ? dates.slice().sort().join(",") : `${from ?? ""}..${to ?? ""}`,
+      dates.length ? dates.slice().sort().join(",") : `${dFrom ?? ""}..${dTo ?? ""}`,
     ],
     staleTime: 30_000,
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
@@ -82,6 +82,12 @@ export function useToInvoiceEntries(filters: {
           .order("transaction_date", { ascending: false })
           .range(from, from + pageSize - 1);
         if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
+        // Filtro de período no servidor: evita baixar todo o acervo para o browser.
+        if (dates.length > 0) q = q.in("transaction_date", dates);
+        else {
+          if (dFrom) q = q.gte("transaction_date", dFrom);
+          if (dTo) q = q.lte("transaction_date", dTo);
+        }
         const { data, error } = await q;
         if (error) throw error;
         const rows = (data ?? []) as ToInvoiceEntry[];
