@@ -697,7 +697,6 @@ function DayBreakdown({
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
-  const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
   const [sendDocsFor, setSendDocsFor] = useState<ToInvoiceEntry | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
@@ -1144,23 +1143,6 @@ function DayBreakdown({
           });
           setProblemFor(null);
           toast.success("Problema registrado. Adm/GG serão avisados.");
-        }}
-      />
-      <DefaultingDialog
-        entry={defaultingFor}
-        onClose={() => setDefaultingFor(null)}
-        onConfirm={async (note) => {
-          if (!defaultingFor) return;
-          await setStatus.mutateAsync({
-            id: defaultingFor.id,
-            gg_status: "inadimplente",
-            gg_note: defaultingFor.gg_note,
-            is_defaulting: true,
-            defaulting_note: note,
-            defaulting_at: new Date().toISOString(),
-          });
-          setDefaultingFor(null);
-          toast.success("Marcado como inadimplente");
         }}
       />
       <NotBillableDialog
