@@ -688,6 +688,7 @@ function DayBreakdown({
     window.open(data.signedUrl, "_blank", "noopener");
   }
   const setStatus = useSetToInvoiceGgStatus();
+  const extractDocs = useExtractArDocs();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
