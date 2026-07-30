@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_ar_ti_hotel_transaction_date ON public.ar_to_invoice_entries (hotel_id, transaction_date DESC);
+CREATE INDEX IF NOT EXISTS idx_ar_ti_transaction_date ON public.ar_to_invoice_entries (transaction_date DESC);

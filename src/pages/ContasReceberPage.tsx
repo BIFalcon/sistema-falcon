@@ -48,11 +48,16 @@ import {
   useArUploadsByKind,
   findContractTerm,
   addDays,
+  resolveDueDate,
+  isEntryDefaulting,
+  isEntryPaid,
+  effectiveStatus,
+  useExtractArDocs,
   type ToInvoiceEntry,
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -151,15 +156,14 @@ function exportToInvoiceToExcel(
     iso ? format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "";
   const rows = entries.map((e) => {
     const term = findContractTerm(contracts, e.account_number, e.account_name);
-    const estimated =
-      e.boleto_due_date ??
-      e.estimated_due_date ??
-      (e.gg_confirmed_at && term != null
-        ? addDays(e.gg_confirmed_at.slice(0, 10), term)
-        : null);
+    const estimated = resolveDueDate(e, term);
+    const status = effectiveStatus(e, estimated);
     const statusLabel =
-      e.gg_status === "faturado" ? "Faturado"
-      : e.gg_status === "nao_faturado" ? "Não faturado"
+      status === "inadimplente" ? "Inadimplente"
+      : status === "pago" ? "Pago"
+      : status === "nao_faturavel" ? "Não faturável"
+      : status === "faturado" ? "Faturado"
+      : status === "nao_faturado" ? "Não faturado"
       : "Pendente";
     return {
       "Hotel": hotelName(e.hotel_id),
@@ -270,7 +274,9 @@ function ToInvoiceSection({
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [faturamentoFilter, setFaturamentoFilter] = useState<"todos" | "pendente" | "faturado" | "pago">("todos");
+  const [faturamentoFilter, setFaturamentoFilter] = useState<
+    "todos" | "pendente" | "faturado" | "pago" | "inadimplente"
+  >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
   // Reset drill quando hotel muda
@@ -313,6 +319,9 @@ function ToInvoiceSection({
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
+    dateFrom,
+    dateTo,
+    dates: specificDates,
   });
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
@@ -347,23 +356,16 @@ function ToInvoiceSection({
 
   const finalEntries = useMemo(() => {
     let arr = filteredToInvoice;
-    // Aplica filtro de datas do header (dateFrom/dateTo ou specificDates)
-    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
-    if (specificDates && specificDates.length > 0) {
-      const set = new Set(specificDates.filter((d) => isoDay.test(d)));
-      if (set.size > 0) {
-        arr = arr.filter((e) => e.transaction_date && set.has(e.transaction_date));
-      }
-    } else if (dateFrom && dateTo && isoDay.test(dateFrom) && isoDay.test(dateTo)) {
-      arr = arr.filter(
-        (e) => e.transaction_date && e.transaction_date >= dateFrom && e.transaction_date <= dateTo,
-      );
-    }
+    // O filtro de datas do header já é aplicado no servidor (useToInvoiceEntries).
     if (faturamentoFilter !== "todos") {
       if (faturamentoFilter === "pago") {
-        arr = arr.filter((e) => !!e.paid_date);
+        arr = arr.filter((e) => isEntryPaid(e));
+      } else if (faturamentoFilter === "inadimplente") {
+        arr = arr.filter((e) =>
+          isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
+        );
       } else if (faturamentoFilter === "pendente") {
-        arr = arr.filter((e) => e.gg_status !== "faturado" && !e.paid_date);
+        arr = arr.filter((e) => e.gg_status !== "faturado" && !isEntryPaid(e));
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
@@ -379,7 +381,7 @@ function ToInvoiceSection({
       );
     }
     return arr;
-  }, [filteredToInvoice, faturamentoFilter, clientSearch, dateFrom, dateTo, specificDates]);
+  }, [filteredToInvoice, faturamentoFilter, clientSearch, contracts]);
 
   return (
     <div className="space-y-5">
@@ -415,8 +417,10 @@ function ToInvoiceSection({
                 <SelectItem value="pendente">Pendentes</SelectItem>
                 <SelectItem value="faturado">Faturados</SelectItem>
                 <SelectItem value="pago">Pagos</SelectItem>
+                <SelectItem value="inadimplente">Inadimplentes</SelectItem>
               </SelectContent>
             </Select>
+            <ExtractDocsButton entries={finalEntries} />
             <Button
               variant="outline"
               size="sm"
@@ -487,6 +491,45 @@ function ToInvoiceSection({
 }
 
 function MonthlyOverview({
+  entries,
+  onPickMonth,
+}: {
+  entries: ToInvoiceEntry[];
+  onPickMonth: (m: string) => void;
+}) {
+  return _MonthlyOverviewImpl({ entries, onPickMonth });
+}
+
+/** Reprocessa a leitura automática (IA) dos anexos que ficaram sem nota/boleto/vencimento. */
+function ExtractDocsButton({ entries }: { entries: ToInvoiceEntry[] }) {
+  const { isMaster, hasRole } = useAuth();
+  const extract = useExtractArDocs();
+  const canExtract = isMaster || hasRole("adm") || hasRole("gg") || hasRole("financeiro") || hasRole("controladoria");
+  const pending = entries.filter(
+    (e) =>
+      (e.invoice_file_1 || e.invoice_file_2) &&
+      (!e.nota_number || !e.boleto_number || !e.boleto_due_date),
+  );
+  if (!canExtract || pending.length === 0) return null;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-2"
+      disabled={extract.isPending}
+      title="Lê novamente nota e boleto anexados para preencher números e vencimento"
+      onClick={async () => {
+        const r = await extract.mutateAsync({ entries: pending });
+        toast.success(`${r.ok} documento(s) reprocessados${r.failed ? ` · ${r.failed} falha(s)` : ""}`);
+      }}
+    >
+      {extract.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+      Extrair dados ({pending.length})
+    </Button>
+  );
+}
+
+function _MonthlyOverviewImpl({
   entries,
   onPickMonth,
 }: {
@@ -645,6 +688,7 @@ function DayBreakdown({
     window.open(data.signedUrl, "_blank", "noopener");
   }
   const setStatus = useSetToInvoiceGgStatus();
+  const extractDocs = useExtractArDocs();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -653,7 +697,6 @@ function DayBreakdown({
   const [invoiceFor, setInvoiceFor] = useState<{ entry: ToInvoiceEntry; term: number | null } | null>(null);
   const [problemFor, setProblemFor] = useState<ToInvoiceEntry | null>(null);
   const [notBillableFor, setNotBillableFor] = useState<ToInvoiceEntry | null>(null);
-  const [defaultingFor, setDefaultingFor] = useState<ToInvoiceEntry | null>(null);
   const [sendDocsFor, setSendDocsFor] = useState<ToInvoiceEntry | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
@@ -767,14 +810,13 @@ function DayBreakdown({
               <TableBody>
                 {groupEntries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
-              const dueFromConfirm = term != null && e.gg_confirmed_at
-                ? addDays(e.gg_confirmed_at.slice(0, 10), term)
-                : null;
               // Prioriza o vencimento extraído do boleto; cai para contrato/estimativa.
-              const due = e.boleto_due_date
-                ?? e.estimated_due_date
-                ?? dueFromConfirm
-                ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
+              const due = resolveDueDate(e, term);
+              const overdue = isEntryDefaulting(e, due);
+              const status = effectiveStatus(e, due);
+              const missingDocData =
+                (e.invoice_file_1 || e.invoice_file_2) &&
+                (!e.nota_number || !e.boleto_number || !e.boleto_due_date);
               // Prazo: se há boleto + faturamento, calcula diretamente; senão usa contrato.
               let prazoDias: number | null = term;
               if (e.boleto_due_date && e.billed_at) {
@@ -838,8 +880,12 @@ function DayBreakdown({
                   <TableCell className="text-xs">
                     {due ? (
                       <>
-                        {formatDay(due)}
-                        {e.gg_status === "faturado" && (
+                        <span className={overdue ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
+                          {formatDay(due)}
+                        </span>
+                        {overdue ? (
+                          <span className="ml-1 text-[10px] text-red-600 dark:text-red-400">(Vencido)</span>
+                        ) : e.gg_status === "faturado" && (
                           <span className="ml-1 text-[10px] text-muted-foreground">(Vence em)</span>
                         )}
                       </>
@@ -855,7 +901,7 @@ function DayBreakdown({
                     )}
                   </TableCell>
                   <TableCell className="text-xs space-y-1 min-w-[220px]">
-                    <GgStatusBadge status={e.gg_status} />
+                    <GgStatusBadge status={status} />
                     {e.gg_note && (
                       <div className="text-[11px] text-muted-foreground italic">"{e.gg_note}"</div>
                     )}
@@ -926,16 +972,6 @@ function DayBreakdown({
                         {canFinanceiro && (
                           <Button
                             size="sm"
-                            variant={e.gg_status === "inadimplente" ? "default" : "outline"}
-                            className="h-6 px-2 text-[11px]"
-                            onClick={() => setDefaultingFor(e)}
-                          >
-                            Inadimplente
-                          </Button>
-                        )}
-                        {canAdmOrGg && (
-                          <Button
-                            size="sm"
                             variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
                             className="h-6 px-2 text-[11px]"
                             onClick={() => setNotBillableFor(e)}
@@ -943,7 +979,7 @@ function DayBreakdown({
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && e.gg_status !== "inadimplente" && (
+                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -951,6 +987,23 @@ function DayBreakdown({
                             onClick={() => setSendDocsFor(e)}
                           >
                             Enviar docs
+                          </Button>
+                        )}
+                        {canAdmOrGg && missingDocData && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            disabled={extractDocs.isPending}
+                            title="Ler novamente nota/boleto anexados"
+                            onClick={async () => {
+                              const r = await extractDocs.mutateAsync({ entries: [e] });
+                              toast[r.ok ? "success" : "error"](
+                                r.ok ? "Dados extraídos do documento" : "Não foi possível extrair",
+                              );
+                            }}
+                          >
+                            Extrair dados
                           </Button>
                         )}
                       </div>
@@ -1006,8 +1059,7 @@ function DayBreakdown({
           if (!payFor) return;
           // Se marcou como Pago, também considera Faturado (a menos que já
           // esteja explicitamente inadimplente ou não faturável).
-          const preserveStatus =
-            payFor.gg_status === "nao_faturavel" || payFor.gg_status === "inadimplente";
+          const preserveStatus = payFor.gg_status === "nao_faturavel";
           const nextStatus = paid && !preserveStatus ? "faturado" : payFor.gg_status;
           const nextBilledAt = paid && !preserveStatus && !payFor.billed_at
             ? new Date().toISOString()
@@ -1090,23 +1142,6 @@ function DayBreakdown({
           });
           setProblemFor(null);
           toast.success("Problema registrado. Adm/GG serão avisados.");
-        }}
-      />
-      <DefaultingDialog
-        entry={defaultingFor}
-        onClose={() => setDefaultingFor(null)}
-        onConfirm={async (note) => {
-          if (!defaultingFor) return;
-          await setStatus.mutateAsync({
-            id: defaultingFor.id,
-            gg_status: "inadimplente",
-            gg_note: defaultingFor.gg_note,
-            is_defaulting: true,
-            defaulting_note: note,
-            defaulting_at: new Date().toISOString(),
-          });
-          setDefaultingFor(null);
-          toast.success("Marcado como inadimplente");
         }}
       />
       <NotBillableDialog
@@ -1582,39 +1617,6 @@ function ProblemDocsDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Registrar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DefaultingDialog({
-  entry,
-  onClose,
-  onConfirm,
-}: {
-  entry: ToInvoiceEntry | null;
-  onClose: () => void;
-  onConfirm: (note: string) => Promise<void>;
-}) {
-  const [note, setNote] = useState("");
-  useEffect(() => { setNote(entry?.defaulting_note ?? ""); }, [entry?.id]);
-  return (
-    <Dialog open={!!entry} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Marcar como inadimplente</DialogTitle>
-          <DialogDescription>
-            {entry && <>{entry.account_name ?? "—"} · {fmtBRL(entry.amount)}</>}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label className="text-xs">Justificativa</Label>
-          <Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalhes da inadimplência" />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!note.trim()} onClick={() => onConfirm(note.trim())}>Confirmar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -48,9 +48,24 @@ export interface ToInvoiceEntry {
   doc_extraction_status: string | null;
 }
 
-export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
+export function useToInvoiceEntries(filters: {
+  hotelId?: string | null;
+  /** Filtro de período aplicado no servidor (reduz muito o volume trafegado). */
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  dates?: string[] | null;
+}) {
+  const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+  const dates = (filters.dates ?? []).filter((d) => isoDay.test(d));
+  const dFrom = dates.length === 0 && filters.dateFrom && isoDay.test(filters.dateFrom) ? filters.dateFrom : null;
+  const dTo = dates.length === 0 && filters.dateTo && isoDay.test(filters.dateTo) ? filters.dateTo : null;
   return useQuery({
-    queryKey: ["ar-to-invoice", filters.hotelId ?? "all"],
+    queryKey: [
+      "ar-to-invoice",
+      filters.hotelId ?? "all",
+      dates.length ? dates.slice().sort().join(",") : `${dFrom ?? ""}..${dTo ?? ""}`,
+    ],
+    staleTime: 30_000,
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       // Paginação manual — PostgREST limita cada request a ~1000 linhas.
       // Sem paginação, meses mais antigos ficavam de fora quando o acervo
@@ -67,6 +82,12 @@ export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
           .order("transaction_date", { ascending: false })
           .range(from, from + pageSize - 1);
         if (filters.hotelId) q = q.eq("hotel_id", filters.hotelId);
+        // Filtro de período no servidor: evita baixar todo o acervo para o browser.
+        if (dates.length > 0) q = q.in("transaction_date", dates);
+        else {
+          if (dFrom) q = q.gte("transaction_date", dFrom);
+          if (dTo) q = q.lte("transaction_date", dTo);
+        }
         const { data, error } = await q;
         if (error) throw error;
         const rows = (data ?? []) as ToInvoiceEntry[];
@@ -477,4 +498,92 @@ export function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/** Data de vencimento efetiva de um lançamento (boleto > estimativa > contrato). */
+export function resolveDueDate(
+  e: ToInvoiceEntry,
+  term: number | null,
+): string | null {
+  return (
+    e.boleto_due_date ??
+    e.estimated_due_date ??
+    (term != null && e.gg_confirmed_at ? addDays(e.gg_confirmed_at.slice(0, 10), term) : null) ??
+    (term != null && e.billed_at ? addDays(e.billed_at.slice(0, 10), term) : null) ??
+    (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null)
+  );
+}
+
+export function isEntryPaid(e: ToInvoiceEntry): boolean {
+  return !!e.paid_date || e.is_paid === true || e.gg_status === "pago";
+}
+
+/**
+ * Inadimplência agora é automática: todo lançamento faturado (ou com documentos)
+ * que passou do vencimento e ainda não foi pago é inadimplente — e deixa de ser
+ * assim que o pagamento é registrado.
+ */
+export function isEntryDefaulting(e: ToInvoiceEntry, due: string | null): boolean {
+  if (isEntryPaid(e)) return false;
+  if (e.gg_status === "nao_faturavel" || e.is_not_billable) return false;
+  if (!due) return false;
+  // Só é inadimplente o que já foi faturado (status ou documentos enviados).
+  const billed =
+    e.gg_status === "faturado" ||
+    e.gg_status === "documentos_enviados" ||
+    e.gg_status === "inadimplente" ||
+    !!e.billed_at ||
+    !!e.invoice_file_1 ||
+    !!e.invoice_file_2;
+  if (!billed) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return due < today;
+}
+
+/** Status exibido, já considerando a inadimplência automática. */
+export function effectiveStatus(
+  e: ToInvoiceEntry,
+  due: string | null,
+): ToInvoiceEntry["gg_status"] {
+  if (isEntryDefaulting(e, due)) return "inadimplente";
+  if (e.gg_status === "inadimplente" && isEntryPaid(e)) return "pago";
+  return e.gg_status;
+}
+
+/** Dispara a leitura automática (IA) de nota/boleto de um lançamento. */
+export function useExtractArDocs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entries: ToInvoiceEntry[] }) => {
+      const targets = input.entries.filter(
+        (e) =>
+          (e.invoice_file_1 || e.invoice_file_2) &&
+          (!e.nota_number || !e.boleto_number || !e.boleto_due_date),
+      );
+      let ok = 0;
+      let failed = 0;
+      // Processa em pequenos lotes para não estourar o limite de requisições.
+      const batch = 4;
+      for (let i = 0; i < targets.length; i += batch) {
+        const slice = targets.slice(i, i + batch);
+        const results = await Promise.all(
+          slice.map((e) =>
+            supabase.functions.invoke("extract-ar-document", {
+              body: {
+                entry_id: e.id,
+                nota_path: e.invoice_file_1,
+                boleto_path: e.invoice_file_2,
+              },
+            }),
+          ),
+        );
+        for (const r of results) {
+          if (r.error) failed += 1;
+          else ok += 1;
+        }
+      }
+      return { total: targets.length, ok, failed };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ar-to-invoice"] }),
+  });
 }

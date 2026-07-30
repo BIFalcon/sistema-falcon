@@ -32,7 +32,12 @@ function digitsOnly(value: unknown): string | null {
   return d || null;
 }
 
-async function callAi(aiKey: string, kind: "nota" | "boleto", dataUrl: string) {
+async function callAi(
+  aiKey: string,
+  kind: "nota" | "boleto",
+  dataUrl: string,
+  mime: string,
+) {
   const sys = kind === "boleto"
     ? `Você lê BOLETOS bancários brasileiros (qualquer banco). Devolva SOMENTE JSON:
 {
@@ -54,44 +59,63 @@ Sem comentários. Datas em ISO. Se não conseguir ler, use null.`
 }
 Sem comentários. Datas em ISO. Se não conseguir ler, use null.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
-    body: JSON.stringify({
-      model: MODEL,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: sys },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: `Extraia os campos do ${kind === "boleto" ? "boleto" : "nota fiscal"} em anexo.` },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-    }),
-  });
-  if (!res.ok) {
+  const isPdf = /pdf/i.test(mime);
+  const label = kind === "boleto" ? "boleto" : "nota fiscal";
+  // PDFs precisam ir como anexo de arquivo; imagens vão como image_url.
+  const attachments: unknown[] = isPdf
+    ? [
+        { type: "file", file: { filename: `${kind}.pdf`, file_data: dataUrl } },
+        { type: "image_url", image_url: { url: dataUrl } },
+      ]
+    : [{ type: "image_url", image_url: { url: dataUrl } }];
+
+  let lastError: { error: string; text?: string } | null = null;
+  let j: any = null;
+  for (const att of attachments) {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
+      body: JSON.stringify({
+        model: MODEL,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: sys },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `Extraia os campos do ${label} em anexo.` },
+              att,
+            ],
+          },
+        ],
+      }),
+    });
+    if (res.ok) { j = await res.json(); lastError = null; break; }
     const txt = await res.text();
-    return { error: `ai_${res.status}`, text: txt.slice(0, 300) };
+    lastError = { error: `ai_${res.status}`, text: txt.slice(0, 300) };
   }
-  const j = await res.json();
+  if (!j) return lastError ?? { error: "ai_failed" };
   const content = j?.choices?.[0]?.message?.content;
   try { return { parsed: JSON.parse(content ?? "{}") }; }
   catch { return { error: "parse_error", text: String(content).slice(0, 300) }; }
 }
 
-async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: string } | { error: string }> {
+async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: string; mime: string } | { error: string }> {
   // Only allow storage-bucket keys; never fetch arbitrary URLs (SSRF protection).
   if (/:\/\//.test(path) || path.startsWith("/") || path.includes("..")) {
     return { error: "invalid_path" };
   }
   const { data, error } = await admin.storage.from("invoices").download(path);
   if (error || !data) return { error: error?.message ?? "download_failed" };
-  const mime = (data as Blob).type || "application/pdf";
+  let mime = (data as Blob).type || "";
+  if (!mime || mime === "application/octet-stream") {
+    const ext = path.split(".").pop()?.toLowerCase();
+    mime = ext === "png" ? "image/png"
+      : ext === "jpg" || ext === "jpeg" ? "image/jpeg"
+      : "application/pdf";
+  }
   const buf = new Uint8Array(await (data as Blob).arrayBuffer());
-  return { dataUrl: `data:${mime};base64,${bytesToBase64(buf)}` };
+  return { dataUrl: `data:${mime};base64,${bytesToBase64(buf)}`, mime };
 }
 
 Deno.serve(async (req) => {
@@ -153,7 +177,7 @@ Deno.serve(async (req) => {
       if ("error" in f) {
         details.nota = { error: f.error };
       } else {
-        const r = await callAi(aiKey, "nota", f.dataUrl);
+        const r = await callAi(aiKey, "nota", f.dataUrl, f.mime);
         if ("error" in r) details.nota = r;
         else {
           details.nota = r.parsed;
@@ -168,7 +192,7 @@ Deno.serve(async (req) => {
       if ("error" in f) {
         details.boleto = { error: f.error };
       } else {
-        const r = await callAi(aiKey, "boleto", f.dataUrl);
+        const r = await callAi(aiKey, "boleto", f.dataUrl, f.mime);
         if ("error" in r) details.boleto = r;
         else {
           details.boleto = r.parsed;
@@ -180,7 +204,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    update.doc_extraction_status = "ok";
+    const gotSomething =
+      update.nota_number !== undefined ||
+      update.boleto_number !== undefined ||
+      update.boleto_due_date !== undefined;
+    update.doc_extraction_status = gotSomething ? "ok" : "pending";
     update.doc_extraction_details = details;
 
     const { error: updErr } = await admin.from("ar_to_invoice_entries").update(update).eq("id", entryId);
