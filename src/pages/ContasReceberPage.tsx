@@ -810,14 +810,13 @@ function DayBreakdown({
               <TableBody>
                 {groupEntries.map((e) => {
               const term = findContractTerm(contracts, e.account_number, e.account_name);
-              const dueFromConfirm = term != null && e.gg_confirmed_at
-                ? addDays(e.gg_confirmed_at.slice(0, 10), term)
-                : null;
               // Prioriza o vencimento extraído do boleto; cai para contrato/estimativa.
-              const due = e.boleto_due_date
-                ?? e.estimated_due_date
-                ?? dueFromConfirm
-                ?? (term != null && e.transaction_date ? addDays(e.transaction_date, term) : null);
+              const due = resolveDueDate(e, term);
+              const overdue = isEntryDefaulting(e, due);
+              const status = effectiveStatus(e, due);
+              const missingDocData =
+                (e.invoice_file_1 || e.invoice_file_2) &&
+                (!e.nota_number || !e.boleto_number || !e.boleto_due_date);
               // Prazo: se há boleto + faturamento, calcula diretamente; senão usa contrato.
               let prazoDias: number | null = term;
               if (e.boleto_due_date && e.billed_at) {
@@ -881,8 +880,12 @@ function DayBreakdown({
                   <TableCell className="text-xs">
                     {due ? (
                       <>
-                        {formatDay(due)}
-                        {e.gg_status === "faturado" && (
+                        <span className={overdue ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
+                          {formatDay(due)}
+                        </span>
+                        {overdue ? (
+                          <span className="ml-1 text-[10px] text-red-600 dark:text-red-400">(Vencido)</span>
+                        ) : e.gg_status === "faturado" && (
                           <span className="ml-1 text-[10px] text-muted-foreground">(Vence em)</span>
                         )}
                       </>
@@ -898,7 +901,7 @@ function DayBreakdown({
                     )}
                   </TableCell>
                   <TableCell className="text-xs space-y-1 min-w-[220px]">
-                    <GgStatusBadge status={e.gg_status} />
+                    <GgStatusBadge status={status} />
                     {e.gg_note && (
                       <div className="text-[11px] text-muted-foreground italic">"{e.gg_note}"</div>
                     )}
