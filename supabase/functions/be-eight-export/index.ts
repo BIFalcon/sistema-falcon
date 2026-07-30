@@ -17,11 +17,22 @@ const corsHeaders = {
 // `include_sensitive` is NOT enabled. Privileged callers with
 // `include_sensitive=true` receive every column.
 const COLUMN_BLOCKLIST: Record<string, string[]> = {
-  profiles: [],
+  profiles: ["email", "display_name", "phone", "avatar_url"],
   user_permissions: [],
-  system_settings: [],
-  rh_employees: ["cpf", "salary", "birth_date", "raw"],
+  system_settings: ["value"],
+  rh_employees: ["cpf", "salary", "birth_date", "raw", "name", "full_name", "email", "phone"],
+  rh_org_nodes: ["email", "phone", "person_name"],
   hotels: ["bank_accounts", "cnpj"],
+  // Client identification / banking-ish identifiers used for AR contracts.
+  ar_client_contracts: ["account_number", "account_name", "notes"],
+  // Guest-level PII and balances from the open-folio / to-invoice reports.
+  ar_open_folio_entries: ["account_name", "account_number", "guest_name", "raw"],
+  ar_to_invoice_entries: ["account_name", "account_number", "guest_name", "raw"],
+  comments: ["body"],
+  notification_queue: ["to_email", "payload", "body"],
+  email_send_log: ["to_email", "payload", "body"],
+  suppressed_emails: ["email"],
+  notification_unsubscribes: ["email"],
 };
 
 // Global column-name patterns that are always stripped, regardless of table.
@@ -56,7 +67,25 @@ const TABLE_DENYLIST = new Set<string>([
   // business data. Bounce / unsubscribe behaviour is still exportable via
   // `notification_unsubscribes` and `suppressed_emails`.
   "email_unsubscribe_tokens",
+  // Account-recovery artifacts: never exportable, in any scope.
+  "password_setup_tokens",
+  // Authorization state — exporting it would leak the app's access model.
+  "user_roles",
+  "user_permissions",
+  "user_hotels",
 ]);
+
+// Columns whose sensitivity is absolute: stripped even for privileged callers.
+const ALWAYS_STRIPPED_PATTERNS = [
+  /password/i,
+  /secret/i,
+  /service_role/i,
+  /private_key/i,
+  /token$/i,
+  /_token$/i,
+  /token_hash/i,
+  /^cpf$/i,
+];
 
 // Derived resources exposed via /export?resource=...
 const DERIVED_RESOURCES = [
@@ -134,7 +163,14 @@ function stripSensitive<T extends Record<string, unknown>>(
   row: T,
   includeSensitive: boolean,
 ): T {
-  if (includeSensitive) return row;
+  if (includeSensitive) {
+    const kept: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (ALWAYS_STRIPPED_PATTERNS.some((re) => re.test(k))) continue;
+      kept[k] = v;
+    }
+    return kept as T;
+  }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
     if (isSensitiveColumn(table, k)) continue;
