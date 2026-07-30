@@ -497,6 +497,45 @@ function MonthlyOverview({
   entries: ToInvoiceEntry[];
   onPickMonth: (m: string) => void;
 }) {
+  return _MonthlyOverviewImpl({ entries, onPickMonth });
+}
+
+/** Reprocessa a leitura automática (IA) dos anexos que ficaram sem nota/boleto/vencimento. */
+function ExtractDocsButton({ entries }: { entries: ToInvoiceEntry[] }) {
+  const { isMaster, hasRole } = useAuth();
+  const extract = useExtractArDocs();
+  const canExtract = isMaster || hasRole("adm") || hasRole("gg") || hasRole("financeiro") || hasRole("controladoria");
+  const pending = entries.filter(
+    (e) =>
+      (e.invoice_file_1 || e.invoice_file_2) &&
+      (!e.nota_number || !e.boleto_number || !e.boleto_due_date),
+  );
+  if (!canExtract || pending.length === 0) return null;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-2"
+      disabled={extract.isPending}
+      title="Lê novamente nota e boleto anexados para preencher números e vencimento"
+      onClick={async () => {
+        const r = await extract.mutateAsync({ entries: pending });
+        toast.success(`${r.ok} documento(s) reprocessados${r.failed ? ` · ${r.failed} falha(s)` : ""}`);
+      }}
+    >
+      {extract.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+      Extrair dados ({pending.length})
+    </Button>
+  );
+}
+
+function _MonthlyOverviewImpl({
+  entries,
+  onPickMonth,
+}: {
+  entries: ToInvoiceEntry[];
+  onPickMonth: (m: string) => void;
+}) {
   const monthly = useMemo(() => {
     const map = new Map<string, number>();
     for (const e of entries) {
