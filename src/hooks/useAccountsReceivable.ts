@@ -527,6 +527,15 @@ export function isEntryDefaulting(e: ToInvoiceEntry, due: string | null): boolea
   if (isEntryPaid(e)) return false;
   if (e.gg_status === "nao_faturavel" || e.is_not_billable) return false;
   if (!due) return false;
+  // Só é inadimplente o que já foi faturado (status ou documentos enviados).
+  const billed =
+    e.gg_status === "faturado" ||
+    e.gg_status === "documentos_enviados" ||
+    e.gg_status === "inadimplente" ||
+    !!e.billed_at ||
+    !!e.invoice_file_1 ||
+    !!e.invoice_file_2;
+  if (!billed) return false;
   const today = new Date().toISOString().slice(0, 10);
   return due < today;
 }
