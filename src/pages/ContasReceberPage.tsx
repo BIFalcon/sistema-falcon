@@ -48,11 +48,16 @@ import {
   useArUploadsByKind,
   findContractTerm,
   addDays,
+  resolveDueDate,
+  isEntryDefaulting,
+  isEntryPaid,
+  effectiveStatus,
+  useExtractArDocs,
   type ToInvoiceEntry,
   type OpenFolioEntry,
   type ClientContract,
 } from "@/hooks/useAccountsReceivable";
-import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertTriangle, ArrowLeft, Plus, Trash2, MessageSquare, FileDown, Mail, Calendar as CalendarIcon, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -151,15 +156,14 @@ function exportToInvoiceToExcel(
     iso ? format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "";
   const rows = entries.map((e) => {
     const term = findContractTerm(contracts, e.account_number, e.account_name);
-    const estimated =
-      e.boleto_due_date ??
-      e.estimated_due_date ??
-      (e.gg_confirmed_at && term != null
-        ? addDays(e.gg_confirmed_at.slice(0, 10), term)
-        : null);
+    const estimated = resolveDueDate(e, term);
+    const status = effectiveStatus(e, estimated);
     const statusLabel =
-      e.gg_status === "faturado" ? "Faturado"
-      : e.gg_status === "nao_faturado" ? "Não faturado"
+      status === "inadimplente" ? "Inadimplente"
+      : status === "pago" ? "Pago"
+      : status === "nao_faturavel" ? "Não faturável"
+      : status === "faturado" ? "Faturado"
+      : status === "nao_faturado" ? "Não faturado"
       : "Pendente";
     return {
       "Hotel": hotelName(e.hotel_id),
