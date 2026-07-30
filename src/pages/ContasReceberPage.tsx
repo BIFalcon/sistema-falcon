@@ -1059,8 +1059,7 @@ function DayBreakdown({
           if (!payFor) return;
           // Se marcou como Pago, também considera Faturado (a menos que já
           // esteja explicitamente inadimplente ou não faturável).
-          const preserveStatus =
-            payFor.gg_status === "nao_faturavel" || payFor.gg_status === "inadimplente";
+          const preserveStatus = payFor.gg_status === "nao_faturavel";
           const nextStatus = paid && !preserveStatus ? "faturado" : payFor.gg_status;
           const nextBilledAt = paid && !preserveStatus && !payFor.billed_at
             ? new Date().toISOString()
