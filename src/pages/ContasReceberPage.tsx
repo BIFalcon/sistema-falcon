@@ -972,16 +972,6 @@ function DayBreakdown({
                         {canFinanceiro && (
                           <Button
                             size="sm"
-                            variant={e.gg_status === "inadimplente" ? "default" : "outline"}
-                            className="h-6 px-2 text-[11px]"
-                            onClick={() => setDefaultingFor(e)}
-                          >
-                            Inadimplente
-                          </Button>
-                        )}
-                        {canAdmOrGg && (
-                          <Button
-                            size="sm"
                             variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
                             className="h-6 px-2 text-[11px]"
                             onClick={() => setNotBillableFor(e)}
@@ -989,7 +979,7 @@ function DayBreakdown({
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && e.gg_status !== "inadimplente" && (
+                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -997,6 +987,23 @@ function DayBreakdown({
                             onClick={() => setSendDocsFor(e)}
                           >
                             Enviar docs
+                          </Button>
+                        )}
+                        {canAdmOrGg && missingDocData && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            disabled={extractDocs.isPending}
+                            title="Ler novamente nota/boleto anexados"
+                            onClick={async () => {
+                              const r = await extractDocs.mutateAsync({ entries: [e] });
+                              toast[r.ok ? "success" : "error"](
+                                r.ok ? "Dados extraídos do documento" : "Não foi possível extrair",
+                              );
+                            }}
+                          >
+                            Extrair dados
                           </Button>
                         )}
                       </div>
