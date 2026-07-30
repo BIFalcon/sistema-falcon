@@ -274,7 +274,9 @@ function ToInvoiceSection({
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [faturamentoFilter, setFaturamentoFilter] = useState<"todos" | "pendente" | "faturado" | "pago">("todos");
+  const [faturamentoFilter, setFaturamentoFilter] = useState<
+    "todos" | "pendente" | "faturado" | "pago" | "inadimplente"
+  >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
   // Reset drill quando hotel muda
@@ -317,6 +319,9 @@ function ToInvoiceSection({
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
+    dateFrom,
+    dateTo,
+    dates: specificDates,
   });
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
@@ -351,23 +356,16 @@ function ToInvoiceSection({
 
   const finalEntries = useMemo(() => {
     let arr = filteredToInvoice;
-    // Aplica filtro de datas do header (dateFrom/dateTo ou specificDates)
-    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
-    if (specificDates && specificDates.length > 0) {
-      const set = new Set(specificDates.filter((d) => isoDay.test(d)));
-      if (set.size > 0) {
-        arr = arr.filter((e) => e.transaction_date && set.has(e.transaction_date));
-      }
-    } else if (dateFrom && dateTo && isoDay.test(dateFrom) && isoDay.test(dateTo)) {
-      arr = arr.filter(
-        (e) => e.transaction_date && e.transaction_date >= dateFrom && e.transaction_date <= dateTo,
-      );
-    }
+    // O filtro de datas do header já é aplicado no servidor (useToInvoiceEntries).
     if (faturamentoFilter !== "todos") {
       if (faturamentoFilter === "pago") {
-        arr = arr.filter((e) => !!e.paid_date);
+        arr = arr.filter((e) => isEntryPaid(e));
+      } else if (faturamentoFilter === "inadimplente") {
+        arr = arr.filter((e) =>
+          isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
+        );
       } else if (faturamentoFilter === "pendente") {
-        arr = arr.filter((e) => e.gg_status !== "faturado" && !e.paid_date);
+        arr = arr.filter((e) => e.gg_status !== "faturado" && !isEntryPaid(e));
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
@@ -383,7 +381,7 @@ function ToInvoiceSection({
       );
     }
     return arr;
-  }, [filteredToInvoice, faturamentoFilter, clientSearch, dateFrom, dateTo, specificDates]);
+  }, [filteredToInvoice, faturamentoFilter, clientSearch, contracts]);
 
   return (
     <div className="space-y-5">
@@ -419,8 +417,10 @@ function ToInvoiceSection({
                 <SelectItem value="pendente">Pendentes</SelectItem>
                 <SelectItem value="faturado">Faturados</SelectItem>
                 <SelectItem value="pago">Pagos</SelectItem>
+                <SelectItem value="inadimplente">Inadimplentes</SelectItem>
               </SelectContent>
             </Select>
+            <ExtractDocsButton entries={finalEntries} />
             <Button
               variant="outline"
               size="sm"
