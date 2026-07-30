@@ -48,9 +48,24 @@ export interface ToInvoiceEntry {
   doc_extraction_status: string | null;
 }
 
-export function useToInvoiceEntries(filters: { hotelId?: string | null }) {
+export function useToInvoiceEntries(filters: {
+  hotelId?: string | null;
+  /** Filtro de período aplicado no servidor (reduz muito o volume trafegado). */
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  dates?: string[] | null;
+}) {
+  const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+  const dates = (filters.dates ?? []).filter((d) => isoDay.test(d));
+  const from = dates.length === 0 && filters.dateFrom && isoDay.test(filters.dateFrom) ? filters.dateFrom : null;
+  const to = dates.length === 0 && filters.dateTo && isoDay.test(filters.dateTo) ? filters.dateTo : null;
   return useQuery({
-    queryKey: ["ar-to-invoice", filters.hotelId ?? "all"],
+    queryKey: [
+      "ar-to-invoice",
+      filters.hotelId ?? "all",
+      dates.length ? dates.slice().sort().join(",") : `${from ?? ""}..${to ?? ""}`,
+    ],
+    staleTime: 30_000,
     queryFn: async (): Promise<ToInvoiceEntry[]> => {
       // Paginação manual — PostgREST limita cada request a ~1000 linhas.
       // Sem paginação, meses mais antigos ficavam de fora quando o acervo
