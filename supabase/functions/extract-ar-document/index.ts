@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       if ("error" in f) {
         details.nota = { error: f.error };
       } else {
-        const r = await callAi(aiKey, "nota", f.dataUrl);
+        const r = await callAi(aiKey, "nota", f.dataUrl, f.mime);
         if ("error" in r) details.nota = r;
         else {
           details.nota = r.parsed;
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
       if ("error" in f) {
         details.boleto = { error: f.error };
       } else {
-        const r = await callAi(aiKey, "boleto", f.dataUrl);
+        const r = await callAi(aiKey, "boleto", f.dataUrl, f.mime);
         if ("error" in r) details.boleto = r;
         else {
           details.boleto = r.parsed;
@@ -204,7 +204,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    update.doc_extraction_status = "ok";
+    const gotSomething =
+      update.nota_number !== undefined ||
+      update.boleto_number !== undefined ||
+      update.boleto_due_date !== undefined;
+    update.doc_extraction_status = gotSomething ? "ok" : "pending";
     update.doc_extraction_details = details;
 
     const { error: updErr } = await admin.from("ar_to_invoice_entries").update(update).eq("id", entryId);
