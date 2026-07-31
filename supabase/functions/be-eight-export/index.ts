@@ -408,12 +408,12 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
 // No row data, no sensitive columns, no payload. Intended for smart syncs so
 // callers can skip resources that have not changed since their last cursor.
 async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; rowsReturned: number }> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
+  } catch {
     return {
-      res: errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId),
+      res: errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId),
       rowsReturned: 0,
     };
   }
@@ -426,7 +426,7 @@ async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; r
     record_count: number | null;
   }>;
   for (const t of tableNames) {
-    const cols: string[] = discovered.get(t) ?? [];
+    const cols: string[] = discovered.get(t)?.columns ?? [];
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const resStart = Date.now();
     const [rowCount, latest] = await Promise.all([
