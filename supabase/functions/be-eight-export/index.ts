@@ -515,7 +515,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
       if (lastClosingId) closingsQ = closingsQ.gt("id", lastClosingId);
 
       const { data: closingsData, error: cErr } = await closingsQ;
-      if (cErr) return errorResponse(500, "query_failed", cErr.message, ctx.requestId);
+      if (cErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
       const batch = (closingsData ?? []) as Array<{ id: string }>;
       if (batch.length === 0) { exhausted = true; break; }
 
@@ -528,7 +528,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
         .from("dre_parsed_lines")
         .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
         .in("closing_id", ids);
-      if (lErr) return errorResponse(500, "query_failed", lErr.message, ctx.requestId);
+      if (lErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
       // Keep only the latest version_number per closing.
       const maxVersion = new Map<string, number>();
       for (const r of (allLines ?? []) as Array<{ closing_id: string; version_number: number }>) {
@@ -583,7 +583,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     const { data, error } = await ctx.supabase
       .from("rh_employees")
       .select("hotel_id, status, gender");
-    if (error) return errorResponse(500, "query_failed", error.message, ctx.requestId);
+    if (error) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     const byHotel: Record<string, { hotel_id: string; total: number; ativos: number; inativos: number; male: number; female: number; other: number }> = {};
     for (const row of (data ?? []) as Array<{ hotel_id: string; status: string; gender: string | null }>) {
       const h = row.hotel_id;
