@@ -177,20 +177,18 @@ async function exportTable(
   table: string,
   url: URL,
 ): Promise<Response> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
-    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
   }
+  // Never interpolate a caller-supplied identifier into SQL, and never touch a
+  // name that is not part of the internally computed catalog.
   if (!discovered.has(table)) {
-    return errorResponse(
-      400,
-      "table_not_allowed",
-      `Table "${table}" is not exportable (missing or denied)`,
-      ctx.requestId,
-    );
+    return errorResponse(404, "resource_not_found", "Unknown resource", ctx.requestId);
   }
+  table = [...discovered.keys()].find((t) => t === table)!;
 
   const limit = Math.min(
     Math.max(parseInt(url.searchParams.get("limit") ?? `${DEFAULT_LIMIT}`, 10) || DEFAULT_LIMIT, 1),
@@ -206,12 +204,12 @@ async function exportTable(
 
   // Prefer the authoritative column list from pg_catalog so that empty
   // tables also work. Fall back to a 1-row sample if discovery is empty.
-  let cols: string[] = discovered.get(table) ?? [];
+  let cols: string[] = discovered.get(table)?.columns ?? [];
   if (cols.length === 0) {
     try {
       cols = await getTableColumns(ctx.supabase, table);
-    } catch (e) {
-      return errorResponse(500, "introspection_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "introspection_failed", "Introspection failed", ctx.requestId);
     }
   }
 
@@ -269,7 +267,10 @@ async function exportTable(
 
   const { data, error } = await q;
   if (error) {
-    return errorResponse(500, "query_failed", error.message, ctx.requestId);
+    console.log(JSON.stringify({
+      kind: "be_eight_export_query_error", request_id: ctx.requestId, resource: table,
+    }));
+    return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
   }
 
   const rows = (data ?? []).map((r) =>
