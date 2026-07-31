@@ -955,6 +955,27 @@ export type Database = {
         }
         Relationships: []
       }
+      be_eight_jti_replay: {
+        Row: {
+          created_at: string
+          expires_at: string
+          jti_hash: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          jti_hash: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          jti_hash?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       closing_status_log: {
         Row: {
           changed_by: string | null
@@ -2554,9 +2575,11 @@ export type Database = {
         Args: never
         Returns: {
           columns: string[]
+          object_kind: string
           table_name: string
         }[]
       }
+      be_eight_purge_expired_jti: { Args: never; Returns: number }
       can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
       can_read_dre_hotel: {

@@ -1,7 +1,30 @@
 // Be Eight read-only export API for Falcon Hoteis.
-// Auth: Authorization: Bearer <BE_EIGHT_EXPORT_TOKEN>
+//
+// Auth (server-to-server only, no end-user session):
+//   - Preferred: ES256 JWT signed by Be Eight (JWKS in BE_EIGHT_EXPORT_JWKS_JSON).
+//   - Temporary: legacy static bearer tokens, gated by
+//     BE_EIGHT_EXPORT_ALLOW_LEGACY_TOKEN (enabled in this delivery so the
+//     production cron keeps working). The security finding is only fully
+//     resolved once legacy mode is turned OFF.
+//
 // Only SELECT operations. Returns JSON. Paginated, max 1000 rows.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import {
+  authenticate,
+  checkRateLimit,
+  rateLimitMax,
+  sha256Hex,
+  SCOPE_SENSITIVE,
+  type AuthMode,
+} from "./auth.ts";
+import {
+  blockedColumns,
+  classifyColumn,
+  isBusinessSensitiveColumn,
+  stripRow,
+  TABLE_DENYLIST,
+  visibleColumns,
+} from "./catalog.ts";
 
 const SCHEMA_VERSION = "falcon-lovable-export-v3";
 const MAX_LIMIT = 1000;
@@ -13,80 +36,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-// Per-table column blocklist to avoid exposing secrets/credentials/tokens when
-// `include_sensitive` is NOT enabled. Privileged callers with
-// `include_sensitive=true` receive every column.
-const COLUMN_BLOCKLIST: Record<string, string[]> = {
-  profiles: ["email", "display_name", "phone", "avatar_url"],
-  user_permissions: [],
-  system_settings: ["value"],
-  rh_employees: ["cpf", "salary", "birth_date", "raw", "name", "full_name", "email", "phone"],
-  rh_org_nodes: ["email", "phone", "person_name"],
-  hotels: ["bank_accounts", "cnpj"],
-  // Client identification / banking-ish identifiers used for AR contracts.
-  ar_client_contracts: ["account_number", "account_name", "notes"],
-  // Guest-level PII and balances from the open-folio / to-invoice reports.
-  ar_open_folio_entries: ["account_name", "account_number", "guest_name", "raw"],
-  ar_to_invoice_entries: ["account_name", "account_number", "guest_name", "raw"],
-  comments: ["body"],
-  notification_queue: ["to_email", "payload", "body"],
-  email_send_log: ["to_email", "payload", "body"],
-  suppressed_emails: ["email"],
-  notification_unsubscribes: ["email"],
-};
-
-// Global column-name patterns that are always stripped, regardless of table.
-const GLOBAL_SENSITIVE_PATTERNS = [
-  /password/i,
-  /secret/i,
-  /service_role/i,
-  /^api_key$/i,
-  /access_token/i,
-  /refresh_token/i,
-  /private_key/i,
-  /token$/i,
-  /_token$/i,
-  /token_hash/i,
-  /_hash$/i,
-  /signed_url/i,
-  /credentials?/i,
-  /^cpf$/i,
-  /salary/i,
-  /birth_date/i,
-  /bank_accounts/i,
-  /cnpj/i,
-];
-
-// Minimal denylist: tables that should NEVER be exported (technical /
-// security artifacts, raw tokens, credentials, internal migrations). Business
-// tables — even those carrying sensitive data — are NOT denied here; their
-// sensitivity is handled per-column via COLUMN_BLOCKLIST /
-// GLOBAL_SENSITIVE_PATTERNS and the `include_sensitive` privileged flag.
-const TABLE_DENYLIST = new Set<string>([
-  // Raw unsubscribe token store — contains opaque security tokens, not
-  // business data. Bounce / unsubscribe behaviour is still exportable via
-  // `notification_unsubscribes` and `suppressed_emails`.
-  "email_unsubscribe_tokens",
-  // Account-recovery artifacts: never exportable, in any scope.
-  "password_setup_tokens",
-  // Authorization state — exporting it would leak the app's access model.
-  "user_roles",
-  "user_permissions",
-  "user_hotels",
-]);
-
-// Columns whose sensitivity is absolute: stripped even for privileged callers.
-const ALWAYS_STRIPPED_PATTERNS = [
-  /password/i,
-  /secret/i,
-  /service_role/i,
-  /private_key/i,
-  /token$/i,
-  /_token$/i,
-  /token_hash/i,
-  /^cpf$/i,
-];
-
+// Table denylist, column classification and row stripping live in catalog.ts.
 // Derived resources exposed via /export?resource=...
 const DERIVED_RESOURCES = [
   "dre_latest_lines",
@@ -121,7 +71,7 @@ interface RequestContext {
   supabase: ReturnType<typeof createClient>;
   scope: "standard" | "privileged";
   includeSensitive: boolean;
-  discovery?: Promise<Map<string, string[]>>;
+  discovery?: Promise<Map<string, { columns: string[]; kind: string }>>;
 }
 
 function newRequestId(): string {
@@ -151,32 +101,12 @@ function errorResponse(
   );
 }
 
-function isSensitiveColumn(table: string, column: string): boolean {
-  if (GLOBAL_SENSITIVE_PATTERNS.some((re) => re.test(column))) return true;
-  const list = COLUMN_BLOCKLIST[table];
-  if (list && list.includes(column)) return true;
-  return false;
-}
-
 function stripSensitive<T extends Record<string, unknown>>(
   table: string,
   row: T,
   includeSensitive: boolean,
 ): T {
-  if (includeSensitive) {
-    const kept: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(row)) {
-      if (ALWAYS_STRIPPED_PATTERNS.some((re) => re.test(k))) continue;
-      kept[k] = v;
-    }
-    return kept as T;
-  }
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (isSensitiveColumn(table, k)) continue;
-    out[k] = v;
-  }
-  return out as T;
+  return stripRow(table, row, includeSensitive);
 }
 
 async function getTableColumns(
@@ -191,23 +121,26 @@ async function getTableColumns(
   return Object.keys(data[0] as Record<string, unknown>);
 }
 
-// Discover all exportable public-schema base tables via a service_role-only
-// RPC. Tables in TABLE_DENYLIST are filtered out. Returns a map of
-// table_name -> column list. Cached per request via ctx.discovery.
+// Discover all exportable public-schema base tables AND views via a
+// service_role-only RPC. Only TABLE_DENYLIST entries (technical/security
+// artifacts) are filtered out, so new business tables/columns are picked up
+// automatically. Cached per request via ctx.discovery.
 async function discoverTables(
   supabase: ReturnType<typeof createClient>,
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, { columns: string[]; kind: string }>> {
   const { data, error } = await supabase.rpc("be_eight_list_tables");
-  if (error) throw new Error(`discovery_failed: ${error.message}`);
-  const map = new Map<string, string[]>();
-  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[] }>) {
+  if (error) throw new Error("discovery_failed");
+  const map = new Map<string, { columns: string[]; kind: string }>();
+  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[]; object_kind?: string }>) {
     if (TABLE_DENYLIST.has(row.table_name)) continue;
-    map.set(row.table_name, row.columns ?? []);
+    map.set(row.table_name, { columns: row.columns ?? [], kind: row.object_kind ?? "table" });
   }
   return map;
 }
 
-async function getDiscovery(ctx: RequestContext): Promise<Map<string, string[]>> {
+async function getDiscovery(
+  ctx: RequestContext,
+): Promise<Map<string, { columns: string[]; kind: string }>> {
   if (!ctx.discovery) ctx.discovery = discoverTables(ctx.supabase);
   return await ctx.discovery;
 }
@@ -244,20 +177,18 @@ async function exportTable(
   table: string,
   url: URL,
 ): Promise<Response> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
-    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
   }
+  // Never interpolate a caller-supplied identifier into SQL, and never touch a
+  // name that is not part of the internally computed catalog.
   if (!discovered.has(table)) {
-    return errorResponse(
-      400,
-      "table_not_allowed",
-      `Table "${table}" is not exportable (missing or denied)`,
-      ctx.requestId,
-    );
+    return errorResponse(404, "resource_not_found", "Unknown resource", ctx.requestId);
   }
+  table = [...discovered.keys()].find((t) => t === table)!;
 
   const limit = Math.min(
     Math.max(parseInt(url.searchParams.get("limit") ?? `${DEFAULT_LIMIT}`, 10) || DEFAULT_LIMIT, 1),
@@ -273,12 +204,12 @@ async function exportTable(
 
   // Prefer the authoritative column list from pg_catalog so that empty
   // tables also work. Fall back to a 1-row sample if discovery is empty.
-  let cols: string[] = discovered.get(table) ?? [];
+  let cols: string[] = discovered.get(table)?.columns ?? [];
   if (cols.length === 0) {
     try {
       cols = await getTableColumns(ctx.supabase, table);
-    } catch (e) {
-      return errorResponse(500, "introspection_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "introspection_failed", "Introspection failed", ctx.requestId);
     }
   }
 
@@ -336,7 +267,10 @@ async function exportTable(
 
   const { data, error } = await q;
   if (error) {
-    return errorResponse(500, "query_failed", error.message, ctx.requestId);
+    console.log(JSON.stringify({
+      kind: "be_eight_export_query_error", request_id: ctx.requestId, resource: table,
+    }));
+    return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
   }
 
   const rows = (data ?? []).map((r) =>
@@ -409,32 +343,35 @@ async function latestUpdatedAt(
 }
 
 async function handleManifest(ctx: RequestContext): Promise<Response> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
-    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
   }
   const tableNames = Array.from(discovered.keys()).sort();
   const tables = [];
   for (const t of tableNames) {
-    const cols: string[] = discovered.get(t) ?? [];
-    const sensitive = cols.filter((c) => isSensitiveColumn(t, c));
-    const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
+    const entry = discovered.get(t);
+    const cols: string[] = entry?.columns ?? [];
+    const sensitive = cols.filter((c) => isBusinessSensitiveColumn(t, c));
+    const secrets = cols.filter((c) => classifyColumn(t, c) === "technical_secret");
+    const visible = visibleColumns(t, cols, ctx.includeSensitive);
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
-    // In privileged + include_sensitive mode, no columns are blocked from the
-    // payload, but the manifest still flags them as sensitive for auditing.
-    const blocked = ctx.includeSensitive ? [] : sensitive;
+    // Metadata only: names of withheld columns are listed, values never are.
+    const blocked = blockedColumns(t, cols, ctx.includeSensitive);
     tables.push({
       table: t,
       resource: t,
+      object_kind: entry?.kind ?? "table",
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
       sensitive_columns: sensitive,
+      technical_secret_columns: secrets,
       row_count: rowCount,
       record_count: rowCount,
       cursor_column: cursorCol,
@@ -471,12 +408,12 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
 // No row data, no sensitive columns, no payload. Intended for smart syncs so
 // callers can skip resources that have not changed since their last cursor.
 async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; rowsReturned: number }> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
+  } catch {
     return {
-      res: errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId),
+      res: errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId),
       rowsReturned: 0,
     };
   }
@@ -489,7 +426,7 @@ async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; r
     record_count: number | null;
   }>;
   for (const t of tableNames) {
-    const cols: string[] = discovered.get(t) ?? [];
+    const cols: string[] = discovered.get(t)?.columns ?? [];
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const resStart = Date.now();
     const [rowCount, latest] = await Promise.all([
@@ -578,7 +515,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
       if (lastClosingId) closingsQ = closingsQ.gt("id", lastClosingId);
 
       const { data: closingsData, error: cErr } = await closingsQ;
-      if (cErr) return errorResponse(500, "query_failed", cErr.message, ctx.requestId);
+      if (cErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
       const batch = (closingsData ?? []) as Array<{ id: string }>;
       if (batch.length === 0) { exhausted = true; break; }
 
@@ -591,7 +528,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
         .from("dre_parsed_lines")
         .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
         .in("closing_id", ids);
-      if (lErr) return errorResponse(500, "query_failed", lErr.message, ctx.requestId);
+      if (lErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
       // Keep only the latest version_number per closing.
       const maxVersion = new Map<string, number>();
       for (const r of (allLines ?? []) as Array<{ closing_id: string; version_number: number }>) {
@@ -646,7 +583,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     const { data, error } = await ctx.supabase
       .from("rh_employees")
       .select("hotel_id, status, gender");
-    if (error) return errorResponse(500, "query_failed", error.message, ctx.requestId);
+    if (error) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     const byHotel: Record<string, { hotel_id: string; total: number; ativos: number; inativos: number; male: number; female: number; other: number }> = {};
     for (const row of (data ?? []) as Array<{ hotel_id: string; status: string; gender: string | null }>) {
       const h = row.hotel_id;
@@ -680,8 +617,8 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     let allTables: string[];
     try {
       allTables = Array.from((await getDiscovery(ctx)).keys()).sort();
-    } catch (e) {
-      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
     }
     const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
@@ -701,18 +638,18 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   if (resource === "latest_updates") {
     const parsed = parseCursor(cursorParam);
     const startToken = parsed?.value ? String(parsed.value) : "";
-    let discovered: Map<string, string[]>;
+    let discovered: Map<string, { columns: string[]; kind: string }>;
     try {
       discovered = await getDiscovery(ctx);
-    } catch (e) {
-      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
     }
     const allTables = Array.from(discovered.keys()).sort();
     const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; column: string | null; latest: string | null }> = [];
     for (const t of page) {
-      const cols = discovered.get(t) ?? [];
+      const cols = discovered.get(t)?.columns ?? [];
       const col = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
       if (!col) { rows.push({ table: t, column: null, latest: null }); continue; }
       const { data, error } = await ctx.supabase
@@ -730,7 +667,18 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     }, 200, ctx.requestId);
   }
 
-  return errorResponse(400, "resource_not_allowed", `Resource "${resource}" not supported`, ctx.requestId);
+  // Base resources: fall through to the catalog-validated table export so that
+  // /export?resource=<new_business_table> works automatically.
+  let discovered: Map<string, { columns: string[]; kind: string }>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
+  }
+  if (discovered.has(resource)) {
+    return await exportTable(ctx, resource, url);
+  }
+  return errorResponse(404, "resource_not_found", "Unknown resource", ctx.requestId);
 }
 
 Deno.serve(async (req) => {
@@ -740,25 +688,35 @@ Deno.serve(async (req) => {
     return errorResponse(405, "method_not_allowed", "Only GET is supported", requestId);
   }
 
-  // Custom token auth.
-  const expected = Deno.env.get("BE_EIGHT_EXPORT_TOKEN");
-  const privilegedExpected = Deno.env.get("BE_EIGHT_EXPORT_PRIVILEGED_TOKEN");
-  if (!expected) {
-    return errorResponse(500, "server_misconfigured", "Export token not configured", requestId);
+  const startedAtAuth = Date.now();
+  const env = (k: string) => Deno.env.get(k);
+  const authLog = (extra: Record<string, unknown>) => {
+    // Auth audit line. Never contains the bearer token, the JWT, its payload
+    // or its signature.
+    console.log(JSON.stringify({
+      kind: "be_eight_export_auth",
+      request_id: requestId,
+      at: new Date().toISOString(),
+      duration_ms: Date.now() - startedAtAuth,
+      ...extra,
+    }));
+  };
+
+  // --- Authentication (fully validated BEFORE any service_role client) ------
+  const authResult = await authenticate(req.headers.get("Authorization"), env);
+  if (!authResult.ok) {
+    authLog({ result: "denied", status: authResult.status, reason: authResult.reason });
+    return errorResponse(authResult.status, authResult.errorCode, authResult.message, requestId);
   }
-  const auth = req.headers.get("Authorization") ?? "";
-  const m = /^Bearer\s+(.+)$/i.exec(auth);
-  if (!m) {
-    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
-  }
-  const presented = m[1];
-  let scope: "standard" | "privileged";
-  if (privilegedExpected && presented === privilegedExpected) {
-    scope = "privileged";
-  } else if (presented === expected) {
-    scope = "standard";
-  } else {
-    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
+  const authMode: AuthMode = authResult.mode;
+  const sub = authResult.sub;
+  const kid = authResult.kid;
+
+  // --- Rate limiting per credential subject (fail-closed) ------------------
+  const rl = checkRateLimit(`${authMode}:${sub}`, rateLimitMax(env));
+  if (!rl.allowed) {
+    authLog({ result: "rate_limited", status: 429, auth_mode: authMode, sub });
+    return errorResponse(429, "rate_limited", "Too many requests", requestId);
   }
 
   const supabase = createClient(
@@ -766,14 +724,38 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+
+  // --- Replay protection (JWT only: one jti per request) -------------------
+  if (authMode === "jwt" && authResult.jti) {
+    try {
+      const jtiHash = await sha256Hex(`${sub}:${authResult.jti}`);
+      const expiresAt = new Date((authResult.exp ?? Math.floor(Date.now() / 1000) + 300) * 1000)
+        .toISOString();
+      const { error: replayErr } = await supabase
+        .from("be_eight_jti_replay")
+        .insert({ jti_hash: jtiHash, subject: sub, expires_at: expiresAt });
+      if (replayErr) {
+        authLog({ result: "denied", status: 401, reason: "jti_replay_or_store_error", auth_mode: authMode, sub, kid });
+        return errorResponse(401, "unauthorized", "Invalid or missing credentials", requestId);
+      }
+      // Opportunistic, safe cleanup of already-expired records.
+      supabase.rpc("be_eight_purge_expired_jti").then(() => {}, () => {});
+    } catch {
+      authLog({ result: "denied", status: 401, reason: "replay_check_failed", auth_mode: authMode, sub, kid });
+      return errorResponse(401, "unauthorized", "Invalid or missing credentials", requestId);
+    }
+  }
+
+  const scope: "standard" | "privileged" = authResult.scope;
   const url = new URL(req.url);
   const includeSensitiveParam = (url.searchParams.get("include_sensitive") ?? "").toLowerCase();
   const wantsSensitive = includeSensitiveParam === "true" || includeSensitiveParam === "1";
-  if (wantsSensitive && scope !== "privileged") {
+  if (wantsSensitive && !authResult.scopes.includes(SCOPE_SENSITIVE)) {
+    authLog({ result: "denied", status: 403, reason: "missing_sensitive_scope", auth_mode: authMode, sub, kid });
     return errorResponse(
       403,
       "forbidden_scope",
-      "include_sensitive requires the privileged bearer token",
+      "include_sensitive requires the export:sensitive scope",
       requestId,
     );
   }
@@ -791,13 +773,15 @@ Deno.serve(async (req) => {
     console.log(JSON.stringify({
       kind: "be_eight_export_audit",
       request_id: requestId,
+      auth_mode: authMode,
+      sub,
+      kid,
       scope,
       include_sensitive: includeSensitive,
       method: req.method,
       path,
       resource: resourceParam,
       updated_since: updatedSinceParam,
-      params: Object.fromEntries(url.searchParams.entries()),
       user_agent: req.headers.get("user-agent") ?? null,
       at: new Date().toISOString(),
       duration_ms: Date.now() - startedAt,
@@ -853,7 +837,8 @@ Deno.serve(async (req) => {
     audit({ status: response.status, rows_returned: rowsReturned });
     return response;
   } catch (err) {
+    // Internal detail stays in the log; the caller only gets a request_id.
     audit({ status: 500, rows_returned: 0, error: err instanceof Error ? err.message : "unknown" });
-    return errorResponse(500, "internal_error", err instanceof Error ? err.message : "unknown", requestId);
+    return errorResponse(500, "internal_error", "Internal error", requestId);
   }
 });
