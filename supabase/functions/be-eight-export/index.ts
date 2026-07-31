@@ -343,32 +343,35 @@ async function latestUpdatedAt(
 }
 
 async function handleManifest(ctx: RequestContext): Promise<Response> {
-  let discovered: Map<string, string[]>;
+  let discovered: Map<string, { columns: string[]; kind: string }>;
   try {
     discovered = await getDiscovery(ctx);
-  } catch (e) {
-    return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
   }
   const tableNames = Array.from(discovered.keys()).sort();
   const tables = [];
   for (const t of tableNames) {
-    const cols: string[] = discovered.get(t) ?? [];
-    const sensitive = cols.filter((c) => isSensitiveColumn(t, c));
-    const visible = ctx.includeSensitive ? cols : cols.filter((c) => !isSensitiveColumn(t, c));
+    const entry = discovered.get(t);
+    const cols: string[] = entry?.columns ?? [];
+    const sensitive = cols.filter((c) => isBusinessSensitiveColumn(t, c));
+    const secrets = cols.filter((c) => classifyColumn(t, c) === "technical_secret");
+    const visible = visibleColumns(t, cols, ctx.includeSensitive);
     const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
-    // In privileged + include_sensitive mode, no columns are blocked from the
-    // payload, but the manifest still flags them as sensitive for auditing.
-    const blocked = ctx.includeSensitive ? [] : sensitive;
+    // Metadata only: names of withheld columns are listed, values never are.
+    const blocked = blockedColumns(t, cols, ctx.includeSensitive);
     tables.push({
       table: t,
       resource: t,
+      object_kind: entry?.kind ?? "table",
       columns: visible,
       hidden_columns: blocked,
       blocked_columns: blocked,
       sensitive_columns: sensitive,
+      technical_secret_columns: secrets,
       row_count: rowCount,
       record_count: rowCount,
       cursor_column: cursorCol,
