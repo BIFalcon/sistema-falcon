@@ -121,23 +121,26 @@ async function getTableColumns(
   return Object.keys(data[0] as Record<string, unknown>);
 }
 
-// Discover all exportable public-schema base tables via a service_role-only
-// RPC. Tables in TABLE_DENYLIST are filtered out. Returns a map of
-// table_name -> column list. Cached per request via ctx.discovery.
+// Discover all exportable public-schema base tables AND views via a
+// service_role-only RPC. Only TABLE_DENYLIST entries (technical/security
+// artifacts) are filtered out, so new business tables/columns are picked up
+// automatically. Cached per request via ctx.discovery.
 async function discoverTables(
   supabase: ReturnType<typeof createClient>,
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, { columns: string[]; kind: string }>> {
   const { data, error } = await supabase.rpc("be_eight_list_tables");
-  if (error) throw new Error(`discovery_failed: ${error.message}`);
-  const map = new Map<string, string[]>();
-  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[] }>) {
+  if (error) throw new Error("discovery_failed");
+  const map = new Map<string, { columns: string[]; kind: string }>();
+  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[]; object_kind?: string }>) {
     if (TABLE_DENYLIST.has(row.table_name)) continue;
-    map.set(row.table_name, row.columns ?? []);
+    map.set(row.table_name, { columns: row.columns ?? [], kind: row.object_kind ?? "table" });
   }
   return map;
 }
 
-async function getDiscovery(ctx: RequestContext): Promise<Map<string, string[]>> {
+async function getDiscovery(
+  ctx: RequestContext,
+): Promise<Map<string, { columns: string[]; kind: string }>> {
   if (!ctx.discovery) ctx.discovery = discoverTables(ctx.supabase);
   return await ctx.discovery;
 }
