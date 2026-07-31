@@ -688,25 +688,35 @@ Deno.serve(async (req) => {
     return errorResponse(405, "method_not_allowed", "Only GET is supported", requestId);
   }
 
-  // Custom token auth.
-  const expected = Deno.env.get("BE_EIGHT_EXPORT_TOKEN");
-  const privilegedExpected = Deno.env.get("BE_EIGHT_EXPORT_PRIVILEGED_TOKEN");
-  if (!expected) {
-    return errorResponse(500, "server_misconfigured", "Export token not configured", requestId);
+  const startedAtAuth = Date.now();
+  const env = (k: string) => Deno.env.get(k);
+  const authLog = (extra: Record<string, unknown>) => {
+    // Auth audit line. Never contains the bearer token, the JWT, its payload
+    // or its signature.
+    console.log(JSON.stringify({
+      kind: "be_eight_export_auth",
+      request_id: requestId,
+      at: new Date().toISOString(),
+      duration_ms: Date.now() - startedAtAuth,
+      ...extra,
+    }));
+  };
+
+  // --- Authentication (fully validated BEFORE any service_role client) ------
+  const authResult = await authenticate(req.headers.get("Authorization"), env);
+  if (!authResult.ok) {
+    authLog({ result: "denied", status: authResult.status, reason: authResult.reason });
+    return errorResponse(authResult.status, authResult.errorCode, authResult.message, requestId);
   }
-  const auth = req.headers.get("Authorization") ?? "";
-  const m = /^Bearer\s+(.+)$/i.exec(auth);
-  if (!m) {
-    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
-  }
-  const presented = m[1];
-  let scope: "standard" | "privileged";
-  if (privilegedExpected && presented === privilegedExpected) {
-    scope = "privileged";
-  } else if (presented === expected) {
-    scope = "standard";
-  } else {
-    return errorResponse(401, "unauthorized", "Invalid or missing bearer token", requestId);
+  const authMode: AuthMode = authResult.mode;
+  const sub = authResult.sub;
+  const kid = authResult.kid;
+
+  // --- Rate limiting per credential subject (fail-closed) ------------------
+  const rl = checkRateLimit(`${authMode}:${sub}`, rateLimitMax(env));
+  if (!rl.allowed) {
+    authLog({ result: "rate_limited", status: 429, auth_mode: authMode, sub });
+    return errorResponse(429, "rate_limited", "Too many requests", requestId);
   }
 
   const supabase = createClient(
@@ -714,14 +724,38 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+
+  // --- Replay protection (JWT only: one jti per request) -------------------
+  if (authMode === "jwt" && authResult.jti) {
+    try {
+      const jtiHash = await sha256Hex(`${sub}:${authResult.jti}`);
+      const expiresAt = new Date((authResult.exp ?? Math.floor(Date.now() / 1000) + 300) * 1000)
+        .toISOString();
+      const { error: replayErr } = await supabase
+        .from("be_eight_jti_replay")
+        .insert({ jti_hash: jtiHash, subject: sub, expires_at: expiresAt });
+      if (replayErr) {
+        authLog({ result: "denied", status: 401, reason: "jti_replay_or_store_error", auth_mode: authMode, sub, kid });
+        return errorResponse(401, "unauthorized", "Invalid or missing credentials", requestId);
+      }
+      // Opportunistic, safe cleanup of already-expired records.
+      supabase.rpc("be_eight_purge_expired_jti").then(() => {}, () => {});
+    } catch {
+      authLog({ result: "denied", status: 401, reason: "replay_check_failed", auth_mode: authMode, sub, kid });
+      return errorResponse(401, "unauthorized", "Invalid or missing credentials", requestId);
+    }
+  }
+
+  const scope: "standard" | "privileged" = authResult.scope;
   const url = new URL(req.url);
   const includeSensitiveParam = (url.searchParams.get("include_sensitive") ?? "").toLowerCase();
   const wantsSensitive = includeSensitiveParam === "true" || includeSensitiveParam === "1";
-  if (wantsSensitive && scope !== "privileged") {
+  if (wantsSensitive && !authResult.scopes.includes(SCOPE_SENSITIVE)) {
+    authLog({ result: "denied", status: 403, reason: "missing_sensitive_scope", auth_mode: authMode, sub, kid });
     return errorResponse(
       403,
       "forbidden_scope",
-      "include_sensitive requires the privileged bearer token",
+      "include_sensitive requires the export:sensitive scope",
       requestId,
     );
   }
@@ -739,13 +773,15 @@ Deno.serve(async (req) => {
     console.log(JSON.stringify({
       kind: "be_eight_export_audit",
       request_id: requestId,
+      auth_mode: authMode,
+      sub,
+      kid,
       scope,
       include_sensitive: includeSensitive,
       method: req.method,
       path,
       resource: resourceParam,
       updated_since: updatedSinceParam,
-      params: Object.fromEntries(url.searchParams.entries()),
       user_agent: req.headers.get("user-agent") ?? null,
       at: new Date().toISOString(),
       duration_ms: Date.now() - startedAt,
