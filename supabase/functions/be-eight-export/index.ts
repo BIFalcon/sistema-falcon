@@ -1,7 +1,30 @@
 // Be Eight read-only export API for Falcon Hoteis.
-// Auth: Authorization: Bearer <BE_EIGHT_EXPORT_TOKEN>
+//
+// Auth (server-to-server only, no end-user session):
+//   - Preferred: ES256 JWT signed by Be Eight (JWKS in BE_EIGHT_EXPORT_JWKS_JSON).
+//   - Temporary: legacy static bearer tokens, gated by
+//     BE_EIGHT_EXPORT_ALLOW_LEGACY_TOKEN (enabled in this delivery so the
+//     production cron keeps working). The security finding is only fully
+//     resolved once legacy mode is turned OFF.
+//
 // Only SELECT operations. Returns JSON. Paginated, max 1000 rows.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import {
+  authenticate,
+  checkRateLimit,
+  rateLimitMax,
+  sha256Hex,
+  SCOPE_SENSITIVE,
+  type AuthMode,
+} from "./auth.ts";
+import {
+  blockedColumns,
+  classifyColumn,
+  isBusinessSensitiveColumn,
+  stripRow,
+  TABLE_DENYLIST,
+  visibleColumns,
+} from "./catalog.ts";
 
 const SCHEMA_VERSION = "falcon-lovable-export-v3";
 const MAX_LIMIT = 1000;
@@ -13,80 +36,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-// Per-table column blocklist to avoid exposing secrets/credentials/tokens when
-// `include_sensitive` is NOT enabled. Privileged callers with
-// `include_sensitive=true` receive every column.
-const COLUMN_BLOCKLIST: Record<string, string[]> = {
-  profiles: ["email", "display_name", "phone", "avatar_url"],
-  user_permissions: [],
-  system_settings: ["value"],
-  rh_employees: ["cpf", "salary", "birth_date", "raw", "name", "full_name", "email", "phone"],
-  rh_org_nodes: ["email", "phone", "person_name"],
-  hotels: ["bank_accounts", "cnpj"],
-  // Client identification / banking-ish identifiers used for AR contracts.
-  ar_client_contracts: ["account_number", "account_name", "notes"],
-  // Guest-level PII and balances from the open-folio / to-invoice reports.
-  ar_open_folio_entries: ["account_name", "account_number", "guest_name", "raw"],
-  ar_to_invoice_entries: ["account_name", "account_number", "guest_name", "raw"],
-  comments: ["body"],
-  notification_queue: ["to_email", "payload", "body"],
-  email_send_log: ["to_email", "payload", "body"],
-  suppressed_emails: ["email"],
-  notification_unsubscribes: ["email"],
-};
-
-// Global column-name patterns that are always stripped, regardless of table.
-const GLOBAL_SENSITIVE_PATTERNS = [
-  /password/i,
-  /secret/i,
-  /service_role/i,
-  /^api_key$/i,
-  /access_token/i,
-  /refresh_token/i,
-  /private_key/i,
-  /token$/i,
-  /_token$/i,
-  /token_hash/i,
-  /_hash$/i,
-  /signed_url/i,
-  /credentials?/i,
-  /^cpf$/i,
-  /salary/i,
-  /birth_date/i,
-  /bank_accounts/i,
-  /cnpj/i,
-];
-
-// Minimal denylist: tables that should NEVER be exported (technical /
-// security artifacts, raw tokens, credentials, internal migrations). Business
-// tables — even those carrying sensitive data — are NOT denied here; their
-// sensitivity is handled per-column via COLUMN_BLOCKLIST /
-// GLOBAL_SENSITIVE_PATTERNS and the `include_sensitive` privileged flag.
-const TABLE_DENYLIST = new Set<string>([
-  // Raw unsubscribe token store — contains opaque security tokens, not
-  // business data. Bounce / unsubscribe behaviour is still exportable via
-  // `notification_unsubscribes` and `suppressed_emails`.
-  "email_unsubscribe_tokens",
-  // Account-recovery artifacts: never exportable, in any scope.
-  "password_setup_tokens",
-  // Authorization state — exporting it would leak the app's access model.
-  "user_roles",
-  "user_permissions",
-  "user_hotels",
-]);
-
-// Columns whose sensitivity is absolute: stripped even for privileged callers.
-const ALWAYS_STRIPPED_PATTERNS = [
-  /password/i,
-  /secret/i,
-  /service_role/i,
-  /private_key/i,
-  /token$/i,
-  /_token$/i,
-  /token_hash/i,
-  /^cpf$/i,
-];
-
+// Table denylist, column classification and row stripping live in catalog.ts.
 // Derived resources exposed via /export?resource=...
 const DERIVED_RESOURCES = [
   "dre_latest_lines",
@@ -121,7 +71,7 @@ interface RequestContext {
   supabase: ReturnType<typeof createClient>;
   scope: "standard" | "privileged";
   includeSensitive: boolean;
-  discovery?: Promise<Map<string, string[]>>;
+  discovery?: Promise<Map<string, { columns: string[]; kind: string }>>;
 }
 
 function newRequestId(): string {
@@ -151,32 +101,12 @@ function errorResponse(
   );
 }
 
-function isSensitiveColumn(table: string, column: string): boolean {
-  if (GLOBAL_SENSITIVE_PATTERNS.some((re) => re.test(column))) return true;
-  const list = COLUMN_BLOCKLIST[table];
-  if (list && list.includes(column)) return true;
-  return false;
-}
-
 function stripSensitive<T extends Record<string, unknown>>(
   table: string,
   row: T,
   includeSensitive: boolean,
 ): T {
-  if (includeSensitive) {
-    const kept: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(row)) {
-      if (ALWAYS_STRIPPED_PATTERNS.some((re) => re.test(k))) continue;
-      kept[k] = v;
-    }
-    return kept as T;
-  }
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (isSensitiveColumn(table, k)) continue;
-    out[k] = v;
-  }
-  return out as T;
+  return stripRow(table, row, includeSensitive);
 }
 
 async function getTableColumns(
