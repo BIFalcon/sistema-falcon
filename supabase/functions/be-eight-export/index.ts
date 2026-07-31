@@ -837,7 +837,8 @@ Deno.serve(async (req) => {
     audit({ status: response.status, rows_returned: rowsReturned });
     return response;
   } catch (err) {
+    // Internal detail stays in the log; the caller only gets a request_id.
     audit({ status: 500, rows_returned: 0, error: err instanceof Error ? err.message : "unknown" });
-    return errorResponse(500, "internal_error", err instanceof Error ? err.message : "unknown", requestId);
+    return errorResponse(500, "internal_error", "Internal error", requestId);
   }
 });
