@@ -617,8 +617,8 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     let allTables: string[];
     try {
       allTables = Array.from((await getDiscovery(ctx)).keys()).sort();
-    } catch (e) {
-      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
     }
     const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
@@ -638,18 +638,18 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   if (resource === "latest_updates") {
     const parsed = parseCursor(cursorParam);
     const startToken = parsed?.value ? String(parsed.value) : "";
-    let discovered: Map<string, string[]>;
+    let discovered: Map<string, { columns: string[]; kind: string }>;
     try {
       discovered = await getDiscovery(ctx);
-    } catch (e) {
-      return errorResponse(500, "discovery_failed", e instanceof Error ? e.message : "unknown", ctx.requestId);
+    } catch {
+      return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
     }
     const allTables = Array.from(discovered.keys()).sort();
     const remaining = allTables.filter((t) => t > startToken);
     const page = remaining.slice(0, limit);
     const rows: Array<{ table: string; column: string | null; latest: string | null }> = [];
     for (const t of page) {
-      const cols = discovered.get(t) ?? [];
+      const cols = discovered.get(t)?.columns ?? [];
       const col = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
       if (!col) { rows.push({ table: t, column: null, latest: null }); continue; }
       const { data, error } = await ctx.supabase
@@ -667,7 +667,18 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     }, 200, ctx.requestId);
   }
 
-  return errorResponse(400, "resource_not_allowed", `Resource "${resource}" not supported`, ctx.requestId);
+  // Base resources: fall through to the catalog-validated table export so that
+  // /export?resource=<new_business_table> works automatically.
+  let discovered: Map<string, { columns: string[]; kind: string }>;
+  try {
+    discovered = await getDiscovery(ctx);
+  } catch {
+    return errorResponse(500, "discovery_failed", "Catalog unavailable", ctx.requestId);
+  }
+  if (discovered.has(resource)) {
+    return await exportTable(ctx, resource, url);
+  }
+  return errorResponse(404, "resource_not_found", "Unknown resource", ctx.requestId);
 }
 
 Deno.serve(async (req) => {
