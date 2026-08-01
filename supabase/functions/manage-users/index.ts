@@ -292,12 +292,26 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
+    // Somente 'processos' pode conceder o papel 'processos' (super-admin).
+    if (
+      (payload.action === "invite" || payload.action === "update") &&
+      payload.primary_role === "processos" &&
+      !isProcessos
+    ) {
+      return json({ error: "only_processos_can_grant_processos" }, 403);
+    }
+    // Somente 'processos' pode promover alguém a master (papel 'fernando').
+    if (
+      (payload.action === "invite" || payload.action === "update") &&
+      payload.is_master &&
+      !isProcessos
+    ) {
+      return json({ error: "only_processos_can_create_master" }, 403);
+    }
+
     switch (payload.action) {
       case "invite": {
         if (!payload.email) return json({ error: "email_required" }, 400);
-        if (payload.is_master && !isProcessos) {
-          return json({ error: "only_processos_can_create_master" }, 403);
-        }
 
         const origin = getAppBaseUrl();
 
