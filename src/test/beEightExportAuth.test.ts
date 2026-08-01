@@ -14,15 +14,15 @@ import {
   sha256Hex,
 } from "../../supabase/functions/be-eight-export/auth.ts";
 import {
-
-type _Fail = { ok: false; status: number; errorCode: string; message: string; reason: string };
-const asFail = (r: unknown) => r as _Fail;
   classifyColumn,
   visibleColumns,
   blockedColumns,
   stripRow,
   TABLE_DENYLIST,
 } from "../../supabase/functions/be-eight-export/catalog.ts";
+
+type _Fail = { ok: false; status: number; errorCode: string; message: string; reason: string };
+const asFail = (r: unknown) => r as _Fail;
 
 // ---------------------------------------------------------------------------
 // Helpers: real ES256 keypair + JWT signing (mirrors what Be Eight will do).
