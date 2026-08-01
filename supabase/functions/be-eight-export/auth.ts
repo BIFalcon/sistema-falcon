@@ -244,8 +244,8 @@ async function webCryptoVerify(jwk: Jwk, data: string, sig: Uint8Array): Promise
   return await crypto.subtle.verify(
     { name: "ECDSA", hash: { name: "SHA-256" } },
     key,
-    sig,
-    new TextEncoder().encode(data),
+    sig.slice().buffer as ArrayBuffer,
+    new TextEncoder().encode(data).slice().buffer as ArrayBuffer,
   );
 }
 
