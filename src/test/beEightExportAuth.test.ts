@@ -96,13 +96,13 @@ describe("be-eight-export auth", () => {
   it("1. no Authorization header -> 401", async () => {
     const r = await authenticate(null, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
   });
 
   it("2. invalid token -> 401", async () => {
     const r = await authenticate("Bearer totally-wrong", envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
   });
 
   it("3. valid JWT with export:read -> allowed, standard scope", async () => {
@@ -121,7 +121,7 @@ describe("be-eight-export auth", () => {
     const t = await signJwt(baseClaims({ iat: now - 600, exp: now - 300 }));
     const r = await authenticate(`Bearer ${t}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect([401]).toContain(r.status);
+    if (!r.ok as boolean) expect([401]).toContain(r.status);
   });
 
   it("4b. JWT with TTL over 5 minutes -> 401", async () => {
@@ -134,19 +134,19 @@ describe("be-eight-export auth", () => {
   it("5. wrong iss -> 401", async () => {
     const r = await authenticate(`Bearer ${await signJwt(baseClaims({ iss: "someone-else" }))}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
   });
 
   it("6. wrong aud -> 401", async () => {
     const r = await authenticate(`Bearer ${await signJwt(baseClaims({ aud: "other-api" }))}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
   });
 
   it("7. unauthorized sub -> 403", async () => {
     const r = await authenticate(`Bearer ${await signJwt(baseClaims({ sub: "attacker" }))}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(403);
+    if (!r.ok as boolean) expect(r.status).toBe(403);
   });
 
   it("7b. configured extra subject is accepted", async () => {
@@ -160,7 +160,7 @@ describe("be-eight-export auth", () => {
   it("8. unknown kid -> 401", async () => {
     const r = await authenticate(`Bearer ${await signJwt(baseClaims(), { kid: "nope" })}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
   });
 
   it("9. non-ES256 alg (incl. alg=none) -> 401", async () => {
@@ -214,7 +214,7 @@ describe("be-eight-export auth", () => {
   it("11b. JWT without export:read -> 403", async () => {
     const r = await authenticate(`Bearer ${await signJwt(baseClaims({ scope: "something:else" }))}`, envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(403);
+    if (!r.ok as boolean) expect(r.status).toBe(403);
   });
 
   it("13. legacy tokens still work while the flag is on", async () => {
@@ -236,7 +236,7 @@ describe("be-eight-export auth", () => {
     const env = envWith({ BE_EIGHT_EXPORT_ALLOW_LEGACY_TOKEN: "false" });
     const r = await authenticate("Bearer legacy-privileged-token-value", env);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(401);
+    if (!r.ok as boolean) expect(r.status).toBe(401);
     // JWT keeps working with legacy disabled.
     const jwt = await authenticate(`Bearer ${await signJwt(baseClaims())}`, env);
     expect(jwt.ok).toBe(true);
@@ -245,7 +245,7 @@ describe("be-eight-export auth", () => {
   it("26. failures never echo the presented credential", async () => {
     const r = await authenticate("Bearer super-secret-value", envWith());
     expect(r.ok).toBe(false);
-    if (!r.ok) {
+    if (!r.ok as boolean) {
       expect(JSON.stringify(r)).not.toContain("super-secret-value");
       expect(r.message).toBe("Invalid or missing credentials");
     }
