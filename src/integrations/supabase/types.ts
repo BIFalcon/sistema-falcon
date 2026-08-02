@@ -2571,6 +2571,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      be_eight_dre_latest_lines: {
+        Args: {
+          _after_closing_id?: string
+          _after_line_id?: string
+          _closing_id?: string
+          _hotel_id?: string
+          _limit?: number
+          _only_indicators?: boolean
+        }
+        Returns: {
+          closing_id: string
+          id: string
+          line_category: string
+          line_label: string
+          line_level: number
+          line_segment: string
+          line_type: string
+          line_value: number
+          version_number: number
+        }[]
+      }
       be_eight_list_tables: {
         Args: never
         Returns: {
