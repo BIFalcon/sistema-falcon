@@ -494,87 +494,39 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   const hotelId = url.searchParams.get("hotel_id");
 
   if (resource === "dre_latest_lines" || resource === "dre_latest_indicators") {
-    // Keyset pagination by closing_id. Fetch a window of closings, then load
-    // only their latest DRE lines via RPC. The cursor advances over closings,
-    // not over lines, but the response still respects `limit` by returning at
-    // most `limit` rows per page (lines that don't fit are deferred).
+    // Row-level keyset pagination over (closing_id, id). The dedupe to the
+    // latest version_number per closing happens inside the privileged RPC in
+    // SQL, so no PostgREST row limit can truncate the set before dedupe. A
+    // closing larger than `limit` is paginated internally — never truncated.
     const parsed = parseCursor(cursorParam);
-    const batchSize = Math.min(50, limit);
-    let collected: Array<Record<string, unknown>> = [];
-    let lastClosingId: string | null = parsed?.value ? String(parsed.value) : null;
-    let exhausted = false;
+    const afterClosingId = parsed?.value ? String(parsed.value) : null;
+    const afterLineId = parsed?.id ?? null;
 
-    while (collected.length < limit) {
-      let closingsQ = ctx.supabase
-        .from("closings")
-        .select("id, hotel_id")
-        .order("id", { ascending: true })
-        .limit(batchSize);
-      if (hotelId) closingsQ = closingsQ.eq("hotel_id", hotelId);
-      if (closingId) closingsQ = closingsQ.eq("id", closingId);
-      if (lastClosingId) closingsQ = closingsQ.gt("id", lastClosingId);
-
-      const { data: closingsData, error: cErr } = await closingsQ;
-      if (cErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
-      const batch = (closingsData ?? []) as Array<{ id: string }>;
-      if (batch.length === 0) { exhausted = true; break; }
-
-      const ids = batch.map((c) => c.id);
-      // Use service-role direct query instead of the SECURITY DEFINER RPC,
-      // which requires auth.uid() and rejects service-role callers. The Be
-      // Eight external token is already validated above; scoping is enforced
-      // at the HTTP layer, not via app-user RLS.
-      const { data: allLines, error: lErr } = await ctx.supabase
-        .from("dre_parsed_lines")
-        .select("closing_id, line_label, line_value, version_number, line_type, line_level, line_category, line_segment")
-        .in("closing_id", ids);
-      if (lErr) return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
-      // Keep only the latest version_number per closing.
-      const maxVersion = new Map<string, number>();
-      for (const r of (allLines ?? []) as Array<{ closing_id: string; version_number: number }>) {
-        const cur = maxVersion.get(r.closing_id) ?? -Infinity;
-        if (r.version_number > cur) maxVersion.set(r.closing_id, r.version_number);
-      }
-      let lines = ((allLines ?? []) as Array<{ closing_id: string; version_number: number; line_type: string }>)
-        .filter((r) => r.version_number === maxVersion.get(r.closing_id));
-      if (resource === "dre_latest_indicators") {
-        lines = lines.filter((r) => r.line_type === "indicator");
-      }
-      // Group by closing_id (preserve closing order).
-      const byClosing = new Map<string, Array<Record<string, unknown>>>();
-      for (const id of ids) byClosing.set(id, []);
-      for (const l of lines) {
-        const arr = byClosing.get(l.closing_id);
-        if (arr) arr.push(l as unknown as Record<string, unknown>);
-      }
-
-      let stopped = false;
-      for (const id of ids) {
-        const arr = byClosing.get(id) ?? [];
-        if (collected.length + arr.length > limit) {
-          // Don't split a closing across pages — stop before it.
-          if (collected.length === 0) {
-            // A single closing exceeds limit; truncate to keep contract.
-            collected = arr.slice(0, limit);
-            lastClosingId = id;
-          }
-          stopped = true;
-          break;
-        }
-        collected = collected.concat(arr);
-        lastClosingId = id;
-        if (collected.length >= limit) { stopped = true; break; }
-      }
-      if (stopped) break;
-      if (batch.length < batchSize) { exhausted = true; break; }
-      if (closingId) { exhausted = true; break; }
+    const { data, error } = await ctx.supabase.rpc("be_eight_dre_latest_lines", {
+      _hotel_id: hotelId,
+      _closing_id: closingId,
+      _only_indicators: resource === "dre_latest_indicators",
+      _after_closing_id: afterClosingId,
+      _after_line_id: afterLineId,
+      _limit: limit + 1,
+    });
+    if (error) {
+      console.log(JSON.stringify({
+        kind: "be_eight_export_query_error", request_id: ctx.requestId, resource,
+      }));
+      return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     }
-
-    const hasMore = !exhausted;
-    const nextCursor = hasMore && lastClosingId ? encodeCursor(lastClosingId, null) : null;
+    const all = (data ?? []) as Array<Record<string, unknown>>;
+    const hasMore = all.length > limit;
+    const collected = hasMore ? all.slice(0, limit) : all;
+    const last = collected[collected.length - 1];
+    const nextCursor = hasMore && last
+      ? encodeCursor(String(last.closing_id), String(last.id))
+      : null;
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
-      limit, count: collected.length, next_cursor: nextCursor, has_more: hasMore,
+      cursor_column: "closing_id,id",
+      limit, count: collected.length, next_cursor: nextCursor, has_more: nextCursor !== null,
       rows: collected,
     }, 200, ctx.requestId);
   }
