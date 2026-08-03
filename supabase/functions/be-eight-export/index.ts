@@ -66,6 +66,28 @@ const INCREMENTAL_CANDIDATES = [
 ];
 const CURSOR_CANDIDATES = [...INCREMENTAL_CANDIDATES, "id"];
 
+// Columns that are safe to paginate on: unique (or effectively unique) and
+// NOT NULL, so a keyset cursor can never skip or repeat a row and can never
+// hit a NULL boundary. Timestamp columns are deliberately NOT used as cursor
+// keys: they are nullable and non-unique, which silently loses rows.
+// Discovered dynamically per table — no manual per-table allowlist.
+const PAGINATION_KEY_CANDIDATES = [
+  "id",
+  "key",
+  "jti_hash",
+  "email",
+  "table_name",
+  "hotel_id",
+  "user_id",
+];
+
+function pickPaginationKey(cols: string[]): string | null {
+  for (const c of PAGINATION_KEY_CANDIDATES) {
+    if (cols.includes(c)) return c;
+  }
+  return null;
+}
+
 interface RequestContext {
   requestId: string;
   supabase: ReturnType<typeof createClient>;
