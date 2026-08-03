@@ -239,14 +239,17 @@ async function exportTable(
 
   const hasCol = (c: string) => cols.includes(c);
 
-  // Determine cursor column.
-  let cursorCol: string | null = null;
-  for (const c of CURSOR_CANDIDATES) {
-    if (hasCol(c)) { cursorCol = c; break; }
-  }
+  // Determine the pagination key: must be unique and NOT NULL so keyset
+  // pagination can neither skip nor duplicate rows. If a table has no safe
+  // key we fail explicitly instead of silently losing rows.
+  const cursorCol = pickPaginationKey(cols);
   if (!cursorCol) {
-    // Empty table sample => no introspected cols. Try common fallbacks.
-    cursorCol = "id";
+    return errorResponse(
+      409,
+      "pagination_unavailable",
+      "Resource has no stable pagination key; see manifest.non_paginated",
+      ctx.requestId,
+    );
   }
 
   // Incremental column.
@@ -255,41 +258,33 @@ async function exportTable(
     if (hasCol(c)) { incrementalCol = c; break; }
   }
 
-  let q = ctx.supabase.from(table).select("*").limit(limit);
+  const buildQuery = (after: string | null, pageSize: number) => {
+    let q = ctx.supabase
+      .from(table)
+      .select("*")
+      .order(cursorCol, { ascending: true })
+      .limit(pageSize);
+    if (hotelId && hasCol("hotel_id")) q = q.eq("hotel_id", hotelId);
+    if (closingId && hasCol("closing_id")) q = q.eq("closing_id", closingId);
+    if (year && hasCol("year")) q = q.eq("year", Number(year));
+    if (month && hasCol("month")) q = q.eq("month", Number(month));
+    if (updatedSince && incrementalCol) q = q.gte(incrementalCol, updatedSince);
+    if (uploadedSince && hasCol("uploaded_at")) q = q.gte("uploaded_at", uploadedSince);
+    if (after !== null) q = q.gt(cursorCol, after as never);
+    return q;
+  };
 
-  // Deterministic ordering.
-  q = q.order(cursorCol, { ascending: true });
-  if (cursorCol !== "id" && hasCol("id")) {
-    q = q.order("id", { ascending: true });
-  }
-
-  // Filters.
-  if (hotelId && hasCol("hotel_id")) q = q.eq("hotel_id", hotelId);
-  if (closingId && hasCol("closing_id")) q = q.eq("closing_id", closingId);
-  if (year && hasCol("year")) q = q.eq("year", Number(year));
-  if (month && hasCol("month")) q = q.eq("month", Number(month));
-
-  if (updatedSince && incrementalCol) {
-    q = q.gte(incrementalCol, updatedSince);
-  }
-  if (uploadedSince && hasCol("uploaded_at")) {
-    q = q.gte("uploaded_at", uploadedSince);
-  }
-
-  // Cursor pagination.
+  // Cursor pagination. Accept cursors issued for this key column; tolerate
+  // legacy cursors that carried the row id alongside a timestamp value.
   const parsed = parseCursor(cursorParam);
-  if (parsed && parsed.value !== null && parsed.value !== undefined) {
-    if (cursorCol !== "id" && hasCol("id") && parsed.id) {
-      // (cursorCol, id) > (parsed.value, parsed.id) — emulate via or().
-      q = q.or(
-        `${cursorCol}.gt.${parsed.value},and(${cursorCol}.eq.${parsed.value},id.gt.${parsed.id})`,
-      );
-    } else {
-      q = q.gt(cursorCol, parsed.value as never);
-    }
+  let after: string | null = null;
+  if (parsed) {
+    if (parsed.col === cursorCol && parsed.value != null) after = String(parsed.value);
+    else if (cursorCol === "id" && parsed.id) after = String(parsed.id);
+    else if (parsed.col === null && parsed.value != null && !parsed.id) after = String(parsed.value);
   }
 
-  const { data, error } = await q;
+  const { data, error } = await buildQuery(after, limit);
   if (error) {
     console.log(JSON.stringify({
       kind: "be_eight_export_query_error", request_id: ctx.requestId, resource: table,
@@ -300,10 +295,20 @@ async function exportTable(
   const rows = (data ?? []).map((r) =>
     stripSensitive(table, r as Record<string, unknown>, ctx.includeSensitive),
   );
+  // has_more via a separate keyset probe (limit=1). Never request `limit + 1`:
+  // PostgREST caps responses at 1000 rows, so with limit=1000 the sentinel row
+  // would never arrive and pagination would stop silently.
   let nextCursor: string | null = null;
-  if (rows.length === limit && data && data.length > 0) {
+  if (data && data.length === limit) {
     const last = data[data.length - 1] as Record<string, unknown>;
-    nextCursor = encodeCursor(last[cursorCol], (last.id as string) ?? null);
+    const lastKey = String(last[cursorCol]);
+    const probe = await buildQuery(lastKey, 1);
+    if (probe.error) {
+      return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
+    }
+    if ((probe.data ?? []).length > 0) {
+      nextCursor = encodeCursor(lastKey, (last.id as string) ?? null, cursorCol);
+    }
   }
 
   return json({
