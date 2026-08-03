@@ -386,7 +386,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const sensitive = cols.filter((c) => isBusinessSensitiveColumn(t, c));
     const secrets = cols.filter((c) => classifyColumn(t, c) === "technical_secret");
     const visible = visibleColumns(t, cols, ctx.includeSensitive);
-    const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
+    const cursorCol = pickPaginationKey(cols);
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
@@ -406,9 +406,10 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
       latest_updated_at: latest,
-      supports_cursor: true,
+      supports_cursor: cursorCol !== null,
       supports_updated_since: incrementalCol !== null,
-      non_paginated: false,
+      non_paginated: cursorCol === null,
+      pagination_error: cursorCol === null ? "no_stable_pagination_key" : null,
       contains_sensitive: sensitive.length > 0,
       contains_sensitive_data: sensitive.length > 0,
     });
