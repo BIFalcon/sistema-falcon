@@ -179,19 +179,21 @@ async function pickColumn(
   return null;
 }
 
-function parseCursor(cursor: string | null): { value: unknown; id: string | null } | null {
+function parseCursor(
+  cursor: string | null,
+): { value: unknown; id: string | null; col: string | null } | null {
   if (!cursor) return null;
   try {
     const decoded = atob(cursor);
     const obj = JSON.parse(decoded);
-    return { value: obj.v ?? null, id: obj.id ?? null };
+    return { value: obj.v ?? null, id: obj.id ?? null, col: obj.c ?? null };
   } catch {
     return null;
   }
 }
 
-function encodeCursor(value: unknown, id: string | null): string {
-  return btoa(JSON.stringify({ v: value, id }));
+function encodeCursor(value: unknown, id: string | null, col?: string): string {
+  return btoa(JSON.stringify(col ? { v: value, id, c: col } : { v: value, id }));
 }
 
 async function exportTable(
