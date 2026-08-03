@@ -66,6 +66,28 @@ const INCREMENTAL_CANDIDATES = [
 ];
 const CURSOR_CANDIDATES = [...INCREMENTAL_CANDIDATES, "id"];
 
+// Columns that are safe to paginate on: unique (or effectively unique) and
+// NOT NULL, so a keyset cursor can never skip or repeat a row and can never
+// hit a NULL boundary. Timestamp columns are deliberately NOT used as cursor
+// keys: they are nullable and non-unique, which silently loses rows.
+// Discovered dynamically per table — no manual per-table allowlist.
+const PAGINATION_KEY_CANDIDATES = [
+  "id",
+  "key",
+  "jti_hash",
+  "email",
+  "table_name",
+  "hotel_id",
+  "user_id",
+];
+
+function pickPaginationKey(cols: string[]): string | null {
+  for (const c of PAGINATION_KEY_CANDIDATES) {
+    if (cols.includes(c)) return c;
+  }
+  return null;
+}
+
 interface RequestContext {
   requestId: string;
   supabase: ReturnType<typeof createClient>;
@@ -157,19 +179,21 @@ async function pickColumn(
   return null;
 }
 
-function parseCursor(cursor: string | null): { value: unknown; id: string | null } | null {
+function parseCursor(
+  cursor: string | null,
+): { value: unknown; id: string | null; col: string | null } | null {
   if (!cursor) return null;
   try {
     const decoded = atob(cursor);
     const obj = JSON.parse(decoded);
-    return { value: obj.v ?? null, id: obj.id ?? null };
+    return { value: obj.v ?? null, id: obj.id ?? null, col: obj.c ?? null };
   } catch {
     return null;
   }
 }
 
-function encodeCursor(value: unknown, id: string | null): string {
-  return btoa(JSON.stringify({ v: value, id }));
+function encodeCursor(value: unknown, id: string | null, col?: string): string {
+  return btoa(JSON.stringify(col ? { v: value, id, c: col } : { v: value, id }));
 }
 
 async function exportTable(
@@ -215,14 +239,17 @@ async function exportTable(
 
   const hasCol = (c: string) => cols.includes(c);
 
-  // Determine cursor column.
-  let cursorCol: string | null = null;
-  for (const c of CURSOR_CANDIDATES) {
-    if (hasCol(c)) { cursorCol = c; break; }
-  }
+  // Determine the pagination key: must be unique and NOT NULL so keyset
+  // pagination can neither skip nor duplicate rows. If a table has no safe
+  // key we fail explicitly instead of silently losing rows.
+  const cursorCol = pickPaginationKey(cols);
   if (!cursorCol) {
-    // Empty table sample => no introspected cols. Try common fallbacks.
-    cursorCol = "id";
+    return errorResponse(
+      409,
+      "pagination_unavailable",
+      "Resource has no stable pagination key; see manifest.non_paginated",
+      ctx.requestId,
+    );
   }
 
   // Incremental column.
@@ -231,41 +258,33 @@ async function exportTable(
     if (hasCol(c)) { incrementalCol = c; break; }
   }
 
-  let q = ctx.supabase.from(table).select("*").limit(limit);
+  const buildQuery = (after: string | null, pageSize: number) => {
+    let q = ctx.supabase
+      .from(table)
+      .select("*")
+      .order(cursorCol, { ascending: true })
+      .limit(pageSize);
+    if (hotelId && hasCol("hotel_id")) q = q.eq("hotel_id", hotelId);
+    if (closingId && hasCol("closing_id")) q = q.eq("closing_id", closingId);
+    if (year && hasCol("year")) q = q.eq("year", Number(year));
+    if (month && hasCol("month")) q = q.eq("month", Number(month));
+    if (updatedSince && incrementalCol) q = q.gte(incrementalCol, updatedSince);
+    if (uploadedSince && hasCol("uploaded_at")) q = q.gte("uploaded_at", uploadedSince);
+    if (after !== null) q = q.gt(cursorCol, after as never);
+    return q;
+  };
 
-  // Deterministic ordering.
-  q = q.order(cursorCol, { ascending: true });
-  if (cursorCol !== "id" && hasCol("id")) {
-    q = q.order("id", { ascending: true });
-  }
-
-  // Filters.
-  if (hotelId && hasCol("hotel_id")) q = q.eq("hotel_id", hotelId);
-  if (closingId && hasCol("closing_id")) q = q.eq("closing_id", closingId);
-  if (year && hasCol("year")) q = q.eq("year", Number(year));
-  if (month && hasCol("month")) q = q.eq("month", Number(month));
-
-  if (updatedSince && incrementalCol) {
-    q = q.gte(incrementalCol, updatedSince);
-  }
-  if (uploadedSince && hasCol("uploaded_at")) {
-    q = q.gte("uploaded_at", uploadedSince);
-  }
-
-  // Cursor pagination.
+  // Cursor pagination. Accept cursors issued for this key column; tolerate
+  // legacy cursors that carried the row id alongside a timestamp value.
   const parsed = parseCursor(cursorParam);
-  if (parsed && parsed.value !== null && parsed.value !== undefined) {
-    if (cursorCol !== "id" && hasCol("id") && parsed.id) {
-      // (cursorCol, id) > (parsed.value, parsed.id) — emulate via or().
-      q = q.or(
-        `${cursorCol}.gt.${parsed.value},and(${cursorCol}.eq.${parsed.value},id.gt.${parsed.id})`,
-      );
-    } else {
-      q = q.gt(cursorCol, parsed.value as never);
-    }
+  let after: string | null = null;
+  if (parsed) {
+    if (parsed.col === cursorCol && parsed.value != null) after = String(parsed.value);
+    else if (cursorCol === "id" && parsed.id) after = String(parsed.id);
+    else if (parsed.col === null && parsed.value != null && !parsed.id) after = String(parsed.value);
   }
 
-  const { data, error } = await q;
+  const { data, error } = await buildQuery(after, limit);
   if (error) {
     console.log(JSON.stringify({
       kind: "be_eight_export_query_error", request_id: ctx.requestId, resource: table,
@@ -276,10 +295,20 @@ async function exportTable(
   const rows = (data ?? []).map((r) =>
     stripSensitive(table, r as Record<string, unknown>, ctx.includeSensitive),
   );
+  // has_more via a separate keyset probe (limit=1). Never request `limit + 1`:
+  // PostgREST caps responses at 1000 rows, so with limit=1000 the sentinel row
+  // would never arrive and pagination would stop silently.
   let nextCursor: string | null = null;
-  if (rows.length === limit && data && data.length > 0) {
+  if (data && data.length === limit) {
     const last = data[data.length - 1] as Record<string, unknown>;
-    nextCursor = encodeCursor(last[cursorCol], (last.id as string) ?? null);
+    const lastKey = String(last[cursorCol]);
+    const probe = await buildQuery(lastKey, 1);
+    if (probe.error) {
+      return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
+    }
+    if ((probe.data ?? []).length > 0) {
+      nextCursor = encodeCursor(lastKey, (last.id as string) ?? null, cursorCol);
+    }
   }
 
   return json({
@@ -357,7 +386,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const sensitive = cols.filter((c) => isBusinessSensitiveColumn(t, c));
     const secrets = cols.filter((c) => classifyColumn(t, c) === "technical_secret");
     const visible = visibleColumns(t, cols, ctx.includeSensitive);
-    const cursorCol = CURSOR_CANDIDATES.find((c) => cols.includes(c)) ?? "id";
+    const cursorCol = pickPaginationKey(cols);
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
@@ -377,9 +406,10 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
       cursor_column: cursorCol,
       incremental_column: incrementalCol,
       latest_updated_at: latest,
-      supports_cursor: true,
+      supports_cursor: cursorCol !== null,
       supports_updated_since: incrementalCol !== null,
-      non_paginated: false,
+      non_paginated: cursorCol === null,
+      pagination_error: cursorCol === null ? "no_stable_pagination_key" : null,
       contains_sensitive: sensitive.length > 0,
       contains_sensitive_data: sensitive.length > 0,
     });
@@ -502,27 +532,43 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     const afterClosingId = parsed?.value ? String(parsed.value) : null;
     const afterLineId = parsed?.id ?? null;
 
-    const { data, error } = await ctx.supabase.rpc("be_eight_dre_latest_lines", {
-      _hotel_id: hotelId,
-      _closing_id: closingId,
-      _only_indicators: resource === "dre_latest_indicators",
-      _after_closing_id: afterClosingId,
-      _after_line_id: afterLineId,
-      _limit: limit + 1,
-    });
+    const fetchPage = (
+      afterClosing: string | null,
+      afterLine: string | null,
+      pageSize: number,
+    ) =>
+      ctx.supabase.rpc("be_eight_dre_latest_lines", {
+        _hotel_id: hotelId,
+        _closing_id: closingId,
+        _only_indicators: resource === "dre_latest_indicators",
+        _after_closing_id: afterClosing,
+        _after_line_id: afterLine,
+        _limit: pageSize,
+      });
+
+    const { data, error } = await fetchPage(afterClosingId, afterLineId, limit);
     if (error) {
       console.log(JSON.stringify({
         kind: "be_eight_export_query_error", request_id: ctx.requestId, resource,
       }));
       return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     }
-    const all = (data ?? []) as Array<Record<string, unknown>>;
-    const hasMore = all.length > limit;
-    const collected = hasMore ? all.slice(0, limit) : all;
+    const collected = (data ?? []) as Array<Record<string, unknown>>;
     const last = collected[collected.length - 1];
-    const nextCursor = hasMore && last
-      ? encodeCursor(String(last.closing_id), String(last.id))
-      : null;
+    // Ask exactly `limit` rows, then probe for one row beyond the last key.
+    // Requesting `limit + 1` breaks at limit=1000 because PostgREST caps the
+    // response at 1000 rows, so the sentinel row never arrives and pagination
+    // stops with has_more=false while millions of rows remain.
+    let nextCursor: string | null = null;
+    if (collected.length === limit && last) {
+      const probe = await fetchPage(String(last.closing_id), String(last.id), 1);
+      if (probe.error) {
+        return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
+      }
+      if (((probe.data ?? []) as unknown[]).length > 0) {
+        nextCursor = encodeCursor(String(last.closing_id), String(last.id));
+      }
+    }
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
       cursor_column: "closing_id,id",
