@@ -531,27 +531,43 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
     const afterClosingId = parsed?.value ? String(parsed.value) : null;
     const afterLineId = parsed?.id ?? null;
 
-    const { data, error } = await ctx.supabase.rpc("be_eight_dre_latest_lines", {
-      _hotel_id: hotelId,
-      _closing_id: closingId,
-      _only_indicators: resource === "dre_latest_indicators",
-      _after_closing_id: afterClosingId,
-      _after_line_id: afterLineId,
-      _limit: limit + 1,
-    });
+    const fetchPage = (
+      afterClosing: string | null,
+      afterLine: string | null,
+      pageSize: number,
+    ) =>
+      ctx.supabase.rpc("be_eight_dre_latest_lines", {
+        _hotel_id: hotelId,
+        _closing_id: closingId,
+        _only_indicators: resource === "dre_latest_indicators",
+        _after_closing_id: afterClosing,
+        _after_line_id: afterLine,
+        _limit: pageSize,
+      });
+
+    const { data, error } = await fetchPage(afterClosingId, afterLineId, limit);
     if (error) {
       console.log(JSON.stringify({
         kind: "be_eight_export_query_error", request_id: ctx.requestId, resource,
       }));
       return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     }
-    const all = (data ?? []) as Array<Record<string, unknown>>;
-    const hasMore = all.length > limit;
-    const collected = hasMore ? all.slice(0, limit) : all;
+    const collected = (data ?? []) as Array<Record<string, unknown>>;
     const last = collected[collected.length - 1];
-    const nextCursor = hasMore && last
-      ? encodeCursor(String(last.closing_id), String(last.id))
-      : null;
+    // Ask exactly `limit` rows, then probe for one row beyond the last key.
+    // Requesting `limit + 1` breaks at limit=1000 because PostgREST caps the
+    // response at 1000 rows, so the sentinel row never arrives and pagination
+    // stops with has_more=false while millions of rows remain.
+    let nextCursor: string | null = null;
+    if (collected.length === limit && last) {
+      const probe = await fetchPage(String(last.closing_id), String(last.id), 1);
+      if (probe.error) {
+        return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
+      }
+      if (((probe.data ?? []) as unknown[]).length > 0) {
+        nextCursor = encodeCursor(String(last.closing_id), String(last.id));
+      }
+    }
     return json({
       schema_version: SCHEMA_VERSION, request_id: ctx.requestId, resource,
       cursor_column: "closing_id,id",
