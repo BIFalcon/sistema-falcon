@@ -18,6 +18,14 @@ import {
   type AuthMode,
 } from "./auth.ts";
 import {
+  type CatalogEntry,
+  encodeKeysetCursor,
+  keysetOrFilter,
+  normalizeCatalogRow,
+  paginationError,
+  parseKeysetCursor,
+} from "./pagination.ts";
+import {
   blockedColumns,
   classifyColumn,
   isBusinessSensitiveColumn,
@@ -66,34 +74,16 @@ const INCREMENTAL_CANDIDATES = [
 ];
 const CURSOR_CANDIDATES = [...INCREMENTAL_CANDIDATES, "id"];
 
-// Columns that are safe to paginate on: unique (or effectively unique) and
-// NOT NULL, so a keyset cursor can never skip or repeat a row and can never
-// hit a NULL boundary. Timestamp columns are deliberately NOT used as cursor
-// keys: they are nullable and non-unique, which silently loses rows.
-// Discovered dynamically per table — no manual per-table allowlist.
-const PAGINATION_KEY_CANDIDATES = [
-  "id",
-  "key",
-  "jti_hash",
-  "email",
-  "table_name",
-  "hotel_id",
-  "user_id",
-];
-
-function pickPaginationKey(cols: string[]): string | null {
-  for (const c of PAGINATION_KEY_CANDIDATES) {
-    if (cols.includes(c)) return c;
-  }
-  return null;
-}
+// Pagination keys are NEVER derived from column names. They come from
+// `be_eight_list_tables()`, which proves them from pg_catalog constraints
+// (see pagination.ts). Resources without a provable key fail closed.
 
 interface RequestContext {
   requestId: string;
   supabase: ReturnType<typeof createClient>;
   scope: "standard" | "privileged";
   includeSensitive: boolean;
-  discovery?: Promise<Map<string, { columns: string[]; kind: string }>>;
+  discovery?: Promise<Map<string, CatalogEntry>>;
 }
 
 function newRequestId(): string {
@@ -149,20 +139,20 @@ async function getTableColumns(
 // automatically. Cached per request via ctx.discovery.
 async function discoverTables(
   supabase: ReturnType<typeof createClient>,
-): Promise<Map<string, { columns: string[]; kind: string }>> {
+): Promise<Map<string, CatalogEntry>> {
   const { data, error } = await supabase.rpc("be_eight_list_tables");
   if (error) throw new Error("discovery_failed");
-  const map = new Map<string, { columns: string[]; kind: string }>();
-  for (const row of (data ?? []) as Array<{ table_name: string; columns: string[]; object_kind?: string }>) {
+  const map = new Map<string, CatalogEntry>();
+  for (const row of (data ?? []) as Array<Record<string, unknown> & { table_name: string }>) {
     if (TABLE_DENYLIST.has(row.table_name)) continue;
-    map.set(row.table_name, { columns: row.columns ?? [], kind: row.object_kind ?? "table" });
+    map.set(row.table_name, normalizeCatalogRow(row as never));
   }
   return map;
 }
 
 async function getDiscovery(
   ctx: RequestContext,
-): Promise<Map<string, { columns: string[]; kind: string }>> {
+): Promise<Map<string, CatalogEntry>> {
   if (!ctx.discovery) ctx.discovery = discoverTables(ctx.supabase);
   return await ctx.discovery;
 }
@@ -201,7 +191,7 @@ async function exportTable(
   table: string,
   url: URL,
 ): Promise<Response> {
-  let discovered: Map<string, { columns: string[]; kind: string }>;
+  let discovered: Map<string, CatalogEntry>;
   try {
     discovered = await getDiscovery(ctx);
   } catch {
@@ -239,15 +229,17 @@ async function exportTable(
 
   const hasCol = (c: string) => cols.includes(c);
 
-  // Determine the pagination key: must be unique and NOT NULL so keyset
-  // pagination can neither skip nor duplicate rows. If a table has no safe
-  // key we fail explicitly instead of silently losing rows.
-  const cursorCol = pickPaginationKey(cols);
-  if (!cursorCol) {
+  // Pagination key: only what the catalog proved from real constraints
+  // (PRIMARY KEY, or a valid non-partial UNIQUE index over NOT NULL columns).
+  // No name heuristics, no offset fallback: fail closed instead of silently
+  // losing rows.
+  const entry = discovered.get(table)!;
+  const keyCols = entry.paginationColumns;
+  if (!entry.paginationVerified || keyCols.length === 0) {
     return errorResponse(
       409,
       "pagination_unavailable",
-      "Resource has no stable pagination key; see manifest.non_paginated",
+      "Resource has no verified pagination key; see manifest.pagination_error",
       ctx.requestId,
     );
   }
@@ -258,31 +250,28 @@ async function exportTable(
     if (hasCol(c)) { incrementalCol = c; break; }
   }
 
-  const buildQuery = (after: string | null, pageSize: number) => {
-    let q = ctx.supabase
-      .from(table)
-      .select("*")
-      .order(cursorCol, { ascending: true })
-      .limit(pageSize);
+  const buildQuery = (after: string[] | null, pageSize: number) => {
+    let q = ctx.supabase.from(table).select("*");
+    // Deterministic order over the full key tuple.
+    for (const c of keyCols) q = q.order(c, { ascending: true });
+    q = q.limit(pageSize);
     if (hotelId && hasCol("hotel_id")) q = q.eq("hotel_id", hotelId);
     if (closingId && hasCol("closing_id")) q = q.eq("closing_id", closingId);
     if (year && hasCol("year")) q = q.eq("year", Number(year));
     if (month && hasCol("month")) q = q.eq("month", Number(month));
     if (updatedSince && incrementalCol) q = q.gte(incrementalCol, updatedSince);
     if (uploadedSince && hasCol("uploaded_at")) q = q.gte("uploaded_at", uploadedSince);
-    if (after !== null) q = q.gt(cursorCol, after as never);
+    if (after !== null) q = q.or(keysetOrFilter(keyCols, after));
     return q;
   };
 
-  // Cursor pagination. Accept cursors issued for this key column; tolerate
-  // legacy cursors that carried the row id alongside a timestamp value.
-  const parsed = parseCursor(cursorParam);
-  let after: string | null = null;
-  if (parsed) {
-    if (parsed.col === cursorCol && parsed.value != null) after = String(parsed.value);
-    else if (cursorCol === "id" && parsed.id) after = String(parsed.id);
-    else if (parsed.col === null && parsed.value != null && !parsed.id) after = String(parsed.value);
+  // Cursor: composite-aware, rejects tampered/stale cursors, still accepts
+  // legacy single-key cursors during the transition.
+  const parsedCursor = parseKeysetCursor(cursorParam, keyCols);
+  if (!parsedCursor.ok) {
+    return errorResponse(400, "invalid_cursor", "Cursor is not valid for this resource", ctx.requestId);
   }
+  const after: string[] | null = parsedCursor.values;
 
   const { data, error } = await buildQuery(after, limit);
   if (error) {
@@ -301,13 +290,13 @@ async function exportTable(
   let nextCursor: string | null = null;
   if (data && data.length === limit) {
     const last = data[data.length - 1] as Record<string, unknown>;
-    const lastKey = String(last[cursorCol]);
+    const lastKey = keyCols.map((c) => String(last[c]));
     const probe = await buildQuery(lastKey, 1);
     if (probe.error) {
       return errorResponse(500, "query_failed", "Query failed", ctx.requestId);
     }
     if ((probe.data ?? []).length > 0) {
-      nextCursor = encodeCursor(lastKey, (last.id as string) ?? null, cursorCol);
+      nextCursor = encodeKeysetCursor(keyCols, lastKey);
     }
   }
 
@@ -315,7 +304,10 @@ async function exportTable(
     schema_version: SCHEMA_VERSION,
     request_id: ctx.requestId,
     table,
-    cursor_column: cursorCol,
+    cursor_column: keyCols.join(","),
+    cursor_columns: keyCols,
+    pagination_kind: entry.paginationKind,
+    pagination_verified: entry.paginationVerified,
     incremental_column: incrementalCol,
     limit,
     count: rows.length,
@@ -372,7 +364,7 @@ async function latestUpdatedAt(
 }
 
 async function handleManifest(ctx: RequestContext): Promise<Response> {
-  let discovered: Map<string, { columns: string[]; kind: string }>;
+  let discovered: Map<string, CatalogEntry>;
   try {
     discovered = await getDiscovery(ctx);
   } catch {
@@ -386,7 +378,8 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
     const sensitive = cols.filter((c) => isBusinessSensitiveColumn(t, c));
     const secrets = cols.filter((c) => classifyColumn(t, c) === "technical_secret");
     const visible = visibleColumns(t, cols, ctx.includeSensitive);
-    const cursorCol = pickPaginationKey(cols);
+    const keyCols = entry ? entry.paginationColumns : [];
+    const verified = entry?.paginationVerified === true && keyCols.length > 0;
     const incrementalCol = INCREMENTAL_CANDIDATES.find((c) => cols.includes(c)) ?? null;
     const rowCount = await exactRowCount(ctx.supabase, t);
     const latest = await latestUpdatedAt(ctx.supabase, t, incrementalCol);
@@ -403,23 +396,26 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
       technical_secret_columns: secrets,
       row_count: rowCount,
       record_count: rowCount,
-      cursor_column: cursorCol,
+      cursor_column: verified ? keyCols.join(",") : null,
+      cursor_columns: verified ? keyCols : [],
+      pagination_kind: verified ? entry!.paginationKind : null,
+      pagination_verified: verified,
       incremental_column: incrementalCol,
       latest_updated_at: latest,
-      supports_cursor: cursorCol !== null,
+      supports_cursor: verified,
       supports_updated_since: incrementalCol !== null,
-      non_paginated: cursorCol === null,
-      pagination_error: cursorCol === null ? "no_stable_pagination_key" : null,
+      non_paginated: !verified,
+      pagination_error: entry ? paginationError(entry) : "no_stable_pagination_key",
       contains_sensitive: sensitive.length > 0,
       contains_sensitive_data: sensitive.length > 0,
     });
   }
   const derived = [
-    { resource: "dre_latest_lines", cursor_column: "closing_id,id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
-    { resource: "dre_latest_indicators", cursor_column: "closing_id,id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
-    { resource: "rh_summary", cursor_column: "hotel_id", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
-    { resource: "table_counts", cursor_column: "table", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
-    { resource: "latest_updates", cursor_column: "table", incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "dre_latest_lines", cursor_column: "closing_id,id", cursor_columns: ["closing_id", "id"], pagination_kind: "primary_key", pagination_verified: true, incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "dre_latest_indicators", cursor_column: "closing_id,id", cursor_columns: ["closing_id", "id"], pagination_kind: "primary_key", pagination_verified: true, incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "rh_summary", cursor_column: "hotel_id", cursor_columns: ["hotel_id"], pagination_kind: null, pagination_verified: false, incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "table_counts", cursor_column: "table", cursor_columns: ["table"], pagination_kind: null, pagination_verified: false, incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
+    { resource: "latest_updates", cursor_column: "table", cursor_columns: ["table"], pagination_kind: null, pagination_verified: false, incremental_column: null, supports_cursor: true, supports_updated_since: false, blocked_columns: [], contains_sensitive_data: false, non_paginated: false },
   ];
   return json({
     schema_version: SCHEMA_VERSION,
@@ -438,7 +434,7 @@ async function handleManifest(ctx: RequestContext): Promise<Response> {
 // No row data, no sensitive columns, no payload. Intended for smart syncs so
 // callers can skip resources that have not changed since their last cursor.
 async function handleWatermarks(ctx: RequestContext): Promise<{ res: Response; rowsReturned: number }> {
-  let discovered: Map<string, { columns: string[]; kind: string }>;
+  let discovered: Map<string, CatalogEntry>;
   try {
     discovered = await getDiscovery(ctx);
   } catch {
@@ -636,7 +632,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
   if (resource === "latest_updates") {
     const parsed = parseCursor(cursorParam);
     const startToken = parsed?.value ? String(parsed.value) : "";
-    let discovered: Map<string, { columns: string[]; kind: string }>;
+    let discovered: Map<string, CatalogEntry>;
     try {
       discovered = await getDiscovery(ctx);
     } catch {
@@ -667,7 +663,7 @@ async function handleResource(ctx: RequestContext, resource: string, url: URL): 
 
   // Base resources: fall through to the catalog-validated table export so that
   // /export?resource=<new_business_table> works automatically.
-  let discovered: Map<string, { columns: string[]; kind: string }>;
+  let discovered: Map<string, CatalogEntry>;
   try {
     discovered = await getDiscovery(ctx);
   } catch {
