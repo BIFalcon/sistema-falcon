@@ -2597,6 +2597,9 @@ export type Database = {
         Returns: {
           columns: string[]
           object_kind: string
+          pagination_columns: string[]
+          pagination_kind: string
+          pagination_verified: boolean
           table_name: string
         }[]
       }
