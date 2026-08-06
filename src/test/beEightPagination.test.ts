@@ -146,7 +146,7 @@ describe("be-eight pagination key discovery (mirrors be_eight_list_tables)", () 
     const forged = encodeKeysetCursor(["salary"], ["0"]);
     const r = parseKeysetCursor(forged, ["id"]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("cursor_key_mismatch");
+    if (!r.ok) expect((r as { ok: false; reason: string }).reason).toBe("cursor_key_mismatch");
     expect(parseKeysetCursor("!!!not-base64!!!", ["id"]).ok).toBe(false);
     expect(parseKeysetCursor(encodeKeysetCursor(["id"], ["a"]), ["closing_id", "id"]).ok).toBe(false);
     // Arity mismatch and control characters are refused.
