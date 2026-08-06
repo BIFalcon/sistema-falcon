@@ -666,7 +666,7 @@ function DayBreakdown({
   daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
   flat?: boolean;
 }) {
-  const { isMaster, hasRole } = useAuth();
+  const { isMaster, isPatronos, hasRole } = useAuth();
   const canConfirm =
     isMaster ||
     hasRole("gg") ||
@@ -674,6 +674,14 @@ function DayBreakdown({
     hasRole("controladoria");
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
+  // "Não faturável" pode ser marcado por matriz e pelo hotel (Adm/GG).
+  const canNotBillable =
+    isMaster ||
+    isPatronos ||
+    hasRole("adm") ||
+    hasRole("gg") ||
+    hasRole("controladoria") ||
+    hasRole("financeiro");
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
   // Matriz (Master, Controladoria, GOP, Patronos) precisa conseguir VER os
