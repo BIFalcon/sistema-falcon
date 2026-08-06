@@ -150,6 +150,12 @@ Deno.serve(async (req) => {
     const { data: allowed } = await admin.rpc("is_hotel_allowed", { _user_id: user.id, _hotel_id: entry.hotel_id });
     if (!allowed) return json({ error: "forbidden" }, 403);
 
+    // Mirror the invoices storage RLS scoping: paths must live under the entry's own hotel folder.
+    const hotelPrefix = `${entry.hotel_id}/`;
+    for (const p of [notaPath, boletoPath]) {
+      if (p && !p.startsWith(hotelPrefix)) return json({ error: "forbidden_path" }, 403);
+    }
+
     // Match ar_to_invoice_entries UPDATE policy: only AR managers, gg, adm (or master) may write.
     const [{ data: isArManager }, { data: isGg }, { data: isAdm }, { data: isMaster }] = await Promise.all([
       admin.rpc("is_ar_manager", { _user_id: user.id }),
