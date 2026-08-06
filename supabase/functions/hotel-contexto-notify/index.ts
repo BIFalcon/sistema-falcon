@@ -13,18 +13,11 @@ const corsHeaders = {
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "https://sistema-falcon.lovable.app";
 const LINK = "/perfil-hotel/contexto";
 
-function parseJwtClaims(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const payload = parts[1]
-      .replaceAll("-", "+")
-      .replaceAll("_", "/")
-      .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
-    return JSON.parse(atob(payload)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 Deno.serve(async (req) => {
@@ -32,19 +25,24 @@ Deno.serve(async (req) => {
 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
   // Autorização: service-role (cron) ou master autenticado.
-  const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace("Bearer ", "").trim();
   let authorized = false;
-  if (token && token === serviceKey) {
+  if (token && safeEqual(token, serviceKey)) {
     authorized = true;
   } else if (token) {
-    const claims = parseJwtClaims(token);
-    if (claims?.role === "service_role") {
-      authorized = true;
-    } else if (claims?.sub) {
+    // Verificação criptográfica do JWT via Supabase Auth (nunca confiar em claims decodificadas).
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    const verifiedUserId = userErr ? null : userData?.user?.id ?? null;
+    if (verifiedUserId) {
       const admin = createClient(supabaseUrl, serviceKey);
-      const { data: isMaster } = await admin.rpc("is_master", { _user_id: claims.sub });
+      const { data: isMaster } = await admin.rpc("is_master", { _user_id: verifiedUserId });
       if (isMaster === true) authorized = true;
     }
   }
