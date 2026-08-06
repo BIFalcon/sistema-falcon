@@ -973,6 +973,7 @@ function DayBreakdown({
                     )}
                     {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
+                        {!notBillable && (
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
@@ -981,7 +982,8 @@ function DayBreakdown({
                         >
                           Pago
                         </Button>
-                        {canFinanceiro && (
+                        )}
+                        {canFinanceiro && !notBillable && (
                           <Button
                             size="sm"
                             variant={e.documents_problem_at ? "default" : "outline"}
@@ -991,17 +993,17 @@ function DayBreakdown({
                             Problema docs
                           </Button>
                         )}
-                        {canFinanceiro && (
+                        {canNotBillable && (
                           <Button
                             size="sm"
-                            variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
+                            variant={notBillable ? "default" : "outline"}
                             className="h-6 px-2 text-[11px]"
                             onClick={() => setNotBillableFor(e)}
                           >
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && (
+                        {canAdmOrGg && !e.paid_date && !notBillable && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1011,7 +1013,7 @@ function DayBreakdown({
                             Enviar docs
                           </Button>
                         )}
-                        {canAdmOrGg && missingDocData && (
+                        {canAdmOrGg && missingDocData && !notBillable && (
                           <Button
                             size="sm"
                             variant="outline"
