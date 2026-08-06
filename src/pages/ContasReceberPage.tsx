@@ -175,6 +175,7 @@ function exportOpenFolioToExcel(
       "Arrival Date": fmt(e.arrival_date),
       "Departure Date": fmt(e.departure_date),
       "Tempo em aberto (dias)": e.days_open ?? 0,
+      "Faixa": agingBucketMeta(e.days_open).label,
       "Justificativa GG": last?.note ?? "",
       "Data prevista de faturamento": fmt(expected),
       "Data da última atualização": fmtDateTime(lastUpdate),
@@ -184,7 +185,7 @@ function exportOpenFolioToExcel(
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
     { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 50 }, { wch: 22 }, { wch: 20 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 50 }, { wch: 22 }, { wch: 20 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Open Folio");
