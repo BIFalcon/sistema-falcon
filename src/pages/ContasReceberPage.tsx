@@ -2278,8 +2278,8 @@ function HotelOpenFolioDetail({
   hotelId: string;
   hotelName: string;
   entries: OpenFolioEntry[];
-  agingFilter: "all" | "fresh" | "mid" | "old";
-  setAgingFilter: (v: "all" | "fresh" | "mid" | "old") => void;
+  agingFilter: "all" | AgingBucket;
+  setAgingFilter: (v: "all" | AgingBucket) => void;
   unjustifiedOnly: boolean;
   setUnjustifiedOnly: (v: boolean) => void;
   unjustifiedCount: number;
