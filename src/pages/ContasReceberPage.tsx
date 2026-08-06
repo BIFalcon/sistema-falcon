@@ -172,7 +172,11 @@ function exportToInvoiceToExcel(
       "Nº Nota": e.nota_number ?? "",
       "Nº Boleto": e.boleto_number ?? "",
       "Valor": Number(e.amount ?? 0),
-      "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
+      "Faturado?":
+        e.gg_status === "faturado" ? "Sim"
+        : e.gg_status === "nao_faturado" ? "Não"
+        : e.gg_status === "nao_faturavel" || e.is_not_billable ? "Não faturável"
+        : "Pendente",
       "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
         ? format(new Date(e.gg_confirmed_at), "dd/MM/yyyy", { locale: ptBR })
         : "",
@@ -275,7 +279,7 @@ function ToInvoiceSection({
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<
-    "todos" | "pendente" | "faturado" | "pago" | "inadimplente"
+    "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
@@ -365,7 +369,16 @@ function ToInvoiceSection({
           isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
         );
       } else if (faturamentoFilter === "pendente") {
-        arr = arr.filter((e) => e.gg_status !== "faturado" && !isEntryPaid(e));
+        // "Não faturável" é um status terminal: nunca aparece como pendente.
+        arr = arr.filter(
+          (e) =>
+            e.gg_status !== "faturado" &&
+            e.gg_status !== "nao_faturavel" &&
+            !e.is_not_billable &&
+            !isEntryPaid(e),
+        );
+      } else if (faturamentoFilter === "nao_faturavel") {
+        arr = arr.filter((e) => e.gg_status === "nao_faturavel" || e.is_not_billable);
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
@@ -418,6 +431,7 @@ function ToInvoiceSection({
                 <SelectItem value="faturado">Faturados</SelectItem>
                 <SelectItem value="pago">Pagos</SelectItem>
                 <SelectItem value="inadimplente">Inadimplentes</SelectItem>
+                <SelectItem value="nao_faturavel">Não faturáveis</SelectItem>
               </SelectContent>
             </Select>
             <ExtractDocsButton entries={finalEntries} />
@@ -652,7 +666,7 @@ function DayBreakdown({
   daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
   flat?: boolean;
 }) {
-  const { isMaster, hasRole } = useAuth();
+  const { isMaster, isPatronos, hasRole } = useAuth();
   const canConfirm =
     isMaster ||
     hasRole("gg") ||
@@ -660,6 +674,14 @@ function DayBreakdown({
     hasRole("controladoria");
   const canFinanceiro = isMaster || hasRole("financeiro");
   const canAdmOrGg = isMaster || hasRole("adm") || hasRole("gg");
+  // "Não faturável" pode ser marcado por matriz e pelo hotel (Adm/GG).
+  const canNotBillable =
+    isMaster ||
+    isPatronos ||
+    hasRole("adm") ||
+    hasRole("gg") ||
+    hasRole("controladoria") ||
+    hasRole("financeiro");
   const isAdm = !isMaster && hasRole("adm") && !hasRole("gg") && !hasRole("financeiro") && !hasRole("controladoria");
   const canShowActions = canConfirm || canAdmOrGg;
   // Matriz (Master, Controladoria, GOP, Patronos) precisa conseguir VER os
@@ -814,6 +836,8 @@ function DayBreakdown({
               const due = resolveDueDate(e, term);
               const overdue = isEntryDefaulting(e, due);
               const status = effectiveStatus(e, due);
+              // Status terminal: não há próxima etapa após "Não faturável".
+              const notBillable = e.gg_status === "nao_faturavel" || e.is_not_billable === true;
               const missingDocData =
                 (e.invoice_file_1 || e.invoice_file_2) &&
                 (!e.nota_number || !e.boleto_number || !e.boleto_due_date);
@@ -951,6 +975,7 @@ function DayBreakdown({
                     )}
                     {canShowActions && !isEditing && (
                       <div className="flex flex-wrap gap-1 pt-1">
+                        {!notBillable && (
                         <Button
                           size="sm"
                           variant={e.paid_date || e.paid_note ? "default" : "outline"}
@@ -959,7 +984,8 @@ function DayBreakdown({
                         >
                           Pago
                         </Button>
-                        {canFinanceiro && (
+                        )}
+                        {canFinanceiro && !notBillable && (
                           <Button
                             size="sm"
                             variant={e.documents_problem_at ? "default" : "outline"}
@@ -969,17 +995,17 @@ function DayBreakdown({
                             Problema docs
                           </Button>
                         )}
-                        {canFinanceiro && (
+                        {canNotBillable && (
                           <Button
                             size="sm"
-                            variant={e.gg_status === "nao_faturavel" ? "default" : "outline"}
+                            variant={notBillable ? "default" : "outline"}
                             className="h-6 px-2 text-[11px]"
                             onClick={() => setNotBillableFor(e)}
                           >
                             Não faturável
                           </Button>
                         )}
-                        {canAdmOrGg && !e.paid_date && e.gg_status !== "nao_faturavel" && (
+                        {canAdmOrGg && !e.paid_date && !notBillable && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -989,7 +1015,7 @@ function DayBreakdown({
                             Enviar docs
                           </Button>
                         )}
-                        {canAdmOrGg && missingDocData && (
+                        {canAdmOrGg && missingDocData && !notBillable && (
                           <Button
                             size="sm"
                             variant="outline"
