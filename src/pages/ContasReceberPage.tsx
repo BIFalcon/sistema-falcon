@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,58 @@ function fullName(e: { first_name: string | null; last_name: string | null }) {
   return [e.first_name, e.last_name].filter(Boolean).join(" ") || "—";
 }
 
+/* ──────────────── Faixas de dias em aberto (aging) ────────────────
+   Espelha a visão do patrono: 1 - Até 7 dias · 2 - Até 30 dias ·
+   3 - Até 60 dias · 4 - 60+ dias. */
+type AgingBucket = "b1" | "b2" | "b3" | "b4";
+const AGING_BUCKETS: {
+  key: AgingBucket;
+  label: string;
+  short: string;
+  headerClass: string;
+  badgeClass: string;
+}[] = [
+  {
+    key: "b1",
+    label: "1 - Até 7 dias",
+    short: "Até 7d",
+    headerClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+    badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  },
+  {
+    key: "b2",
+    label: "2 - Até 30 dias",
+    short: "Até 30d",
+    headerClass: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
+    badgeClass: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
+  },
+  {
+    key: "b3",
+    label: "3 - Até 60 dias",
+    short: "Até 60d",
+    headerClass: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  },
+  {
+    key: "b4",
+    label: "4 - 60+ dias",
+    short: "60+d",
+    headerClass: "bg-destructive/10 text-destructive border-destructive/30",
+    badgeClass: "bg-destructive/10 text-destructive border-destructive/30",
+  },
+];
+function agingBucketOf(days: number | null | undefined): AgingBucket {
+  const d = days ?? 0;
+  if (d <= 7) return "b1";
+  if (d <= 30) return "b2";
+  if (d <= 60) return "b3";
+  return "b4";
+}
+function agingBucketMeta(days: number | null | undefined) {
+  const key = agingBucketOf(days);
+  return AGING_BUCKETS.find((b) => b.key === key)!;
+}
+
 /* ──────────────── Export Open Folio para Excel ──────────────── */
 function exportOpenFolioToExcel(
   entries: OpenFolioEntry[],
@@ -123,6 +175,7 @@ function exportOpenFolioToExcel(
       "Arrival Date": fmt(e.arrival_date),
       "Departure Date": fmt(e.departure_date),
       "Tempo em aberto (dias)": e.days_open ?? 0,
+      "Faixa": agingBucketMeta(e.days_open).label,
       "Justificativa GG": last?.note ?? "",
       "Data prevista de faturamento": fmt(expected),
       "Data da última atualização": fmtDateTime(lastUpdate),
@@ -132,7 +185,7 @@ function exportOpenFolioToExcel(
   const ws = XLSX.utils.json_to_sheet(rows);
   ws["!cols"] = [
     { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 50 }, { wch: 22 }, { wch: 20 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 50 }, { wch: 22 }, { wch: 20 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Open Folio");
@@ -1878,7 +1931,7 @@ function OpenFolioSection({
   const [localHiddenHotel, setLocalHiddenHotel] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const selectedHotel = localHiddenHotel ?? globalHotelId;
-  const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
+  const [agingFilter, setAgingFilter] = useState<"all" | AgingBucket>("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
   const [notifying, setNotifying] = useState<string | null>(null);
   const [ofSearchText, setOfSearchText] = useState<string>("");
@@ -1939,12 +1992,18 @@ function OpenFolioSection({
   );
 
   const allSummaries = useMemo(() => {
-    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number }>();
+    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number; buckets: Record<AgingBucket, { total: number; count: number }> }>();
     for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
-      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0, unjustified: 0 };
+      const cur = map.get(e.hotel_id) ?? {
+        count: 0, total: 0, daysSum: 0, daysCount: 0, unjustified: 0,
+        buckets: { b1: { total: 0, count: 0 }, b2: { total: 0, count: 0 }, b3: { total: 0, count: 0 }, b4: { total: 0, count: 0 } },
+      };
       cur.count++;
       cur.total += Number(e.balance ?? 0);
+      const bk = agingBucketOf(e.days_open);
+      cur.buckets[bk].total += Number(e.balance ?? 0);
+      cur.buckets[bk].count++;
       if (e.days_open != null) {
         cur.daysSum += e.days_open;
         cur.daysCount++;
@@ -1962,6 +2021,7 @@ function OpenFolioSection({
         total: v.total,
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
         unjustified: v.unjustified,
+        buckets: v.buckets,
       }))
       .sort((a, b) => b.total - a.total);
   }, [visibleEntries, hotels, justifiedByHotel, inactiveHotelIds]);
@@ -1981,10 +2041,7 @@ function OpenFolioSection({
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
-        const d = e.days_open ?? 0;
-        if (agingFilter === "fresh") return d <= 30;
-        if (agingFilter === "mid") return d > 30 && d <= 90;
-        return d > 90;
+        return agingBucketOf(e.days_open) === agingFilter;
       })
       .filter((e) => (unjustifiedOnly ? !isJustified(e) : true));
 
@@ -2088,39 +2145,75 @@ function OpenFolioSection({
           {summaries.length === 0 ? (
             <EmptyState text="Nenhum folio em aberto." />
           ) : (
-            <div className="space-y-2">
-              {summaries.map((s) => {
-                const tone =
-                  s.avgDays > 90 ? "bg-destructive/10 border-destructive/30 text-destructive"
-                  : s.avgDays > 30 ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
-                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400";
-                return (
-                  <div
-                    key={s.id}
-                    className="w-full text-left p-4 rounded-lg border hover:border-accent hover:shadow-soft transition-all flex items-center gap-4"
-                  >
-                    <button
-                      onClick={() => setHotelId(s.id)}
-                      className="flex-1 min-w-0 text-left"
-                    >
-                      <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.count} folio(s) em aberto
-                        {s.unjustified > 0 && (
-                          <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
-                        )}
-                      </p>
-                    </button>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold">{fmtBRL(s.total)}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${tone}`}>
-                        média {s.avgDays}d
-                      </span>
-                    </div>
-                    {/* Notificação automática após upload — botão manual removido */}
-                  </div>
-                );
-              })}
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                Saldo em aberto por faixa de dias. Clique no hotel para ver os folios detalhados.
+              </p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[180px]">Hotel</TableHead>
+                      {AGING_BUCKETS.map((b) => (
+                        <TableHead key={b.key} className={`text-right whitespace-nowrap ${b.headerClass}`}>
+                          {b.label}
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-right whitespace-nowrap">Total geral</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaries.map((s) => (
+                      <TableRow
+                        key={s.id}
+                        className="cursor-pointer"
+                        onClick={() => setHotelId(s.id)}
+                      >
+                        <TableCell className="py-2">
+                          <p className="font-semibold text-sm leading-tight">{s.name}</p>
+                          <p className="text-[10px] text-muted-foreground leading-tight">
+                            {s.count} folio(s) · média {s.avgDays}d
+                            {s.unjustified > 0 && (
+                              <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
+                            )}
+                          </p>
+                        </TableCell>
+                        {AGING_BUCKETS.map((b) => {
+                          const cell = s.buckets[b.key];
+                          return (
+                            <TableCell key={b.key} className="text-right text-xs tabular-nums whitespace-nowrap">
+                              {cell.count === 0 ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <>
+                                  <span className="font-medium">{fmtBRL(cell.total)}</span>
+                                  <span className="block text-[10px] text-muted-foreground leading-tight">
+                                    {cell.count} folio(s)
+                                  </span>
+                                </>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right font-semibold text-sm tabular-nums whitespace-nowrap">
+                          {fmtBRL(s.total)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell className="text-xs uppercase tracking-wider">Total geral</TableCell>
+                      {AGING_BUCKETS.map((b) => (
+                        <TableCell key={b.key} className="text-right text-xs tabular-nums whitespace-nowrap">
+                          {fmtBRL(summaries.reduce((acc, s) => acc + s.buckets[b.key].total, 0))}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
+                        {fmtBRL(summaries.reduce((acc, s) => acc + s.total, 0))}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
               {canSeeHiddenHotels && showHidden && hiddenSummaries.length > 0 && (
                 <div className="pt-3 mt-2 border-t border-dashed border-border space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2185,8 +2278,8 @@ function HotelOpenFolioDetail({
   hotelId: string;
   hotelName: string;
   entries: OpenFolioEntry[];
-  agingFilter: "all" | "fresh" | "mid" | "old";
-  setAgingFilter: (v: "all" | "fresh" | "mid" | "old") => void;
+  agingFilter: "all" | AgingBucket;
+  setAgingFilter: (v: "all" | AgingBucket) => void;
   unjustifiedOnly: boolean;
   setUnjustifiedOnly: (v: boolean) => void;
   unjustifiedCount: number;
@@ -2212,6 +2305,27 @@ function HotelOpenFolioDetail({
     }
     return m;
   }, [notes]);
+
+  // Agrupa por faixa de dias em aberto, preservando a ordenação escolhida dentro de cada faixa.
+  const groups = useMemo(() => {
+    const byBucket = new Map<AgingBucket, OpenFolioEntry[]>();
+    for (const e of entries) {
+      const k = agingBucketOf(e.days_open);
+      const list = byBucket.get(k) ?? [];
+      list.push(e);
+      byBucket.set(k, list);
+    }
+    return AGING_BUCKETS.map((b) => ({
+      bucket: b,
+      rows: byBucket.get(b.key) ?? [],
+      total: (byBucket.get(b.key) ?? []).reduce((acc, e) => acc + Number(e.balance ?? 0), 0),
+    })).filter((g) => g.rows.length > 0);
+  }, [entries]);
+
+  const grandTotal = useMemo(
+    () => entries.reduce((acc, e) => acc + Number(e.balance ?? 0), 0),
+    [entries],
+  );
 
   return (
     <Card className="p-5 shadow-soft space-y-4">
@@ -2248,10 +2362,10 @@ function HotelOpenFolioDetail({
           <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="fresh">Até 30 dias</SelectItem>
-              <SelectItem value="mid">31 a 90 dias</SelectItem>
-              <SelectItem value="old">Acima de 90 dias</SelectItem>
+              <SelectItem value="all">Todas as faixas</SelectItem>
+              {AGING_BUCKETS.map((b) => (
+                <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {/* Notificação automática após upload — botão manual removido */}
@@ -2267,84 +2381,142 @@ function HotelOpenFolioDetail({
           </Button>
         </div>
       </div>
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setAgingFilter("all")}
+            className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+              agingFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Todas · {fmtBRL(grandTotal)}
+          </button>
+          {AGING_BUCKETS.map((b) => {
+            const g = groups.find((x) => x.bucket.key === b.key);
+            const active = agingFilter === b.key;
+            return (
+              <button
+                key={b.key}
+                onClick={() => setAgingFilter(active ? "all" : b.key)}
+                className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wide transition-all ${b.badgeClass} ${
+                  active ? "ring-2 ring-offset-1 ring-current" : "opacity-90 hover:opacity-100"
+                }`}
+              >
+                {b.short} · {fmtBRL(g?.total ?? 0)}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="rounded-lg border overflow-hidden">
-        <Table>
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <SortableHead col="guest_name" label="Hóspede" sort={sort} onSort={onSort} />
-              <TableHead>Confirmação</TableHead>
-              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
-              <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
-              <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
+              <SortableHead col="guest_name" label="Hóspede / Confirmação" sort={sort} onSort={onSort} />
+              <SortableHead col="arrival_date" label="Estadia" sort={sort} onSort={onSort} />
               <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
-              <TableHead>Previsto fechamento</TableHead>
-              <TableHead>Justificativa</TableHead>
+              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
+              <TableHead className="w-[34%]">Justificativa &amp; previsão</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
             ) : (
-              entries.map((e) => {
-                const cn = e.confirmation_number ?? "";
-                const cnNotes = notesByConf.get(cn) ?? [];
-                const last = cnNotes[0];
-                const aging = e.days_open ?? 0;
-                const tone = aging > 90 ? "text-destructive" : aging > 30 ? "text-amber-600" : "text-muted-foreground";
-                const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
-                const todayIso = new Date().toISOString().slice(0, 10);
-                const overdue = expected && expected < todayIso;
-                return (
-                  <TableRow key={e.id}>
-                    <TableCell className="text-sm">
-                      <div>{fullName(e)}</div>
-                      {(e.company || e.travel_agent) && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                          {e.company && <span>🏢 {e.company}</span>}
-                          {e.company && e.travel_agent && <span> · </span>}
-                          {e.travel_agent && <span>✈ {e.travel_agent}</span>}
-                        </div>
-                      )}
+              groups.map((g) => (
+                <Fragment key={g.bucket.key}>
+                  <TableRow className={`border-y ${g.bucket.headerClass} hover:bg-transparent`}>
+                    <TableCell colSpan={2} className="py-1.5 text-[11px] font-bold uppercase tracking-wider">
+                      {g.bucket.label}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
-                    <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
-                    <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
-                    <TableCell className="text-xs">{e.departure_date ? formatDay(e.departure_date) : "—"}</TableCell>
-                    <TableCell className={`text-right text-xs font-semibold ${tone}`}>{aging}d</TableCell>
-                    <TableCell className="text-xs">
-                      {expected ? (
-                        <span className={overdue ? "text-destructive font-semibold" : ""}>
-                          {formatDay(expected)}
-                          {overdue && <Badge variant="destructive" className="ml-1.5 text-[9px] px-1 py-0">vencido</Badge>}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <TableCell className="py-1.5 text-right text-[11px] font-semibold whitespace-nowrap">
+                      {g.rows.length} folio(s)
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {last ? (
-                          <span className="text-xs text-muted-foreground line-clamp-2 max-w-[220px]">{last.note}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">Sem justificativa</span>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => setNoteFor(e)}>
-                          <MessageSquare className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    <TableCell className="py-1.5 text-right text-[11px] font-bold tabular-nums whitespace-nowrap">
+                      {fmtBRL(g.total)}
                     </TableCell>
+                    <TableCell className="py-1.5" />
                   </TableRow>
-                );
-              })
+                  {g.rows.map((e) => {
+                    const cn = e.confirmation_number ?? "";
+                    const cnNotes = notesByConf.get(cn) ?? [];
+                    const last = cnNotes[0];
+                    const aging = e.days_open ?? 0;
+                    const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
+                    const todayIso = new Date().toISOString().slice(0, 10);
+                    const overdue = expected && expected < todayIso;
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="text-sm align-top py-2">
+                          <div className="truncate font-medium">{fullName(e)}</div>
+                          <div className="text-[10px] text-muted-foreground leading-tight font-mono">{cn || "—"}</div>
+                          {(e.company || e.travel_agent) && (
+                            <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                              {e.company && <span>🏢 {e.company}</span>}
+                              {e.company && e.travel_agent && <span> · </span>}
+                              {e.travel_agent && <span>✈ {e.travel_agent}</span>}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs align-top py-2 whitespace-nowrap">
+                          <div>{e.arrival_date ? formatDay(e.arrival_date) : "—"}</div>
+                          <div className="text-[10px] text-muted-foreground leading-tight">
+                            até {e.departure_date ? formatDay(e.departure_date) : "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right align-top py-2 whitespace-nowrap">
+                          <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${g.bucket.badgeClass}`}>
+                            {aging}d
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold align-top py-2 tabular-nums whitespace-nowrap">
+                          {fmtBRL(e.balance)}
+                        </TableCell>
+                        <TableCell className="align-top py-2">
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              {last ? (
+                                <span className="text-xs text-muted-foreground line-clamp-2 block">{last.note}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Sem justificativa</span>
+                              )}
+                              <div className="text-[10px] leading-tight mt-0.5">
+                                {expected ? (
+                                  <span className={overdue ? "text-destructive font-semibold" : "text-muted-foreground"}>
+                                    Previsto: {formatDay(expected)}
+                                    {overdue && <Badge variant="destructive" className="ml-1.5 text-[9px] px-1 py-0">vencido</Badge>}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">Sem previsão de fechamento</span>
+                                )}
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNoteFor(e)}>
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
+              ))
+            )}
+            {entries.length > 0 && (
+              <TableRow className="bg-muted/50">
+                <TableCell colSpan={3} className="text-[11px] font-bold uppercase tracking-wider">Total geral</TableCell>
+                <TableCell className="text-right font-bold tabular-nums whitespace-nowrap">{fmtBRL(grandTotal)}</TableCell>
+                <TableCell />
+              </TableRow>
             )}
           </TableBody>
         </Table>
