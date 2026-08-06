@@ -1931,7 +1931,7 @@ function OpenFolioSection({
   const [localHiddenHotel, setLocalHiddenHotel] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const selectedHotel = localHiddenHotel ?? globalHotelId;
-  const [agingFilter, setAgingFilter] = useState<"all" | "fresh" | "mid" | "old">("all");
+  const [agingFilter, setAgingFilter] = useState<"all" | AgingBucket>("all");
   const [unjustifiedOnly, setUnjustifiedOnly] = useState(false);
   const [notifying, setNotifying] = useState<string | null>(null);
   const [ofSearchText, setOfSearchText] = useState<string>("");
@@ -1992,12 +1992,18 @@ function OpenFolioSection({
   );
 
   const allSummaries = useMemo(() => {
-    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number }>();
+    const map = new Map<string, { count: number; total: number; daysSum: number; daysCount: number; unjustified: number; buckets: Record<AgingBucket, { total: number; count: number }> }>();
     for (const e of visibleEntries) {
       if (!e.hotel_id) continue;
-      const cur = map.get(e.hotel_id) ?? { count: 0, total: 0, daysSum: 0, daysCount: 0, unjustified: 0 };
+      const cur = map.get(e.hotel_id) ?? {
+        count: 0, total: 0, daysSum: 0, daysCount: 0, unjustified: 0,
+        buckets: { b1: { total: 0, count: 0 }, b2: { total: 0, count: 0 }, b3: { total: 0, count: 0 }, b4: { total: 0, count: 0 } },
+      };
       cur.count++;
       cur.total += Number(e.balance ?? 0);
+      const bk = agingBucketOf(e.days_open);
+      cur.buckets[bk].total += Number(e.balance ?? 0);
+      cur.buckets[bk].count++;
       if (e.days_open != null) {
         cur.daysSum += e.days_open;
         cur.daysCount++;
@@ -2015,6 +2021,7 @@ function OpenFolioSection({
         total: v.total,
         avgDays: v.daysCount ? Math.round(v.daysSum / v.daysCount) : 0,
         unjustified: v.unjustified,
+        buckets: v.buckets,
       }))
       .sort((a, b) => b.total - a.total);
   }, [visibleEntries, hotels, justifiedByHotel, inactiveHotelIds]);
@@ -2034,10 +2041,7 @@ function OpenFolioSection({
       .filter((e) => e.hotel_id === selectedHotel)
       .filter((e) => {
         if (agingFilter === "all") return true;
-        const d = e.days_open ?? 0;
-        if (agingFilter === "fresh") return d <= 30;
-        if (agingFilter === "mid") return d > 30 && d <= 90;
-        return d > 90;
+        return agingBucketOf(e.days_open) === agingFilter;
       })
       .filter((e) => (unjustifiedOnly ? !isJustified(e) : true));
 
