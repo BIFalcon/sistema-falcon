@@ -82,6 +82,58 @@ function fullName(e: { first_name: string | null; last_name: string | null }) {
   return [e.first_name, e.last_name].filter(Boolean).join(" ") || "—";
 }
 
+/* ──────────────── Faixas de dias em aberto (aging) ────────────────
+   Espelha a visão do patrono: 1 - Até 7 dias · 2 - Até 30 dias ·
+   3 - Até 60 dias · 4 - 60+ dias. */
+type AgingBucket = "b1" | "b2" | "b3" | "b4";
+const AGING_BUCKETS: {
+  key: AgingBucket;
+  label: string;
+  short: string;
+  headerClass: string;
+  badgeClass: string;
+}[] = [
+  {
+    key: "b1",
+    label: "1 - Até 7 dias",
+    short: "Até 7d",
+    headerClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+    badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  },
+  {
+    key: "b2",
+    label: "2 - Até 30 dias",
+    short: "Até 30d",
+    headerClass: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
+    badgeClass: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
+  },
+  {
+    key: "b3",
+    label: "3 - Até 60 dias",
+    short: "Até 60d",
+    headerClass: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  },
+  {
+    key: "b4",
+    label: "4 - 60+ dias",
+    short: "60+d",
+    headerClass: "bg-destructive/10 text-destructive border-destructive/30",
+    badgeClass: "bg-destructive/10 text-destructive border-destructive/30",
+  },
+];
+function agingBucketOf(days: number | null | undefined): AgingBucket {
+  const d = days ?? 0;
+  if (d <= 7) return "b1";
+  if (d <= 30) return "b2";
+  if (d <= 60) return "b3";
+  return "b4";
+}
+function agingBucketMeta(days: number | null | undefined) {
+  const key = agingBucketOf(days);
+  return AGING_BUCKETS.find((b) => b.key === key)!;
+}
+
 /* ──────────────── Export Open Folio para Excel ──────────────── */
 function exportOpenFolioToExcel(
   entries: OpenFolioEntry[],
