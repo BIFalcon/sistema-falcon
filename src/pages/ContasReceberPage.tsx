@@ -2306,6 +2306,27 @@ function HotelOpenFolioDetail({
     return m;
   }, [notes]);
 
+  // Agrupa por faixa de dias em aberto, preservando a ordenação escolhida dentro de cada faixa.
+  const groups = useMemo(() => {
+    const byBucket = new Map<AgingBucket, OpenFolioEntry[]>();
+    for (const e of entries) {
+      const k = agingBucketOf(e.days_open);
+      const list = byBucket.get(k) ?? [];
+      list.push(e);
+      byBucket.set(k, list);
+    }
+    return AGING_BUCKETS.map((b) => ({
+      bucket: b,
+      rows: byBucket.get(b.key) ?? [],
+      total: (byBucket.get(b.key) ?? []).reduce((acc, e) => acc + Number(e.balance ?? 0), 0),
+    })).filter((g) => g.rows.length > 0);
+  }, [entries]);
+
+  const grandTotal = useMemo(
+    () => entries.reduce((acc, e) => acc + Number(e.balance ?? 0), 0),
+    [entries],
+  );
+
   return (
     <Card className="p-5 shadow-soft space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -2341,10 +2362,10 @@ function HotelOpenFolioDetail({
           <Select value={agingFilter} onValueChange={(v) => setAgingFilter(v as typeof agingFilter)}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="fresh">Até 30 dias</SelectItem>
-              <SelectItem value="mid">31 a 90 dias</SelectItem>
-              <SelectItem value="old">Acima de 90 dias</SelectItem>
+              <SelectItem value="all">Todas as faixas</SelectItem>
+              {AGING_BUCKETS.map((b) => (
+                <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {/* Notificação automática após upload — botão manual removido */}
