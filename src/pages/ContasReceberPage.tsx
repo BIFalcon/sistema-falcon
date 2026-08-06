@@ -2145,39 +2145,75 @@ function OpenFolioSection({
           {summaries.length === 0 ? (
             <EmptyState text="Nenhum folio em aberto." />
           ) : (
-            <div className="space-y-2">
-              {summaries.map((s) => {
-                const tone =
-                  s.avgDays > 90 ? "bg-destructive/10 border-destructive/30 text-destructive"
-                  : s.avgDays > 30 ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
-                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400";
-                return (
-                  <div
-                    key={s.id}
-                    className="w-full text-left p-4 rounded-lg border hover:border-accent hover:shadow-soft transition-all flex items-center gap-4"
-                  >
-                    <button
-                      onClick={() => setHotelId(s.id)}
-                      className="flex-1 min-w-0 text-left"
-                    >
-                      <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.count} folio(s) em aberto
-                        {s.unjustified > 0 && (
-                          <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
-                        )}
-                      </p>
-                    </button>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold">{fmtBRL(s.total)}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${tone}`}>
-                        média {s.avgDays}d
-                      </span>
-                    </div>
-                    {/* Notificação automática após upload — botão manual removido */}
-                  </div>
-                );
-              })}
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                Saldo em aberto por faixa de dias. Clique no hotel para ver os folios detalhados.
+              </p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[180px]">Hotel</TableHead>
+                      {AGING_BUCKETS.map((b) => (
+                        <TableHead key={b.key} className={`text-right whitespace-nowrap ${b.headerClass}`}>
+                          {b.label}
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-right whitespace-nowrap">Total geral</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaries.map((s) => (
+                      <TableRow
+                        key={s.id}
+                        className="cursor-pointer"
+                        onClick={() => setHotelId(s.id)}
+                      >
+                        <TableCell className="py-2">
+                          <p className="font-semibold text-sm leading-tight">{s.name}</p>
+                          <p className="text-[10px] text-muted-foreground leading-tight">
+                            {s.count} folio(s) · média {s.avgDays}d
+                            {s.unjustified > 0 && (
+                              <> · <span className="text-amber-600 font-medium">{s.unjustified} sem justificativa</span></>
+                            )}
+                          </p>
+                        </TableCell>
+                        {AGING_BUCKETS.map((b) => {
+                          const cell = s.buckets[b.key];
+                          return (
+                            <TableCell key={b.key} className="text-right text-xs tabular-nums whitespace-nowrap">
+                              {cell.count === 0 ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <>
+                                  <span className="font-medium">{fmtBRL(cell.total)}</span>
+                                  <span className="block text-[10px] text-muted-foreground leading-tight">
+                                    {cell.count} folio(s)
+                                  </span>
+                                </>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right font-semibold text-sm tabular-nums whitespace-nowrap">
+                          {fmtBRL(s.total)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell className="text-xs uppercase tracking-wider">Total geral</TableCell>
+                      {AGING_BUCKETS.map((b) => (
+                        <TableCell key={b.key} className="text-right text-xs tabular-nums whitespace-nowrap">
+                          {fmtBRL(summaries.reduce((acc, s) => acc + s.buckets[b.key].total, 0))}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
+                        {fmtBRL(summaries.reduce((acc, s) => acc + s.total, 0))}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
               {canSeeHiddenHotels && showHidden && hiddenSummaries.length > 0 && (
                 <div className="pt-3 mt-2 border-t border-dashed border-border space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
