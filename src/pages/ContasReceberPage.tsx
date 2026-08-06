@@ -172,7 +172,11 @@ function exportToInvoiceToExcel(
       "Nº Nota": e.nota_number ?? "",
       "Nº Boleto": e.boleto_number ?? "",
       "Valor": Number(e.amount ?? 0),
-      "Faturado?": e.gg_status === "faturado" ? "Sim" : e.gg_status === "nao_faturado" ? "Não" : "Pendente",
+      "Faturado?":
+        e.gg_status === "faturado" ? "Sim"
+        : e.gg_status === "nao_faturado" ? "Não"
+        : e.gg_status === "nao_faturavel" || e.is_not_billable ? "Não faturável"
+        : "Pendente",
       "Data Faturamento": e.gg_status === "faturado" && e.gg_confirmed_at
         ? format(new Date(e.gg_confirmed_at), "dd/MM/yyyy", { locale: ptBR })
         : "",
@@ -275,7 +279,7 @@ function ToInvoiceSection({
   const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<
-    "todos" | "pendente" | "faturado" | "pago" | "inadimplente"
+    "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
@@ -365,7 +369,16 @@ function ToInvoiceSection({
           isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
         );
       } else if (faturamentoFilter === "pendente") {
-        arr = arr.filter((e) => e.gg_status !== "faturado" && !isEntryPaid(e));
+        // "Não faturável" é um status terminal: nunca aparece como pendente.
+        arr = arr.filter(
+          (e) =>
+            e.gg_status !== "faturado" &&
+            e.gg_status !== "nao_faturavel" &&
+            !e.is_not_billable &&
+            !isEntryPaid(e),
+        );
+      } else if (faturamentoFilter === "nao_faturavel") {
+        arr = arr.filter((e) => e.gg_status === "nao_faturavel" || e.is_not_billable);
       } else {
         arr = arr.filter((e) => e.gg_status === faturamentoFilter);
       }
@@ -418,6 +431,7 @@ function ToInvoiceSection({
                 <SelectItem value="faturado">Faturados</SelectItem>
                 <SelectItem value="pago">Pagos</SelectItem>
                 <SelectItem value="inadimplente">Inadimplentes</SelectItem>
+                <SelectItem value="nao_faturavel">Não faturáveis</SelectItem>
               </SelectContent>
             </Select>
             <ExtractDocsButton entries={finalEntries} />
