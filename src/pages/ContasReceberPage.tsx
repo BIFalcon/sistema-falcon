@@ -836,6 +836,8 @@ function DayBreakdown({
               const due = resolveDueDate(e, term);
               const overdue = isEntryDefaulting(e, due);
               const status = effectiveStatus(e, due);
+              // Status terminal: não há próxima etapa após "Não faturável".
+              const notBillable = e.gg_status === "nao_faturavel" || e.is_not_billable === true;
               const missingDocData =
                 (e.invoice_file_1 || e.invoice_file_2) &&
                 (!e.nota_number || !e.boleto_number || !e.boleto_due_date);
