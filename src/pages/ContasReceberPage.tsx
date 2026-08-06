@@ -2381,84 +2381,142 @@ function HotelOpenFolioDetail({
           </Button>
         </div>
       </div>
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar hóspede, nº de confirmação, company ou agência..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setAgingFilter("all")}
+            className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+              agingFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Todas · {fmtBRL(grandTotal)}
+          </button>
+          {AGING_BUCKETS.map((b) => {
+            const g = groups.find((x) => x.bucket.key === b.key);
+            const active = agingFilter === b.key;
+            return (
+              <button
+                key={b.key}
+                onClick={() => setAgingFilter(active ? "all" : b.key)}
+                className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wide transition-all ${b.badgeClass} ${
+                  active ? "ring-2 ring-offset-1 ring-current" : "opacity-90 hover:opacity-100"
+                }`}
+              >
+                {b.short} · {fmtBRL(g?.total ?? 0)}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="rounded-lg border overflow-hidden">
-        <Table>
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <SortableHead col="guest_name" label="Hóspede" sort={sort} onSort={onSort} />
-              <TableHead>Confirmação</TableHead>
-              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
-              <SortableHead col="arrival_date" label="Check-in" sort={sort} onSort={onSort} />
-              <SortableHead col="departure_date" label="Check-out" sort={sort} onSort={onSort} />
+              <SortableHead col="guest_name" label="Hóspede / Confirmação" sort={sort} onSort={onSort} />
+              <SortableHead col="arrival_date" label="Estadia" sort={sort} onSort={onSort} />
               <SortableHead col="days_open" label="Em aberto" sort={sort} onSort={onSort} align="right" />
-              <TableHead>Previsto fechamento</TableHead>
-              <TableHead>Justificativa</TableHead>
+              <SortableHead col="balance" label="Saldo" sort={sort} onSort={onSort} align="right" />
+              <TableHead className="w-[34%]">Justificativa &amp; previsão</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Nenhum folio.</TableCell></TableRow>
             ) : (
-              entries.map((e) => {
-                const cn = e.confirmation_number ?? "";
-                const cnNotes = notesByConf.get(cn) ?? [];
-                const last = cnNotes[0];
-                const aging = e.days_open ?? 0;
-                const tone = aging > 90 ? "text-destructive" : aging > 30 ? "text-amber-600" : "text-muted-foreground";
-                const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
-                const todayIso = new Date().toISOString().slice(0, 10);
-                const overdue = expected && expected < todayIso;
-                return (
-                  <TableRow key={e.id}>
-                    <TableCell className="text-sm">
-                      <div>{fullName(e)}</div>
-                      {(e.company || e.travel_agent) && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                          {e.company && <span>🏢 {e.company}</span>}
-                          {e.company && e.travel_agent && <span> · </span>}
-                          {e.travel_agent && <span>✈ {e.travel_agent}</span>}
-                        </div>
-                      )}
+              groups.map((g) => (
+                <Fragment key={g.bucket.key}>
+                  <TableRow className={`border-y ${g.bucket.headerClass} hover:bg-transparent`}>
+                    <TableCell colSpan={2} className="py-1.5 text-[11px] font-bold uppercase tracking-wider">
+                      {g.bucket.label}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{cn || "—"}</TableCell>
-                    <TableCell className="text-right font-semibold">{fmtBRL(e.balance)}</TableCell>
-                    <TableCell className="text-xs">{e.arrival_date ? formatDay(e.arrival_date) : "—"}</TableCell>
-                    <TableCell className="text-xs">{e.departure_date ? formatDay(e.departure_date) : "—"}</TableCell>
-                    <TableCell className={`text-right text-xs font-semibold ${tone}`}>{aging}d</TableCell>
-                    <TableCell className="text-xs">
-                      {expected ? (
-                        <span className={overdue ? "text-destructive font-semibold" : ""}>
-                          {formatDay(expected)}
-                          {overdue && <Badge variant="destructive" className="ml-1.5 text-[9px] px-1 py-0">vencido</Badge>}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <TableCell className="py-1.5 text-right text-[11px] font-semibold whitespace-nowrap">
+                      {g.rows.length} folio(s)
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {last ? (
-                          <span className="text-xs text-muted-foreground line-clamp-2 max-w-[220px]">{last.note}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">Sem justificativa</span>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => setNoteFor(e)}>
-                          <MessageSquare className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    <TableCell className="py-1.5 text-right text-[11px] font-bold tabular-nums whitespace-nowrap">
+                      {fmtBRL(g.total)}
                     </TableCell>
+                    <TableCell className="py-1.5" />
                   </TableRow>
-                );
-              })
+                  {g.rows.map((e) => {
+                    const cn = e.confirmation_number ?? "";
+                    const cnNotes = notesByConf.get(cn) ?? [];
+                    const last = cnNotes[0];
+                    const aging = e.days_open ?? 0;
+                    const expected = e.expected_payment_date ?? last?.expected_payment_date ?? null;
+                    const todayIso = new Date().toISOString().slice(0, 10);
+                    const overdue = expected && expected < todayIso;
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="text-sm align-top py-2">
+                          <div className="truncate font-medium">{fullName(e)}</div>
+                          <div className="text-[10px] text-muted-foreground leading-tight font-mono">{cn || "—"}</div>
+                          {(e.company || e.travel_agent) && (
+                            <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                              {e.company && <span>🏢 {e.company}</span>}
+                              {e.company && e.travel_agent && <span> · </span>}
+                              {e.travel_agent && <span>✈ {e.travel_agent}</span>}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs align-top py-2 whitespace-nowrap">
+                          <div>{e.arrival_date ? formatDay(e.arrival_date) : "—"}</div>
+                          <div className="text-[10px] text-muted-foreground leading-tight">
+                            até {e.departure_date ? formatDay(e.departure_date) : "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right align-top py-2 whitespace-nowrap">
+                          <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${g.bucket.badgeClass}`}>
+                            {aging}d
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold align-top py-2 tabular-nums whitespace-nowrap">
+                          {fmtBRL(e.balance)}
+                        </TableCell>
+                        <TableCell className="align-top py-2">
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              {last ? (
+                                <span className="text-xs text-muted-foreground line-clamp-2 block">{last.note}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Sem justificativa</span>
+                              )}
+                              <div className="text-[10px] leading-tight mt-0.5">
+                                {expected ? (
+                                  <span className={overdue ? "text-destructive font-semibold" : "text-muted-foreground"}>
+                                    Previsto: {formatDay(expected)}
+                                    {overdue && <Badge variant="destructive" className="ml-1.5 text-[9px] px-1 py-0">vencido</Badge>}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">Sem previsão de fechamento</span>
+                                )}
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNoteFor(e)}>
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
+              ))
+            )}
+            {entries.length > 0 && (
+              <TableRow className="bg-muted/50">
+                <TableCell colSpan={3} className="text-[11px] font-bold uppercase tracking-wider">Total geral</TableCell>
+                <TableCell className="text-right font-bold tabular-nums whitespace-nowrap">{fmtBRL(grandTotal)}</TableCell>
+                <TableCell />
+              </TableRow>
             )}
           </TableBody>
         </Table>
