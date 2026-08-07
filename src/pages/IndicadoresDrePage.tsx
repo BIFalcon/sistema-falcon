@@ -743,6 +743,58 @@ export default function IndicadoresDrePage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9">
+                    {customMonths.length === 0
+                      ? "Meses (múltiplos)"
+                      : `${customMonths.length} mês(es) somados`}
+                    <ChevronDown className="h-4 w-4 ml-1.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[260px] bg-popover" align="start">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Somar meses
+                    </span>
+                    {customMonths.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setCustomMonths([])}
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {MONTHS_PT.map((label, i) => {
+                      const m = i + 1;
+                      const checked = customMonths.includes(m);
+                      return (
+                        <label
+                          key={m}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/70 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() =>
+                              setCustomMonths((prev) =>
+                                prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
+                              )
+                            }
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Ao selecionar meses aqui, o período acima é ignorado.
+                  </p>
+                </PopoverContent>
+              </Popover>
               <span className="text-xs text-muted-foreground">{periodLabel}</span>
             </div>
           </div>
