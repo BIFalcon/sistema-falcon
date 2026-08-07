@@ -922,6 +922,13 @@ export default function IndicadoresDrePage() {
                 <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <YAxis
+                    reversed={invertYAxis}
+                    tickLine={false}
+                    axisLine={false}
+                    width={70}
+                    tickFormatter={(v) => formatChartValue(v)}
+                  />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
