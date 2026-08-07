@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,12 @@ const CARD_LINES: CardDef[] = [
   { title: "Taxa de Ocupação", format: "pct", agg: "avg", labels: ["Taxa de Ocupação"] },
   { title: "ADR", format: "brl", agg: "avg", labels: ["Diária Média", "ADR"] },
   { title: "RevPAR", format: "brl", agg: "avg", labels: ["RevPAR"] },
+  {
+    title: "Receita Bruta Total",
+    format: "brl",
+    agg: "sum",
+    labels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
+  },
   { title: "GOP", format: "brl", agg: "sum", labels: ["GOP", "Resultado Operacional Bruto"] },
   {
     title: "%GOP",
@@ -48,6 +55,12 @@ const CARD_LINES: CardDef[] = [
     agg: "ratio",
     numLabels: ["GOP", "Resultado Operacional Bruto"],
     denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
+  },
+  {
+    title: "Lucro Líquido",
+    format: "brl",
+    agg: "sum",
+    labels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
   },
   {
     title: "Margem Líquida",
@@ -416,6 +429,8 @@ export default function IndicadoresDrePage() {
   
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
+  // Seleção múltipla de meses — quando preenchida, substitui a janela do período
+  const [customMonths, setCustomMonths] = useState<number[]>([]);
   const showAsPct = divider === "revenue";
   const hotelIds = useMemo(() => {
     if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
@@ -535,6 +550,17 @@ export default function IndicadoresDrePage() {
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
+  /**
+   * Séries de despesas vêm negativas. Nesse caso invertemos o eixo Y para que
+   * "mais gasto" apareça mais alto no gráfico, mantendo os valores negativos.
+   */
+  const invertYAxis = useMemo(() => {
+    const vals = chartData
+      .flatMap((p) => [p.current, p.budget, p.previous])
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    if (vals.length === 0) return false;
+    return vals.every((v) => v <= 0) && vals.some((v) => v < 0);
+  }, [chartData]);
   const formatChartValue = (value: unknown) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "—";
@@ -554,16 +580,23 @@ export default function IndicadoresDrePage() {
     });
 
   const monthsWindow = useMemo(
-    () => periodMonths(month, periodCfg.months),
-    [month, periodCfg.months],
+    () =>
+      customMonths.length > 0
+        ? [...customMonths].sort((a, b) => a - b)
+        : periodMonths(month, periodCfg.months),
+    [month, periodCfg.months, customMonths],
   );
   const periodLabel = useMemo(() => {
+    if (customMonths.length > 0) {
+      const sorted = [...customMonths].sort((a, b) => a - b);
+      return `${sorted.map((m) => MONTHS_SHORT[m - 1]).join(" + ")} de ${year}`;
+    }
     if (monthsWindow.length === 12) return `Acumulado de ${year}`;
     if (monthsWindow.length === 1) return `${MONTHS_PT[monthsWindow[0] - 1]} de ${year}`;
     const first = MONTHS_PT[monthsWindow[0] - 1];
     const last = MONTHS_PT[monthsWindow[monthsWindow.length - 1] - 1];
     return `${first}–${last} de ${year}`;
-  }, [monthsWindow, year]);
+  }, [monthsWindow, year, customMonths]);
 
   return (
     <div className="space-y-6">
@@ -721,6 +754,58 @@ export default function IndicadoresDrePage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9">
+                    {customMonths.length === 0
+                      ? "Meses (múltiplos)"
+                      : `${customMonths.length} mês(es) somados`}
+                    <ChevronDown className="h-4 w-4 ml-1.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[260px] bg-popover" align="start">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Somar meses
+                    </span>
+                    {customMonths.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setCustomMonths([])}
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {MONTHS_PT.map((label, i) => {
+                      const m = i + 1;
+                      const checked = customMonths.includes(m);
+                      return (
+                        <label
+                          key={m}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/70 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() =>
+                              setCustomMonths((prev) =>
+                                prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
+                              )
+                            }
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Ao selecionar meses aqui, o período acima é ignorado.
+                  </p>
+                </PopoverContent>
+              </Popover>
               <span className="text-xs text-muted-foreground">{periodLabel}</span>
             </div>
           </div>
@@ -837,6 +922,13 @@ export default function IndicadoresDrePage() {
                 <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <YAxis
+                    reversed={invertYAxis}
+                    tickLine={false}
+                    axisLine={false}
+                    width={70}
+                    tickFormatter={(v) => formatChartValue(v)}
+                  />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
