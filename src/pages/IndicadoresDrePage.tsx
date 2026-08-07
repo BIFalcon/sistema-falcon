@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,12 @@ const CARD_LINES: CardDef[] = [
   { title: "Taxa de Ocupação", format: "pct", agg: "avg", labels: ["Taxa de Ocupação"] },
   { title: "ADR", format: "brl", agg: "avg", labels: ["Diária Média", "ADR"] },
   { title: "RevPAR", format: "brl", agg: "avg", labels: ["RevPAR"] },
+  {
+    title: "Receita Bruta Total",
+    format: "brl",
+    agg: "sum",
+    labels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
+  },
   { title: "GOP", format: "brl", agg: "sum", labels: ["GOP", "Resultado Operacional Bruto"] },
   {
     title: "%GOP",
@@ -48,6 +55,12 @@ const CARD_LINES: CardDef[] = [
     agg: "ratio",
     numLabels: ["GOP", "Resultado Operacional Bruto"],
     denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
+  },
+  {
+    title: "Lucro Líquido",
+    format: "brl",
+    agg: "sum",
+    labels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
   },
   {
     title: "Margem Líquida",
