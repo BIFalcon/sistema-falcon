@@ -550,6 +550,17 @@ export default function IndicadoresDrePage() {
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
+  /**
+   * Séries de despesas vêm negativas. Nesse caso invertemos o eixo Y para que
+   * "mais gasto" apareça mais alto no gráfico, mantendo os valores negativos.
+   */
+  const invertYAxis = useMemo(() => {
+    const vals = chartData
+      .flatMap((p) => [p.current, p.budget, p.previous])
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    if (vals.length === 0) return false;
+    return vals.every((v) => v <= 0) && vals.some((v) => v < 0);
+  }, [chartData]);
   const formatChartValue = (value: unknown) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "—";
