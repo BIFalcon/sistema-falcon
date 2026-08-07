@@ -429,6 +429,8 @@ export default function IndicadoresDrePage() {
   
   const [divider, setDivider] = useState("none");
   const [period, setPeriod] = useState<PeriodKey>("1");
+  // Seleção múltipla de meses — quando preenchida, substitui a janela do período
+  const [customMonths, setCustomMonths] = useState<number[]>([]);
   const showAsPct = divider === "revenue";
   const hotelIds = useMemo(() => {
     if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
@@ -567,16 +569,23 @@ export default function IndicadoresDrePage() {
     });
 
   const monthsWindow = useMemo(
-    () => periodMonths(month, periodCfg.months),
-    [month, periodCfg.months],
+    () =>
+      customMonths.length > 0
+        ? [...customMonths].sort((a, b) => a - b)
+        : periodMonths(month, periodCfg.months),
+    [month, periodCfg.months, customMonths],
   );
   const periodLabel = useMemo(() => {
+    if (customMonths.length > 0) {
+      const sorted = [...customMonths].sort((a, b) => a - b);
+      return `${sorted.map((m) => MONTHS_SHORT[m - 1]).join(" + ")} de ${year}`;
+    }
     if (monthsWindow.length === 12) return `Acumulado de ${year}`;
     if (monthsWindow.length === 1) return `${MONTHS_PT[monthsWindow[0] - 1]} de ${year}`;
     const first = MONTHS_PT[monthsWindow[0] - 1];
     const last = MONTHS_PT[monthsWindow[monthsWindow.length - 1] - 1];
     return `${first}–${last} de ${year}`;
-  }, [monthsWindow, year]);
+  }, [monthsWindow, year, customMonths]);
 
   return (
     <div className="space-y-6">
