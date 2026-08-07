@@ -810,7 +810,7 @@ export default function IndicadoresDrePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {CARD_LINES.map((card) => {
               const cur = computeCardValue(card, dataset, monthsWindow, "current");
               const bud = computeCardValue(card, dataset, monthsWindow, "budget");
@@ -818,27 +818,27 @@ export default function IndicadoresDrePage() {
               const fmt = (v: number | null) =>
                 card.format === "pct" ? pct(v) : fmtBRL(v);
               return (
-                <Card key={card.title} className="p-4 shadow-soft">
-                  <h3 className="text-sm font-semibold mb-3">{card.title}</h3>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                <Card key={card.title} className="p-3 shadow-soft">
+                  <h3 className="text-xs font-semibold mb-2 truncate">{card.title}</h3>
+                  <div className="grid grid-cols-3 gap-1 text-[11px]">
                     <div>
                       <p className="text-muted-foreground">Realizado</p>
-                      <p className="font-semibold text-foreground">{fmt(cur)}</p>
+                      <p className="font-semibold text-foreground tabular-nums">{fmt(cur)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Orçado</p>
-                      <p className="font-semibold text-foreground">{fmt(bud)}</p>
+                      <p className="font-semibold text-foreground tabular-nums">{fmt(bud)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Ano ant.</p>
-                      <p className="font-semibold text-foreground">{fmt(prev)}</p>
+                      <p className="font-semibold text-foreground tabular-nums">{fmt(prev)}</p>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs">
+                  <div className="mt-2 flex items-center justify-between text-[11px]">
                     <span>vs Ano ant.</span>
                     <VariationPill value={variation(cur, prev)} />
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-xs">
+                  <div className="mt-0.5 flex items-center justify-between text-[11px]">
                     <span>vs Orçado</span>
                     <VariationPill value={variation(cur, bud)} />
                   </div>
