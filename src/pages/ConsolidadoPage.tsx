@@ -235,7 +235,7 @@ export default function ConsolidadoPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="text-xs">
               <TableHeader>
                 <TableRow className="bg-secondary/40 hover:bg-secondary/40">
                   <TableHead className="text-xs uppercase tracking-wider">Hotel</TableHead>

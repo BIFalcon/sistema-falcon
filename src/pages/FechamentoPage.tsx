@@ -1,16 +1,24 @@
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useClosings } from "@/hooks/useClosings";
 import { ClosingTable } from "@/components/closings/ClosingTable";
 import { MONTHS_PT, hotelSkipsCarta } from "@/lib/constants";
 import { CheckCircle2, Clock, AlertCircle, FileSpreadsheet } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export default function Index() {
   const { isMaster, allowedHotels } = useAuth();
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { data: closings = [] } = useClosings({ hotelId, month, year });
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const closingHotels = useMemo(
     () => allowedHotels.filter((h) => h.show_in_closing !== false),
@@ -63,8 +71,21 @@ export default function Index() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Fechamentos · {MONTHS_PT[month - 1]} / {year}
           </h2>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[240px]">
+              <SelectValue placeholder="Filtrar por status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="nao_iniciado">Não Iniciado</SelectItem>
+              <SelectItem value="aguardando_gg">Aguardando GG</SelectItem>
+              <SelectItem value="aguardando_controladoria">Aguardando Controladoria</SelectItem>
+              <SelectItem value="aguardando_gop">Aguardando GOP</SelectItem>
+              <SelectItem value="aguardando_fernando">Aguardando Fernando</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <ClosingTable hotelId={hotelId} month={month} year={year} />
+        <ClosingTable hotelId={hotelId} month={month} year={year} statusFilter={statusFilter} />
       </div>
     </div>
   );
