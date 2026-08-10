@@ -121,14 +121,15 @@ export default function FinanceiroPage() {
             Nenhum fechamento com DRE aprovada para este período ainda.
           </div>
         ) : (
-          <Table>
+          <Table className="text-xs">
             <TableHeader>
               <TableRow className="bg-secondary/40 hover:bg-secondary/40">
-                <TableHead className="text-xs uppercase tracking-wider">Hotel</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider">Lucro Líquido (DRE)</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider">Distribuição</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider">Decisão</TableHead>
-                <TableHead className="text-right text-xs uppercase tracking-wider">Ação</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Hotel</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider text-right">Lucro Líquido (DRE)</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuição DRE</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuído</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Decisão</TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">Ação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,12 +138,18 @@ export default function FinanceiroPage() {
                 const { value: lucro, source } = lucroFromLines(row.estimated_lines);
                 const consolidatedRow = consolidadoByHotel.get(row.hotel_id) ?? null;
                 const consolidatedTotal = consolidatedRow?.distribuicaoTotal ?? null;
-                // Se o Financeiro já registrou o valor final, ele prevalece.
-                // Caso contrário, mostra exatamente o valor do Consolidado.
-                // Não usamos estimated_distribution aqui pra evitar divergência
-                // com o Consolidado (que foi o problema reportado em Arcoverde).
-                const distribution =
-                  row.final_distribution ?? consolidatedTotal ?? null;
+                // Distribuição DRE = sempre o valor do Consolidado (fonte única
+                // da verdade). Nunca é sobrescrito pela decisão do Financeiro.
+                const dreDistribution = consolidatedTotal ?? row.estimated_distribution ?? null;
+                // Distribuído = valor efetivamente enviado pelo Financeiro.
+                const paidDistribution =
+                  row.distribution_decision === "sem_distribuicao"
+                    ? 0
+                    : row.final_distribution ?? null;
+                const diverges =
+                  paidDistribution != null &&
+                  dreDistribution != null &&
+                  Math.abs(paidDistribution - dreDistribution) > 0.01;
                 const decisionLabel: Record<DistributionDecision, { label: string; tone: string; icon: React.ElementType }> = {
                   enviado: { label: "Enviado", tone: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },
                   sem_distribuicao: { label: "Sem Distribuição", tone: "bg-muted text-muted-foreground border-border", icon: XCircle },
@@ -154,7 +161,7 @@ export default function FinanceiroPage() {
                     <TableCell className="font-medium">
                       {hotel?.name ?? row.hotel_id}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <div className="flex items-center gap-2">
                         <span className={lucro != null && lucro < 0 ? "text-destructive font-medium" : "font-medium"}>
                           {formatBRL(lucro ?? 0)}
@@ -171,13 +178,37 @@ export default function FinanceiroPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {distribution != null && distribution !== 0 ? (
-                        <span className="font-medium text-success">{formatBRL(distribution)}</span>
+                    <TableCell className="text-right tabular-nums">
+                      {dreDistribution != null && dreDistribution !== 0 ? (
+                        <span className="font-medium">{formatBRL(dreDistribution)}</span>
                       ) : isConsolidadoLoading ? (
-                        <span className="text-xs text-muted-foreground italic">carregando…</span>
+                        <span className="text-[11px] text-muted-foreground italic">carregando…</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {paidDistribution == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-col items-end">
+                          <span
+                            className={
+                              paidDistribution === 0
+                                ? "font-medium text-muted-foreground"
+                                : diverges
+                                  ? "font-medium text-warning"
+                                  : "font-medium text-success"
+                            }
+                          >
+                            {formatBRL(paidDistribution)}
+                          </span>
+                          {diverges && (
+                            <span className="text-[10px] text-warning">
+                              ≠ DRE ({formatBRL(paidDistribution - dreDistribution)})
+                            </span>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>
