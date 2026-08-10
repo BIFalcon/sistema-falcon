@@ -281,6 +281,13 @@ export default function FinanceiroPage() {
                   onChange={(e) => setValueStr(e.target.value)}
                   placeholder="0,00"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  Distribuição DRE:{" "}
+                  {openMetrics?.distribuicaoTotal != null
+                    ? formatBRL(openMetrics.distribuicaoTotal)
+                    : "—"}{" "}
+                  — se distribuir menos, justifique nas observações.
+                </p>
               </div>
             )}
 
