@@ -235,20 +235,20 @@ export default function ConsolidadoPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="text-xs">
               <TableHeader>
                 <TableRow className="bg-secondary/40 hover:bg-secondary/40">
-                  <TableHead className="text-xs uppercase tracking-wider">Hotel</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Tx. Ocup.</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Diária Média</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">RevPAR</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Receita Bruta</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Fee/Rec.Bruta</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Incentive Fee</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Distrib. Total</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Distrib./UH</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">GOP</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-right">Fundo de Reserva</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider">Hotel</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Tx. Ocup.</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Diária Média</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">RevPAR</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Receita Bruta</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Fee/Rec.Bruta</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Incentive Fee</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Distrib. Total</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Distrib./UH</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">GOP</TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider text-right">Fundo de Reserva</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
