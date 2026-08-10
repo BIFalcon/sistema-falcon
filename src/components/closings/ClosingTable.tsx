@@ -20,9 +20,10 @@ interface Props {
   hotelId: string | null;
   month: number;
   year: number;
+  statusFilter?: string;
 }
 
-export function ClosingTable({ hotelId, month, year }: Props) {
+export function ClosingTable({ hotelId, month, year, statusFilter = "all" }: Props) {
   const navigate = useNavigate();
   const { allowedHotels, isMaster } = useAuth();
   const ensure = useEnsureClosing();
@@ -31,8 +32,16 @@ export function ClosingTable({ hotelId, month, year }: Props) {
   // Constrói linhas: para cada hotel permitido (e que aparece no fechamento),
   // exibir o closing existente OU placeholder.
   const closingHotels = allowedHotels.filter((h) => h.show_in_closing !== false);
-  const visibleHotels = hotelId ? closingHotels.filter((h) => h.id === hotelId) : closingHotels;
   const byHotel = new Map(closings.map((c) => [c.hotel_id, c]));
+  const scopedHotels = hotelId ? closingHotels.filter((h) => h.id === hotelId) : closingHotels;
+  const visibleHotels = scopedHotels.filter((h) => {
+    if (statusFilter === "all") return true;
+    const c = byHotel.get(h.id);
+    const statuses = c
+      ? [c.status_dre, c.status_carta, c.status_financeiro, c.status_envio]
+      : ["nao_iniciado"];
+    return statuses.includes(statusFilter as ClosingRow["status_dre"]);
+  });
 
   async function startClosing(hid: string) {
     try {
