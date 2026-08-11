@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -301,9 +301,37 @@ function divideSeries(values: DreMonthValue[], divisor?: DreLineNode, key?: DreS
   });
 }
 
-function VariationPill({ value }: { value: number | null }) {
+/**
+ * Variação do Realizado vs base (Orçado / Ano Anterior).
+ * - Receitas: realizado maior → +% verde; menor → -% vermelho.
+ * - Despesas: realizado maior (gasto maior) → +% vermelho; menor → -% verde.
+ *   Para despesas comparamos magnitudes (valores vêm negativos na DRE).
+ */
+function variationFor(
+  current: number | null | undefined,
+  base: number | null | undefined,
+  isExpense: boolean,
+) {
+  if (current == null || base == null) return null;
+  if (isExpense) {
+    const c = Math.abs(current);
+    const b = Math.abs(base);
+    if (b === 0) return null;
+    return ((c - b) / b) * 100;
+  }
+  return variation(current, base);
+}
+
+function VariationPill({ value, isExpense = false }: { value: number | null; isExpense?: boolean }) {
   if (value == null) return <span className="text-muted-foreground">—</span>;
-  return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
+  const up = value >= 0;
+  const good = isExpense ? !up : up;
+  return (
+    <span className={good ? "text-success" : "text-destructive"}>
+      {up ? "+" : ""}
+      {pct(value)}
+    </span>
+  );
 }
 
 function isPctLineLabel(label: string) {
@@ -331,12 +359,14 @@ function DreComparativeRow({
   months,
   expanded,
   toggle,
+  isExpense,
 }: {
   node: DreLineNode;
   depth: number;
   months: number[];
   expanded: Set<string>;
   toggle: (id: string) => void;
+  isExpense: boolean;
 }) {
   const cur = computeNodeValue(node, "current", months);
   const bud = computeNodeValue(node, "budget", months);
@@ -360,12 +390,12 @@ function DreComparativeRow({
         </TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, cur)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, bud)}</TableCell>
-        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, bud)} /></TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, bud, isExpense)} isExpense={isExpense} /></TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, prev)}</TableCell>
-        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, prev)} /></TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, prev, isExpense)} isExpense={isExpense} /></TableCell>
       </TableRow>
       {isOpen && hasChildren && node.children.map((child) => (
-        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} />
+        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} isExpense={isExpense} />
       ))}
     </>
   );
