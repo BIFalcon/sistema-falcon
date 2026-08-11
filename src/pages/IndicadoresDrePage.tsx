@@ -986,7 +986,14 @@ export default function IndicadoresDrePage() {
                 ))}
                 <Select value={divider} onValueChange={setDivider}>
                   <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">Sem divisor</SelectItem><SelectItem value="roomnights">÷ Room Nights</SelectItem><SelectItem value="uhs">÷ UHs Disponíveis</SelectItem><SelectItem value="revenue">÷ Receita Bruta Total</SelectItem></SelectContent>
+                  <SelectContent>
+                    <SelectItem value="none">Sem divisor</SelectItem>
+                    <SelectItem value="roomnights">÷ Room Nights</SelectItem>
+                    <SelectItem value="uhs">÷ UHs Disponíveis</SelectItem>
+                    <SelectItem value="revenue">÷ Receita Bruta Total</SelectItem>
+                    <SelectItem value="netprofit">÷ Lucro Líquido</SelectItem>
+                    <SelectItem value="lodging">÷ Receita de Hospedagem</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div className="flex items-center gap-6 text-xs text-muted-foreground">
@@ -1009,40 +1016,60 @@ export default function IndicadoresDrePage() {
                   </div>
                 )}
               </div>
-              <ChartContainer config={chartConfig} className="h-[440px] w-full aspect-auto">
-                <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis
-                    reversed={invertYAxis}
-                    tickLine={false}
-                    axisLine={false}
-                    width={70}
-                    tickFormatter={(v) => formatChartValue(v)}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, name) => (
-                          <>
-                            <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
-                            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
-                          </>
-                        )}
+              {selectedNodes.length > 2 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Máximo de 2 gráficos: exibindo as 2 primeiras linhas selecionadas.
+                </p>
+              )}
+              {chartGroups.map((group) => (
+                <div key={group.key} className="space-y-1">
+                  {group.title && (
+                    <p className="text-xs font-semibold text-foreground/80">
+                      {group.title}
+                      {group.isExpense && (
+                        <span className="ml-2 font-normal text-muted-foreground">eixo invertido (despesa)</span>
+                      )}
+                    </p>
+                  )}
+                  <ChartContainer
+                    config={chartConfig}
+                    className={`${chartGroups.length > 1 ? "h-[260px]" : "h-[440px]"} w-full aspect-auto`}
+                  >
+                    <LineChart data={buildChartData(group.lines)} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                      <YAxis
+                        reversed={group.isExpense}
+                        tickLine={false}
+                        axisLine={false}
+                        width={70}
+                        tickFormatter={(v) => formatChartValue(v)}
                       />
-                    }
-                  />
-                  {visible.current  && (
-                    <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false} />
-                  )}
-                  {visible.budget   && (
-                    <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3" />
-                  )}
-                  {visible.previous && (
-                    <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3" />
-                  )}
-                </LineChart>
-              </ChartContainer>
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => (
+                              <>
+                                <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
+                                <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
+                              </>
+                            )}
+                          />
+                        }
+                      />
+                      {visible.current  && (
+                        <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false} />
+                      )}
+                      {visible.budget   && (
+                        <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3" />
+                      )}
+                      {visible.previous && (
+                        <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3" />
+                      )}
+                    </LineChart>
+                  </ChartContainer>
+                </div>
+              ))}
                 </>
               ) : (
                 <div className="space-y-2">
@@ -1072,6 +1099,7 @@ export default function IndicadoresDrePage() {
                               depth={0}
                               months={monthsWindow}
                               expanded={expandedRows}
+                              isExpense={isExpenseNode(node)}
                               toggle={(id) =>
                                 setExpandedRows((prev) => {
                                   const next = new Set(prev);
