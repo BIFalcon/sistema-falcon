@@ -279,19 +279,30 @@ Deno.serve(async (req) => {
               .filter((id: string | null): id is string => !!id),
           ),
         );
+        // Só compara contra registros existentes dentro do mesmo intervalo de
+        // datas do arquivo enviado — evita ler o histórico inteiro do hotel
+        // a cada upload (ficava lento/estourava o tempo limite conforme o
+        // volume acumulado crescia, principalmente com vários hotéis juntos).
+        const txDates = result.entries
+          .map((e: any) => e.transaction_date)
+          .filter((d: string | null): d is string => !!d);
+        const minDate = txDates.length ? txDates.reduce((a, b) => (a < b ? a : b)) : null;
+        const maxDate = txDates.length ? txDates.reduce((a, b) => (a > b ? a : b)) : null;
+
         const existingKeys = new Set<string>();
         if (hotelIds.length) {
           const pageSize = 1000;
           let from = 0;
-          // eslint-disable-next-line no-constant-condition
           while (true) {
-            const { data: rows, error: exErr } = await admin
+            let query = admin
               .from("ar_to_invoice_entries")
               .select(
                 "hotel_id, transaction_date, confirmation_number, amount, account_number",
               )
-              .in("hotel_id", hotelIds)
-              .range(from, from + pageSize - 1);
+              .in("hotel_id", hotelIds);
+            if (minDate) query = query.gte("transaction_date", minDate);
+            if (maxDate) query = query.lte("transaction_date", maxDate);
+            const { data: rows, error: exErr } = await query.range(from, from + pageSize - 1);
             if (exErr) throw exErr;
             const list = rows ?? [];
             for (const r of list) existingKeys.add(makeDedupKey(r as any));
