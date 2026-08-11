@@ -497,9 +497,44 @@ export default function IndicadoresDrePage() {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
     if (divider === "uhs") return findDreLine(dataset, "Número de apartamentos disponíveis");
+    if (divider === "netprofit")
+      return (
+        findDreLine(dataset, "Lucro Líquido / Prejuízo do Exercício") ??
+        findDreLine(dataset, "Lucro Líquido") ??
+        findDreLine(dataset, "Lucro / Prejuízo a Distribuir do período")
+      );
+    if (divider === "lodging") return findDreLine(dataset, "Receita de Hospedagem");
     return findDreLine(dataset, "RECEITA BRUTA TOTAL");
   }, [dataset, divider]);
-  const chartData = useMemo(() => {
+
+  // IDs de todas as linhas que descendem de um bloco de Despesas
+  const expenseIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!dataset) return ids;
+    const collect = (n: DreLineNode) => {
+      ids.add(n.id);
+      n.children.forEach(collect);
+    };
+    for (const root of dataset.tree) {
+      if (/despesa|custo/i.test(root.label)) collect(root);
+    }
+    return ids;
+  }, [dataset]);
+  const isExpenseNode = (node: DreLineNode) =>
+    expenseIds.has(node.id) || /despesa|custo/i.test(node.label);
+
+  // Limpa a seleção quando o filtro de hotel muda
+  const hotelKey = hotelIds.join(",");
+  const prevHotelKey = useRef(hotelKey);
+  useEffect(() => {
+    if (prevHotelKey.current !== hotelKey) {
+      prevHotelKey.current = hotelKey;
+      setSelectedIds(new Set());
+      setExpandedRows(new Set());
+    }
+  }, [hotelKey]);
+
+  const buildChartData = (lines: DreLineNode[]) => {
     const pMonths = periodCfg.months;
     type ChartPoint = { label: string; months: number[] };
     let points: ChartPoint[];
@@ -555,15 +590,15 @@ export default function IndicadoresDrePage() {
       return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
-    const lineAgg = selectedLines.length > 0 ? getAggType(selectedLines[0].label) : "sum";
+    const lineAgg = lines.length > 0 ? getAggType(lines[0].label) : "sum";
 
     const rnNode = findDreLine(dataset ?? undefined, "Apartamentos ocupados")
       ?? findDreLine(dataset ?? undefined, "Apartamentos Ocupados")
       ?? findDreLine(dataset ?? undefined, "Room Nights");
 
-    const baseCurrent = divideSeries(aggregateSelectedSeries(selectedLines, "current", dataset), divisorLine, "current");
-    const baseBudget = divideSeries(aggregateSelectedSeries(selectedLines, "budget", dataset), divisorLine, "budget");
-    const basePrevious = divideSeries(aggregateSelectedSeries(selectedLines, "previous", dataset), divisorLine, "previous");
+    const baseCurrent = divideSeries(aggregateSelectedSeries(lines, "current", dataset), divisorLine, "current");
+    const baseBudget = divideSeries(aggregateSelectedSeries(lines, "budget", dataset), divisorLine, "budget");
+    const basePrevious = divideSeries(aggregateSelectedSeries(lines, "previous", dataset), divisorLine, "previous");
 
     return points.map(({ label, months }) => {
       const cur = aggPoint(baseCurrent, months, lineAgg, rnNode?.series.current);
@@ -576,21 +611,47 @@ export default function IndicadoresDrePage() {
         previous: prev,
       };
     });
-  }, [selectedLines, divisorLine, periodCfg, dataset, year]);
+  };
+
+  const expandLeaves = (nodes: DreLineNode[]): DreLineNode[] => {
+    const leaves = (n: DreLineNode): DreLineNode[] =>
+      n.children.length === 0 ? [n] : n.children.flatMap(leaves);
+    const out: DreLineNode[] = [];
+    for (const node of nodes) {
+      const hasSeries = node.series.current.some((v) => v != null);
+      if (hasSeries || node.children.length === 0) out.push(node);
+      else out.push(...leaves(node));
+    }
+    return out;
+  };
+
+  /**
+   * Até 2 gráficos: com 2+ linhas selecionadas, gera um gráfico por linha
+   * (máximo de 2, empilhados) para comparação.
+   */
+  const chartGroups = useMemo(() => {
+    if (selectedNodes.length === 0) {
+      return [{ key: "empty", title: "", lines: [] as DreLineNode[], isExpense: false }];
+    }
+    if (selectedNodes.length === 1) {
+      return [{
+        key: selectedNodes[0].id,
+        title: selectedNodes[0].label,
+        lines: expandLeaves([selectedNodes[0]]),
+        isExpense: isExpenseNode(selectedNodes[0]),
+      }];
+    }
+    return selectedNodes.slice(0, 2).map((node) => ({
+      key: node.id,
+      title: node.label,
+      lines: expandLeaves([node]),
+      isExpense: isExpenseNode(node),
+    }));
+  }, [selectedNodes, expenseIds]);
+
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
-  /**
-   * Séries de despesas vêm negativas. Nesse caso invertemos o eixo Y para que
-   * "mais gasto" apareça mais alto no gráfico, mantendo os valores negativos.
-   */
-  const invertYAxis = useMemo(() => {
-    const vals = chartData
-      .flatMap((p) => [p.current, p.budget, p.previous])
-      .filter((v): v is number => v != null && Number.isFinite(v));
-    if (vals.length === 0) return false;
-    return vals.every((v) => v <= 0) && vals.some((v) => v < 0);
-  }, [chartData]);
   const formatChartValue = (value: unknown) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "—";
