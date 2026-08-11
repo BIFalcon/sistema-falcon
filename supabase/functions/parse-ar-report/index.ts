@@ -318,7 +318,7 @@ Deno.serve(async (req) => {
             const chunk = toInsert.slice(i, i + chunkSize);
             const { error: insErr } = await admin
               .from("ar_to_invoice_entries")
-              .insert(chunk);
+              .upsert(chunk, { onConflict: "entry_key" });
             if (insErr) throw insErr;
             inserted += chunk.length;
           }
