@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -301,9 +301,37 @@ function divideSeries(values: DreMonthValue[], divisor?: DreLineNode, key?: DreS
   });
 }
 
-function VariationPill({ value }: { value: number | null }) {
+/**
+ * Variação do Realizado vs base (Orçado / Ano Anterior).
+ * - Receitas: realizado maior → +% verde; menor → -% vermelho.
+ * - Despesas: realizado maior (gasto maior) → +% vermelho; menor → -% verde.
+ *   Para despesas comparamos magnitudes (valores vêm negativos na DRE).
+ */
+function variationFor(
+  current: number | null | undefined,
+  base: number | null | undefined,
+  isExpense: boolean,
+) {
+  if (current == null || base == null) return null;
+  if (isExpense) {
+    const c = Math.abs(current);
+    const b = Math.abs(base);
+    if (b === 0) return null;
+    return ((c - b) / b) * 100;
+  }
+  return variation(current, base);
+}
+
+function VariationPill({ value, isExpense = false }: { value: number | null; isExpense?: boolean }) {
   if (value == null) return <span className="text-muted-foreground">—</span>;
-  return <span className={value >= 0 ? "text-success" : "text-destructive"}>{value >= 0 ? "+" : ""}{pct(value)}</span>;
+  const up = value >= 0;
+  const good = isExpense ? !up : up;
+  return (
+    <span className={good ? "text-success" : "text-destructive"}>
+      {up ? "+" : ""}
+      {pct(value)}
+    </span>
+  );
 }
 
 function isPctLineLabel(label: string) {
@@ -331,12 +359,14 @@ function DreComparativeRow({
   months,
   expanded,
   toggle,
+  isExpense,
 }: {
   node: DreLineNode;
   depth: number;
   months: number[];
   expanded: Set<string>;
   toggle: (id: string) => void;
+  isExpense: boolean;
 }) {
   const cur = computeNodeValue(node, "current", months);
   const bud = computeNodeValue(node, "budget", months);
@@ -360,12 +390,12 @@ function DreComparativeRow({
         </TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, cur)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, bud)}</TableCell>
-        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, bud)} /></TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, bud, isExpense)} isExpense={isExpense} /></TableCell>
         <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, prev)}</TableCell>
-        <TableCell className="text-right text-sm"><VariationPill value={variation(cur, prev)} /></TableCell>
+        <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, prev, isExpense)} isExpense={isExpense} /></TableCell>
       </TableRow>
       {isOpen && hasChildren && node.children.map((child) => (
-        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} />
+        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} isExpense={isExpense} />
       ))}
     </>
   );
@@ -467,9 +497,44 @@ export default function IndicadoresDrePage() {
     if (!dataset || divider === "none") return undefined;
     if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
     if (divider === "uhs") return findDreLine(dataset, "Número de apartamentos disponíveis");
+    if (divider === "netprofit")
+      return (
+        findDreLine(dataset, "Lucro Líquido / Prejuízo do Exercício") ??
+        findDreLine(dataset, "Lucro Líquido") ??
+        findDreLine(dataset, "Lucro / Prejuízo a Distribuir do período")
+      );
+    if (divider === "lodging") return findDreLine(dataset, "Receita de Hospedagem");
     return findDreLine(dataset, "RECEITA BRUTA TOTAL");
   }, [dataset, divider]);
-  const chartData = useMemo(() => {
+
+  // IDs de todas as linhas que descendem de um bloco de Despesas
+  const expenseIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!dataset) return ids;
+    const collect = (n: DreLineNode) => {
+      ids.add(n.id);
+      n.children.forEach(collect);
+    };
+    for (const root of dataset.tree) {
+      if (/despesa|custo/i.test(root.label)) collect(root);
+    }
+    return ids;
+  }, [dataset]);
+  const isExpenseNode = (node: DreLineNode) =>
+    expenseIds.has(node.id) || /despesa|custo/i.test(node.label);
+
+  // Limpa a seleção quando o filtro de hotel muda
+  const hotelKey = hotelIds.join(",");
+  const prevHotelKey = useRef(hotelKey);
+  useEffect(() => {
+    if (prevHotelKey.current !== hotelKey) {
+      prevHotelKey.current = hotelKey;
+      setSelectedIds(new Set());
+      setExpandedRows(new Set());
+    }
+  }, [hotelKey]);
+
+  const buildChartData = (lines: DreLineNode[]) => {
     const pMonths = periodCfg.months;
     type ChartPoint = { label: string; months: number[] };
     let points: ChartPoint[];
@@ -525,15 +590,15 @@ export default function IndicadoresDrePage() {
       return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
-    const lineAgg = selectedLines.length > 0 ? getAggType(selectedLines[0].label) : "sum";
+    const lineAgg = lines.length > 0 ? getAggType(lines[0].label) : "sum";
 
     const rnNode = findDreLine(dataset ?? undefined, "Apartamentos ocupados")
       ?? findDreLine(dataset ?? undefined, "Apartamentos Ocupados")
       ?? findDreLine(dataset ?? undefined, "Room Nights");
 
-    const baseCurrent = divideSeries(aggregateSelectedSeries(selectedLines, "current", dataset), divisorLine, "current");
-    const baseBudget = divideSeries(aggregateSelectedSeries(selectedLines, "budget", dataset), divisorLine, "budget");
-    const basePrevious = divideSeries(aggregateSelectedSeries(selectedLines, "previous", dataset), divisorLine, "previous");
+    const baseCurrent = divideSeries(aggregateSelectedSeries(lines, "current", dataset), divisorLine, "current");
+    const baseBudget = divideSeries(aggregateSelectedSeries(lines, "budget", dataset), divisorLine, "budget");
+    const basePrevious = divideSeries(aggregateSelectedSeries(lines, "previous", dataset), divisorLine, "previous");
 
     return points.map(({ label, months }) => {
       const cur = aggPoint(baseCurrent, months, lineAgg, rnNode?.series.current);
@@ -546,21 +611,47 @@ export default function IndicadoresDrePage() {
         previous: prev,
       };
     });
-  }, [selectedLines, divisorLine, periodCfg, dataset, year]);
+  };
+
+  const expandLeaves = (nodes: DreLineNode[]): DreLineNode[] => {
+    const leaves = (n: DreLineNode): DreLineNode[] =>
+      n.children.length === 0 ? [n] : n.children.flatMap(leaves);
+    const out: DreLineNode[] = [];
+    for (const node of nodes) {
+      const hasSeries = node.series.current.some((v) => v != null);
+      if (hasSeries || node.children.length === 0) out.push(node);
+      else out.push(...leaves(node));
+    }
+    return out;
+  };
+
+  /**
+   * Até 2 gráficos: com 2+ linhas selecionadas, gera um gráfico por linha
+   * (máximo de 2, empilhados) para comparação.
+   */
+  const chartGroups = useMemo(() => {
+    if (selectedNodes.length === 0) {
+      return [{ key: "empty", title: "", lines: [] as DreLineNode[], isExpense: false }];
+    }
+    if (selectedNodes.length === 1) {
+      return [{
+        key: selectedNodes[0].id,
+        title: selectedNodes[0].label,
+        lines: expandLeaves([selectedNodes[0]]),
+        isExpense: isExpenseNode(selectedNodes[0]),
+      }];
+    }
+    return selectedNodes.slice(0, 2).map((node) => ({
+      key: node.id,
+      title: node.label,
+      lines: expandLeaves([node]),
+      isExpense: isExpenseNode(node),
+    }));
+  }, [selectedNodes, expenseIds]);
+
   const chartValueIsPct = selectedLines.some((l) =>
     /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
   );
-  /**
-   * Séries de despesas vêm negativas. Nesse caso invertemos o eixo Y para que
-   * "mais gasto" apareça mais alto no gráfico, mantendo os valores negativos.
-   */
-  const invertYAxis = useMemo(() => {
-    const vals = chartData
-      .flatMap((p) => [p.current, p.budget, p.previous])
-      .filter((v): v is number => v != null && Number.isFinite(v));
-    if (vals.length === 0) return false;
-    return vals.every((v) => v <= 0) && vals.some((v) => v < 0);
-  }, [chartData]);
   const formatChartValue = (value: unknown) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "—";
@@ -895,7 +986,14 @@ export default function IndicadoresDrePage() {
                 ))}
                 <Select value={divider} onValueChange={setDivider}>
                   <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">Sem divisor</SelectItem><SelectItem value="roomnights">÷ Room Nights</SelectItem><SelectItem value="uhs">÷ UHs Disponíveis</SelectItem><SelectItem value="revenue">÷ Receita Bruta Total</SelectItem></SelectContent>
+                  <SelectContent>
+                    <SelectItem value="none">Sem divisor</SelectItem>
+                    <SelectItem value="roomnights">÷ Room Nights</SelectItem>
+                    <SelectItem value="uhs">÷ UHs Disponíveis</SelectItem>
+                    <SelectItem value="revenue">÷ Receita Bruta Total</SelectItem>
+                    <SelectItem value="netprofit">÷ Lucro Líquido</SelectItem>
+                    <SelectItem value="lodging">÷ Receita de Hospedagem</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div className="flex items-center gap-6 text-xs text-muted-foreground">
@@ -918,40 +1016,60 @@ export default function IndicadoresDrePage() {
                   </div>
                 )}
               </div>
-              <ChartContainer config={chartConfig} className="h-[440px] w-full aspect-auto">
-                <LineChart data={chartData} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis
-                    reversed={invertYAxis}
-                    tickLine={false}
-                    axisLine={false}
-                    width={70}
-                    tickFormatter={(v) => formatChartValue(v)}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, name) => (
-                          <>
-                            <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
-                            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
-                          </>
-                        )}
+              {selectedNodes.length > 2 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Máximo de 2 gráficos: exibindo as 2 primeiras linhas selecionadas.
+                </p>
+              )}
+              {chartGroups.map((group) => (
+                <div key={group.key} className="space-y-1">
+                  {group.title && (
+                    <p className="text-xs font-semibold text-foreground/80">
+                      {group.title}
+                      {group.isExpense && (
+                        <span className="ml-2 font-normal text-muted-foreground">eixo invertido (despesa)</span>
+                      )}
+                    </p>
+                  )}
+                  <ChartContainer
+                    config={chartConfig}
+                    className={`${chartGroups.length > 1 ? "h-[260px]" : "h-[440px]"} w-full aspect-auto`}
+                  >
+                    <LineChart data={buildChartData(group.lines)} margin={{ left: 12, right: 20, top: 12, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                      <YAxis
+                        reversed={group.isExpense}
+                        tickLine={false}
+                        axisLine={false}
+                        width={70}
+                        tickFormatter={(v) => formatChartValue(v)}
                       />
-                    }
-                  />
-                  {visible.current  && (
-                    <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false} />
-                  )}
-                  {visible.budget   && (
-                    <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3" />
-                  )}
-                  {visible.previous && (
-                    <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3" />
-                  )}
-                </LineChart>
-              </ChartContainer>
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => (
+                              <>
+                                <span className="text-muted-foreground">{chartConfig[String(name) as DreSeriesKey]?.label ?? String(name)}</span>
+                                <span className="ml-auto font-mono font-medium tabular-nums text-foreground">{formatChartValue(value)}</span>
+                              </>
+                            )}
+                          />
+                        }
+                      />
+                      {visible.current  && (
+                        <Line type="monotone" dataKey="current"  stroke="#1D4ED8" strokeWidth={3} dot={{ r: 3, fill: "#1D4ED8" }} connectNulls={false} />
+                      )}
+                      {visible.budget   && (
+                        <Line type="monotone" dataKey="budget"   stroke="#16A34A" strokeWidth={2} dot={{ r: 3, fill: "#16A34A" }} connectNulls={false} strokeDasharray="5 3" />
+                      )}
+                      {visible.previous && (
+                        <Line type="monotone" dataKey="previous" stroke="#9CA3AF" strokeWidth={2} dot={{ r: 3, fill: "#9CA3AF" }} connectNulls={false} strokeDasharray="3 3" />
+                      )}
+                    </LineChart>
+                  </ChartContainer>
+                </div>
+              ))}
                 </>
               ) : (
                 <div className="space-y-2">
@@ -981,6 +1099,7 @@ export default function IndicadoresDrePage() {
                               depth={0}
                               months={monthsWindow}
                               expanded={expandedRows}
+                              isExpense={isExpenseNode(node)}
                               toggle={(id) =>
                                 setExpandedRows((prev) => {
                                   const next = new Set(prev);
