@@ -3,8 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -12,7 +11,10 @@ function normalize(s: any): string {
   return String(s ?? "").trim();
 }
 function toAscii(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 function sanitizeFileName(name: string): string {
   const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -53,7 +55,12 @@ type OpenFolioPayload = {
   travel_agent: string | null;
 };
 
-function makeOpenFolioKey(p: { confirmation_number: string | null; property_name_raw: string; arrival_date: string | null; departure_date: string | null }): string {
+function makeOpenFolioKey(p: {
+  confirmation_number: string | null;
+  property_name_raw: string;
+  arrival_date: string | null;
+  departure_date: string | null;
+}): string {
   return `${p.confirmation_number ?? ""}|${p.property_name_raw ?? ""}|${p.arrival_date ?? ""}|${p.departure_date ?? ""}`;
 }
 
@@ -85,9 +92,7 @@ function makeDedupKey(e: {
 
 async function loadHotelMap(admin: any): Promise<HotelMap> {
   const map: HotelMap = new Map();
-  const { data } = await admin
-    .from("hotels")
-    .select("id, name, opera_property_name");
+  const { data } = await admin.from("hotels").select("id, name, opera_property_name");
   for (const h of data ?? []) {
     if (h.opera_property_name) {
       map.set(toAscii(h.opera_property_name).trim(), h.id);
@@ -194,7 +199,8 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData.user) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const userId = userData.user.id;
@@ -205,7 +211,8 @@ Deno.serve(async (req) => {
     const rawEntries = String(form.get("entries") ?? "[]");
     if (!file || !["to_invoice", "open_folio"].includes(kind)) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -215,7 +222,8 @@ Deno.serve(async (req) => {
       if (!Array.isArray(parsedEntries)) throw new Error("invalid_entries");
     } catch {
       return new Response(JSON.stringify({ error: "invalid_entries" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -223,7 +231,8 @@ Deno.serve(async (req) => {
     const { data: isManager } = await admin.rpc("is_ar_manager", { _user_id: userId });
     if (!isManager) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -273,11 +282,7 @@ Deno.serve(async (req) => {
 
         // 2) Carrega chaves existentes nos hotéis afetados.
         const hotelIds = Array.from(
-          new Set(
-            result.entries
-              .map((e: any) => e.hotel_id)
-              .filter((id: string | null): id is string => !!id),
-          ),
+          new Set(result.entries.map((e: any) => e.hotel_id).filter((id: string | null): id is string => !!id)),
         );
         const existingKeys = new Set<string>();
         if (hotelIds.length) {
@@ -287,9 +292,7 @@ Deno.serve(async (req) => {
           while (true) {
             const { data: rows, error: exErr } = await admin
               .from("ar_to_invoice_entries")
-              .select(
-                "hotel_id, transaction_date, confirmation_number, amount, account_number",
-              )
+              .select("hotel_id, transaction_date, confirmation_number, amount, account_number")
               .in("hotel_id", hotelIds)
               .range(from, from + pageSize - 1);
             if (exErr) throw exErr;
@@ -312,7 +315,7 @@ Deno.serve(async (req) => {
           toInsert.push({ ...e, entry_key: k.slice(0, 240) });
         }
 
-       if (toInsert.length) {
+        if (toInsert.length) {
           const chunkSize = 500;
           for (let i = 0; i < toInsert.length; i += chunkSize) {
             const chunk = toInsert.slice(i, i + chunkSize);
@@ -365,7 +368,7 @@ Deno.serve(async (req) => {
           inserted += chunk.length;
         }
       }
-       // Arquiva (não deleta) os registros que sumiram do novo upload — preserva
+      // Arquiva (não deleta) os registros que sumiram do novo upload — preserva
       // histórico e justificativas. Paginação manual porque o PostgREST limita
       // a 1000 linhas por request — sem isso, hotéis com >1k folios deixavam
       // registros antigos visíveis mesmo após upload novo.
@@ -374,11 +377,7 @@ Deno.serve(async (req) => {
       // o Open Folio de um hotel arquivava por engano os registros em aberto de
       // TODOS os outros hotéis (bug real, confirmado em produção em 27/07).
       const archiveHotelIds = Array.from(
-        new Set(
-          result.entries
-            .map((e: any) => e.hotel_id)
-            .filter((id: string | null): id is string => !!id),
-        ),
+        new Set(result.entries.map((e: any) => e.hotel_id).filter((id: string | null): id is string => !!id)),
       );
       const nowIso = new Date().toISOString();
       const toArchive: string[] = [];
@@ -441,19 +440,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({
-      ok: true,
-      upload_id: uploadRow.id,
-      entries: inserted,
-      unmapped_properties: result.unmapped,
-      total_rows: (result as any).total_rows ?? inserted,
-      skipped_existing: (result as any).skipped_existing ?? 0,
-      skipped_duplicate_in_file: (result as any).skipped_duplicate_in_file ?? 0,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        upload_id: uploadRow.id,
+        entries: inserted,
+        unmapped_properties: result.unmapped,
+        total_rows: (result as any).total_rows ?? inserted,
+        skipped_existing: (result as any).skipped_existing ?? 0,
+        skipped_duplicate_in_file: (result as any).skipped_duplicate_in_file ?? 0,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("parse-ar-report error", err);
     return new Response(JSON.stringify({ error: err?.message ?? String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
