@@ -312,15 +312,19 @@ Deno.serve(async (req) => {
           toInsert.push({ ...e, entry_key: k.slice(0, 240) });
         }
 
-        if (toInsert.length) {
+       if (toInsert.length) {
           const chunkSize = 500;
           for (let i = 0; i < toInsert.length; i += chunkSize) {
             const chunk = toInsert.slice(i, i + chunkSize);
-            const { error: insErr } = await admin
+            // ignoreDuplicates: true garante que, se já existir uma linha com
+            // essa entry_key (corrida entre uploads simultâneos, por exemplo),
+            // o banco só ignora essa linha em vez de sobrescrever o que já
+            // existe ou derrubar o upload inteiro com erro de chave duplicada.
+            const { error: insErr, count } = await admin
               .from("ar_to_invoice_entries")
-              .upsert(chunk, { onConflict: "entry_key" });
+              .upsert(chunk, { onConflict: "entry_key", ignoreDuplicates: true, count: "exact" });
             if (insErr) throw insErr;
-            inserted += chunk.length;
+            inserted += count ?? 0;
           }
         }
 
