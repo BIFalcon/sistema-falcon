@@ -144,7 +144,7 @@ export default function TurnoverPage() {
           {sexData.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Sem dados.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer key={`sex-${hotelId}-${month}-${year}-${periodMonths}`} width="100%" height={240}>
               <PieChart margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
                 <Pie
                   data={sexData}
@@ -166,7 +166,7 @@ export default function TurnoverPage() {
         </Card>
         <Card className="p-4 shadow-soft">
           <p className="text-sm font-semibold mb-3">Distribuição por faixa etária</p>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer key={`age-${hotelId}-${month}-${year}-${periodMonths}`} width="100%" height={240}>
             <BarChart data={ageData}>
               <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
