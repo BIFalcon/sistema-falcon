@@ -162,7 +162,7 @@ export default function FinanceiroPage() {
                       {hotel?.name ?? row.hotel_id}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-end gap-2 tabular-nums">
                         <span className={lucro != null && lucro < 0 ? "text-destructive font-medium" : "font-medium"}>
                           {formatBRL(lucro ?? 0)}
                         </span>

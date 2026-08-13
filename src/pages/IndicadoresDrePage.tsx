@@ -338,6 +338,13 @@ function isPctLineLabel(label: string) {
   return /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(label);
 }
 
+/** Linhas que são contagens (não monetárias): apartamentos, hóspedes, room nights. */
+function isCountLineLabel(label: string) {
+  return /(apartamentos|quartos|uh)\s*(ocupados|dispon)|room\s*nights|n[uú]mero\s*de\s*h[oó]spedes|h[oó]spedes|di[aá]rias\s*vendidas/i.test(
+    label,
+  );
+}
+
 function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]): number | null {
   const agg = getAggType(node.label);
   const baseAgg: "sum" | "avg" = agg === "sum" ? "sum" : "avg";
@@ -350,6 +357,8 @@ function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]
 function fmtNodeValue(node: DreLineNode, v: number | null): string {
   if (v == null || !Number.isFinite(v)) return "—";
   if (isPctLineLabel(node.label)) return `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  if (isCountLineLabel(node.label))
+    return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
   return fmtBRL(v);
 }
 
@@ -388,10 +397,10 @@ function DreComparativeRow({
             <span className={depth === 0 ? "text-sm font-medium" : "text-sm text-foreground/80"}>{node.label}</span>
           </div>
         </TableCell>
-        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, cur)}</TableCell>
-        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, bud)}</TableCell>
+        <TableCell className="text-right tabular-nums text-[13px] whitespace-nowrap">{fmtNodeValue(node, cur)}</TableCell>
+        <TableCell className="text-right tabular-nums text-[13px] whitespace-nowrap">{fmtNodeValue(node, bud)}</TableCell>
         <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, bud, isExpense)} isExpense={isExpense} /></TableCell>
-        <TableCell className="text-right tabular-nums text-sm">{fmtNodeValue(node, prev)}</TableCell>
+        <TableCell className="text-right tabular-nums text-[13px] whitespace-nowrap">{fmtNodeValue(node, prev)}</TableCell>
         <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, prev, isExpense)} isExpense={isExpense} /></TableCell>
       </TableRow>
       {isOpen && hasChildren && node.children.map((child) => (
@@ -649,18 +658,24 @@ export default function IndicadoresDrePage() {
     }));
   }, [selectedNodes, expenseIds]);
 
-  const chartValueIsPct = selectedLines.some((l) =>
-    /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
-  );
-  const formatChartValue = (value: unknown) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "—";
-    if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-    if (chartValueIsPct) {
-      const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-      return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-    }
-    return numeric.toLocaleString("pt-BR");
+  /**
+   * Formatador por gráfico: cada gráfico usa o tipo de valor das SUAS linhas
+   * (percentual, contagem ou moeda) — nunca o tipo do gráfico anterior.
+   */
+  const makeChartFormatter = (lines: DreLineNode[]) => {
+    const isPct = lines.some((l) => isPctLineLabel(l.label));
+    const isCount = !isPct && lines.length > 0 && lines.every((l) => isCountLineLabel(l.label));
+    return (value: unknown) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "—";
+      if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+      if (isPct) {
+        const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+        return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+      }
+      if (isCount) return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+      return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    };
   };
   const selectLine = (id: string) =>
     setSelectedIds((prev) => {
@@ -1021,7 +1036,9 @@ export default function IndicadoresDrePage() {
                   Máximo de 2 gráficos: exibindo as 2 primeiras linhas selecionadas.
                 </p>
               )}
-              {chartGroups.map((group) => (
+              {chartGroups.map((group) => {
+                const formatChartValue = makeChartFormatter(group.lines);
+                return (
                 <div key={group.key} className="space-y-1">
                   {group.title && (
                     <p className="text-xs font-semibold text-foreground/80">
@@ -1069,7 +1086,8 @@ export default function IndicadoresDrePage() {
                     </LineChart>
                   </ChartContainer>
                 </div>
-              ))}
+                );
+              })}
                 </>
               ) : (
                 <div className="space-y-2">
