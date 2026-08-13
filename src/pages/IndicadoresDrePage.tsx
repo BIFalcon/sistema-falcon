@@ -658,18 +658,24 @@ export default function IndicadoresDrePage() {
     }));
   }, [selectedNodes, expenseIds]);
 
-  const chartValueIsPct = selectedLines.some((l) =>
-    /taxa\s*de\s*ocupa|%\s*gop|margem|fator\s*de\s*ocupa/i.test(l.label)
-  );
-  const formatChartValue = (value: unknown) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "—";
-    if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-    if (chartValueIsPct) {
-      const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-      return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-    }
-    return numeric.toLocaleString("pt-BR");
+  /**
+   * Formatador por gráfico: cada gráfico usa o tipo de valor das SUAS linhas
+   * (percentual, contagem ou moeda) — nunca o tipo do gráfico anterior.
+   */
+  const makeChartFormatter = (lines: DreLineNode[]) => {
+    const isPct = lines.some((l) => isPctLineLabel(l.label));
+    const isCount = !isPct && lines.length > 0 && lines.every((l) => isCountLineLabel(l.label));
+    return (value: unknown) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "—";
+      if (showAsPct) return `${(numeric * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+      if (isPct) {
+        const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+        return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+      }
+      if (isCount) return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+      return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    };
   };
   const selectLine = (id: string) =>
     setSelectedIds((prev) => {
