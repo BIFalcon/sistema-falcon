@@ -7,7 +7,7 @@ import { TrendingUp } from "lucide-react";
 type DisplayKey = IndicatorKey | "gop_margin" | "net_margin";
 
 const ORDER: DisplayKey[] = [
-  "ocupacao", "adr", "revpar", "roomnights",
+  "ocupacao", "adr", "revpar",
   "receita_bruta_total", "gop", "gop_margin", "lucro_liquido", "net_margin",
 ];
 
