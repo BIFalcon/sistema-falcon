@@ -2781,6 +2781,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_accessible_hotels: {
+        Args: never
+        Returns: {
+          active: boolean
+          brand: string
+          brand_logo_url: string
+          cover_url: string
+          created_at: string
+          financial_system: Database["public"]["Enums"]["financial_system"]
+          id: string
+          is_active: boolean
+          name: string
+          num_apartments: number
+          opera_property_name: string
+          rh_only: boolean
+          show_in_closing: boolean
+        }[]
+      }
       mark_envio_sent: {
         Args: { _closing_id: string; _sent: boolean }
         Returns: undefined
