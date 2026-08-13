@@ -1036,7 +1036,9 @@ export default function IndicadoresDrePage() {
                   Máximo de 2 gráficos: exibindo as 2 primeiras linhas selecionadas.
                 </p>
               )}
-              {chartGroups.map((group) => (
+              {chartGroups.map((group) => {
+                const formatChartValue = makeChartFormatter(group.lines);
+                return (
                 <div key={group.key} className="space-y-1">
                   {group.title && (
                     <p className="text-xs font-semibold text-foreground/80">
@@ -1084,7 +1086,8 @@ export default function IndicadoresDrePage() {
                     </LineChart>
                   </ChartContainer>
                 </div>
-              ))}
+                );
+              })}
                 </>
               ) : (
                 <div className="space-y-2">
