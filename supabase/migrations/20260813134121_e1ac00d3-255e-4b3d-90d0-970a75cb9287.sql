@@ -1,0 +1,1 @@
+ALTER FUNCTION public.ar_to_invoice_skip_duplicate() SET search_path = public, pg_temp;
