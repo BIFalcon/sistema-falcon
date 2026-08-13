@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUserData = async (uid: string) => {
-    const [{ data: prof }, { data: roleRows }, { data: hotelRows }, { data: allHotelRows }] =
+    const [{ data: prof }, { data: roleRows }, { data: hotelRows }, hotelsRes] =
       await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", uid).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", uid),
@@ -72,14 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("user_hotels")
           .select("hotel_id, hotels(id,name,brand,active)")
           .eq("user_id", uid),
-        supabase
-          .from("hotels")
-          .select(
-            "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,rh_only,created_at",
-          )
-          .eq("is_active", true)
-          .order("name"),
+        // RPC security definer: garante que todo usuário com visão global
+        // (viewer, ri, rh, controladoria, patronos, operacoes, fernando, master)
+        // receba a lista completa de hotéis, sem colunas sensíveis.
+        supabase.rpc("list_accessible_hotels"),
       ]);
+
+    let allHotelRows = hotelsRes.data as Hotel[] | null;
+    if (hotelsRes.error || !allHotelRows) {
+      const fallback = await supabase
+        .from("hotels")
+        .select(
+          "id,name,brand,active,is_active,cover_url,brand_logo_url,opera_property_name,num_apartments,financial_system,show_in_closing,rh_only,created_at",
+        )
+        .eq("is_active", true)
+        .order("name");
+      allHotelRows = (fallback.data ?? []) as Hotel[];
+    }
 
     setProfile((prof ?? null) as Profile | null);
     setRoles((roleRows ?? []).map((r: { role: AppRole }) => r.role));
