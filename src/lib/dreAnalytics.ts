@@ -9,6 +9,8 @@ export interface DreLineNode {
   level: number;
   series: Record<DreSeriesKey, DreMonthValue[]>;
   children: DreLineNode[];
+  /** true quando o nível veio de uma coluna "Nível" da planilha (não inferido) */
+  levelExplicit?: boolean;
 }
 
 export interface DreAnalyticsDataset {
@@ -34,8 +36,14 @@ function normalize(text: string) {
   return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function makeId(label: string, level: number) {
-  return `${level}:${normalize(label)}`;
+/**
+ * O id é derivado APENAS do rótulo normalizado. As abas "ANO ANTERIOR" (e
+ * algumas de "Orçamento") não trazem a coluna "Nível", então o nível é
+ * inferido — se o id incluísse o nível, a mesma linha apareceria duplicada
+ * e as séries de orçamento/ano anterior nunca casariam com a DRE realizada.
+ */
+function makeId(label: string) {
+  return `${normalize(label)}`;
 }
 
 function asNumber(value: unknown): number | null {
