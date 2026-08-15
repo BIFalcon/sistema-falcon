@@ -1188,6 +1188,7 @@ function drawDreTable(
 
   const x0 = 12, x1 = SIZE - 12;
   let y = HEADER_CONTENT_Y;
+  let uhValue: number | null = null;
   // header navy
   doc.setFillColor(NAVY);
   doc.rect(x0, y, x1 - x0, 7, "F");
@@ -1240,8 +1241,25 @@ function drawDreTable(
     }
     doc.text(r.label, x0 + (r.kind === "item" ? 6 : 3), y + rowH - 1.6);
     doc.text(fmtVal(v), x1 - 3, y + rowH - 1.6, { align: "right" });
+    if (r.kind === "highlight" && /por\s+uh/i.test(r.label)) uhValue = v;
     y += rowH;
     if (y > SIZE - 12) break; // proteção contra overflow
+  }
+
+  // Disclaimer somente quando a Distribuição por UH for inferior a R$ 50,00.
+  if (uhValue != null && uhValue < 50) {
+    const msg =
+      "Valores com distribuição por UH inferior a R$ 50,00 serão acumulados para o próximo mês.";
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    doc.setTextColor(MUTED);
+    const wrapped = doc.splitTextToSize(msg, x1 - x0 - 6) as string[];
+    const lineH = 3.2;
+    const blockH = wrapped.length * lineH;
+    const baseY = Math.max(y + 6, SIZE - 10 - blockH);
+    for (let i = 0; i < wrapped.length; i++) {
+      doc.text(wrapped[i], x0 + 3, baseY + i * lineH);
+    }
   }
 }
 
