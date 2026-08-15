@@ -185,7 +185,14 @@ export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: strin
     const rows: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false, defval: null, raw: true });
     for (const node of extractRows(rows, seriesKey).values()) {
       const existing = byKey.get(node.id);
-      if (existing) existing.series[seriesKey] = node.series.current;
+      if (existing) {
+        existing.series[seriesKey] = node.series.current;
+        // Prefere o nível vindo de uma coluna "Nível" real (normalmente a aba DRE)
+        if (node.levelExplicit && !existing.levelExplicit) {
+          existing.level = node.level;
+          existing.levelExplicit = true;
+        }
+      }
       else byKey.set(node.id, { ...node, series: { current: Array(12).fill(null), budget: Array(12).fill(null), previous: Array(12).fill(null), [seriesKey]: node.series.current } });
     }
   }
