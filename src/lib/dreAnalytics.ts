@@ -115,7 +115,9 @@ function extractRows(rows: unknown[][], sheetKey: DreSeriesKey) {
   for (const row of rows) {
     if (!row) continue;
     let level: number | null = levelCol != null ? asNumber(row[levelCol]) : null;
+    let levelExplicit = level != null && level >= 1 && level <= 3;
     if (!level || level < 1 || level > 3) {
+      levelExplicit = false;
       const hasDetailLabel = labelCols[0] != null &&
         typeof row[labelCols[0]] === 'string' &&
         String(row[labelCols[0]]).trim().length > 2;
@@ -145,10 +147,11 @@ function extractRows(rows: unknown[][], sheetKey: DreSeriesKey) {
       series.forEach((v, i) => { if (v != null && v !== 0) last = i; });
       for (let i = last + 1; i < series.length; i++) series[i] = null;
     }
-    out.set(makeId(label, level), {
-      id: makeId(label, level),
+    out.set(makeId(label), {
+      id: makeId(label),
       label,
       level,
+      levelExplicit,
       series: { current: series, budget: Array(12).fill(null), previous: Array(12).fill(null) },
       children: [],
     });
