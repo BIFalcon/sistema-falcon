@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { buildAliasIndex, DRE_LABEL_ALIASES } from "@/lib/dreLabelAliases";
 
 export type DreSeriesKey = "current" | "budget" | "previous";
 export type DreMonthValue = number | null;
@@ -37,13 +38,59 @@ function normalize(text: string) {
 }
 
 /**
+ * Limpeza tolerante (igual a `cleanForMatch` em useDre.ts): ignora acentos,
+ * caixa, marcadores contábeis "(=)/(+)/(-)", conteúdo entre parênteses e
+ * pontuação. Necessário porque cada hotel nomeia as linhas de forma diferente
+ * entre as abas DRE / Orçamento / ANO ANTERIOR.
+ */
+function cleanForMatch(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^\s*\(\s*[=+-]\s*\)\s*/, "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const ALIAS_INDEX = buildAliasIndex(cleanForMatch);
+
+/** Representante canônico de cada grupo de sinônimos. */
+const ALIAS_CANONICAL = (() => {
+  const map = new Map<string, string>();
+  for (const group of DRE_LABEL_ALIASES) {
+    const cleaned = group.map(cleanForMatch).filter(Boolean);
+    if (cleaned.length === 0) continue;
+    for (const c of cleaned) map.set(c, cleaned[0]);
+  }
+  return map;
+})();
+
+function looseLabelMatch(a: string, b: string): boolean {
+  const ca = cleanForMatch(a);
+  const cb = cleanForMatch(b);
+  if (!ca || !cb) return false;
+  if (ca === cb) return true;
+  const [shorter, longer] = ca.length <= cb.length ? [ca, cb] : [cb, ca];
+  if (shorter.length >= 6 && longer.includes(shorter)) return true;
+  const aliasesA = ALIAS_INDEX.get(ca);
+  if (aliasesA?.includes(cb)) return true;
+  const aliasesB = ALIAS_INDEX.get(cb);
+  if (aliasesB?.includes(ca)) return true;
+  return false;
+}
+
+/**
  * O id é derivado APENAS do rótulo normalizado. As abas "ANO ANTERIOR" (e
  * algumas de "Orçamento") não trazem a coluna "Nível", então o nível é
  * inferido — se o id incluísse o nível, a mesma linha apareceria duplicada
  * e as séries de orçamento/ano anterior nunca casariam com a DRE realizada.
  */
 function makeId(label: string) {
-  return `${normalize(label)}`;
+  const cleaned = cleanForMatch(label) || normalize(label);
+  return ALIAS_CANONICAL.get(cleaned) ?? cleaned;
 }
 
 function asNumber(value: unknown): number | null {
