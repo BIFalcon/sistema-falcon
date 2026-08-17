@@ -243,7 +243,6 @@ export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: strin
       }
       if (existing) {
         existing.series[seriesKey] = node.series.current;
-        existing.series[seriesKey] = node.series.current;
         // Prefere o nível vindo de uma coluna "Nível" real (normalmente a aba DRE)
         if (node.levelExplicit && !existing.levelExplicit) {
           existing.level = node.level;
