@@ -268,7 +268,7 @@ Gere o JSON.`;
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: sysPrompt,
         messages: [
           { role: "user", content: `${userPrompt}\n\nResponda SOMENTE com o JSON, sem texto antes ou depois.` },
@@ -283,9 +283,13 @@ Gere o JSON.`;
       return json({ error: `IA retornou erro: ${txt.slice(0, 200)}` }, 500);
     }
     const aiJson = await aiRes.json();
-    const rawContent = aiJson?.content?.[0]?.text ?? "";
+    console.error("Anthropic response debug", JSON.stringify(aiJson).slice(0, 2000));
+    const textBlock = (aiJson?.content ?? []).find((b: any) => b?.type === "text");
+    const rawContent = textBlock?.text ?? "";
     const content = rawContent.replace(/```json\s*|```/g, "").trim();
-    if (!content) return json({ error: "Resposta vazia da IA" }, 500);
+    if (!content) {
+      return json({ error: `Resposta vazia da IA (stop_reason: ${aiJson?.stop_reason ?? "desconhecido"})` }, 500);
+    }
 
     let parsed: Record<string, string>;
     try {
