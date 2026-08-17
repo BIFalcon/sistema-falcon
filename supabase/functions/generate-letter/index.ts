@@ -256,30 +256,35 @@ Gere o JSON.`;
       userPrompt += `\n\nINSTRUÇÃO ADICIONAL DO USUÁRIO PARA ESTA REGENERAÇÃO:\n${instruction.trim()}`;
     }
 
-    const aiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!aiKey) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
+    const aiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!aiKey) return json({ error: "ANTHROPIC_API_KEY não configurada" }, 500);
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": aiKey,
+        "anthropic-version": "2023-06-01",
+      },
       body: JSON.stringify({
         model: MODEL,
+        max_tokens: 2048,
+        system: sysPrompt,
         messages: [
-          { role: "system", content: sysPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: `${userPrompt}\n\nResponda SOMENTE com o JSON, sem texto antes ou depois.` },
         ],
-        response_format: { type: "json_object" },
       }),
     });
 
     if (aiRes.status === 429) return json({ error: "Limite de uso temporário. Tente novamente em alguns minutos." }, 429);
-    if (aiRes.status === 402) return json({ error: "Créditos da IA esgotados. Adicione créditos no workspace Lovable." }, 402);
+    if (aiRes.status === 402) return json({ error: "Créditos da IA esgotados. Verifique o saldo na Anthropic Console." }, 402);
     if (!aiRes.ok) {
       const txt = await aiRes.text();
       return json({ error: `IA retornou erro: ${txt.slice(0, 200)}` }, 500);
     }
     const aiJson = await aiRes.json();
-    const content = aiJson?.choices?.[0]?.message?.content;
+    const rawContent = aiJson?.content?.[0]?.text ?? "";
+    const content = rawContent.replace(/```json\s*|```/g, "").trim();
     if (!content) return json({ error: "Resposta vazia da IA" }, 500);
 
     let parsed: Record<string, string>;
