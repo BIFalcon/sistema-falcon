@@ -22,7 +22,7 @@ interface Body {
   };
 }
 
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "claude-sonnet-5";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
