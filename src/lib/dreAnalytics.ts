@@ -231,8 +231,18 @@ export function parseDreAnalyticsWorkbook(buffer: ArrayBuffer, sourceName: strin
     if (!sheetName) continue;
     const rows: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false, defval: null, raw: true });
     for (const node of extractRows(rows, seriesKey).values()) {
-      const existing = byKey.get(node.id);
+      let existing = byKey.get(node.id);
+      if (!existing && seriesKey !== "current") {
+        // Rótulos diferentes entre abas (ex.: "Receita Total Bruta" na DRE vs
+        // "RECEITA BRUTA TOTAL" no Orçamento). Só aceita quando há um único
+        // candidato, para não misturar linhas parecidas.
+        const candidates = Array.from(byKey.values()).filter(
+          (n) => n.series[seriesKey].every((v) => v == null) && looseLabelMatch(n.label, node.label),
+        );
+        if (candidates.length === 1) existing = candidates[0];
+      }
       if (existing) {
+        existing.series[seriesKey] = node.series.current;
         existing.series[seriesKey] = node.series.current;
         // Prefere o nível vindo de uma coluna "Nível" real (normalmente a aba DRE)
         if (node.levelExplicit && !existing.levelExplicit) {
