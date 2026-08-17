@@ -283,12 +283,14 @@ Gere o JSON.`;
       return json({ error: `IA retornou erro: ${txt.slice(0, 200)}` }, 500);
     }
     const aiJson = await aiRes.json();
-    console.error("Anthropic response debug", JSON.stringify(aiJson).slice(0, 2000));
     const textBlock = (aiJson?.content ?? []).find((b: any) => b?.type === "text");
     const rawContent = textBlock?.text ?? "";
     const content = rawContent.replace(/```json\s*|```/g, "").trim();
     if (!content) {
-      return json({ error: `Resposta vazia da IA (stop_reason: ${aiJson?.stop_reason ?? "desconhecido"})` }, 500);
+      return json({
+        error: `Resposta vazia da IA (stop_reason: ${aiJson?.stop_reason ?? "desconhecido"})`,
+        debug: aiJson,
+      }, 500);
     }
 
     let parsed: Record<string, string>;
