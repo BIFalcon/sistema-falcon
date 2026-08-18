@@ -46,6 +46,7 @@ export interface ToInvoiceEntry {
   boleto_number: string | null;
   boleto_due_date: string | null;
   doc_extraction_status: string | null;
+  created_at?: string | null;
 }
 
 export function useToInvoiceEntries(filters: {
@@ -70,7 +71,7 @@ export function useToInvoiceEntries(filters: {
       // Paginação manual — PostgREST limita cada request a ~1000 linhas.
       // Sem paginação, meses mais antigos ficavam de fora quando o acervo
       // ultrapassava o limite (ex.: consolidado com todos os hotéis).
-      const cols = "id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at,nota_number,boleto_number,boleto_due_date,doc_extraction_status";
+      const cols = "id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at,nota_number,boleto_number,boleto_due_date,doc_extraction_status,created_at";
       const pageSize = 1000;
       const all: ToInvoiceEntry[] = [];
       let from = 0;
@@ -518,6 +519,39 @@ export function isEntryPaid(e: ToInvoiceEntry): boolean {
   return !!e.paid_date || e.is_paid === true || e.gg_status === "pago";
 }
 
+/** Nenhuma ação registrada sobre o lançamento (docs, faturamento, nota, pagamento, notas). */
+export function hasNoAction(e: ToInvoiceEntry): boolean {
+  return (
+    !e.invoice_file_1 &&
+    !e.invoice_file_2 &&
+    !e.proof_file &&
+    !e.billed_at &&
+    !e.gg_confirmed_at &&
+    !e.nota_number &&
+    !e.boleto_number &&
+    !e.boleto_due_date &&
+    !e.gg_note &&
+    !e.documents_problem_at &&
+    !e.is_not_billable &&
+    !isEntryPaid(e) &&
+    (e.gg_status === "pendente" || !e.gg_status)
+  );
+}
+
+/**
+ * Pendente sem nenhuma ação por mais de 30 dias desde o lançamento
+ * (data do registro no contas a receber) vira inadimplente automaticamente.
+ */
+export function isStalePending(e: ToInvoiceEntry): boolean {
+  if (!hasNoAction(e)) return false;
+  const base = e.created_at?.slice(0, 10) ?? e.transaction_date ?? null;
+  if (!base) return false;
+  const days = Math.floor(
+    (Date.now() - new Date(base + "T00:00:00").getTime()) / 86400000,
+  );
+  return days > 30;
+}
+
 /**
  * Inadimplência agora é automática: todo lançamento faturado (ou com documentos)
  * que passou do vencimento e ainda não foi pago é inadimplente — e deixa de ser
@@ -526,6 +560,8 @@ export function isEntryPaid(e: ToInvoiceEntry): boolean {
 export function isEntryDefaulting(e: ToInvoiceEntry, due: string | null): boolean {
   if (isEntryPaid(e)) return false;
   if (e.gg_status === "nao_faturavel" || e.is_not_billable) return false;
+  // Pendente há mais de 30 dias sem qualquer ação => inadimplente.
+  if (isStalePending(e)) return true;
   if (!due) return false;
   // Só é inadimplente o que já foi faturado (status ou documentos enviados).
   const billed =

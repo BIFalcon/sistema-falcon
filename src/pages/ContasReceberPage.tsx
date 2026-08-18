@@ -328,51 +328,14 @@ function ToInvoiceSection({
     specificDates,
   } = useModuleFilters("financeiro");
   const hotelId = globalHotelId ?? "";
-  const [drillMonth, setDrillMonth] = useState<string | null>(null);
-  const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<
     "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
-  // Reset drill quando hotel muda
-  useEffect(() => {
-    setDrillMonth(null);
-    setDrillDay(null);
-  }, [hotelId]);
-
-  // Sincroniza drill com o filtro de datas do header:
-  // - 1 data específica  → vai direto pro dia
-  // - dateFrom == dateTo → vai direto pro dia
-  // - intervalo cobre exatamente 1 mês calendário → abre o mês
-  // - caso contrário     → volta para visão mensal (overview)
-  useEffect(() => {
-    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
-    if (specificDates && specificDates.length === 1 && isoDay.test(specificDates[0])) {
-      const d = specificDates[0];
-      setDrillMonth(ymKey(d));
-      setDrillDay(d);
-      return;
-    }
-    if (dateFrom && dateTo && isoDay.test(dateFrom) && isoDay.test(dateTo)) {
-      if (dateFrom === dateTo) {
-        setDrillMonth(ymKey(dateFrom));
-        setDrillDay(dateFrom);
-        return;
-      }
-      const fromYm = ymKey(dateFrom);
-      const toYm = ymKey(dateTo);
-      if (fromYm === toYm) {
-        // intervalo dentro de um único mês calendário → abre o mês
-        setDrillMonth(fromYm);
-        setDrillDay(null);
-        return;
-      }
-    }
-    setDrillMonth(null);
-    setDrillDay(null);
-  }, [dateFrom, dateTo, specificDates]);
+  // Lista corrida agrupada por mês — o filtro de datas do header já restringe
+  // o período no servidor, portanto não há mais drill por mês/dia.
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
@@ -512,7 +475,7 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
-        ) : clientSearch.trim() ? (
+        ) : (
           <DayBreakdown
             entries={finalEntries
               .slice()
@@ -521,27 +484,11 @@ function ToInvoiceSection({
               )}
             day={null}
             flat
+            searching={!!clientSearch.trim()}
             contracts={contracts}
             onBack={() => setClientSearch("")}
             daysSinceUpload={daysSinceUpload}
           />
-        ) : drillDay ? (
-          <DayBreakdown
-            entries={finalEntries.filter((e) => e.transaction_date === drillDay)}
-            day={drillDay}
-            contracts={contracts}
-            onBack={() => setDrillDay(null)}
-            daysSinceUpload={daysSinceUpload}
-          />
-        ) : drillMonth ? (
-          <MonthBreakdown
-            entries={finalEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
-            month={drillMonth}
-            onPickDay={setDrillDay}
-            onBack={() => setDrillMonth(null)}
-          />
-        ) : (
-          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
@@ -711,6 +658,7 @@ function DayBreakdown({
   onBack,
   daysSinceUpload,
   flat = false,
+  searching = false,
 }: {
   entries: ToInvoiceEntry[];
   day: string | null;
@@ -718,6 +666,7 @@ function DayBreakdown({
   onBack: () => void;
   daysSinceUpload?: (uploadId: string | null | undefined) => number | null;
   flat?: boolean;
+  searching?: boolean;
 }) {
   const { isMaster, isPatronos, hasRole } = useAuth();
   const canConfirm =
@@ -807,12 +756,14 @@ function DayBreakdown({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> {flat ? "Limpar busca" : "Voltar"}
-        </Button>
+        {(!flat || searching) && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+            <ArrowLeft className="h-4 w-4" /> {flat ? "Limpar busca" : "Voltar"}
+          </Button>
+        )}
         <h3 className="text-sm font-semibold">
           {flat
-            ? `Resultados da busca · ${entries.length} lançamento(s)`
+            ? `${searching ? "Resultados da busca" : "Lançamentos"} · ${entries.length} lançamento(s)`
             : `Lançamentos de ${formatDay(day ?? "")}`}
         </h3>
         {canShowActions && selectedIds.size > 0 && (
