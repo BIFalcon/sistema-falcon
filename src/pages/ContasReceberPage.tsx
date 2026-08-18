@@ -768,11 +768,10 @@ function DayBreakdown({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        {(!flat || searching) && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> {flat ? "Limpar busca" : "Voltar"}
-          </Button>
-        )}
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {flat ? (searching ? "Limpar busca" : "Voltar aos meses") : "Voltar"}
+        </Button>
         <h3 className="text-sm font-semibold">
           {flat
             ? `${searching ? "Resultados da busca" : "Lançamentos"} · ${entries.length} lançamento(s)`
