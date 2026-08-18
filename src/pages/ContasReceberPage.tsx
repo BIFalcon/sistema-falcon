@@ -512,7 +512,7 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
-        ) : clientSearch.trim() ? (
+        ) : (
           <DayBreakdown
             entries={finalEntries
               .slice()
@@ -525,23 +525,6 @@ function ToInvoiceSection({
             onBack={() => setClientSearch("")}
             daysSinceUpload={daysSinceUpload}
           />
-        ) : drillDay ? (
-          <DayBreakdown
-            entries={finalEntries.filter((e) => e.transaction_date === drillDay)}
-            day={drillDay}
-            contracts={contracts}
-            onBack={() => setDrillDay(null)}
-            daysSinceUpload={daysSinceUpload}
-          />
-        ) : drillMonth ? (
-          <MonthBreakdown
-            entries={finalEntries.filter((e) => e.transaction_date && ymKey(e.transaction_date) === drillMonth)}
-            month={drillMonth}
-            onPickDay={setDrillDay}
-            onBack={() => setDrillMonth(null)}
-          />
-        ) : (
-          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
         )}
       </Card>
 
