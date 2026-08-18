@@ -334,43 +334,8 @@ function ToInvoiceSection({
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
 
-  // Reset drill quando hotel muda
-  useEffect(() => {
-    setDrillMonth(null);
-    setDrillDay(null);
-  }, [hotelId]);
-
-  // Sincroniza drill com o filtro de datas do header:
-  // - 1 data específica  → vai direto pro dia
-  // - dateFrom == dateTo → vai direto pro dia
-  // - intervalo cobre exatamente 1 mês calendário → abre o mês
-  // - caso contrário     → volta para visão mensal (overview)
-  useEffect(() => {
-    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
-    if (specificDates && specificDates.length === 1 && isoDay.test(specificDates[0])) {
-      const d = specificDates[0];
-      setDrillMonth(ymKey(d));
-      setDrillDay(d);
-      return;
-    }
-    if (dateFrom && dateTo && isoDay.test(dateFrom) && isoDay.test(dateTo)) {
-      if (dateFrom === dateTo) {
-        setDrillMonth(ymKey(dateFrom));
-        setDrillDay(dateFrom);
-        return;
-      }
-      const fromYm = ymKey(dateFrom);
-      const toYm = ymKey(dateTo);
-      if (fromYm === toYm) {
-        // intervalo dentro de um único mês calendário → abre o mês
-        setDrillMonth(fromYm);
-        setDrillDay(null);
-        return;
-      }
-    }
-    setDrillMonth(null);
-    setDrillDay(null);
-  }, [dateFrom, dateTo, specificDates]);
+  // Lista corrida agrupada por mês — o filtro de datas do header já restringe
+  // o período no servidor, portanto não há mais drill por mês/dia.
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
