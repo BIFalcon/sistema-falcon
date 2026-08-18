@@ -333,9 +333,11 @@ function ToInvoiceSection({
     "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
-
-  // Lista corrida agrupada por mês — o filtro de datas do header já restringe
-  // o período no servidor, portanto não há mais drill por mês/dia.
+  // Drill por mês: quadradinhos de mês → lista corrida do mês escolhido.
+  const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  useEffect(() => {
+    setDrillMonth(null);
+  }, [hotelId]);
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
@@ -475,9 +477,16 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
+        ) : !drillMonth && !clientSearch.trim() ? (
+          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
         ) : (
           <DayBreakdown
             entries={finalEntries
+              .filter((e) =>
+                clientSearch.trim() || !drillMonth
+                  ? true
+                  : e.transaction_date && ymKey(e.transaction_date) === drillMonth,
+              )
               .slice()
               .sort((a, b) =>
                 (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""),
@@ -486,7 +495,10 @@ function ToInvoiceSection({
             flat
             searching={!!clientSearch.trim()}
             contracts={contracts}
-            onBack={() => setClientSearch("")}
+            onBack={() => {
+              setClientSearch("");
+              setDrillMonth(null);
+            }}
             daysSinceUpload={daysSinceUpload}
           />
         )}
