@@ -518,6 +518,39 @@ export function isEntryPaid(e: ToInvoiceEntry): boolean {
   return !!e.paid_date || e.is_paid === true || e.gg_status === "pago";
 }
 
+/** Nenhuma ação registrada sobre o lançamento (docs, faturamento, nota, pagamento, notas). */
+export function hasNoAction(e: ToInvoiceEntry): boolean {
+  return (
+    !e.invoice_file_1 &&
+    !e.invoice_file_2 &&
+    !e.proof_file &&
+    !e.billed_at &&
+    !e.gg_confirmed_at &&
+    !e.nota_number &&
+    !e.boleto_number &&
+    !e.boleto_due_date &&
+    !e.gg_note &&
+    !e.documents_problem_at &&
+    !e.is_not_billable &&
+    !isEntryPaid(e) &&
+    (e.gg_status === "pendente" || !e.gg_status)
+  );
+}
+
+/**
+ * Pendente sem nenhuma ação por mais de 30 dias desde o lançamento
+ * (data do registro no contas a receber) vira inadimplente automaticamente.
+ */
+export function isStalePending(e: ToInvoiceEntry): boolean {
+  if (!hasNoAction(e)) return false;
+  const base = e.created_at?.slice(0, 10) ?? e.transaction_date ?? null;
+  if (!base) return false;
+  const days = Math.floor(
+    (Date.now() - new Date(base + "T00:00:00").getTime()) / 86400000,
+  );
+  return days > 30;
+}
+
 /**
  * Inadimplência agora é automática: todo lançamento faturado (ou com documentos)
  * que passou do vencimento e ainda não foi pago é inadimplente — e deixa de ser
@@ -526,6 +559,8 @@ export function isEntryPaid(e: ToInvoiceEntry): boolean {
 export function isEntryDefaulting(e: ToInvoiceEntry, due: string | null): boolean {
   if (isEntryPaid(e)) return false;
   if (e.gg_status === "nao_faturavel" || e.is_not_billable) return false;
+  // Pendente há mais de 30 dias sem qualquer ação => inadimplente.
+  if (isStalePending(e)) return true;
   if (!due) return false;
   // Só é inadimplente o que já foi faturado (status ou documentos enviados).
   const billed =
