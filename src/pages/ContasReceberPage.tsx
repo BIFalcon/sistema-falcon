@@ -333,9 +333,11 @@ function ToInvoiceSection({
     "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
   >("todos");
   const [clientSearch, setClientSearch] = useState("");
-
-  // Lista corrida agrupada por mês — o filtro de datas do header já restringe
-  // o período no servidor, portanto não há mais drill por mês/dia.
+  // Drill por mês: quadradinhos de mês → lista corrida do mês escolhido.
+  const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  useEffect(() => {
+    setDrillMonth(null);
+  }, [hotelId]);
 
   const { data: entries = [], isLoading } = useToInvoiceEntries({
     hotelId: hotelId || undefined,
@@ -475,9 +477,16 @@ function ToInvoiceSection({
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
           <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
+        ) : !drillMonth && !clientSearch.trim() ? (
+          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
         ) : (
           <DayBreakdown
             entries={finalEntries
+              .filter((e) =>
+                clientSearch.trim() || !drillMonth
+                  ? true
+                  : e.transaction_date && ymKey(e.transaction_date) === drillMonth,
+              )
               .slice()
               .sort((a, b) =>
                 (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""),
@@ -486,7 +495,10 @@ function ToInvoiceSection({
             flat
             searching={!!clientSearch.trim()}
             contracts={contracts}
-            onBack={() => setClientSearch("")}
+            onBack={() => {
+              setClientSearch("");
+              setDrillMonth(null);
+            }}
             daysSinceUpload={daysSinceUpload}
           />
         )}
@@ -756,11 +768,10 @@ function DayBreakdown({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        {(!flat || searching) && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> {flat ? "Limpar busca" : "Voltar"}
-          </Button>
-        )}
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {flat ? (searching ? "Limpar busca" : "Voltar aos meses") : "Voltar"}
+        </Button>
         <h3 className="text-sm font-semibold">
           {flat
             ? `${searching ? "Resultados da busca" : "Lançamentos"} · ${entries.length} lançamento(s)`
