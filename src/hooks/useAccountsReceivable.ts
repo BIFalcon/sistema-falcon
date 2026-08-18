@@ -46,6 +46,7 @@ export interface ToInvoiceEntry {
   boleto_number: string | null;
   boleto_due_date: string | null;
   doc_extraction_status: string | null;
+  created_at?: string | null;
 }
 
 export function useToInvoiceEntries(filters: {
@@ -70,7 +71,7 @@ export function useToInvoiceEntries(filters: {
       // Paginação manual — PostgREST limita cada request a ~1000 linhas.
       // Sem paginação, meses mais antigos ficavam de fora quando o acervo
       // ultrapassava o limite (ex.: consolidado com todos os hotéis).
-      const cols = "id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at,nota_number,boleto_number,boleto_due_date,doc_extraction_status";
+      const cols = "id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at,nota_number,boleto_number,boleto_due_date,doc_extraction_status,created_at";
       const pageSize = 1000;
       const all: ToInvoiceEntry[] = [];
       let from = 0;
