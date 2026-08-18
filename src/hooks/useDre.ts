@@ -832,6 +832,16 @@ function useDreAnalyticsImpl(input: {
             .replace(/\s+/g, " ")
             .trim();
         const aliasIndex = buildAliasIndex(cleanForMatch);
+        /** Igualdade forte: mesmo rótulo (normalizado) ou sinônimo declarado. */
+        const strictLabelMatch = (a: string, b: string): boolean => {
+          const ca = cleanForMatch(a);
+          const cb = cleanForMatch(b);
+          if (!ca || !cb) return false;
+          if (ca === cb) return true;
+          if (aliasIndex.get(ca)?.includes(cb)) return true;
+          if (aliasIndex.get(cb)?.includes(ca)) return true;
+          return false;
+        };
         const looseLabelMatch = (a: string, b: string): boolean => {
           const ca = cleanForMatch(a);
           const cb = cleanForMatch(b);
@@ -844,28 +854,45 @@ function useDreAnalyticsImpl(input: {
           if (aliasesA && aliasesA.includes(cb)) return true;
           const aliasesB = aliasIndex.get(cb);
           if (aliasesB && aliasesB.includes(ca)) return true;
-          // Match também por containment via alias
-          if (aliasesA && aliasesA.some((al) => al && (al === cb || (al.length >= 6 && (al.includes(cb) || cb.includes(al)))))) return true;
-          if (aliasesB && aliasesB.some((al) => al && (al === ca || (al.length >= 6 && (al.includes(ca) || ca.includes(al)))))) return true;
+          // Match por containment via alias — exige que AMBOS os lados tenham
+          // >= 6 chars, senão siglas curtas ("ISS") casavam dentro de palavras
+          // maiores ("com-ISS-ões de Cartão de Crédito").
+          const containsBoth = (x: string, y: string) =>
+            x.length >= 6 && y.length >= 6 && (x.includes(y) || y.includes(x));
+          if (aliasesA?.some((al) => al && (al === cb || containsBoth(al, cb)))) return true;
+          if (aliasesB?.some((al) => al && (al === ca || containsBoth(al, ca)))) return true;
           return false;
+        };
+        /**
+         * Busca em duas passadas: primeiro igualdade forte (rótulo idêntico ou
+         * sinônimo declarado), só depois o match tolerante. Sem isso, o rótulo
+         * cuja série aparecia primeiro no mapa podia "roubar" a série de outra
+         * linha (ex.: Comissões de Cartão de Crédito vs Comissões de Agências).
+         */
+        const pickByLabel = <T,>(map: Map<string, T>, label: string): T | undefined => {
+          for (const [lbl, value] of map) {
+            if (strictLabelMatch(lbl, label)) return value;
+          }
+          for (const [lbl, value] of map) {
+            if (looseLabelMatch(lbl, label)) return value;
+          }
+          return undefined;
         };
 
         // Busca série de um label nos dados do banco
         const findSeriesForLabel = (label: string): (number | null)[] => {
           // 1) Preferir a série anual completa do realizado vinda da
           //    última DRE do ano ([cline_M] LABEL).
-          for (const [lbl, series] of currentDetailSeries) {
-            if (looseLabelMatch(lbl, label)) return series;
-          }
+          const detail = pickByLabel(currentDetailSeries, label);
+          if (detail) return detail;
           // 2) Fallback: mapa por mês oriundo de fechamentos antigos.
-          for (const [lbl, data] of linesByLabel) {
-            if (looseLabelMatch(lbl, label)) {
-              const series: (number | null)[] = Array(12).fill(null);
-              for (const [m, v] of data.values) {
-                if (currentMonthRange.includes(m)) series[m - 1] = v;
-              }
-              return series;
+          const fallback = pickByLabel(linesByLabel, label);
+          if (fallback) {
+            const series: (number | null)[] = Array(12).fill(null);
+            for (const [m, v] of fallback.values) {
+              if (currentMonthRange.includes(m)) series[m - 1] = v;
             }
+            return series;
           }
           return Array(12).fill(null);
         };
@@ -874,9 +901,8 @@ function useDreAnalyticsImpl(input: {
         const findBudgetForLabel = (label: string): (number | null)[] => {
           const norm = normLabel(label);
           // 1. Linha detalhada do orçamento (série anual completa via [bline_M])
-          for (const [lbl, series] of budgetDetailSeries) {
-            if (looseLabelMatch(lbl, label)) return series;
-          }
+          const detail = pickByLabel(budgetDetailSeries, label);
+          if (detail) return detail;
           // 2. Indicadores parseados (séries mensais ou valor único)
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
@@ -895,9 +921,8 @@ function useDreAnalyticsImpl(input: {
         const findPreviousForLabel = (label: string): (number | null)[] => {
           const norm = normLabel(label);
           // 1. Linha detalhada do ano anterior (série anual completa via [pline_M])
-          for (const [lbl, series] of prevDetailSeries) {
-            if (looseLabelMatch(lbl, label)) return series;
-          }
+          const detail = pickByLabel(prevDetailSeries, label);
+          if (detail) return detail;
           // 2. Indicadores parseados
           for (const ind of INDICATORS) {
             if (ind.rx.some((rx) => rx.test(label))) {
