@@ -328,8 +328,6 @@ function ToInvoiceSection({
     specificDates,
   } = useModuleFilters("financeiro");
   const hotelId = globalHotelId ?? "";
-  const [drillMonth, setDrillMonth] = useState<string | null>(null);
-  const [drillDay, setDrillDay] = useState<string | null>(null);
   const [contractsOpen, setContractsOpen] = useState(false);
   const [faturamentoFilter, setFaturamentoFilter] = useState<
     "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
