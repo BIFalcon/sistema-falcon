@@ -199,7 +199,19 @@ export default function ConciliacaoCartaoPage() {
   const importAcquirer = useImportAcquirer();
   const importBank = useImportBankStatement();
   const uploads = useConcUploads();
+  const deleteUpload = useDeleteConcUpload();
   const trxCodes = useTrxCodeMapping();
+
+  const uploadHotelLabel = (u: Record<string, unknown>): string => {
+    const direct = allowedHotels.find((h) => h.id === u.hotel_id)?.name;
+    if (direct) return direct;
+    const meta = (u.metadata ?? {}) as { hotel_ids?: string[] };
+    const names = (meta.hotel_ids ?? [])
+      .map((id) => allowedHotels.find((h) => h.id === id)?.name)
+      .filter(Boolean) as string[];
+    if (names.length === 0) return "—";
+    return names.length <= 2 ? names.join(", ") : `${names.length} hotéis`;
+  };
   const updateTrx = useUpdateTrxCode();
   const [trxSearch, setTrxSearch] = useState("");
 
