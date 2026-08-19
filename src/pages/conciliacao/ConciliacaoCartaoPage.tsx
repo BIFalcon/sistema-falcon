@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
@@ -323,7 +322,7 @@ export default function ConciliacaoCartaoPage() {
         <TabsContent value="cartao" className="mt-4">
           {needsHotel ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Selecione uma empresa/hotel para começar.
+              Selecione um hotel no filtro do topo da página para começar.
             </CardContent></Card>
           ) : (
             <Tabs defaultValue="pendentes">
@@ -367,7 +366,7 @@ export default function ConciliacaoCartaoPage() {
         <TabsContent value="pix" className="mt-4">
           {needsHotel ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Selecione uma empresa/hotel para começar.
+              Selecione um hotel no filtro do topo da página para começar.
             </CardContent></Card>
           ) : (
             <Tabs defaultValue="pendentes">
@@ -428,7 +427,7 @@ export default function ConciliacaoCartaoPage() {
               <CardContent>
                 <DropZone
                   label="Enviar XML do Opera"
-                  hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel acima antes de importar"}
+                  hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel no filtro do topo antes de importar"}
                   accept={{ "application/xml": [".xml"], "text/xml": [".xml"] }}
                   busy={importOpera.isPending}
                   onFile={(f) => {
