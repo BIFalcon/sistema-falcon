@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CheckCircle2, CreditCard, Download, FileSpreadsheet, Landmark,
-  Loader2, Undo2, Upload, Wallet,
+  Loader2, Trash2, Undo2, Upload, Wallet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ import { fmtBRL, fmtDateTime } from "@/lib/formatters";
 import { ReconcilePanel, Money, fmtDay, exportRows, type ReconcileRow } from "@/components/conciliacao/ReconcilePanel";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer,
-  useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
+  useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch,
 } from "@/hooks/useConciliacaoCartao";
@@ -199,7 +199,19 @@ export default function ConciliacaoCartaoPage() {
   const importAcquirer = useImportAcquirer();
   const importBank = useImportBankStatement();
   const uploads = useConcUploads();
+  const deleteUpload = useDeleteConcUpload();
   const trxCodes = useTrxCodeMapping();
+
+  const uploadHotelLabel = (u: Record<string, unknown>): string => {
+    const direct = allowedHotels.find((h) => h.id === u.hotel_id)?.name;
+    if (direct) return direct;
+    const meta = (u.metadata ?? {}) as { hotel_ids?: string[] };
+    const names = (meta.hotel_ids ?? [])
+      .map((id) => allowedHotels.find((h) => h.id === id)?.name)
+      .filter(Boolean) as string[];
+    if (names.length === 0) return "—";
+    return names.length <= 2 ? names.join(", ") : `${names.length} hotéis`;
+  };
   const updateTrx = useUpdateTrxCode();
   const [trxSearch, setTrxSearch] = useState("");
 
@@ -487,6 +499,7 @@ export default function ConciliacaoCartaoPage() {
                     <TableHead>Hotel</TableHead>
                     <TableHead className="text-right">Importados</TableHead>
                     <TableHead className="text-right">Descartados</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,13 +508,32 @@ export default function ConciliacaoCartaoPage() {
                       <TableCell>{fmtDateTime(u.uploaded_at as string)}</TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px]">{String(u.kind)}</Badge></TableCell>
                       <TableCell className="max-w-[280px] truncate">{String(u.file_name)}</TableCell>
-                      <TableCell>{allowedHotels.find((h) => h.id === u.hotel_id)?.name ?? "—"}</TableCell>
+                      <TableCell>{uploadHotelLabel(u)}</TableCell>
                       <TableCell className="text-right">{Number(u.parsed_count ?? 0)}</TableCell>
                       <TableCell className="text-right">{Number(u.skipped_count ?? 0)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost" size="sm"
+                          className="h-6 text-[11px] text-destructive hover:text-destructive"
+                          disabled={deleteUpload.isPending}
+                          onClick={() => {
+                            if (!window.confirm(`Excluir a importação "${String(u.file_name)}" e todos os lançamentos dela?`)) return;
+                            deleteUpload.mutate(
+                              { id: u.id as string, kind: String(u.kind) },
+                              {
+                                onSuccess: () => toast.success("Importação excluída."),
+                                onError: (e) => toast.error((e as Error).message),
+                              },
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" /> Excluir
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {(uploads.data ?? []).length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">
+                    <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">
                       Nenhuma importação ainda.
                     </TableCell></TableRow>
                   )}

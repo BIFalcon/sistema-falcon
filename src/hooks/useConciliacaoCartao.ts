@@ -279,16 +279,19 @@ export function useImportAcquirer() {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
       const { rows, skipped, unmatched } = await parseAcquirerExcel(file, hotels);
 
+      const matchedHotelIds = [...new Set(rows.map((r) => r.hotel_id).filter(Boolean) as string[])];
+
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
         .insert({
+          hotel_id: matchedHotelIds.length === 1 ? matchedHotelIds[0] : null,
           kind: "acquirer",
           file_name: file.name,
           file_size: file.size,
           parsed_count: rows.length,
           skipped_count: skipped,
           uploaded_by: user!.id,
-          metadata: { unmatched },
+          metadata: { unmatched, hotel_ids: matchedHotelIds },
         })
         .select("id")
         .single();
@@ -371,6 +374,45 @@ export function useImportBankStatement() {
 /* ------------------------------------------------------------------ */
 /* Mutations — conciliação manual                                      */
 /* ------------------------------------------------------------------ */
+
+/** Exclui uma importação e todos os lançamentos que vieram dela.
+ *  Bloqueia se algum lançamento já foi conciliado (desfazer primeiro). */
+export function useDeleteConcUpload() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, kind }: { id: string; kind: string }) => {
+      const table =
+        kind === "opera" ? "conc_opera_entries"
+        : kind === "acquirer" ? "conc_acquirer_entries"
+        : "conc_bank_entries";
+
+      const { data: matched, error: mErr } = await supabase
+        .from(table)
+        .select("id")
+        .eq("upload_id", id)
+        .not("matched_at", "is", null)
+        .limit(1);
+      if (mErr) throw mErr;
+      if ((matched ?? []).length > 0) {
+        throw new Error(
+          "Esta importação possui lançamentos já conciliados. Desfaça as conciliações antes de excluir o arquivo.",
+        );
+      }
+
+      const { error: delErr } = await supabase.from(table).delete().eq("upload_id", id);
+      if (delErr) throw delErr;
+      const { error: upErr } = await supabase.from("conc_uploads").delete().eq("id", id);
+      if (upErr) throw upErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank-all"] });
+      qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+    },
+  });
+}
 
 const TABLE_BY_SIDE: Record<ConcSide, "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries"> = {
   opera: "conc_opera_entries",
