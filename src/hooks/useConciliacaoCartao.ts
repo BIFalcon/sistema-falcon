@@ -279,16 +279,19 @@ export function useImportAcquirer() {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
       const { rows, skipped, unmatched } = await parseAcquirerExcel(file, hotels);
 
+      const matchedHotelIds = [...new Set(rows.map((r) => r.hotel_id).filter(Boolean) as string[])];
+
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
         .insert({
+          hotel_id: matchedHotelIds.length === 1 ? matchedHotelIds[0] : null,
           kind: "acquirer",
           file_name: file.name,
           file_size: file.size,
           parsed_count: rows.length,
           skipped_count: skipped,
           uploaded_by: user!.id,
-          metadata: { unmatched },
+          metadata: { unmatched, hotel_ids: matchedHotelIds },
         })
         .select("id")
         .single();
