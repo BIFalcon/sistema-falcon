@@ -495,3 +495,54 @@ export function useUpdateTrxCode() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trx-code-mapping"] }),
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Verificação automática: Faturamento pago × Extrato bancário         */
+/* ------------------------------------------------------------------ */
+
+export interface PaidVerificationInput {
+  id: string;
+  hotel_id: string | null;
+  paid_date: string | null;
+  amount: number | null;
+}
+
+/**
+ * Roda sozinha sempre que o extrato é importado (a query é invalidada):
+ * para cada lançamento de Faturamento marcado como pago, procura no extrato
+ * do hotel uma linha com Data = paid_date e Valor positivo igual.
+ * Retorna os ids sem correspondência — só considera hotéis/períodos que já
+ * possuem extrato importado, para não gerar alerta falso.
+ */
+export function usePaidBankVerification(entries: PaidVerificationInput[], enabled: boolean) {
+  const bank = useAllBankEntries(enabled);
+
+  const missing = new Set<string>();
+  if (enabled && bank.data) {
+    const byHotel = new Map<string, { dates: Set<string>; min: string; max: string; amounts: Map<string, number> }>();
+    for (const b of bank.data) {
+      if (!b.hotel_id || !b.line_date) continue;
+      let h = byHotel.get(b.hotel_id);
+      if (!h) {
+        h = { dates: new Set(), min: b.line_date, max: b.line_date, amounts: new Map() };
+        byHotel.set(b.hotel_id, h);
+      }
+      h.dates.add(b.line_date);
+      if (b.line_date < h.min) h.min = b.line_date;
+      if (b.line_date > h.max) h.max = b.line_date;
+      const key = `${b.line_date}|${Number(b.amount).toFixed(2)}`;
+      h.amounts.set(key, (h.amounts.get(key) ?? 0) + 1);
+    }
+
+    for (const e of entries) {
+      if (!e.hotel_id || !e.paid_date || e.amount == null) continue;
+      const h = byHotel.get(e.hotel_id);
+      if (!h) continue; // sem extrato importado para esse hotel
+      if (e.paid_date < h.min || e.paid_date > h.max) continue; // fora do período coberto
+      const key = `${e.paid_date}|${Math.abs(Number(e.amount)).toFixed(2)}`;
+      if (!h.amounts.has(key)) missing.add(e.id);
+    }
+  }
+
+  return { missing, isLoading: bank.isLoading, enabled };
+}
