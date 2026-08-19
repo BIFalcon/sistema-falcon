@@ -263,10 +263,10 @@ function computeCardValue(
     // Orçado/Ano Anterior, onde "Lucro a Distribuir" não tem dados,
     // mas "Lucro Líquido / Prejuízo do Exercício" tem).
     for (const nLbl of card.numLabels) {
-      const num = findDreLine(dataset ?? undefined, nLbl);
+      const num = pickLine(dataset, [nLbl]);
       if (!num) continue;
       for (const dLbl of card.denLabels) {
-        const den = findDreLine(dataset ?? undefined, dLbl);
+        const den = pickLine(dataset, [dLbl]);
         if (!den) continue;
         const v = aggregateRatio(num.series[series], den.series[series], months);
         if (v != null) return v;
