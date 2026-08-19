@@ -273,7 +273,6 @@ export default function ConciliacaoCartaoPage() {
     ...acquirerRows.filter((r) => (acquirer.data ?? []).find((e) => e.id === r.id)?.matched_at),
   ];
   const conciliadosPix = [
-    ...operaPixPendentes.filter(() => false),
     ...operaRows.filter((r) => operaById.get(r.id)?.matched_at && isPix(operaById.get(r.id)?.categoria)),
     ...bankRows.filter((r) => (bank.data ?? []).find((e) => e.id === r.id)?.matched_at),
   ];
