@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CheckCircle2, CreditCard, Download, FileSpreadsheet, Landmark,
-  Loader2, Undo2, Upload, Wallet,
+  Loader2, Trash2, Undo2, Upload, Wallet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ import { fmtBRL, fmtDateTime } from "@/lib/formatters";
 import { ReconcilePanel, Money, fmtDay, exportRows, type ReconcileRow } from "@/components/conciliacao/ReconcilePanel";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer,
-  useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
+  useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch,
 } from "@/hooks/useConciliacaoCartao";
