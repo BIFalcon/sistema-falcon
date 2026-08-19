@@ -60,13 +60,25 @@ const CARD_LINES: CardDef[] = [
     title: "Lucro Líquido",
     format: "brl",
     agg: "sum",
-    labels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
+    labels: [
+      "Lucro / Prejuízo a Distribuir",
+      "Lucro Líquido",
+      "Resultado Líquido do Exercício",
+      "Lucro/ (Prejuízo) da Sociedade no Exercício",
+      "Resultado Líquido",
+    ],
   },
   {
     title: "Margem Líquida",
     format: "pct",
     agg: "ratio",
-    numLabels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
+    numLabels: [
+      "Lucro / Prejuízo a Distribuir",
+      "Lucro Líquido",
+      "Resultado Líquido do Exercício",
+      "Lucro/ (Prejuízo) da Sociedade no Exercício",
+      "Resultado Líquido",
+    ],
     denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
 ];
@@ -170,6 +182,16 @@ function pickLine(
   dataset: ReturnType<typeof useDreAnalytics>["data"],
   labels: string[],
 ): DreLineNode | undefined {
+  // 1ª passada: match exato do rótulo normalizado (evita que buscas amplas
+  // como "Lucro Líquido" caiam em linhas como "Margem de Lucro Líquido %").
+  const flat = dataset?.flat ?? [];
+  for (const lbl of labels) {
+    const needle = lbl.toLowerCase().replace(/[^a-z0-9]+/gi, "");
+    const exact = flat.find(
+      (l) => l.label.toLowerCase().replace(/[^a-z0-9]+/gi, "") === needle,
+    );
+    if (exact) return exact;
+  }
   for (const lbl of labels) {
     const ln = findDreLine(dataset ?? undefined, lbl);
     if (ln) return ln;
@@ -241,10 +263,10 @@ function computeCardValue(
     // Orçado/Ano Anterior, onde "Lucro a Distribuir" não tem dados,
     // mas "Lucro Líquido / Prejuízo do Exercício" tem).
     for (const nLbl of card.numLabels) {
-      const num = findDreLine(dataset ?? undefined, nLbl);
+      const num = pickLine(dataset, [nLbl]);
       if (!num) continue;
       for (const dLbl of card.denLabels) {
-        const den = findDreLine(dataset ?? undefined, dLbl);
+        const den = pickLine(dataset, [dLbl]);
         if (!den) continue;
         const v = aggregateRatio(num.series[series], den.series[series], months);
         if (v != null) return v;
