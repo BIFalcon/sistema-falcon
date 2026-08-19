@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePaidBankVerification } from "@/hooks/useConciliacaoCartao";
+import ConciliacaoSection from "@/pages/conciliacao/ConciliacaoCartaoPage";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
