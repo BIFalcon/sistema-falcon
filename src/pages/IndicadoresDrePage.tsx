@@ -182,6 +182,16 @@ function pickLine(
   dataset: ReturnType<typeof useDreAnalytics>["data"],
   labels: string[],
 ): DreLineNode | undefined {
+  // 1ª passada: match exato do rótulo normalizado (evita que buscas amplas
+  // como "Lucro Líquido" caiam em linhas como "Margem de Lucro Líquido %").
+  const flat = dataset?.flat ?? [];
+  for (const lbl of labels) {
+    const needle = lbl.toLowerCase().replace(/[^a-z0-9]+/gi, "");
+    const exact = flat.find(
+      (l) => l.label.toLowerCase().replace(/[^a-z0-9]+/gi, "") === needle,
+    );
+    if (exact) return exact;
+  }
   for (const lbl of labels) {
     const ln = findDreLine(dataset ?? undefined, lbl);
     if (ln) return ln;
