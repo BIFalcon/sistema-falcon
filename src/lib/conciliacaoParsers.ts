@@ -107,6 +107,17 @@ export function parseMoney(raw: unknown): number {
   return negative ? -Math.abs(v) : v;
 }
 
+/** Contador de ocorrências: distingue linhas idênticas dentro do arquivo
+ * sem depender da posição absoluta (reimportar o mesmo dado não duplica). */
+function makeOccCounter() {
+  const seen = new Map<string, number>();
+  return (base: string) => {
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n;
+  };
+}
+
 function hashKey(parts: (string | number)[]): string {
   const s = parts.map((p) => String(p ?? "")).join("|");
   let h = 0;
@@ -160,6 +171,7 @@ export async function parseOperaXml(
   );
 
   const rows: OperaRow[] = [];
+  const occ = makeOccCounter();
   let skipped = 0;
 
   for (const el of rowEls) {
@@ -178,7 +190,10 @@ export async function parseOperaXml(
     const receipt = tagValue(el, "RECEIPT_NO");
 
     rows.push({
-      entry_key: hashKey([hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2)]),
+      entry_key: hashKey([
+        hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2),
+        occ([hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2)].join("|")),
+      ]),
       trx_code: trxCode,
       trx_desc: tagValue(el, "TRX_DESC"),
       amount,
@@ -246,6 +261,7 @@ export async function parseAcquirerExcel(
   }
 
   const rows: AcquirerRow[] = [];
+  const occ = makeOccCounter();
   const unmatched = new Set<string>();
   let skipped = 0;
 
@@ -273,8 +289,10 @@ export async function parseAcquirerExcel(
       : "PIX";
 
     rows.push({
-      entry_key: hashKey([hotelId, saleDate, amount.toFixed(2), bandeira, modalidade, estab,
-        String(r[findCol(header, "nsu", "codigo da venda", "numero do resumo")] ?? "")]),
+      entry_key: (() => {
+        const base = [hotelId, saleDate, amount.toFixed(2), bandeira, modalidade, estab].join("|");
+        return hashKey([base, occ(base)]);
+      })(),
       hotel_id: hotelId,
       establishment_raw: estab,
       sale_date: saleDate,
@@ -351,6 +369,7 @@ export async function parseBankStatement(
   }
 
   const rows: BankRow[] = [];
+  const occ = makeOccCounter();
   let skipped = 0;
 
   for (const r of grid.slice(headerIdx + 1)) {
@@ -366,7 +385,10 @@ export async function parseBankStatement(
     if (!lineDate && amount === 0) continue;
 
     rows.push({
-      entry_key: hashKey([hotelId ?? accountName, lineDate, desc, amount.toFixed(2), rows.length]),
+      entry_key: (() => {
+        const base = [hotelId ?? accountName, lineDate, desc, amount.toFixed(2)].join("|");
+        return hashKey([base, occ(base)]);
+      })(),
       line_date: lineDate,
       description: desc,
       amount,
