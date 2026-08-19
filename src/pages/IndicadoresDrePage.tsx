@@ -60,13 +60,25 @@ const CARD_LINES: CardDef[] = [
     title: "Lucro Líquido",
     format: "brl",
     agg: "sum",
-    labels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
+    labels: [
+      "Lucro / Prejuízo a Distribuir",
+      "Lucro Líquido",
+      "Resultado Líquido do Exercício",
+      "Lucro/ (Prejuízo) da Sociedade no Exercício",
+      "Resultado Líquido",
+    ],
   },
   {
     title: "Margem Líquida",
     format: "pct",
     agg: "ratio",
-    numLabels: ["Lucro / Prejuízo a Distribuir", "Lucro Líquido", "Resultado Líquido"],
+    numLabels: [
+      "Lucro / Prejuízo a Distribuir",
+      "Lucro Líquido",
+      "Resultado Líquido do Exercício",
+      "Lucro/ (Prejuízo) da Sociedade no Exercício",
+      "Resultado Líquido",
+    ],
     denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
 ];
