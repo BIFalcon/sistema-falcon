@@ -110,6 +110,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
           { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, allowedRoles: ["financeiro","gg","viewer"] as AppRole[] },
           { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, allowedRoles: ["financeiro","viewer"] as AppRole[] },
           { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, allowedRoles: ["financeiro","gg","adm","gop","operacoes","viewer"] as AppRole[] },
+          { title: "Conciliação Cartão / PIX", url: "/financeiro/contas-receber/conciliacao", icon: GitCompare, allowedRoles: ["controladoria","fernando","patronos"] as AppRole[] },
         ],
       },
       // Adiciona "Clientes" também no menu do financeiro.

@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePaidBankVerification } from "@/hooks/useConciliacaoCartao";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
@@ -681,6 +682,12 @@ function DayBreakdown({
   searching?: boolean;
 }) {
   const { isMaster, isPatronos, hasRole } = useAuth();
+  // Verificação automática Faturamento pago × Extrato bancário (matriz).
+  const canSeeBankCheck = isMaster || isPatronos || hasRole("controladoria") || hasRole("fernando");
+  const bankCheck = usePaidBankVerification(
+    entries.map((e) => ({ id: e.id, hotel_id: e.hotel_id, paid_date: e.paid_date, amount: e.amount })),
+    canSeeBankCheck,
+  );
   const canConfirm =
     isMaster ||
     hasRole("gg") ||
@@ -948,6 +955,15 @@ function DayBreakdown({
                       <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
                         Pago em {formatDay(e.paid_date)}
                       </div>
+                    )}
+                    {e.paid_date && bankCheck.missing.has(e.id) && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-amber-500/60 text-amber-700 dark:text-amber-400"
+                        title="Marcado como pago, mas não encontrado no extrato bancário — investigar"
+                      >
+                        Sem correspondência no extrato
+                      </Badge>
                     )}
                     {e.paid_note && !e.paid_date && (
                       <div className="text-[11px] text-amber-700 dark:text-amber-400 italic">
