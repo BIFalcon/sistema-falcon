@@ -206,6 +206,27 @@ export function useConcUploads() {
 
 const CHUNK = 500;
 
+/** Conciliação automática: casa pares exatos 1:1 (data + categoria + valor).
+ *  Não substitui a conciliação manual — só resolve os casos óbvios. */
+async function runAutoReconcile(hotelId?: string | null) {
+  const { data, error } = await supabase.rpc("conc_auto_reconcile", hotelId ? { _hotel_id: hotelId } : {});
+  if (error) throw error;
+  return (data ?? 0) as number;
+}
+
+export function useAutoReconcile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (hotelId?: string | null) => runAutoReconcile(hotelId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["conc-matches"] });
+    },
+  });
+}
+
 async function upsertChunks<T>(table: "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries", rows: T[]) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     const { error } = await supabase
@@ -262,11 +283,15 @@ export function useImportOpera() {
         raw: r as unknown as Record<string, unknown>,
       })));
 
-      return { inserted: rows.length, skipped };
+      const autoMatched = await runAutoReconcile(hotelId);
+      return { inserted: rows.length, skipped, autoMatched };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["conc-matches"] });
     },
   });
 }
@@ -311,11 +336,14 @@ export function useImportAcquirer() {
         raw: r as unknown as Record<string, unknown>,
       })));
 
-      return { inserted: rows.length, skipped, unmatched };
+      const autoMatched = await runAutoReconcile(matchedHotelIds.length === 1 ? matchedHotelIds[0] : null);
+      return { inserted: rows.length, skipped, unmatched, autoMatched };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-matches"] });
     },
   });
 }
@@ -361,12 +389,15 @@ export function useImportBankStatement() {
         raw: r as unknown as Record<string, unknown>,
       })));
 
-      return { inserted: parsed.rows.length, hotelId, accountName: parsed.accountName };
+      const autoMatched = await runAutoReconcile(hotelId);
+      return { inserted: parsed.rows.length, hotelId, accountName: parsed.accountName, autoMatched };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-bank-all"] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-matches"] });
     },
   });
 }
