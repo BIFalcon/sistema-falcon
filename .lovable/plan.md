@@ -1,33 +1,60 @@
-Sim — as validações de nome, check-in e valor continuam ativas, mas com uma ressalva importante na planilha do Serra Talhada.
+# Módulo Conciliação (Cartão, PIX, Extrato) em Contas a Receber
 
-## Como está hoje (após o último ajuste)
+## O que será entregue
 
-O cruzamento acontece em duas etapas:
+Novo submódulo em Contas a Receber com 4 abas de navegação:
+1. **Cartão e PIX** (Opera × Adquirente)
+2. **PIX × Extrato Bancário**
+3. **Dinheiro** — espaço reservado, sem regra ainda
+4. **Importações / Códigos** — uploads e tabela de referência TRX_CODE
 
-1. **Pareamento (quem bate com quem)**: agora usa **RPS = Fiscal Bill Number** como chave principal, com fallback por Confirmation Number quando a descrição da nota trouxer.
-2. **Validação de conteúdo** (dentro de `useNfConference`): para cada nota pareada, ainda comparamos:
-   - **Nome do hóspede** — extraído do texto "HÓSPEDE: ..." da descrição.
-   - **Check-in** — extraído de "CHECK-IN: ..." da descrição.
-   - **Valor** — comparado com `netAmount` ou `paymentAmount` das linhas do Opera (tolerância R$ 1,00).
-   - Check-out não é validado hoje (só extraído, nunca comparado).
+Acesso restrito a: Master, Fernando, Patronos, Controladoria.
 
-Se qualquer uma falhar, a reserva vai para **Divergências** com o motivo específico.
+## Dados e importações
 
-## O problema com Serra Talhada
+Três importações acumulativas (nunca substituem, só somam; reimportar o mesmo arquivo não duplica, por chave única):
 
-A planilha da Prefeitura do Serra Talhada **não tem coluna "Descrição do Serviço"** — só DPS Nº, valor, tomador etc. Sem descrição, não há como extrair nome do hóspede nem check-in da nota. Resultado prático:
+- **Opera (XML)**: lê TRX_CODE, TRX_DESC, CASHIER_CREDIT (valor), BUSINESS_FORMAT_DATE, ROOM, GUEST_FULL_NAME, RECEIPT_NO. Entram só os códigos ativos da tabela de referência; a categoria vem do mapeamento.
+- **Adquirente (Rede, Excel)**: cabeçalho na 2ª linha; só linhas com status "aprovada" ou "pago"; usa valor da venda atualizado, data da venda, bandeira + modalidade como categoria (bandeira vazia = PIX) e nome do estabelecimento para achar o hotel.
+- **Extrato Bancário (Excel)**: apenas aba "Lançamentos", cabeçalho na linha 10; usa "Nome" (linhas de identificação) para achar o hotel; colunas Data, Lançamento, Valor (R$); descarta SALDO ANTERIOR e SALDO TOTAL DISPONÍVEL DIA.
 
-- **Valor**: continua sendo validado normalmente (vem da coluna "Valor do Serviço").
-- **Nome e Check-in**: são pulados silenciosamente (o código já trata como "sem informação para comparar", não gera falso-positivo).
+**Identificação do hotel por texto**: mesma normalização já usada nos relatórios do sistema (sem acento, maiúsculas, sem pontuação/ruído), comparando com nome do hotel e nome de propriedade Opera, com tolerância a variação de grafia. Se não casar, a importação avisa quais nomes ficaram sem hotel.
 
-Ou seja: para Serra Talhada, o cruzamento passa a ser essencialmente **RPS + Valor**. Para hotéis cuja prefeitura devolve a descrição completa (padrão que já existia antes), continua sendo **RPS/Confirmação + Nome + Check-in + Valor**.
+**Tabela de referência trx_code_mapping**: campos trx_code, descrição, categoria, ativo. Carga inicial com os 110 códigos da planilha enviada. Editável na tela (ativar/desativar e ajustar categoria). Categorias normalizadas (maiúsculo, sem acento) nos dois lados antes de comparar.
 
-## O que você quer que eu faça
+## Tela 1 — Cartão e PIX (Opera × Adquirente)
 
-Preciso confirmar antes de mexer:
+- Seletor de hotel no topo (usa o filtro global de hotel do sistema).
+- Abas internas: **Não Conciliados**, **Front Caixa X Adquirente** (histórico), **Cartões Conciliados**.
+- Em Não Conciliados: filtro de Data de Conciliação + campo Buscar. (Filtro de Conta Transitória fica para fase seguinte.)
+- Dois quadros lado a lado — Adquirente à esquerda, Front Caixa (Opera) à direita — mostrando somente pendências.
+- Seleção manual com checkbox em cada lado, N:1 permitido; botão **Conciliar** cria o grupo. O sistema nunca concilia sozinho.
+- Rodapé de cada quadro com soma da seleção e, no centro, a diferença em tempo real (verde quando zero).
+- Valores positivos e negativos com cores distintas.
+- Ação por linha do Opera: **Recebido direto no banco** — remove da pendência sem conciliar (reversível).
+- Conciliados saem das pendências e aparecem em Cartões Conciliados (com data, usuário, itens dos dois lados e diferença), com opção de desfazer.
 
-- **(A) Manter como está** — RPS + valor onde não houver descrição; RPS/conf + nome + check-in + valor onde houver.
-- **(B) Reforçar** — validar também check-out quando a descrição existir.
-- **(C) Outra regra** — por exemplo, comparar nome do tomador (que existe na planilha do Serra Talhada, coluna "Nome Tomador") com o nome do hóspede do Opera, para ter mais uma checagem mesmo sem descrição.
+## Tela 2 — PIX × Extrato Bancário
 
-Me diga qual caminho seguir e eu ajusto.
+Mesmo layout e interação da Tela 1:
+- Esquerda: lançamentos do Opera classificados como PIX.
+- Direita: linhas do extrato com "PIX" no Lançamento e valor positivo.
+- Sugestão de par por data + valor apenas como destaque visual; a conciliação continua manual.
+
+## Verificação automática — Faturamento Pago × Extrato
+
+- Para cada lançamento de Faturamento com data de pagamento preenchida, procura no extrato do hotel uma linha com a mesma data e o mesmo valor positivo.
+- Sem correspondência → badge de alerta na tela de Faturamento: "marcado como pago, mas não encontrado no extrato bancário — investigar".
+- Recalcula automaticamente a cada novo extrato importado.
+
+## Exportar Excel
+
+Botão em cada aba das telas de conciliação, respeitando filtros aplicados. Na aba de conciliados, o arquivo inclui soma de cada lado e a diferença.
+
+## Detalhes técnicos
+
+- Novas tabelas: `trx_code_mapping`, `conc_opera_entries`, `conc_acquirer_entries`, `conc_bank_statement_entries`, `conc_uploads`, `conc_matches` + `conc_match_items` (suporta N:1), e flag de "recebido direto no banco" na entrada do Opera. RLS liberando leitura/escrita apenas aos papéis autorizados, com GRANTs.
+- Parsers no cliente (`src/lib/conciliacaoCartaoParser.ts`): XML do Opera via DOMParser, Excel via `xlsx` (padrão já usado em `conciliationParser.ts` e `arReportParser.ts`).
+- Hook `src/hooks/useCardConciliation.ts` para consultas, seleção, conciliação e desfazer.
+- Páginas em `src/pages/conciliacao/` e rotas sob `/financeiro/contas-receber/conciliacao` protegidas por `RoleGuard` com os 4 papéis.
+- Verificação Faturamento × Extrato calculada por consulta no hook de Contas a Receber, exibida como badge na lista de Faturamento.
