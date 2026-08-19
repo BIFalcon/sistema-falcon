@@ -20,6 +20,7 @@ import { ReconcilePanel, Money, fmtDay, exportRows, type ReconcileRow } from "@/
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
+  useAutoReconcile,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch,
 } from "@/hooks/useConciliacaoCartao";
@@ -198,6 +199,7 @@ export default function ConciliacaoCartaoPage() {
   const importOpera = useImportOpera();
   const importAcquirer = useImportAcquirer();
   const importBank = useImportBankStatement();
+  const autoReconcile = useAutoReconcile();
   const uploads = useConcUploads();
   const deleteUpload = useDeleteConcUpload();
   const trxCodes = useTrxCodeMapping();
@@ -445,7 +447,10 @@ export default function ConciliacaoCartaoPage() {
                   onFile={(f) => {
                     if (!hotelId) { toast.error("Selecione o hotel antes de importar o XML do Opera."); return; }
                     importOpera.mutate({ file: f, hotelId }, {
-                      onSuccess: (r) => toast.success(`${r.inserted} transação(ões) importada(s) · ${r.skipped} fora do mapeamento`),
+                      onSuccess: (r) => toast.success(
+                        `${r.inserted} transação(ões) importada(s) · ${r.skipped} fora do mapeamento` +
+                        ` · ${r.autoMatched} conciliada(s) automaticamente`,
+                      ),
                       onError: (e: Error) => toast.error(e.message),
                     });
                   }}
@@ -463,6 +468,7 @@ export default function ConciliacaoCartaoPage() {
                   onFile={(f) => importAcquirer.mutate({ file: f }, {
                     onSuccess: (r) => toast.success(
                       `${r.inserted} venda(s) importada(s) · ${r.skipped} descartada(s)` +
+                      ` · ${r.autoMatched} conciliada(s) automaticamente` +
                       (r.unmatched.length ? ` · sem hotel: ${r.unmatched.slice(0, 3).join(", ")}` : ""),
                     ),
                     onError: (e: Error) => toast.error(e.message),
@@ -479,7 +485,10 @@ export default function ConciliacaoCartaoPage() {
                   accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
                   busy={importBank.isPending}
                   onFile={(f) => importBank.mutate({ file: f, hotelIdOverride: hotelId }, {
-                    onSuccess: (r) => toast.success(`${r.inserted} lançamento(s) importado(s) — ${r.accountName || r.hotelId}`),
+                    onSuccess: (r) => toast.success(
+                      `${r.inserted} lançamento(s) importado(s) — ${r.accountName || r.hotelId}` +
+                      ` · ${r.autoMatched} conciliada(s) automaticamente`,
+                    ),
                     onError: (e: Error) => toast.error(e.message),
                   })}
                 />
@@ -489,6 +498,19 @@ export default function ConciliacaoCartaoPage() {
 
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Últimas importações</CardTitle></CardHeader>
+            <CardContent className="pb-3 pt-0">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={autoReconcile.isPending}
+                onClick={() => autoReconcile.mutate(hotelId, {
+                  onSuccess: (n) => toast.success(n ? `${n} par(es) conciliado(s) automaticamente` : "Nenhum par exato pendente"),
+                  onError: (e: Error) => toast.error(e.message),
+                })}
+              >
+                Rodar conciliação automática
+              </Button>
+            </CardContent>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
