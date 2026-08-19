@@ -20,7 +20,14 @@ export const DRE_LABEL_ALIASES: string[][] = [
   ["Resultado Operacional Bruto (GOP)", "Lucro Operacional Bruto (GOP)", "GOP"],
   ["Receita Bruta Total", "Receita Total Bruta", "RECEITA BRUTA TOTAL", "Total Das Receitas Bruta"],
   ["Receita Líquida Total", "Receita Total Líquida", "RECEITA LÍQUIDA TOTAL"],
-  ["Lucro Líquido", "Resultado Líquido", "Resultado Líquido do Exercício"],
+  [
+    "Lucro Líquido",
+    "Resultado Líquido",
+    "Resultado Líquido do Exercício",
+    "Lucro Líquido / Prejuízo do Exercício",
+    "Lucro/ (Prejuízo) da Sociedade no Exercício",
+    "Resultado Liquido das Operações",
+  ],
 
   // — Receitas —
   ["Receita de Hospedagem", "Receitas de Hospedagem"],
