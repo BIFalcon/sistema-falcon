@@ -486,7 +486,7 @@ export function useUpdateTrxCode() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ativo, categoria }: { id: string; ativo?: boolean; categoria?: string | null }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { ativo?: boolean; categoria?: string | null } = {};
       if (ativo !== undefined) patch.ativo = ativo;
       if (categoria !== undefined) patch.categoria = categoria;
       const { error } = await supabase.from("trx_code_mapping").update(patch).eq("id", id);
