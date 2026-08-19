@@ -27,6 +27,7 @@ import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
+import ConciliacaoCartaoPage from "./pages/conciliacao/ConciliacaoCartaoPage";
 import ConferenciaNotasFiscaisPage from "./pages/ConferenciaNotasFiscaisPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
