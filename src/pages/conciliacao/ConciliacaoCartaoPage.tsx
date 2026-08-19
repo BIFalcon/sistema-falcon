@@ -487,6 +487,7 @@ export default function ConciliacaoCartaoPage() {
                     <TableHead>Hotel</TableHead>
                     <TableHead className="text-right">Importados</TableHead>
                     <TableHead className="text-right">Descartados</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,13 +496,32 @@ export default function ConciliacaoCartaoPage() {
                       <TableCell>{fmtDateTime(u.uploaded_at as string)}</TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px]">{String(u.kind)}</Badge></TableCell>
                       <TableCell className="max-w-[280px] truncate">{String(u.file_name)}</TableCell>
-                      <TableCell>{allowedHotels.find((h) => h.id === u.hotel_id)?.name ?? "—"}</TableCell>
+                      <TableCell>{uploadHotelLabel(u)}</TableCell>
                       <TableCell className="text-right">{Number(u.parsed_count ?? 0)}</TableCell>
                       <TableCell className="text-right">{Number(u.skipped_count ?? 0)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost" size="sm"
+                          className="h-6 text-[11px] text-destructive hover:text-destructive"
+                          disabled={deleteUpload.isPending}
+                          onClick={() => {
+                            if (!window.confirm(`Excluir a importação "${String(u.file_name)}" e todos os lançamentos dela?`)) return;
+                            deleteUpload.mutate(
+                              { id: u.id as string, kind: String(u.kind) },
+                              {
+                                onSuccess: () => toast.success("Importação excluída."),
+                                onError: (e) => toast.error((e as Error).message),
+                              },
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" /> Excluir
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {(uploads.data ?? []).length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">
+                    <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">
                       Nenhuma importação ainda.
                     </TableCell></TableRow>
                   )}
