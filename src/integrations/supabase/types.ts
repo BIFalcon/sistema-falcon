@@ -1150,6 +1150,336 @@ export type Database = {
           },
         ]
       }
+      conc_acquirer_entries: {
+        Row: {
+          amount: number
+          bandeira: string | null
+          categoria: string | null
+          created_at: string
+          entry_key: string
+          establishment_raw: string | null
+          hotel_id: string
+          id: string
+          matched_at: string | null
+          modalidade: string | null
+          raw: Json
+          sale_date: string | null
+          status: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          amount?: number
+          bandeira?: string | null
+          categoria?: string | null
+          created_at?: string
+          entry_key: string
+          establishment_raw?: string | null
+          hotel_id: string
+          id?: string
+          matched_at?: string | null
+          modalidade?: string | null
+          raw?: Json
+          sale_date?: string | null
+          status?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          amount?: number
+          bandeira?: string | null
+          categoria?: string | null
+          created_at?: string
+          entry_key?: string
+          establishment_raw?: string | null
+          hotel_id?: string
+          id?: string
+          matched_at?: string | null
+          modalidade?: string | null
+          raw?: Json
+          sale_date?: string | null
+          status?: string | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_acquirer_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_acquirer_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_bank_entries: {
+        Row: {
+          account_name_raw: string | null
+          amount: number
+          created_at: string
+          description: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          line_date: string | null
+          matched_at: string | null
+          raw: Json
+          upload_id: string | null
+        }
+        Insert: {
+          account_name_raw?: string | null
+          amount?: number
+          created_at?: string
+          description?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          line_date?: string | null
+          matched_at?: string | null
+          raw?: Json
+          upload_id?: string | null
+        }
+        Update: {
+          account_name_raw?: string | null
+          amount?: number
+          created_at?: string
+          description?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          line_date?: string | null
+          matched_at?: string | null
+          raw?: Json
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_bank_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_bank_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_match_items: {
+        Row: {
+          amount: number
+          created_at: string
+          entry_id: string
+          id: string
+          match_id: string
+          side: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          entry_id: string
+          id?: string
+          match_id: string
+          side: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          entry_id?: string
+          id?: string
+          match_id?: string
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_match_items_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "conc_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_matches: {
+        Row: {
+          difference: number
+          hotel_id: string
+          id: string
+          kind: string
+          left_total: number
+          matched_at: string
+          matched_by: string
+          note: string | null
+          right_total: number
+        }
+        Insert: {
+          difference?: number
+          hotel_id: string
+          id?: string
+          kind: string
+          left_total?: number
+          matched_at?: string
+          matched_by: string
+          note?: string | null
+          right_total?: number
+        }
+        Update: {
+          difference?: number
+          hotel_id?: string
+          id?: string
+          kind?: string
+          left_total?: number
+          matched_at?: string
+          matched_by?: string
+          note?: string | null
+          right_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_matches_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_opera_entries: {
+        Row: {
+          amount: number
+          business_date: string | null
+          categoria: string | null
+          created_at: string
+          direct_bank: boolean
+          direct_bank_at: string | null
+          direct_bank_by: string | null
+          entry_key: string
+          guest_full_name: string | null
+          hotel_id: string
+          id: string
+          matched_at: string | null
+          raw: Json
+          receipt_no: string | null
+          room: string | null
+          trx_code: string
+          trx_desc: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          amount?: number
+          business_date?: string | null
+          categoria?: string | null
+          created_at?: string
+          direct_bank?: boolean
+          direct_bank_at?: string | null
+          direct_bank_by?: string | null
+          entry_key: string
+          guest_full_name?: string | null
+          hotel_id: string
+          id?: string
+          matched_at?: string | null
+          raw?: Json
+          receipt_no?: string | null
+          room?: string | null
+          trx_code: string
+          trx_desc?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          amount?: number
+          business_date?: string | null
+          categoria?: string | null
+          created_at?: string
+          direct_bank?: boolean
+          direct_bank_at?: string | null
+          direct_bank_by?: string | null
+          entry_key?: string
+          guest_full_name?: string | null
+          hotel_id?: string
+          id?: string
+          matched_at?: string | null
+          raw?: Json
+          receipt_no?: string | null
+          room?: string | null
+          trx_code?: string
+          trx_desc?: string | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_opera_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_opera_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_uploads: {
+        Row: {
+          file_name: string
+          file_size: number | null
+          hotel_id: string | null
+          id: string
+          kind: string
+          metadata: Json
+          parse_error: string | null
+          parsed_count: number | null
+          skipped_count: number | null
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          file_name: string
+          file_size?: number | null
+          hotel_id?: string | null
+          id?: string
+          kind: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_count?: number | null
+          skipped_count?: number | null
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          file_name?: string
+          file_size?: number | null
+          hotel_id?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          parse_error?: string | null
+          parsed_count?: number | null
+          skipped_count?: number | null
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_uploads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conciliation_journal_lines: {
         Row: {
           categoria: string | null
@@ -2489,6 +2819,36 @@ export type Database = {
         }
         Relationships: []
       }
+      trx_code_mapping: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          trx_code: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          trx_code: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          trx_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_hotels: {
         Row: {
           created_at: string
@@ -2604,6 +2964,7 @@ export type Database = {
         }[]
       }
       be_eight_purge_expired_jti: { Args: never; Returns: number }
+      can_access_conciliacao: { Args: { _user_id: string }; Returns: boolean }
       can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
       can_read_dre_hotel: {
