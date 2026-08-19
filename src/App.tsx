@@ -27,7 +27,6 @@ import IndicadoresDrePage from "./pages/IndicadoresDrePage";
 import PerfilPage from "./pages/PerfilPage";
 import HomePage from "./pages/HomePage";
 import ConciliacaoPage from "./pages/ConciliacaoPage";
-import ConciliacaoCartaoPage from "./pages/conciliacao/ConciliacaoCartaoPage";
 import ConferenciaNotasFiscaisPage from "./pages/ConferenciaNotasFiscaisPage";
 import TurnoverPage from "./pages/rh/TurnoverPage";
 import OrganogramaPage from "./pages/rh/OrganogramaPage";
@@ -164,7 +163,7 @@ const App = () => (
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ContasPagarPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","operacoes","viewer"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
-              <Route path="/financeiro/contas-receber/conciliacao" element={<RoleGuard roles={["controladoria","patronos","fernando"]}><ConciliacaoCartaoPage /></RoleGuard>} />
+              <Route path="/financeiro/contas-receber/conciliacao" element={<Navigate to="/financeiro/contas-receber" replace />} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
               <Route path="/perfil-hotel/contexto" element={<RoleGuard roles={["gg","gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelPage /></RoleGuard>} />

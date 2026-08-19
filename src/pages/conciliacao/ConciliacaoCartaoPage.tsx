@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
@@ -183,7 +182,8 @@ function ConciliadosList({ rows, title, exportName }: { rows: ReconcileRow[]; ti
 
 export default function ConciliacaoCartaoPage() {
   const { allowedHotels } = useAuth();
-  const { hotelId, setHotelId, dateFrom, dateTo, setDateFrom, setDateTo } = useModuleFilters("conciliacao");
+  // Usa os mesmos filtros globais de Contas a Receber (hotel + período do topo).
+  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
 
   const opera = useOperaEntries(hotelId, dateFrom, dateTo);
   const acquirer = useAcquirerEntries(hotelId, dateFrom, dateTo);
@@ -303,35 +303,11 @@ export default function ConciliacaoCartaoPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Conciliação de Cartão, PIX e Extrato</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Opera × Operadora × Extrato bancário — conciliação manual pelo financeiro.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Empresa / Hotel</p>
-            <Select value={hotelId ?? ""} onValueChange={(v) => setHotelId(v || null)}>
-              <SelectTrigger className="h-8 w-[240px] text-xs"><SelectValue placeholder="Selecione o hotel" /></SelectTrigger>
-              <SelectContent>
-                {allowedHotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id} className="text-xs">{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">De</p>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[140px] text-xs" />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Até</p>
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[140px] text-xs" />
-          </div>
-        </div>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Opera × Operadora × Extrato bancário — conciliação manual pelo financeiro.
+        {hotelId ? <> Hotel: <span className="font-medium text-foreground">{hotelName}</span>.</> : null}{" "}
+        Use os filtros de hotel e período no topo da página.
+      </p>
 
       <Tabs defaultValue="cartao">
         <TabsList>
@@ -346,7 +322,7 @@ export default function ConciliacaoCartaoPage() {
         <TabsContent value="cartao" className="mt-4">
           {needsHotel ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Selecione uma empresa/hotel para começar.
+              Selecione um hotel no filtro do topo da página para começar.
             </CardContent></Card>
           ) : (
             <Tabs defaultValue="pendentes">
@@ -390,7 +366,7 @@ export default function ConciliacaoCartaoPage() {
         <TabsContent value="pix" className="mt-4">
           {needsHotel ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Selecione uma empresa/hotel para começar.
+              Selecione um hotel no filtro do topo da página para começar.
             </CardContent></Card>
           ) : (
             <Tabs defaultValue="pendentes">
@@ -451,7 +427,7 @@ export default function ConciliacaoCartaoPage() {
               <CardContent>
                 <DropZone
                   label="Enviar XML do Opera"
-                  hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel acima antes de importar"}
+                  hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel no filtro do topo antes de importar"}
                   accept={{ "application/xml": [".xml"], "text/xml": [".xml"] }}
                   busy={importOpera.isPending}
                   onFile={(f) => {

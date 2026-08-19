@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePaidBankVerification } from "@/hooks/useConciliacaoCartao";
+import ConciliacaoSection from "@/pages/conciliacao/ConciliacaoCartaoPage";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
@@ -265,7 +266,8 @@ export default function ContasReceberPage() {
   // GG/GOP: somente os hotéis da sua cartela
   const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);
-  const [tab, setTab] = useState<"to_invoice" | "open_folio">("to_invoice");
+  const canConciliar = isMaster || isPatronos || isFernando || hasRole("controladoria") || hasRole("financeiro");
+  const [tab, setTab] = useState<"to_invoice" | "open_folio" | "conciliacao">("to_invoice");
 
   return (
     <div className="space-y-6">
@@ -281,6 +283,7 @@ export default function ContasReceberPage() {
         <TabsList>
           <TabsTrigger value="to_invoice">Faturamento</TabsTrigger>
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
+          {canConciliar && <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>}
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
           <ToInvoiceSection
@@ -300,6 +303,11 @@ export default function ContasReceberPage() {
             isGgOnly={isGgOnly}
           />
         </TabsContent>
+        {canConciliar && (
+          <TabsContent value="conciliacao" className="mt-5">
+            <ConciliacaoSection />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
