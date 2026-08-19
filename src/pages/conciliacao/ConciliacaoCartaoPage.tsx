@@ -183,7 +183,8 @@ function ConciliadosList({ rows, title, exportName }: { rows: ReconcileRow[]; ti
 
 export default function ConciliacaoCartaoPage() {
   const { allowedHotels } = useAuth();
-  const { hotelId, setHotelId, dateFrom, dateTo, setDateFrom, setDateTo } = useModuleFilters("conciliacao");
+  // Usa os mesmos filtros globais de Contas a Receber (hotel + período do topo).
+  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
 
   const opera = useOperaEntries(hotelId, dateFrom, dateTo);
   const acquirer = useAcquirerEntries(hotelId, dateFrom, dateTo);
@@ -303,35 +304,11 @@ export default function ConciliacaoCartaoPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Conciliação de Cartão, PIX e Extrato</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Opera × Operadora × Extrato bancário — conciliação manual pelo financeiro.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Empresa / Hotel</p>
-            <Select value={hotelId ?? ""} onValueChange={(v) => setHotelId(v || null)}>
-              <SelectTrigger className="h-8 w-[240px] text-xs"><SelectValue placeholder="Selecione o hotel" /></SelectTrigger>
-              <SelectContent>
-                {allowedHotels.map((h) => (
-                  <SelectItem key={h.id} value={h.id} className="text-xs">{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">De</p>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[140px] text-xs" />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Até</p>
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[140px] text-xs" />
-          </div>
-        </div>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Opera × Operadora × Extrato bancário — conciliação manual pelo financeiro.
+        {hotelId ? <> Hotel: <span className="font-medium text-foreground">{hotelName}</span>.</> : null}{" "}
+        Use os filtros de hotel e período no topo da página.
+      </p>
 
       <Tabs defaultValue="cartao">
         <TabsList>
