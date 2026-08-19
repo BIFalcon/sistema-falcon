@@ -2976,6 +2976,7 @@ export type Database = {
         Returns: boolean
       }
       can_view_rh_directory: { Args: { _user_id: string }; Returns: boolean }
+      conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
