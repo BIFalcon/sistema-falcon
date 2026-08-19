@@ -26,7 +26,6 @@ export const DRE_LABEL_ALIASES: string[][] = [
     "Resultado Líquido do Exercício",
     "Lucro Líquido / Prejuízo do Exercício",
     "Lucro/ (Prejuízo) da Sociedade no Exercício",
-    "Resultado Liquido das Operações",
   ],
 
   // — Receitas —
