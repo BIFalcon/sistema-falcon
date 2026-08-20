@@ -132,48 +132,133 @@ function MatchHistory({ matches, onUndo, undoing, exportName }: {
   );
 }
 
-function ConciliadosList({ rows, title, exportName }: { rows: ReconcileRow[]; title: string; exportName: string }) {
-  const total = rows.reduce((s, r) => s + r.amount, 0);
+const SIDE_LABEL: Record<string, string> = {
+  opera: "Front Caixa (Opera)",
+  acquirer: "Operadora (Adquirente)",
+  bank: "Extrato Bancário",
+};
+
+/** Conciliados: mostra os dois lados da equação de cada conciliação. */
+function ConciliadosPairs({
+  matches, rowById, title, leftSides, exportName, onUndo, undoing,
+}: {
+  matches: ConcMatch[];
+  rowById: Map<string, ReconcileRow>;
+  title: string;
+  leftSides: string[];
+  exportName: string;
+  onUndo: (m: ConcMatch) => void;
+  undoing: boolean;
+}) {
+  const groups = matches.map((m) => {
+    const items = m.conc_match_items.map((i) => ({
+      side: i.side as string,
+      amount: Number(i.amount),
+      row: rowById.get(i.entry_id),
+    }));
+    return {
+      match: m,
+      left: items.filter((i) => leftSides.includes(i.side)),
+      right: items.filter((i) => !leftSides.includes(i.side)),
+    };
+  });
+
+  const leftSum = groups.reduce((s, g) => s + g.left.reduce((a, i) => a + i.amount, 0), 0);
+  const rightSum = groups.reduce((s, g) => s + g.right.reduce((a, i) => a + i.amount, 0), 0);
+
+  const handleExport = () => {
+    const data: Record<string, string | number>[] = [];
+    groups.forEach((g, idx) => {
+      const all = [...g.left.map((i) => ({ ...i, pos: "Esquerda" })), ...g.right.map((i) => ({ ...i, pos: "Direita" }))];
+      for (const i of all) {
+        data.push({
+          "Conciliação": idx + 1,
+          "Conciliado em": fmtDateTime(g.match.matched_at),
+          Lado: i.pos,
+          Origem: SIDE_LABEL[i.side] ?? i.side,
+          Data: fmtDay(i.row?.date ?? null),
+          Descrição: i.row?.title ?? "(lançamento fora do período/filtro)",
+          Detalhe: i.row?.subtitle ?? "",
+          Valor: i.amount,
+        });
+      }
+    });
+    data.push({ "Conciliação": "TOTAL", "Conciliado em": "", Lado: "", Origem: "", Data: "", Descrição: "", Detalhe: "", Valor: leftSum });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Conciliados");
+    XLSX.writeFile(wb, exportName);
+  };
+
+  const ItemList = ({ items }: { items: { side: string; amount: number; row?: ReconcileRow }[] }) => (
+    <ul className="space-y-1">
+      {items.length === 0 && <li className="text-muted-foreground">—</li>}
+      {items.map((i, k) => (
+        <li key={k} className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground tabular-nums">{fmtDay(i.row?.date ?? null)}</span>
+              <span className="font-medium truncate">{i.row?.title ?? "(fora do filtro atual)"}</span>
+            </div>
+            {i.row?.subtitle && <p className="text-muted-foreground truncate">{i.row.subtitle}</p>}
+            <Badge variant="outline" className="mt-0.5 text-[9px] px-1 py-0 h-4">{SIDE_LABEL[i.side] ?? i.side}</Badge>
+          </div>
+          <Money value={i.amount} />
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3 flex-row items-center justify-between gap-2">
         <div>
           <CardTitle className="text-sm">{title}</CardTitle>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {rows.length} lançamento(s) · Total <Money value={total} />
+            {groups.length} conciliação(ões) · Esquerda <Money value={leftSum} /> · Direita <Money value={rightSum} /> · Diferença{" "}
+            <span className="tabular-nums">{fmtBRL(leftSum - rightSum)}</span>
           </p>
         </div>
-        <Button variant="outline" size="sm" className="h-7 text-[11px]"
-          onClick={() => exportRows(rows, exportName, { "TOTAL": total })}>
+        <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={handleExport}>
           <Download className="h-3 w-3 mr-1" /> Exportar Excel
         </Button>
       </CardHeader>
-      <CardContent className="p-0 max-h-[520px] overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="text-[11px]">
-              <TableHead>Data</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Detalhe</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">
-                Nada conciliado ainda.
-              </TableCell></TableRow>
-            )}
-            {rows.map((r) => (
-              <TableRow key={r.id} className="text-[11px]">
-                <TableCell>{fmtDay(r.date)}</TableCell>
-                <TableCell className="font-medium">{r.title}</TableCell>
-                <TableCell className="text-muted-foreground">{r.subtitle}</TableCell>
-                <TableCell className="text-right"><Money value={r.amount} /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <CardContent className="p-0 max-h-[620px] overflow-auto">
+        {groups.length === 0 ? (
+          <p className="py-8 text-center text-xs text-muted-foreground">Nada conciliado ainda.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {groups.map((g) => {
+              const l = g.left.reduce((s, i) => s + i.amount, 0);
+              const r = g.right.reduce((s, i) => s + i.amount, 0);
+              return (
+                <li key={g.match.id} className="p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <span className="text-muted-foreground">
+                      {fmtDateTime(g.match.matched_at)}
+                      {g.match.note ? ` · ${g.match.note}` : ""}
+                    </span>
+                    <span className="flex items-center gap-3">
+                      <span>Diferença: <span className="tabular-nums">{fmtBRL(l - r)}</span></span>
+                      <Button variant="ghost" size="sm" className="h-6 text-[11px]" disabled={undoing} onClick={() => onUndo(g.match)}>
+                        <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+                      </Button>
+                    </span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 text-[11px]">
+                    <div className="rounded-md border p-2">
+                      <p className="mb-1 font-semibold">Lado esquerdo · <Money value={l} /></p>
+                      <ItemList items={g.left} />
+                    </div>
+                    <div className="rounded-md border p-2">
+                      <p className="mb-1 font-semibold">Lado direito · <Money value={r} /></p>
+                      <ItemList items={g.right} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
