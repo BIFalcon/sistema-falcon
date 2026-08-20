@@ -461,7 +461,18 @@ export default function ConciliacaoCartaoPage() {
                 />
               </TabsContent>
               <TabsContent value="conciliados" className="mt-4">
-                <ConciliadosList rows={conciliadosCartao} title="Cartões conciliados" exportName={`cartoes-conciliados-${hotelId}.xlsx`} />
+                <ConciliadosPairs
+                  matches={cardMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["acquirer"]}
+                  title="Cartões conciliados — Adquirente × Front Caixa"
+                  exportName={`cartoes-conciliados-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
               </TabsContent>
             </Tabs>
           )}
@@ -505,23 +516,68 @@ export default function ConciliacaoCartaoPage() {
                 />
               </TabsContent>
               <TabsContent value="conciliados" className="mt-4">
-                <ConciliadosList rows={conciliadosPix} title="PIX conciliados" exportName={`pix-conciliados-${hotelId}.xlsx`} />
+                <ConciliadosPairs
+                  matches={pixMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["opera"]}
+                  title="PIX conciliados — Opera × Extrato Bancário"
+                  exportName={`pix-conciliados-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
               </TabsContent>
             </Tabs>
           )}
         </TabsContent>
 
-        {/* Dinheiro — reservado */}
+        {/* Dinheiro */}
         <TabsContent value="dinheiro" className="mt-4">
-          <Card>
-            <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
-              <Wallet className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm font-medium">Conciliação de Dinheiro</p>
-              <p className="text-xs text-muted-foreground max-w-md">
-                Espaço reservado. As regras de conciliação de dinheiro serão definidas em uma fase seguinte.
-              </p>
-            </CardContent>
-          </Card>
+          {needsHotel ? (
+            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+              Selecione um hotel no filtro do topo da página para começar.
+            </CardContent></Card>
+          ) : (
+            <Tabs defaultValue="pendentes">
+              <TabsList>
+                <TabsTrigger value="pendentes" className="text-[11px]">Não Conciliados</TabsTrigger>
+                <TabsTrigger value="conciliados" className="text-[11px]">Dinheiro Conciliado</TabsTrigger>
+              </TabsList>
+              <TabsContent value="pendentes" className="mt-4">
+                <p className="mb-3 text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Wallet className="h-3 w-3" /> Todo lançamento do Opera com categoria DINHEIRO vem direto para cá
+                  (não aparece na tela de cartão). Concilie com o depósito no extrato bancário.
+                </p>
+                <ReconcilePanel
+                  leftTitle="Front Caixa (Dinheiro)"
+                  leftSubtitle="Opera — transações em dinheiro"
+                  rightTitle="Extrato Bancário"
+                  rightSubtitle="Depósitos / créditos no extrato"
+                  leftRows={operaCashPendentes}
+                  rightRows={bankCashPendentes}
+                  onReconcile={(l, r) => doReconcile("dinheiro")(l, r)}
+                  isReconciling={reconcile.isPending}
+                  exportPrefix={`conciliacao-dinheiro-${hotelId}`}
+                />
+              </TabsContent>
+              <TabsContent value="conciliados" className="mt-4">
+                <ConciliadosPairs
+                  matches={cashMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["opera"]}
+                  title="Dinheiro conciliado — Opera × Extrato Bancário"
+                  exportName={`dinheiro-conciliado-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
         </TabsContent>
 
         {/* Importações */}
