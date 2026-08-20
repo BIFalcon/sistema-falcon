@@ -10,7 +10,7 @@ import {
 } from "@/lib/conciliacaoParsers";
 
 export type ConcSide = "opera" | "acquirer" | "bank";
-export type ConcKind = "cartao" | "pix_extrato";
+export type ConcKind = "cartao" | "pix_extrato" | "dinheiro";
 
 export interface TrxCodeMap {
   id: string;
@@ -453,7 +453,6 @@ const TABLE_BY_SIDE: Record<ConcSide, "conc_opera_entries" | "conc_acquirer_entr
 
 export function useReconcile() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: {
       hotelId: string;
@@ -462,44 +461,20 @@ export function useReconcile() {
       right: { side: ConcSide; id: string; amount: number }[];
       note?: string | null;
     }) => {
-      const leftTotal = input.left.reduce((s, i) => s + i.amount, 0);
-      const rightTotal = input.right.reduce((s, i) => s + i.amount, 0);
-
-      const { data: match, error } = await supabase
-        .from("conc_matches")
-        .insert({
-          hotel_id: input.hotelId,
-          kind: input.kind,
-          left_total: leftTotal,
-          right_total: rightTotal,
-          difference: leftTotal - rightTotal,
-          note: input.note ?? null,
-          matched_by: user!.id,
-        })
-        .select("id")
-        .single();
+      // Operação atômica no banco: evita conciliações pela metade quando a
+      // rede falha no meio (agrupamentos grandes faziam várias requisições).
+      const items = [
+        ...input.left.map((i) => ({ position: "left", side: i.side, id: i.id, amount: i.amount })),
+        ...input.right.map((i) => ({ position: "right", side: i.side, id: i.id, amount: i.amount })),
+      ];
+      const { data, error } = await supabase.rpc("conc_reconcile_manual", {
+        _hotel_id: input.hotelId,
+        _kind: input.kind,
+        _items: items,
+        _note: input.note ?? null,
+      });
       if (error) throw error;
-
-      const items = [...input.left, ...input.right].map((i) => ({
-        match_id: match.id,
-        side: i.side,
-        entry_id: i.id,
-        amount: i.amount,
-      }));
-      const { error: itemsErr } = await supabase.from("conc_match_items").insert(items);
-      if (itemsErr) throw itemsErr;
-
-      const now = new Date().toISOString();
-      for (const side of ["opera", "acquirer", "bank"] as ConcSide[]) {
-        const ids = items.filter((i) => i.side === side).map((i) => i.entry_id);
-        if (!ids.length) continue;
-        const { error: e } = await supabase
-          .from(TABLE_BY_SIDE[side])
-          .update({ matched_at: now })
-          .in("id", ids);
-        if (e) throw e;
-      }
-      return match.id;
+      return data as unknown as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
