@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { fmtBRL, fmtDateTime } from "@/lib/formatters";
-import { ReconcilePanel, Money, fmtDay, exportRows, type ReconcileRow } from "@/components/conciliacao/ReconcilePanel";
+import { ReconcilePanel, Money, fmtDay, type ReconcileRow } from "@/components/conciliacao/ReconcilePanel";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile, useSetDirectBank,
@@ -132,48 +132,133 @@ function MatchHistory({ matches, onUndo, undoing, exportName }: {
   );
 }
 
-function ConciliadosList({ rows, title, exportName }: { rows: ReconcileRow[]; title: string; exportName: string }) {
-  const total = rows.reduce((s, r) => s + r.amount, 0);
+const SIDE_LABEL: Record<string, string> = {
+  opera: "Front Caixa (Opera)",
+  acquirer: "Operadora (Adquirente)",
+  bank: "Extrato Bancário",
+};
+
+/** Conciliados: mostra os dois lados da equação de cada conciliação. */
+function ConciliadosPairs({
+  matches, rowById, title, leftSides, exportName, onUndo, undoing,
+}: {
+  matches: ConcMatch[];
+  rowById: Map<string, ReconcileRow>;
+  title: string;
+  leftSides: string[];
+  exportName: string;
+  onUndo: (m: ConcMatch) => void;
+  undoing: boolean;
+}) {
+  const groups = matches.map((m) => {
+    const items = m.conc_match_items.map((i) => ({
+      side: i.side as string,
+      amount: Number(i.amount),
+      row: rowById.get(i.entry_id),
+    }));
+    return {
+      match: m,
+      left: items.filter((i) => leftSides.includes(i.side)),
+      right: items.filter((i) => !leftSides.includes(i.side)),
+    };
+  });
+
+  const leftSum = groups.reduce((s, g) => s + g.left.reduce((a, i) => a + i.amount, 0), 0);
+  const rightSum = groups.reduce((s, g) => s + g.right.reduce((a, i) => a + i.amount, 0), 0);
+
+  const handleExport = () => {
+    const data: Record<string, string | number>[] = [];
+    groups.forEach((g, idx) => {
+      const all = [...g.left.map((i) => ({ ...i, pos: "Esquerda" })), ...g.right.map((i) => ({ ...i, pos: "Direita" }))];
+      for (const i of all) {
+        data.push({
+          "Conciliação": idx + 1,
+          "Conciliado em": fmtDateTime(g.match.matched_at),
+          Lado: i.pos,
+          Origem: SIDE_LABEL[i.side] ?? i.side,
+          Data: fmtDay(i.row?.date ?? null),
+          Descrição: i.row?.title ?? "(lançamento fora do período/filtro)",
+          Detalhe: i.row?.subtitle ?? "",
+          Valor: i.amount,
+        });
+      }
+    });
+    data.push({ "Conciliação": "TOTAL", "Conciliado em": "", Lado: "", Origem: "", Data: "", Descrição: "", Detalhe: "", Valor: leftSum });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Conciliados");
+    XLSX.writeFile(wb, exportName);
+  };
+
+  const ItemList = ({ items }: { items: { side: string; amount: number; row?: ReconcileRow }[] }) => (
+    <ul className="space-y-1">
+      {items.length === 0 && <li className="text-muted-foreground">—</li>}
+      {items.map((i, k) => (
+        <li key={k} className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground tabular-nums">{fmtDay(i.row?.date ?? null)}</span>
+              <span className="font-medium truncate">{i.row?.title ?? "(fora do filtro atual)"}</span>
+            </div>
+            {i.row?.subtitle && <p className="text-muted-foreground truncate">{i.row.subtitle}</p>}
+            <Badge variant="outline" className="mt-0.5 text-[9px] px-1 py-0 h-4">{SIDE_LABEL[i.side] ?? i.side}</Badge>
+          </div>
+          <Money value={i.amount} />
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3 flex-row items-center justify-between gap-2">
         <div>
           <CardTitle className="text-sm">{title}</CardTitle>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {rows.length} lançamento(s) · Total <Money value={total} />
+            {groups.length} conciliação(ões) · Esquerda <Money value={leftSum} /> · Direita <Money value={rightSum} /> · Diferença{" "}
+            <span className="tabular-nums">{fmtBRL(leftSum - rightSum)}</span>
           </p>
         </div>
-        <Button variant="outline" size="sm" className="h-7 text-[11px]"
-          onClick={() => exportRows(rows, exportName, { "TOTAL": total })}>
+        <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={handleExport}>
           <Download className="h-3 w-3 mr-1" /> Exportar Excel
         </Button>
       </CardHeader>
-      <CardContent className="p-0 max-h-[520px] overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="text-[11px]">
-              <TableHead>Data</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Detalhe</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">
-                Nada conciliado ainda.
-              </TableCell></TableRow>
-            )}
-            {rows.map((r) => (
-              <TableRow key={r.id} className="text-[11px]">
-                <TableCell>{fmtDay(r.date)}</TableCell>
-                <TableCell className="font-medium">{r.title}</TableCell>
-                <TableCell className="text-muted-foreground">{r.subtitle}</TableCell>
-                <TableCell className="text-right"><Money value={r.amount} /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <CardContent className="p-0 max-h-[620px] overflow-auto">
+        {groups.length === 0 ? (
+          <p className="py-8 text-center text-xs text-muted-foreground">Nada conciliado ainda.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {groups.map((g) => {
+              const l = g.left.reduce((s, i) => s + i.amount, 0);
+              const r = g.right.reduce((s, i) => s + i.amount, 0);
+              return (
+                <li key={g.match.id} className="p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <span className="text-muted-foreground">
+                      {fmtDateTime(g.match.matched_at)}
+                      {g.match.note ? ` · ${g.match.note}` : ""}
+                    </span>
+                    <span className="flex items-center gap-3">
+                      <span>Diferença: <span className="tabular-nums">{fmtBRL(l - r)}</span></span>
+                      <Button variant="ghost" size="sm" className="h-6 text-[11px]" disabled={undoing} onClick={() => onUndo(g.match)}>
+                        <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+                      </Button>
+                    </span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 text-[11px]">
+                    <div className="rounded-md border p-2">
+                      <p className="mb-1 font-semibold">Lado esquerdo · <Money value={l} /></p>
+                      <ItemList items={g.left} />
+                    </div>
+                    <div className="rounded-md border p-2">
+                      <p className="mb-1 font-semibold">Lado direito · <Money value={r} /></p>
+                      <ItemList items={g.right} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
@@ -191,6 +276,7 @@ export default function ConciliacaoCartaoPage() {
   const bank = useBankEntries(hotelId, dateFrom, dateTo);
   const cardMatches = useConcMatches(hotelId, "cartao");
   const pixMatches = useConcMatches(hotelId, "pix_extrato");
+  const cashMatches = useConcMatches(hotelId, "dinheiro");
 
   const reconcile = useReconcile();
   const undo = useUndoReconcile();
@@ -248,9 +334,16 @@ export default function ConciliacaoCartaoPage() {
   );
 
   const isPix = (categoria?: string | null) => (categoria ?? "").includes("PIX");
+  const isCash = (categoria?: string | null) => (categoria ?? "").includes("DINHEIRO");
+
+  const rowById = useMemo(() => {
+    const m = new Map<string, ReconcileRow>();
+    for (const r of [...operaRows, ...acquirerRows, ...bankRows]) m.set(r.id, r);
+    return m;
+  }, [operaRows, acquirerRows, bankRows]);
 
   // Tela 1 — pendências (sem par e sem "recebido direto no banco")
-  const operaPendentes = operaRows.filter((r) => {
+  const operaPendentesAll = operaRows.filter((r) => {
     const e = operaById.get(r.id);
     return e && !e.matched_at && !e.direct_bank;
   }).map((r) => {
@@ -273,6 +366,13 @@ export default function ConciliacaoCartaoPage() {
       ),
     };
   });
+  // Dinheiro sai da tela de cartão e vai direto para a aba Dinheiro.
+  const operaPendentes = operaPendentesAll.filter((r) => !isCash(operaById.get(r.id)?.categoria));
+  const operaCashPendentes = operaPendentesAll.filter((r) => isCash(operaById.get(r.id)?.categoria));
+  const bankCashPendentes = bankRows.filter((r) => {
+    const e = (bank.data ?? []).find((b) => b.id === r.id);
+    return e && !e.matched_at && Number(e.amount) > 0;
+  });
   const acquirerPendentes = acquirerRows.filter((r) => !(acquirer.data ?? []).find((e) => e.id === r.id)?.matched_at);
 
   // Tela 2 — PIX do Opera × extrato bancário (linhas com "PIX" e valor positivo)
@@ -281,15 +381,6 @@ export default function ConciliacaoCartaoPage() {
     const e = (bank.data ?? []).find((b) => b.id === r.id);
     return e && !e.matched_at && Number(e.amount) > 0 && (e.description ?? "").toUpperCase().includes("PIX");
   });
-
-  const conciliadosCartao = [
-    ...operaRows.filter((r) => operaById.get(r.id)?.matched_at),
-    ...acquirerRows.filter((r) => (acquirer.data ?? []).find((e) => e.id === r.id)?.matched_at),
-  ];
-  const conciliadosPix = [
-    ...operaRows.filter((r) => operaById.get(r.id)?.matched_at && isPix(operaById.get(r.id)?.categoria)),
-    ...bankRows.filter((r) => (bank.data ?? []).find((e) => e.id === r.id)?.matched_at),
-  ];
 
   const doReconcile = (kind: ConcKind) => (left: ReconcileRow[], right: ReconcileRow[]) => {
     if (!hotelId) return;
@@ -370,7 +461,18 @@ export default function ConciliacaoCartaoPage() {
                 />
               </TabsContent>
               <TabsContent value="conciliados" className="mt-4">
-                <ConciliadosList rows={conciliadosCartao} title="Cartões conciliados" exportName={`cartoes-conciliados-${hotelId}.xlsx`} />
+                <ConciliadosPairs
+                  matches={cardMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["acquirer"]}
+                  title="Cartões conciliados — Adquirente × Front Caixa"
+                  exportName={`cartoes-conciliados-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
               </TabsContent>
             </Tabs>
           )}
@@ -414,23 +516,68 @@ export default function ConciliacaoCartaoPage() {
                 />
               </TabsContent>
               <TabsContent value="conciliados" className="mt-4">
-                <ConciliadosList rows={conciliadosPix} title="PIX conciliados" exportName={`pix-conciliados-${hotelId}.xlsx`} />
+                <ConciliadosPairs
+                  matches={pixMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["opera"]}
+                  title="PIX conciliados — Opera × Extrato Bancário"
+                  exportName={`pix-conciliados-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
               </TabsContent>
             </Tabs>
           )}
         </TabsContent>
 
-        {/* Dinheiro — reservado */}
+        {/* Dinheiro */}
         <TabsContent value="dinheiro" className="mt-4">
-          <Card>
-            <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
-              <Wallet className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm font-medium">Conciliação de Dinheiro</p>
-              <p className="text-xs text-muted-foreground max-w-md">
-                Espaço reservado. As regras de conciliação de dinheiro serão definidas em uma fase seguinte.
-              </p>
-            </CardContent>
-          </Card>
+          {needsHotel ? (
+            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+              Selecione um hotel no filtro do topo da página para começar.
+            </CardContent></Card>
+          ) : (
+            <Tabs defaultValue="pendentes">
+              <TabsList>
+                <TabsTrigger value="pendentes" className="text-[11px]">Não Conciliados</TabsTrigger>
+                <TabsTrigger value="conciliados" className="text-[11px]">Dinheiro Conciliado</TabsTrigger>
+              </TabsList>
+              <TabsContent value="pendentes" className="mt-4">
+                <p className="mb-3 text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Wallet className="h-3 w-3" /> Todo lançamento do Opera com categoria DINHEIRO vem direto para cá
+                  (não aparece na tela de cartão). Concilie com o depósito no extrato bancário.
+                </p>
+                <ReconcilePanel
+                  leftTitle="Front Caixa (Dinheiro)"
+                  leftSubtitle="Opera — transações em dinheiro"
+                  rightTitle="Extrato Bancário"
+                  rightSubtitle="Depósitos / créditos no extrato"
+                  leftRows={operaCashPendentes}
+                  rightRows={bankCashPendentes}
+                  onReconcile={(l, r) => doReconcile("dinheiro")(l, r)}
+                  isReconciling={reconcile.isPending}
+                  exportPrefix={`conciliacao-dinheiro-${hotelId}`}
+                />
+              </TabsContent>
+              <TabsContent value="conciliados" className="mt-4">
+                <ConciliadosPairs
+                  matches={cashMatches.data ?? []}
+                  rowById={rowById}
+                  leftSides={["opera"]}
+                  title="Dinheiro conciliado — Opera × Extrato Bancário"
+                  exportName={`dinheiro-conciliado-${hotelId}.xlsx`}
+                  onUndo={(m) => undo.mutate(m, {
+                    onSuccess: () => toast.success("Conciliação desfeita"),
+                    onError: (e: Error) => toast.error(e.message),
+                  })}
+                  undoing={undo.isPending}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
         </TabsContent>
 
         {/* Importações */}
