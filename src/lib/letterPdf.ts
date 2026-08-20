@@ -20,7 +20,7 @@ import { MONTHS_PT } from "@/lib/constants";
 import type { IndicatorKey } from "@/lib/dreParser";
 import type { LetterHistory, MonthDatum } from "@/lib/letterHistory";
 import { fetchLetterHistory, fetchDreLines } from "@/lib/letterHistory";
-import { getHighlightPhotoDataUrl } from "@/hooks/useLetter";
+import { getHighlightPhotoDataUrl, getHighlightPhotoUrl } from "@/hooks/useLetter";
 
 const SIZE = 210; // mm
 const NAVY = "#0E2A47";
@@ -723,17 +723,27 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
 
   // Baixa as fotos dos destaques como DataURL via SDK do Supabase.
   // Evita falhas intermitentes de CORS ao carregar a signed URL em <img>.
-  const highlightDataUrls = await Promise.all(
-    highlights.map((h) => h.photo_url ? getHighlightPhotoDataUrl(h.photo_url) : Promise.resolve(null)),
+  // Se o download via SDK falhar (rede/RLS/cache), tenta a signed URL como fallback
+  // para não perder a foto no PDF.
+  const highlightImgsResolved = await Promise.all(
+    highlights.map(async (h) => {
+      if (!h.photo_url) return null;
+      const dataUrl = await getHighlightPhotoDataUrl(h.photo_url).catch(() => null);
+      const fromData = await loadImageFromDataUrl(dataUrl);
+      if (fromData) return fromData;
+      const signed = await getHighlightPhotoUrl(h.photo_url).catch(() => null);
+      return await loadImage(signed);
+    }),
   );
 
   // Carrega imagens
-  const [coverImg, brandLogoImg, falconLogoImg, ...highlightImgs] = await Promise.all([
+  const [coverImg, brandLogoImg, falconLogoImg] = await Promise.all([
     loadImage(hotelCoverUrl),
     loadImage(brandLogoUrl),
     loadImage(falconLogoUrl),
-    ...highlightDataUrls.map((d) => loadImageFromDataUrl(d)),
   ]);
+  const highlightImgs = highlightImgsResolved;
+
 
   const coverData = coverImg ? imageToDataUrl(coverImg, 1800, "jpeg") : null;
   // Logos como PNG (preserva transparência — sem fundo preto/branco)
