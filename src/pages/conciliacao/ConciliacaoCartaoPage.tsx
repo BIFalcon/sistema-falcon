@@ -276,6 +276,7 @@ export default function ConciliacaoCartaoPage() {
   const bank = useBankEntries(hotelId, dateFrom, dateTo);
   const cardMatches = useConcMatches(hotelId, "cartao");
   const pixMatches = useConcMatches(hotelId, "pix_extrato");
+  const cashMatches = useConcMatches(hotelId, "dinheiro");
 
   const reconcile = useReconcile();
   const undo = useUndoReconcile();
@@ -333,9 +334,16 @@ export default function ConciliacaoCartaoPage() {
   );
 
   const isPix = (categoria?: string | null) => (categoria ?? "").includes("PIX");
+  const isCash = (categoria?: string | null) => (categoria ?? "").includes("DINHEIRO");
+
+  const rowById = useMemo(() => {
+    const m = new Map<string, ReconcileRow>();
+    for (const r of [...operaRows, ...acquirerRows, ...bankRows]) m.set(r.id, r);
+    return m;
+  }, [operaRows, acquirerRows, bankRows]);
 
   // Tela 1 — pendências (sem par e sem "recebido direto no banco")
-  const operaPendentes = operaRows.filter((r) => {
+  const operaPendentesAll = operaRows.filter((r) => {
     const e = operaById.get(r.id);
     return e && !e.matched_at && !e.direct_bank;
   }).map((r) => {
@@ -358,6 +366,13 @@ export default function ConciliacaoCartaoPage() {
       ),
     };
   });
+  // Dinheiro sai da tela de cartão e vai direto para a aba Dinheiro.
+  const operaPendentes = operaPendentesAll.filter((r) => !isCash(operaById.get(r.id)?.categoria));
+  const operaCashPendentes = operaPendentesAll.filter((r) => isCash(operaById.get(r.id)?.categoria));
+  const bankCashPendentes = bankRows.filter((r) => {
+    const e = (bank.data ?? []).find((b) => b.id === r.id);
+    return e && !e.matched_at && Number(e.amount) > 0;
+  });
   const acquirerPendentes = acquirerRows.filter((r) => !(acquirer.data ?? []).find((e) => e.id === r.id)?.matched_at);
 
   // Tela 2 — PIX do Opera × extrato bancário (linhas com "PIX" e valor positivo)
@@ -366,15 +381,6 @@ export default function ConciliacaoCartaoPage() {
     const e = (bank.data ?? []).find((b) => b.id === r.id);
     return e && !e.matched_at && Number(e.amount) > 0 && (e.description ?? "").toUpperCase().includes("PIX");
   });
-
-  const conciliadosCartao = [
-    ...operaRows.filter((r) => operaById.get(r.id)?.matched_at),
-    ...acquirerRows.filter((r) => (acquirer.data ?? []).find((e) => e.id === r.id)?.matched_at),
-  ];
-  const conciliadosPix = [
-    ...operaRows.filter((r) => operaById.get(r.id)?.matched_at && isPix(operaById.get(r.id)?.categoria)),
-    ...bankRows.filter((r) => (bank.data ?? []).find((e) => e.id === r.id)?.matched_at),
-  ];
 
   const doReconcile = (kind: ConcKind) => (left: ReconcileRow[], right: ReconcileRow[]) => {
     if (!hotelId) return;
