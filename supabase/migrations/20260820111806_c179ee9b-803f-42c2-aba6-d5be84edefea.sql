@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.conc_reconcile_manual(text, text, jsonb, text) FROM anon;
