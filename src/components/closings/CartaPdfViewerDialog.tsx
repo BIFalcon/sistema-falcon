@@ -10,9 +10,11 @@ interface Props {
   pdfPath: string | null | undefined;
   versionLabel?: string;
   onDownload?: () => void;
+  /** Opcional: gera o PDF na hora (layout atual) em vez de exibir o arquivo salvo. */
+  buildBlob?: () => Promise<Blob | null>;
 }
 
-export function CartaPdfViewerDialog({ open, onOpenChange, pdfPath, versionLabel, onDownload }: Props) {
+export function CartaPdfViewerDialog({ open, onOpenChange, pdfPath, versionLabel, onDownload, buildBlob }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,19 +22,38 @@ export function CartaPdfViewerDialog({ open, onOpenChange, pdfPath, versionLabel
   useEffect(() => {
     if (!open || !pdfPath) return;
     let cancelled = false;
+    let objectUrl: string | null = null;
     setLoading(true);
     setError(null);
     setUrl(null);
-    getLetterPdfSignedUrl(pdfPath)
-      .then((u) => {
-        if (cancelled) return;
-        if (!u) setError("Não foi possível gerar o link de visualização.");
-        else setUrl(u);
-      })
-      .catch(() => !cancelled && setError("Não foi possível gerar o link de visualização."))
-      .finally(() => !cancelled && setLoading(false));
-    return () => { cancelled = true; };
+    (async () => {
+      // 1) tenta gerar o PDF na hora, garantindo o layout mais recente para todos
+      if (buildBlob) {
+        try {
+          const blob = await buildBlob();
+          if (cancelled) return;
+          if (blob) {
+            objectUrl = URL.createObjectURL(blob);
+            setUrl(objectUrl);
+            setLoading(false);
+            return;
+          }
+        } catch { /* cai para o arquivo salvo */ }
+      }
+      // 2) fallback: arquivo salvo no storage
+      const u = await getLetterPdfSignedUrl(pdfPath).catch(() => null);
+      if (cancelled) return;
+      if (!u) setError("Não foi possível gerar o link de visualização.");
+      else setUrl(u);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pdfPath]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

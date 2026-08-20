@@ -421,11 +421,35 @@ export default function CartaPage() {
     }
   }
 
+  /** Gera o PDF na hora (layout atual) e, se falhar, cai para o arquivo salvo. */
+  async function buildFreshPdfBlob(): Promise<Blob | null> {
+    if (!letter || !closing || !assetsReady) return null;
+    try {
+      const [hotelCoverUrl, brandLogoUrl] = await Promise.all([
+        getSignedPrivateUrl(hotelRow?.cover_url ?? null, "hotel-assets"),
+        getSignedPrivateUrl(hotelRow?.brand_logo_url ?? null, "hotel-assets"),
+      ]);
+      return await generateLetterPdf({
+        letter,
+        closing,
+        hotel,
+        hotelCoverUrl,
+        brandLogoUrl,
+        falconLogoUrl: falconLogoUrl ?? null,
+        highlights,
+        indicators: indicatorMap,
+        previousIndicators: prevIndicatorMap,
+      });
+    } catch {
+      return null;
+    }
+  }
+
   async function handleDownloadPdf() {
     if (!letter?.pdf_url) return;
     const filename = letter.pdf_url.split("/").pop() ?? "carta-investidor.pdf";
     try {
-      const blob = await downloadLetterPdfBlob(letter.pdf_url);
+      const blob = (await buildFreshPdfBlob()) ?? (await downloadLetterPdfBlob(letter.pdf_url));
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
@@ -439,6 +463,7 @@ export default function CartaPage() {
       toast.error(e instanceof Error ? e.message : "Não foi possível baixar o PDF");
     }
   }
+
 
   return (
     <div className="space-y-6">
@@ -661,6 +686,8 @@ export default function CartaPage() {
         pdfPath={letter?.pdf_url}
         versionLabel={letter?.pdf_version ? `v${letter.pdf_version}` : undefined}
         onDownload={handleDownloadPdf}
+        buildBlob={buildFreshPdfBlob}
+
       />
     </div>
   );
