@@ -1068,11 +1068,49 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
         if (img) {
           drawContainedPhoto(doc, img, x, photoY, colW, photoH);
         } else {
-          doc.setFillColor("#F3F4F6");
+          // Sem foto: usa o espaço para exibir a observação escrita pelo gerente.
+          doc.setFillColor("#F8FAFC");
           doc.rect(x, photoY, colW, photoH, "F");
-          doc.setTextColor(MUTED);
-          doc.setFontSize(emptyFontSize);
-          doc.text("(sem foto)", x + colW / 2, photoY + photoH / 2, { align: "center" });
+          doc.setDrawColor(BORDER);
+          doc.setLineWidth(0.3);
+          doc.rect(x, photoY, colW, photoH, "S");
+          const note = (h.note || "").trim();
+          if (note) {
+            const padX = 3;
+            const padY = 3;
+            const maxW = colW - padX * 2;
+            const maxH = photoH - padY * 2;
+            // Ajuste automático do corpo de texto para caber na célula.
+            let size = emptyFontSize;
+            let noteLines: string[] = [];
+            let lineH = 0;
+            const minSize = 4.6;
+            doc.setFont("helvetica", "normal");
+            while (size >= minSize) {
+              doc.setFontSize(size);
+              lineH = (size * 1.25) / doc.internal.scaleFactor;
+              noteLines = doc.splitTextToSize(note, maxW) as string[];
+              if (noteLines.length * lineH <= maxH) break;
+              size -= 0.3;
+            }
+            // Se ainda não couber no tamanho mínimo, corta com elipse.
+            const maxLines = Math.max(1, Math.floor(maxH / lineH));
+            if (noteLines.length > maxLines) {
+              noteLines = noteLines.slice(0, maxLines);
+              noteLines[maxLines - 1] = noteLines[maxLines - 1].replace(/\s*\S*$/, "") + "…";
+            }
+            doc.setTextColor(TEXT);
+            const blockH2 = noteLines.length * lineH;
+            let ty = photoY + Math.max(padY, (photoH - blockH2) / 2) + lineH * 0.78;
+            for (const ln of noteLines) {
+              doc.text(ln, x + padX, ty);
+              ty += lineH;
+            }
+          } else {
+            doc.setTextColor(MUTED);
+            doc.setFontSize(emptyFontSize);
+            doc.text("(sem foto)", x + colW / 2, photoY + photoH / 2, { align: "center" });
+          }
         }
       }
     }
