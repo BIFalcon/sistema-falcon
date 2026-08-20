@@ -686,6 +686,8 @@ export default function CartaPage() {
         pdfPath={letter?.pdf_url}
         versionLabel={letter?.pdf_version ? `v${letter.pdf_version}` : undefined}
         onDownload={handleDownloadPdf}
+        buildBlob={buildFreshPdfBlob}
+
       />
     </div>
   );
