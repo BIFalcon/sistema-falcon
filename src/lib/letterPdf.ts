@@ -864,25 +864,28 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   const recChart = drawLineChart("Receita Total Bruta", trimmedCurrent, trimmedPrevious, "receita_bruta_total", (v) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`, { w: cardW - 6, h: recH - 6 });
   doc.addImage(recChart, "PNG", 15, HEADER_CONTENT_Y + 3, cardW - 6, recH - 6);
 
-  // dois cards lado a lado — borda na MESMA cor do gráfico (BORDER cinza claro)
+  // cards: Fundo de Reserva só aparece se houver valor > 0; senão RPS centralizado
+  const showReserve = !!letter.reserve_fund && Number(letter.reserve_fund) > 0;
   const cw = (SIZE - 30) / 2, ch = 64, cy = HEADER_CONTENT_Y + recH + 6;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
-  // Fundo de Reserva
-  doc.roundedRect(12, cy, cw, ch, 2, 2, "S");
-  doc.setTextColor(NAVY);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
-  drawGoldDollarIcon(doc, 12 + cw / 2, cy + 30);
-  // valor (maior)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(NAVY);
-  doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 50, { align: "center" });
+  if (showReserve) {
+    // Fundo de Reserva
+    doc.roundedRect(12, cy, cw, ch, 2, 2, "S");
+    doc.setTextColor(NAVY);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Fundo de Reserva", 12 + cw / 2, cy + 12, { align: "center" });
+    drawGoldDollarIcon(doc, 12 + cw / 2, cy + 30);
+    // valor (maior)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(NAVY);
+    doc.text(fmtBRL0(letter.reserve_fund), 12 + cw / 2, cy + 50, { align: "center" });
+  }
 
   // RPS
-  const rx = 12 + cw + 6;
+  const rx = showReserve ? 12 + cw + 6 : (SIZE - cw) / 2;
   doc.setDrawColor(BORDER);
   doc.setLineWidth(0.4);
   doc.roundedRect(rx, cy, cw, ch, 2, 2, "S");
@@ -901,6 +904,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   doc.setTextColor(NAVY);
   const rpsTxt = letter.rps_score != null ? `${letter.rps_score}%` : "—";
   doc.text(rpsTxt, rx + cw / 2, cy + 50, { align: "center" });
+
 
   /* ───── 4. COMENTÁRIOS DO MÊS ───── */
   addPage(doc);
