@@ -1223,13 +1223,22 @@ function drawDreTable(
     { kind: "highlight", label: "Distribuição por UH", rx: [/^por\s+uh$/i, /^distribui[çc][ãa]o\s+por\s+uh$/i, /^distribui[çc][ãa]o\s+\/\s*uh$/i, /^resultado\s+por\s+uh$/i, /^dividendo\s+efetivamente\s+distribu[íi]do/i, /^distribui[çc][ãa]o\s+linear/i] },
   ];
 
+  // Prioriza a ORDEM DOS PADRÕES, não a ordem das linhas da DRE: o primeiro
+  // regex da lista é o rótulo preferencial (ex.: "Receita Bruta de Serviços"),
+  // e só caímos nos alternativos (ex.: "Receita de Hospedagem") quando o
+  // preferencial não existe naquele template.
   const findValue = (rxs: RegExp[]): number | null => {
-    for (const l of lines) {
-      const lbl = l.label.replace(/^\[\w+\]\s*/, "").trim();
-      if (rxs.some((rx) => rx.test(lbl))) return l.value;
+    const cleaned = lines.map((l) => ({
+      lbl: l.label.replace(/^\[\w+\]\s*/, "").trim(),
+      value: l.value,
+    }));
+    for (const rx of rxs) {
+      const hit = cleaned.find((l) => rx.test(l.lbl));
+      if (hit) return hit.value;
     }
     return null;
   };
+
 
   const fmtVal = (v: number | null) =>
     v == null
