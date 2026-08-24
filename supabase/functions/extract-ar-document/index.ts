@@ -32,14 +32,10 @@ function digitsOnly(value: unknown): string | null {
   return d || null;
 }
 
-async function callAi(
-  apiKey: string,
-  kind: "nota" | "boleto",
-  dataUrl: string,
-  mime: string,
-) {
-  const sys = kind === "boleto"
-    ? `Você lê BOLETOS bancários brasileiros (qualquer banco). Devolva SOMENTE JSON:
+async function callAi(apiKey: string, kind: "nota" | "boleto", dataUrl: string, mime: string) {
+  const sys =
+    kind === "boleto"
+      ? `Você lê BOLETOS bancários brasileiros (qualquer banco). Devolva SOMENTE JSON:
 {
   "boleto_number": "string com o NÚMERO DO DOCUMENTO do título | null",
   "due_date": "YYYY-MM-DD (campo Vencimento) | null",
@@ -51,7 +47,7 @@ REGRA CRÍTICA para boleto_number:
 - NUNCA use o "Nosso Número" (Nosso Nº / Nosso numero) — esse é o número interno do banco e NÃO é o que queremos.
 - Se houver ambos no boleto, escolha "Núm. do documento". Só caia para "Nosso Número" se realmente não existir o campo "Núm. do documento".
 Sem comentários. Datas em ISO. Se não conseguir ler, use null.`
-    : `Você lê NOTAS FISCAIS brasileiras (NF-e, NFS-e, recibo). Devolva SOMENTE JSON:
+      : `Você lê NOTAS FISCAIS brasileiras (NF-e, NFS-e, recibo). Devolva SOMENTE JSON:
 {
   "nota_number": "número da nota fiscal (apenas o número) | null",
   "issue_date": "YYYY-MM-DD (data de emissão) | null",
@@ -82,7 +78,10 @@ Sem comentários. Datas em ISO. Se não conseguir ler, use null.`;
         {
           role: "user",
           content: [
-            { type: "text", text: `Extraia os campos do ${label} em anexo. Responda SOMENTE com o JSON, sem texto antes ou depois.` },
+            {
+              type: "text",
+              text: `Extraia os campos do ${label} em anexo. Responda SOMENTE com o JSON, sem texto antes ou depois.`,
+            },
             contentBlock,
           ],
         },
@@ -97,11 +96,17 @@ Sem comentários. Datas em ISO. Se não conseguir ler, use null.`;
   const j = await res.json();
   const content = j?.content?.[0]?.text ?? "";
   const cleaned = content.replace(/```json\s*|```/g, "").trim();
-  try { return { parsed: JSON.parse(cleaned) }; }
-  catch { return { error: "parse_error", text: content.slice(0, 300) }; }
+  try {
+    return { parsed: JSON.parse(cleaned) };
+  } catch {
+    return { error: "parse_error", text: content.slice(0, 300) };
+  }
 }
 
-async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: string; mime: string } | { error: string }> {
+async function fetchFileAsDataUrl(
+  admin: any,
+  path: string,
+): Promise<{ dataUrl: string; mime: string } | { error: string }> {
   // Only allow storage-bucket keys; never fetch arbitrary URLs (SSRF protection).
   if (/:\/\//.test(path) || path.startsWith("/") || path.includes("..")) {
     return { error: "invalid_path" };
@@ -111,9 +116,7 @@ async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: 
   let mime = (data as Blob).type || "";
   if (!mime || mime === "application/octet-stream") {
     const ext = path.split(".").pop()?.toLowerCase();
-    mime = ext === "png" ? "image/png"
-      : ext === "jpg" || ext === "jpeg" ? "image/jpeg"
-      : "application/pdf";
+    mime = ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "application/pdf";
   }
   const buf = new Uint8Array(await (data as Blob).arrayBuffer());
   return { dataUrl: `data:${mime};base64,${bytesToBase64(buf)}`, mime };
@@ -132,7 +135,9 @@ Deno.serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user } } = await userClient.auth.getUser();
+    const {
+      data: { user },
+    } = await userClient.auth.getUser();
     if (!user) return json({ error: "unauthorized" }, 401);
 
     const body = await req.json();
@@ -145,7 +150,10 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: entry, error: entryErr } = await admin
-      .from("ar_to_invoice_entries").select("id,hotel_id").eq("id", entryId).maybeSingle();
+      .from("ar_to_invoice_entries")
+      .select("id,hotel_id")
+      .eq("id", entryId)
+      .maybeSingle();
     if (entryErr || !entry) return json({ error: "entry_not_found" }, 404);
 
     const { data: allowed } = await admin.rpc("is_hotel_allowed", { _user_id: user.id, _hotel_id: entry.hotel_id });
@@ -169,10 +177,13 @@ Deno.serve(async (req) => {
     }
 
     if (!aiKey) {
-      await admin.from("ar_to_invoice_entries").update({
-        doc_extraction_status: "pending",
-        doc_extraction_details: { reason: "no_ai_key" },
-      }).eq("id", entryId);
+      await admin
+        .from("ar_to_invoice_entries")
+        .update({
+          doc_extraction_status: "pending",
+          doc_extraction_details: { reason: "no_ai_key" },
+        })
+        .eq("id", entryId);
       return json({ ok: true, status: "pending" });
     }
 
@@ -212,9 +223,7 @@ Deno.serve(async (req) => {
     }
 
     const gotSomething =
-      update.nota_number !== undefined ||
-      update.boleto_number !== undefined ||
-      update.boleto_due_date !== undefined;
+      update.nota_number !== undefined || update.boleto_number !== undefined || update.boleto_due_date !== undefined;
     update.doc_extraction_status = gotSomething ? "ok" : "pending";
     update.doc_extraction_details = details;
 
