@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "claude-haiku-4-5-20251001";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -33,7 +33,7 @@ function digitsOnly(value: unknown): string | null {
 }
 
 async function callAi(
-  aiKey: string,
+  apiKey: string,
   kind: "nota" | "boleto",
   dataUrl: string,
   mime: string,
@@ -61,43 +61,44 @@ Sem comentários. Datas em ISO. Se não conseguir ler, use null.`;
 
   const isPdf = /pdf/i.test(mime);
   const label = kind === "boleto" ? "boleto" : "nota fiscal";
-  // PDFs precisam ir como anexo de arquivo; imagens vão como image_url.
-  const attachments: unknown[] = isPdf
-    ? [
-        { type: "file", file: { filename: `${kind}.pdf`, file_data: dataUrl } },
-        { type: "image_url", image_url: { url: dataUrl } },
-      ]
-    : [{ type: "image_url", image_url: { url: dataUrl } }];
+  const base64Data = dataUrl.split(",")[1] ?? "";
 
-  let lastError: { error: string; text?: string } | null = null;
-  let j: any = null;
-  for (const att of attachments) {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
-      body: JSON.stringify({
-        model: MODEL,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: `Extraia os campos do ${label} em anexo.` },
-              att,
-            ],
-          },
-        ],
-      }),
-    });
-    if (res.ok) { j = await res.json(); lastError = null; break; }
+  const contentBlock = isPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Data } }
+    : { type: "image", source: { type: "base64", media_type: mime, data: base64Data } };
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1024,
+      system: sys,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Extraia os campos do ${label} em anexo. Responda SOMENTE com o JSON, sem texto antes ou depois.` },
+            contentBlock,
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
     const txt = await res.text();
-    lastError = { error: `ai_${res.status}`, text: txt.slice(0, 300) };
+    return { error: `ai_${res.status}`, text: txt.slice(0, 300) };
   }
-  if (!j) return lastError ?? { error: "ai_failed" };
-  const content = j?.choices?.[0]?.message?.content;
-  try { return { parsed: JSON.parse(content ?? "{}") }; }
-  catch { return { error: "parse_error", text: String(content).slice(0, 300) }; }
+  const j = await res.json();
+  const content = j?.content?.[0]?.text ?? "";
+  const cleaned = content.replace(/```json\s*|```/g, "").trim();
+  try { return { parsed: JSON.parse(cleaned) }; }
+  catch { return { error: "parse_error", text: content.slice(0, 300) }; }
 }
 
 async function fetchFileAsDataUrl(admin: any, path: string): Promise<{ dataUrl: string; mime: string } | { error: string }> {
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const aiKey = Deno.env.get("LOVABLE_API_KEY");
+    const aiKey = Deno.env.get("ANTHROPIC_API_KEY");
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
