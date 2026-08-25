@@ -140,8 +140,15 @@ function periodMonths(endMonth: number, periodMonths: number): number[] {
   if (endMonth === 0 || periodMonths >= 12) {
     return Array.from({ length: 12 }, (_, i) => i + 1);
   }
-  const start = Math.max(1, endMonth - periodMonths + 1);
-  return Array.from({ length: endMonth - start + 1 }, (_, i) => start + i);
+  let start = Math.max(1, endMonth - periodMonths + 1);
+  let end = endMonth;
+  // Se não houver meses suficientes pra trás, estende pra frente
+  // (nunca ultrapassando dezembro) em vez de encolher a janela.
+  const short = periodMonths - (end - start + 1);
+  if (short > 0) {
+    end = Math.min(12, end + short);
+  }
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 
 function aggregateSeries(
