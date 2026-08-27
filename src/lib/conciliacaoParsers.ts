@@ -221,6 +221,7 @@ export interface AcquirerRow {
   modalidade: string;
   categoria: string;
   status: string;
+  cnpj: string;
 }
 
 const findCol = (header: string[], ...names: string[]): number => {
@@ -235,10 +236,18 @@ const findCol = (header: string[], ...names: string[]): number => {
   return -1;
 };
 
+export const onlyDigits = (v: unknown): string => String(v ?? "").replace(/\D/g, "");
+
+/**
+ * Planilha da operadora (Rede). O financeiro sempre envia um arquivo com
+ * vários hotéis; o hotel é identificado pelo CNPJ da linha comparado ao CNPJ
+ * do hotel selecionado no filtro global — as demais linhas são descartadas.
+ */
 export async function parseAcquirerExcel(
   file: File,
   hotels: HotelRef[],
-): Promise<{ rows: AcquirerRow[]; skipped: number; unmatched: string[] }> {
+  target?: { id: string; cnpj?: string | null } | null,
+): Promise<{ rows: AcquirerRow[]; skipped: number; unmatched: string[]; otherHotels: number }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
@@ -255,34 +264,56 @@ export async function parseAcquirerExcel(
   const iModalidade = findCol(header, "modalidade");
   const iDate = findCol(header, "data da venda", "data");
   const iEstab = findCol(header, "nome do estabelecimento", "estabelecimento");
+  const iCnpj = findCol(header, "cnpj do estabelecimento", "cnpj cpf", "cnpj");
 
   if (iStatus === -1 || iAmount === -1 || iDate === -1) {
     throw new Error("Cabeçalho da operadora não reconhecido (esperado na 2ª linha).");
+  }
+
+  const targetCnpj = onlyDigits(target?.cnpj);
+  if (target && iCnpj !== -1 && !targetCnpj) {
+    throw new Error("O hotel selecionado não possui CNPJ cadastrado — cadastre o CNPJ para importar a planilha da operadora.");
   }
 
   const rows: AcquirerRow[] = [];
   const occ = makeOccCounter();
   const unmatched = new Set<string>();
   let skipped = 0;
+  let otherHotels = 0;
 
   for (const r of grid.slice(headerIdx + 1)) {
     const status = normText(r[iStatus]);
     if (!status) continue;
+
+    const cnpj = iCnpj !== -1 ? onlyDigits(r[iCnpj]) : "";
+    const estab = String(r[iEstab] ?? "").trim();
+
+    // Identificação por CNPJ contra o hotel selecionado; linhas de outros
+    // hotéis são simplesmente descartadas.
+    let hotelId: string | null = null;
+    if (target && iCnpj !== -1) {
+      if (!cnpj || cnpj !== targetCnpj) { otherHotels++; continue; }
+      hotelId = target.id;
+    } else if (target) {
+      hotelId = target.id;
+    } else {
+      hotelId = matchHotelByText(estab, hotels);
+    }
+
     if (!(status.includes("APROVADA") || status.includes("PAGO"))) {
       skipped++;
       continue;
     }
-    const amount = parseMoney(r[iAmount]);
-    const saleDate = toIso(r[iDate]);
-    const bandeira = String(r[iBandeira] ?? "").trim();
-    const modalidade = String(r[iModalidade] ?? "").trim();
-    const estab = String(r[iEstab] ?? "").trim();
-    const hotelId = matchHotelByText(estab, hotels);
     if (!hotelId) {
       if (estab) unmatched.add(estab);
       skipped++;
       continue;
     }
+
+    const amount = parseMoney(r[iAmount]);
+    const saleDate = toIso(r[iDate]);
+    const bandeira = String(r[iBandeira] ?? "").trim();
+    const modalidade = String(r[iModalidade] ?? "").trim();
     // Bandeira vazia = PIX; senão bandeira + modalidade formam a categoria.
     const categoria = bandeira
       ? normCategoria(`${bandeira} ${modalidade}`)
@@ -301,11 +332,13 @@ export async function parseAcquirerExcel(
       modalidade,
       categoria,
       status: String(r[iStatus] ?? "").trim(),
+      cnpj,
     });
   }
 
-  return { rows, skipped, unmatched: [...unmatched] };
+  return { rows, skipped, unmatched: [...unmatched], otherHotels };
 }
+
 
 /* ------------------------------------------------------------------ *
  * 3. Extrato bancário (Excel — aba "Lançamentos", cabeçalho na linha 10)
