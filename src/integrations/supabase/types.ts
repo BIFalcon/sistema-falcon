@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1153,6 +1153,9 @@ export type Database = {
       conc_acquirer_entries: {
         Row: {
           amount: number
+          b2b: boolean
+          b2b_at: string | null
+          b2b_by: string | null
           bandeira: string | null
           categoria: string | null
           created_at: string
@@ -1169,6 +1172,9 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          b2b?: boolean
+          b2b_at?: string | null
+          b2b_by?: string | null
           bandeira?: string | null
           categoria?: string | null
           created_at?: string
@@ -1185,6 +1191,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          b2b?: boolean
+          b2b_at?: string | null
+          b2b_by?: string | null
           bandeira?: string | null
           categoria?: string | null
           created_at?: string
@@ -1273,6 +1282,50 @@ export type Database = {
           },
         ]
       }
+      conc_justifications: {
+        Row: {
+          author_id: string
+          created_at: string
+          entry_id: string
+          hotel_id: string
+          id: string
+          kind: string
+          note: string
+          side: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          entry_id: string
+          hotel_id: string
+          id?: string
+          kind: string
+          note: string
+          side: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          entry_id?: string
+          hotel_id?: string
+          id?: string
+          kind?: string
+          note?: string
+          side?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_justifications_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_match_items: {
         Row: {
           amount: number
@@ -1355,7 +1408,14 @@ export type Database = {
       conc_opera_entries: {
         Row: {
           amount: number
+          b2b: boolean
+          b2b_at: string | null
+          b2b_by: string | null
           business_date: string | null
+          cash_paid_at: string | null
+          cash_paid_by: string | null
+          cash_paid_date: string | null
+          cash_proof_path: string | null
           categoria: string | null
           created_at: string
           direct_bank: boolean
@@ -1375,7 +1435,14 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          b2b?: boolean
+          b2b_at?: string | null
+          b2b_by?: string | null
           business_date?: string | null
+          cash_paid_at?: string | null
+          cash_paid_by?: string | null
+          cash_paid_date?: string | null
+          cash_proof_path?: string | null
           categoria?: string | null
           created_at?: string
           direct_bank?: boolean
@@ -1395,7 +1462,14 @@ export type Database = {
         }
         Update: {
           amount?: number
+          b2b?: boolean
+          b2b_at?: string | null
+          b2b_by?: string | null
           business_date?: string | null
+          cash_paid_at?: string | null
+          cash_paid_by?: string | null
+          cash_paid_date?: string | null
+          cash_proof_path?: string | null
           categoria?: string | null
           created_at?: string
           direct_bank?: boolean
@@ -2967,6 +3041,10 @@ export type Database = {
       can_access_conciliacao: { Args: { _user_id: string }; Returns: boolean }
       can_edit_marketing: { Args: { _user_id: string }; Returns: boolean }
       can_edit_rh_content: { Args: { _user_id: string }; Returns: boolean }
+      can_justify_conciliacao: {
+        Args: { _hotel_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_read_dre_hotel: {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
