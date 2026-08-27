@@ -34,6 +34,11 @@ export interface OperaEntry {
   direct_bank: boolean;
   direct_bank_at: string | null;
   matched_at: string | null;
+  b2b: boolean;
+  b2b_at: string | null;
+  cash_paid_date: string | null;
+  cash_proof_path: string | null;
+  cash_paid_at: string | null;
 }
 
 export interface AcquirerEntry {
@@ -47,7 +52,10 @@ export interface AcquirerEntry {
   categoria: string | null;
   status: string | null;
   matched_at: string | null;
+  b2b: boolean;
+  b2b_at: string | null;
 }
+
 
 export interface BankEntry {
   id: string;
