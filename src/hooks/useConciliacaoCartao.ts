@@ -98,19 +98,23 @@ export function useTrxCodeMapping() {
   });
 }
 
-export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateTo?: string) {
+export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateTo?: string, dates?: string[]) {
+  const days = dates ?? [];
   return useQuery({
-    queryKey: ["conc-opera", hotelId ?? "none", dateFrom ?? "", dateTo ?? ""],
+    queryKey: ["conc-opera", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
       let q = supabase
         .from("conc_opera_entries")
-        .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at")
+        .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
         .eq("hotel_id", hotelId!)
         .order("business_date", { ascending: true })
         .limit(20000);
-      if (dateFrom) q = q.gte("business_date", dateFrom);
-      if (dateTo) q = q.lte("business_date", dateTo);
+      if (days.length) q = q.in("business_date", days);
+      else {
+        if (dateFrom) q = q.gte("business_date", dateFrom);
+        if (dateTo) q = q.lte("business_date", dateTo);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as OperaEntry[];
@@ -118,19 +122,23 @@ export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateT
   });
 }
 
-export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, dateTo?: string) {
+export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, dateTo?: string, dates?: string[]) {
+  const days = dates ?? [];
   return useQuery({
-    queryKey: ["conc-acquirer", hotelId ?? "none", dateFrom ?? "", dateTo ?? ""],
+    queryKey: ["conc-acquirer", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
       let q = supabase
         .from("conc_acquirer_entries")
-        .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at")
+        .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
         .eq("hotel_id", hotelId!)
         .order("sale_date", { ascending: true })
         .limit(20000);
-      if (dateFrom) q = q.gte("sale_date", dateFrom);
-      if (dateTo) q = q.lte("sale_date", dateTo);
+      if (days.length) q = q.in("sale_date", days);
+      else {
+        if (dateFrom) q = q.gte("sale_date", dateFrom);
+        if (dateTo) q = q.lte("sale_date", dateTo);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as AcquirerEntry[];
@@ -138,9 +146,10 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
   });
 }
 
-export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo?: string) {
+export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo?: string, dates?: string[]) {
+  const days = dates ?? [];
   return useQuery({
-    queryKey: ["conc-bank", hotelId ?? "none", dateFrom ?? "", dateTo ?? ""],
+    queryKey: ["conc-bank", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
       let q = supabase
@@ -149,8 +158,11 @@ export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo
         .eq("hotel_id", hotelId!)
         .order("line_date", { ascending: true })
         .limit(20000);
-      if (dateFrom) q = q.gte("line_date", dateFrom);
-      if (dateTo) q = q.lte("line_date", dateTo);
+      if (days.length) q = q.in("line_date", days);
+      else {
+        if (dateFrom) q = q.gte("line_date", dateFrom);
+        if (dateTo) q = q.lte("line_date", dateTo);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as BankEntry[];
@@ -258,7 +270,12 @@ export function useImportOpera() {
       const byCode = new Map((map ?? []).map((m) => [m.trx_code, m.categoria]));
       const active = new Set(byCode.keys());
 
-      const { rows, skipped, total } = await parseOperaXml(file, hotelId, active);
+      const parsedOpera = await parseOperaXml(file, hotelId, active);
+      const { skipped, total } = parsedOpera;
+      // Relatório acumulado (MTD): descarta o que já existe.
+      const knownOpera = await existingKeys("conc_opera_entries", hotelId);
+      const rows = parsedOpera.rows.filter((r) => !knownOpera.has(r.entry_key));
+      const duplicates = parsedOpera.rows.length - rows.length;
 
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
@@ -268,9 +285,9 @@ export function useImportOpera() {
           file_name: file.name,
           file_size: file.size,
           parsed_count: rows.length,
-          skipped_count: skipped,
+          skipped_count: skipped + duplicates,
           uploaded_by: user!.id,
-          metadata: { total_rows: total },
+          metadata: { total_rows: total, duplicates },
         })
         .select("id")
         .single();
@@ -292,7 +309,7 @@ export function useImportOpera() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, autoMatched };
+      return { inserted: rows.length, skipped, autoMatched, duplicates };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
@@ -304,27 +321,58 @@ export function useImportOpera() {
   });
 }
 
+/** Busca as chaves já importadas para descartar duplicatas de planilhas MTD. */
+async function existingKeys(
+  table: "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries",
+  hotelId: string,
+): Promise<Set<string>> {
+  const keys = new Set<string>();
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("entry_key")
+      .eq("hotel_id", hotelId)
+      .range(from, from + 999);
+    if (error) throw error;
+    for (const r of data ?? []) keys.add((r as { entry_key: string }).entry_key);
+    if (!data || data.length < 1000) break;
+    from += 1000;
+  }
+  return keys;
+}
+
 export function useImportAcquirer() {
   const qc = useQueryClient();
   const { user, allowedHotels } = useAuth();
   return useMutation({
-    mutationFn: async ({ file }: { file: File }) => {
+    mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
-      const { rows, skipped, unmatched } = await parseAcquirerExcel(file, hotels);
+      // Hotel identificado pelo CNPJ do hotel selecionado no filtro global.
+      const { data: fin, error: finErr } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelId });
+      if (finErr) throw finErr;
+      const cnpj = (fin as unknown as { cnpj: string | null }[])?.[0]?.cnpj ?? null;
+      const parsed = await parseAcquirerExcel(file, hotels, { id: hotelId, cnpj });
+      const { skipped, unmatched, otherHotels } = parsed;
 
-      const matchedHotelIds = [...new Set(rows.map((r) => r.hotel_id).filter(Boolean) as string[])];
+      // Planilha MTD (acumulada): descarta o que já foi importado antes.
+      const known = await existingKeys("conc_acquirer_entries", hotelId);
+      const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
+      const duplicates = parsed.rows.length - rows.length;
+
+      const matchedHotelIds = [hotelId];
 
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
         .insert({
-          hotel_id: matchedHotelIds.length === 1 ? matchedHotelIds[0] : null,
+          hotel_id: hotelId,
           kind: "acquirer",
           file_name: file.name,
           file_size: file.size,
           parsed_count: rows.length,
-          skipped_count: skipped,
+          skipped_count: skipped + duplicates + otherHotels,
           uploaded_by: user!.id,
-          metadata: { unmatched, hotel_ids: matchedHotelIds },
+          metadata: { unmatched, hotel_ids: matchedHotelIds, duplicates, other_hotels: otherHotels },
         })
         .select("id")
         .single();
@@ -344,8 +392,8 @@ export function useImportAcquirer() {
         raw: r as unknown as Record<string, unknown>,
       })));
 
-      const autoMatched = await runAutoReconcile(matchedHotelIds.length === 1 ? matchedHotelIds[0] : null);
-      return { inserted: rows.length, skipped, unmatched, autoMatched };
+      const autoMatched = await runAutoReconcile(hotelId);
+      return { inserted: rows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
@@ -370,6 +418,11 @@ export function useImportBankStatement() {
         );
       }
 
+      // Extrato acumulado (MTD): descarta lançamentos já importados antes.
+      const knownBank = await existingKeys("conc_bank_entries", hotelId);
+      const bankRows = parsed.rows.filter((r) => !knownBank.has(r.entry_key));
+      const duplicates = parsed.rows.length - bankRows.length;
+
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
         .insert({
@@ -377,16 +430,16 @@ export function useImportBankStatement() {
           kind: "bank",
           file_name: file.name,
           file_size: file.size,
-          parsed_count: parsed.rows.length,
-          skipped_count: parsed.skipped,
+          parsed_count: bankRows.length,
+          skipped_count: parsed.skipped + duplicates,
           uploaded_by: user!.id,
-          metadata: { account_name: parsed.accountName },
+          metadata: { account_name: parsed.accountName, duplicates },
         })
         .select("id")
         .single();
       if (upErr) throw upErr;
 
-      await upsertChunks("conc_bank_entries", parsed.rows.map((r) => ({
+      await upsertChunks("conc_bank_entries", bankRows.map((r) => ({
         hotel_id: hotelId,
         upload_id: up.id,
         entry_key: r.entry_key,
@@ -398,7 +451,7 @@ export function useImportBankStatement() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: parsed.rows.length, hotelId, accountName: parsed.accountName, autoMatched };
+      return { inserted: bankRows.length, hotelId, accountName: parsed.accountName, autoMatched, duplicates };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
@@ -601,4 +654,189 @@ export function usePaidBankVerification(entries: PaidVerificationInput[], enable
   }
 
   return { missing, isLoading: bank.isLoading, enabled };
+}
+
+/* ------------------------------------------------------------------ */
+/* Ações em lote — B2B, direto no banco, dinheiro pago                 */
+/* ------------------------------------------------------------------ */
+
+/** Classifica lançamentos como B2B (é uma forma de conciliação: saem das pendências). */
+export function useSetB2B() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ ids, side, value }: { ids: string[]; side: "opera" | "acquirer"; value: boolean }) => {
+      if (!ids.length) return;
+      const { error } = await supabase
+        .from(side === "opera" ? "conc_opera_entries" : "conc_acquirer_entries")
+        .update({
+          b2b: value,
+          b2b_by: value ? user!.id : null,
+          b2b_at: value ? new Date().toISOString() : null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+    },
+  });
+}
+
+/** Marca / desmarca vários itens do Opera como "recebido direto no banco". */
+export function useSetDirectBankBulk() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      if (!ids.length) return;
+      const { error } = await supabase
+        .from("conc_opera_entries")
+        .update({
+          direct_bank: value,
+          direct_bank_by: value ? user!.id : null,
+          direct_bank_at: value ? new Date().toISOString() : null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-opera"] }),
+  });
+}
+
+/** Dinheiro: marca lançamentos como pagos, com data e comprovante. */
+export function useMarkCashPaid() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ ids, hotelId, paidDate, proof }: {
+      ids: string[]; hotelId: string; paidDate: string; proof?: File | null;
+    }) => {
+      if (!ids.length) throw new Error("Selecione ao menos um lançamento.");
+      if (!paidDate) throw new Error("Informe a data do pagamento.");
+      let path: string | null = null;
+      if (proof) {
+        path = `${hotelId}/dinheiro/${Date.now()}-${proof.name.replace(/[^\w.\-]+/g, "_")}`;
+        const { error: upErr } = await supabase.storage
+          .from("conciliacao-docs")
+          .upload(path, proof, { upsert: false });
+        if (upErr) throw upErr;
+      }
+      const { error } = await supabase
+        .from("conc_opera_entries")
+        .update({
+          cash_paid_date: paidDate,
+          cash_proof_path: path,
+          cash_paid_by: user!.id,
+          cash_paid_at: new Date().toISOString(),
+        })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-opera"] }),
+  });
+}
+
+export function useCashProofUrl() {
+  return useMutation({
+    mutationFn: async (path: string) => {
+      const { data, error } = await supabase.storage
+        .from("conciliacao-docs")
+        .createSignedUrl(path, 300);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Justificativas (GG e Admin)                                         */
+/* ------------------------------------------------------------------ */
+
+export interface ConcJustification {
+  id: string;
+  hotel_id: string;
+  side: string;
+  entry_id: string;
+  kind: string;
+  note: string;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useConcJustifications(hotelId: string | null) {
+  return useQuery({
+    queryKey: ["conc-justifications", hotelId ?? "none"],
+    enabled: !!hotelId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conc_justifications")
+        .select("id, hotel_id, side, entry_id, kind, note, author_id, created_at, updated_at")
+        .eq("hotel_id", hotelId!)
+        .order("updated_at", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      return (data ?? []) as ConcJustification[];
+    },
+  });
+}
+
+export function useSaveJustification() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ hotelId, side, entryId, kind, note }: {
+      hotelId: string; side: ConcSide; entryId: string; kind: ConcKind; note: string;
+    }) => {
+      const { data: existing, error: selErr } = await supabase
+        .from("conc_justifications")
+        .select("id")
+        .eq("entry_id", entryId)
+        .eq("kind", kind)
+        .limit(1);
+      if (selErr) throw selErr;
+      if ((existing ?? []).length) {
+        const { error } = await supabase
+          .from("conc_justifications")
+          .update({ note, updated_at: new Date().toISOString() })
+          .eq("id", existing![0].id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("conc_justifications").insert({
+          hotel_id: hotelId, side, entry_id: entryId, kind, note, author_id: user!.id,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-justifications"] }),
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Conciliados por importação (coluna "Conciliados" na Central)         */
+/* ------------------------------------------------------------------ */
+
+export function useMatchedCountsByUpload() {
+  return useQuery({
+    queryKey: ["conc-matched-by-upload"],
+    queryFn: async () => {
+      const counts = new Map<string, number>();
+      for (const table of ["conc_opera_entries", "conc_acquirer_entries", "conc_bank_entries"] as const) {
+        const { data, error } = await supabase
+          .from(table)
+          .select("upload_id")
+          .not("matched_at", "is", null)
+          .not("upload_id", "is", null)
+          .limit(50000);
+        if (error) throw error;
+        for (const r of data ?? []) {
+          const id = (r as { upload_id: string }).upload_id;
+          counts.set(id, (counts.get(id) ?? 0) + 1);
+        }
+      }
+      return counts;
+    },
+  });
 }
