@@ -919,7 +919,7 @@ export default function ConciliacaoCartaoPage() {
               Ativar
             </Button>
           </DialogFooter>
-        </Dialog>
+        </DialogContent>
       </Dialog>
     </div>
   );
