@@ -142,7 +142,7 @@ export default function CartaPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { hotelId, month, year } = useModuleFilters("fechamento");
-  const { user, allowedHotels, hasRole, isMaster } = useAuth();
+  const { user, allowedHotels, hasRole, isMaster, isPatronos } = useAuth();
 
   const ensure = useEnsureClosing();
   const ensureLetter = useEnsureLetter();
@@ -202,25 +202,7 @@ export default function CartaPage() {
   );
 
   const skip = hotelSkipsCarta(closing?.hotel_id);
-  // Carta só pode ser editada quando estiver no estágio certo do fluxo:
-  // - GG: somente em "aguardando_gg" (libera após GOP+Fernando aprovarem a DRE)
-  // - GOP: somente em "aguardando_fernando" (revisão antes do Fernando)
-  // - Master/Controladoria: sempre podem editar (backoffice)
   const stage = closing?.status_carta;
-  const canEdit =
-    isMaster ||
-    hasRole("controladoria") ||
-    hasRole("fernando") ||
-    // RI edita a Carta em qualquer estágio (inclusive aguardando_fernando)
-    hasRole("ri") ||
-    // GG edita enquanto a carta ainda não foi aprovada pelo GOP
-    (hasRole("gg") && (stage === "aguardando_gg" || stage === "aguardando_gop")) ||
-    // GOP edita do início até a aprovação final do Fernando
-    (hasRole("gop") && (stage === "aguardando_gg" || stage === "aguardando_gop" || stage === "aguardando_fernando"));
-  const canEditReserveFund =
-    !canEdit &&
-    hasRole("financeiro") &&
-    closing?.status_carta === "aguardando_gg";
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const hasDreData = indicators.length > 0;
@@ -247,6 +229,24 @@ export default function CartaPage() {
     indicatorsFetched &&
     !indicatorsLoading &&
     currentClosingHasDre === false;
+
+  // A carta fica liberada para edição a partir do momento em que a
+  // Controladoria posta a primeira prévia de DRE do mês.
+  const dreReady = hasDreData || currentClosingHasDre === true;
+  const canEdit =
+    dreReady &&
+    (isMaster ||
+      hasRole("controladoria") ||
+      hasRole("fernando") ||
+      hasRole("ri") ||
+      hasRole("gg") ||
+      hasRole("gop"));
+  // Antes da prévia de DRE, somente Controladoria/Patronos (e Master) podem
+  // preencher o Fundo de Reserva — e nada além disso.
+  const canEditReserveFund =
+    !canEdit && (isMaster || hasRole("controladoria") || isPatronos);
+
+
 
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
