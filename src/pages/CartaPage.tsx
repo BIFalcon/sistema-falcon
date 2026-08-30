@@ -142,7 +142,7 @@ export default function CartaPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { hotelId, month, year } = useModuleFilters("fechamento");
-  const { user, allowedHotels, hasRole, isMaster } = useAuth();
+  const { user, allowedHotels, hasRole, isMaster, isPatronos } = useAuth();
 
   const ensure = useEnsureClosing();
   const ensureLetter = useEnsureLetter();
