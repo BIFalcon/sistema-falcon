@@ -230,6 +230,24 @@ export default function CartaPage() {
     !indicatorsLoading &&
     currentClosingHasDre === false;
 
+  // A carta fica liberada para edição a partir do momento em que a
+  // Controladoria posta a primeira prévia de DRE do mês.
+  const dreReady = hasDreData || currentClosingHasDre === true;
+  const canEdit =
+    dreReady &&
+    (isMaster ||
+      hasRole("controladoria") ||
+      hasRole("fernando") ||
+      hasRole("ri") ||
+      hasRole("gg") ||
+      hasRole("gop"));
+  // Antes da prévia de DRE, somente Controladoria/Patronos (e Master) podem
+  // preencher o Fundo de Reserva — e nada além disso.
+  const canEditReserveFund =
+    !canEdit && (isMaster || hasRole("controladoria") || isPatronos);
+
+
+
   const missingAssets: string[] = [];
   if (hotelRow && !hotelRow.cover_url) missingAssets.push("Foto de capa do hotel");
   if (hotelRow && !hotelRow.brand_logo_url) missingAssets.push("Logo da bandeira");
