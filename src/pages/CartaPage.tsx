@@ -202,25 +202,7 @@ export default function CartaPage() {
   );
 
   const skip = hotelSkipsCarta(closing?.hotel_id);
-  // Carta só pode ser editada quando estiver no estágio certo do fluxo:
-  // - GG: somente em "aguardando_gg" (libera após GOP+Fernando aprovarem a DRE)
-  // - GOP: somente em "aguardando_fernando" (revisão antes do Fernando)
-  // - Master/Controladoria: sempre podem editar (backoffice)
   const stage = closing?.status_carta;
-  const canEdit =
-    isMaster ||
-    hasRole("controladoria") ||
-    hasRole("fernando") ||
-    // RI edita a Carta em qualquer estágio (inclusive aguardando_fernando)
-    hasRole("ri") ||
-    // GG edita enquanto a carta ainda não foi aprovada pelo GOP
-    (hasRole("gg") && (stage === "aguardando_gg" || stage === "aguardando_gop")) ||
-    // GOP edita do início até a aprovação final do Fernando
-    (hasRole("gop") && (stage === "aguardando_gg" || stage === "aguardando_gop" || stage === "aguardando_fernando"));
-  const canEditReserveFund =
-    !canEdit &&
-    hasRole("financeiro") &&
-    closing?.status_carta === "aguardando_gg";
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const hasDreData = indicators.length > 0;
