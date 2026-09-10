@@ -113,6 +113,6 @@ export function usePendingNotificationCount() {
       return count ?? 0;
     },
     enabled: !!user?.id,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
 }
