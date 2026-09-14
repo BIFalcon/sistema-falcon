@@ -1,8 +1,13 @@
-// Edge function: drena a fila lógica `notification_queue` enfileirando
-// cada mensagem na pgmq `transactional_emails`, que é processada pelo
-// cron `process-email-queue` a cada 5s.
+// Edge function: drena a fila lógica `notification_queue` enviando cada
+// mensagem pela API gerenciada de e-mails da Lovable (envio síncrono).
 
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import {
+  logEmailFailureAlert,
+  logEmailSend,
+  sendRawEmail,
+} from "../_shared/email/send-raw-email.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,8 +17,6 @@ const corsHeaders = {
 
 const APP_BASE_URL =
   Deno.env.get("APP_BASE_URL") ?? "https://sistema-falcon.lovable.app";
-const SENDER_DOMAIN = "notify.falconhoteis.com.br";
-const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
 
 function parseJwtClaims(token: string): Record<string, unknown> | null {
   const parts = token.split(".");
@@ -97,21 +100,7 @@ Deno.serve(async (req) => {
     return Array.from(new Set(matches.map((s) => s.trim().toLowerCase())));
   }
 
-  // Generate or fetch an unsubscribe token for a recipient email.
-  async function getUnsubscribeToken(email: string): Promise<string> {
-    const { data: existing } = await supabase
-      .from("email_unsubscribe_tokens")
-      .select("token")
-      .eq("email", email)
-      .is("used_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existing?.token) return existing.token as string;
-    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
-    await supabase.from("email_unsubscribe_tokens").insert({ email, token });
-    return token;
-  }
+
 
   for (const item of pending) {
     try {
@@ -154,32 +143,45 @@ Deno.serve(async (req) => {
         .replace(/\*\*(.+?)\*\*/g, "$1")
         .replace(/\[(.+?)\]\((.+?)\)/g, "$1 ($2)")}\n\n---\nSistema Falcon Hotels\nGerenciar notificações: ${APP_BASE_URL}/notificacoes`;
 
-      // Enfileira um job por destinatário (sufixo no message_id quando >1).
+      // Envia um e-mail por destinatário (sufixo no id quando >1).
       for (let i = 0; i < recipients.length; i++) {
         const to = recipients[i];
         const messageId = recipients.length > 1 ? `notif-${item.id}-${i}` : `notif-${item.id}`;
-        const unsubscribeToken = await getUnsubscribeToken(to);
-        const payload = {
-          message_id: messageId,
-          idempotency_key: messageId,
-          purpose: "transactional",
-          label: `workflow:${item.event ?? "notification"}`,
-          to,
-          from: FROM_ADDRESS,
-          sender_domain: SENDER_DOMAIN,
-          subject: item.subject,
-          html,
-          text,
-          unsubscribe_token: unsubscribeToken,
-          queued_at: new Date().toISOString(),
-          link_url: linkHref,
-        };
-        const { error: enqError } = await supabase.rpc("enqueue_email", {
-          queue_name: "transactional_emails",
-          payload,
-        });
-        if (enqError) throw enqError;
+        const label = `workflow:${item.event ?? "notification"}`;
+        try {
+          const result = await sendRawEmail({
+            to,
+            subject: String(item.subject ?? ""),
+            html,
+            text,
+            label,
+            idempotencyKey: messageId,
+          });
+          await logEmailSend(supabase, {
+            message_id: messageId,
+            template_name: label,
+            recipient_email: to,
+            status: result.sent ? "sent" : "suppressed",
+          });
+        } catch (sendErr) {
+          const sendMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          await logEmailSend(supabase, {
+            message_id: messageId,
+            template_name: label,
+            recipient_email: to,
+            status: "failed",
+            error_message: sendMsg,
+          });
+          await logEmailFailureAlert(supabase, {
+            to,
+            subject: String(item.subject ?? ""),
+            label,
+            reason: sendMsg,
+          });
+          throw sendErr;
+        }
       }
+
 
       await supabase
         .from("notification_queue")
