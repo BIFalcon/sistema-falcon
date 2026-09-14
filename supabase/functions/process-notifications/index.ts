@@ -159,32 +159,45 @@ Deno.serve(async (req) => {
         .replace(/\*\*(.+?)\*\*/g, "$1")
         .replace(/\[(.+?)\]\((.+?)\)/g, "$1 ($2)")}\n\n---\nSistema Falcon Hotels\nGerenciar notificações: ${APP_BASE_URL}/notificacoes`;
 
-      // Enfileira um job por destinatário (sufixo no message_id quando >1).
+      // Envia um e-mail por destinatário (sufixo no id quando >1).
       for (let i = 0; i < recipients.length; i++) {
         const to = recipients[i];
         const messageId = recipients.length > 1 ? `notif-${item.id}-${i}` : `notif-${item.id}`;
-        const unsubscribeToken = await getUnsubscribeToken(to);
-        const payload = {
-          message_id: messageId,
-          idempotency_key: messageId,
-          purpose: "transactional",
-          label: `workflow:${item.event ?? "notification"}`,
-          to,
-          from: FROM_ADDRESS,
-          sender_domain: SENDER_DOMAIN,
-          subject: item.subject,
-          html,
-          text,
-          unsubscribe_token: unsubscribeToken,
-          queued_at: new Date().toISOString(),
-          link_url: linkHref,
-        };
-        const { error: enqError } = await supabase.rpc("enqueue_email", {
-          queue_name: "transactional_emails",
-          payload,
-        });
-        if (enqError) throw enqError;
+        const label = `workflow:${item.event ?? "notification"}`;
+        try {
+          const result = await sendRawEmail({
+            to,
+            subject: String(item.subject ?? ""),
+            html,
+            text,
+            label,
+            idempotencyKey: messageId,
+          });
+          await logEmailSend(supabase, {
+            message_id: messageId,
+            template_name: label,
+            recipient_email: to,
+            status: result.sent ? "sent" : "suppressed",
+          });
+        } catch (sendErr) {
+          const sendMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          await logEmailSend(supabase, {
+            message_id: messageId,
+            template_name: label,
+            recipient_email: to,
+            status: "failed",
+            error_message: sendMsg,
+          });
+          await logEmailFailureAlert(supabase, {
+            to,
+            subject: String(item.subject ?? ""),
+            label,
+            reason: sendMsg,
+          });
+          throw sendErr;
+        }
       }
+
 
       await supabase
         .from("notification_queue")
