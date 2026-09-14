@@ -492,12 +492,23 @@ function ToInvoiceSection({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendente">Pendentes</SelectItem>
-                <SelectItem value="faturado">Faturados</SelectItem>
-                <SelectItem value="pago">Pagos</SelectItem>
-                <SelectItem value="inadimplente">Inadimplentes</SelectItem>
-                <SelectItem value="nao_faturavel">Não faturáveis</SelectItem>
+                {(
+                  [
+                    ["todos", "Todos"],
+                    ["pendente", "Pendentes"],
+                    ["faturado", "Faturados"],
+                    ["pago", "Pagos"],
+                    ["inadimplente", "Inadimplentes"],
+                    ["nao_faturavel", "Não faturáveis"],
+                  ] as [ToInvoiceStatusFilter, string][]
+                ).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                    {statusCounts ? (
+                      <span className="text-muted-foreground"> ({statusCounts[value]})</span>
+                    ) : null}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <ExtractDocsButton
