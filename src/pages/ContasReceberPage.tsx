@@ -34,7 +34,14 @@ import ConciliacaoSection from "@/pages/conciliacao/ConciliacaoCartaoPage";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
-  useToInvoiceEntries,
+  useToInvoiceTotals,
+  useToInvoiceStatusCounts,
+  useToInvoiceRows,
+  useArDocsPendingCount,
+  fetchToInvoiceRows,
+  applyStatusFilter,
+  type ToInvoiceStatusFilter,
+  type ToInvoiceRowsQuery,
   useOpenFolioEntries,
   useLatestArUpload,
   useLatestToInvoiceDate,
