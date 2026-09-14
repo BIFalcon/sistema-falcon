@@ -1,8 +1,13 @@
-// Edge function: drena a fila lógica `notification_queue` enfileirando
-// cada mensagem na pgmq `transactional_emails`, que é processada pelo
-// cron `process-email-queue` a cada 5s.
+// Edge function: drena a fila lógica `notification_queue` enviando cada
+// mensagem pela API gerenciada de e-mails da Lovable (envio síncrono).
 
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import {
+  logEmailFailureAlert,
+  logEmailSend,
+  sendRawEmail,
+} from "../_shared/email/send-raw-email.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
