@@ -17,8 +17,6 @@ const corsHeaders = {
 
 const APP_BASE_URL =
   Deno.env.get("APP_BASE_URL") ?? "https://sistema-falcon.lovable.app";
-const SENDER_DOMAIN = "notify.falconhoteis.com.br";
-const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
 
 function parseJwtClaims(token: string): Record<string, unknown> | null {
   const parts = token.split(".");
