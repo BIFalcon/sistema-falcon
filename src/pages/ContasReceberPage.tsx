@@ -1861,23 +1861,10 @@ function SendDocsDialog({
 }
 
 function ConsolidatedRanking({
-  entries,
-  hotelName,
+  ranking,
 }: {
-  entries: ToInvoiceEntry[];
-  hotelName: (id: string | null) => string;
+  ranking: { id: string; name: string; total: number }[];
 }) {
-  const ranking = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of entries) {
-      const id = e.hotel_id ?? "__unmapped__";
-      map.set(id, (map.get(id) ?? 0) + Number(e.amount ?? 0));
-    }
-    return Array.from(map.entries())
-      .map(([id, total]) => ({ id, name: id === "__unmapped__" ? "(não mapeado)" : hotelName(id), total }))
-      .sort((a, b) => b.total - a.total);
-  }, [entries, hotelName]);
-
   if (!ranking.length) return <EmptyState text="Sem dados consolidados." />;
   const max = ranking[0].total;
   const grand = ranking.reduce((s, r) => s + r.total, 0);
