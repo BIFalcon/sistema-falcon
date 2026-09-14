@@ -102,21 +102,7 @@ Deno.serve(async (req) => {
     return Array.from(new Set(matches.map((s) => s.trim().toLowerCase())));
   }
 
-  // Generate or fetch an unsubscribe token for a recipient email.
-  async function getUnsubscribeToken(email: string): Promise<string> {
-    const { data: existing } = await supabase
-      .from("email_unsubscribe_tokens")
-      .select("token")
-      .eq("email", email)
-      .is("used_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existing?.token) return existing.token as string;
-    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
-    await supabase.from("email_unsubscribe_tokens").insert({ email, token });
-    return token;
-  }
+
 
   for (const item of pending) {
     try {
