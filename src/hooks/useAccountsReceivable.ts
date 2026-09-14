@@ -623,3 +623,260 @@ export function useExtractArDocs() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ar-to-invoice"] }),
   });
 }
+/* ──────────────── FATURAMENTO: CONSULTAS AGREGADAS / SOB DEMANDA ────────────────
+   O acervo completo não é mais carregado no navegador: o ranking por hotel e os
+   cards de mês vêm de agregações no banco, e as linhas completas só são buscadas
+   no drill por mês, na busca por cliente e nas exportações. */
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export type ToInvoiceStatusFilter =
+  | "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel";
+
+export interface ArScopeFilters {
+  hotelId?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  dates?: string[] | null;
+  /** Hotéis visíveis quando o usuário não vê todos (GG/GOP). */
+  hotelIds?: string[] | null;
+}
+
+function normScope(f: ArScopeFilters) {
+  const dates = (f.dates ?? []).filter((d) => ISO_DAY.test(d));
+  const dateFrom = dates.length === 0 && f.dateFrom && ISO_DAY.test(f.dateFrom) ? f.dateFrom : null;
+  const dateTo = dates.length === 0 && f.dateTo && ISO_DAY.test(f.dateTo) ? f.dateTo : null;
+  return {
+    hotelId: f.hotelId || null,
+    hotelIds: f.hotelIds ?? null,
+    dates: dates.length ? dates : null,
+    dateFrom,
+    dateTo,
+  };
+}
+
+function scopeKey(f: ArScopeFilters) {
+  const s = normScope(f);
+  return [
+    s.hotelId ?? "all",
+    s.hotelIds ? s.hotelIds.slice().sort().join("|") : "any",
+    s.dates ? s.dates.slice().sort().join(",") : `${s.dateFrom ?? ""}..${s.dateTo ?? ""}`,
+  ].join("__");
+}
+
+/** Dados de faturamento mudam todos os dias (upload matinal) — nunca servir cache velho. */
+const FRESH = { staleTime: 0, gcTime: 60_000, refetchOnMount: "always" as const };
+
+export interface ToInvoiceTotalRow {
+  hotel_id: string | null;
+  ym: string | null;
+  total: number;
+  cnt: number;
+}
+
+/** Totais agregados no banco (SUM/GROUP BY por hotel e por hotel+mês). */
+export function useToInvoiceTotals(filters: ArScopeFilters, status: ToInvoiceStatusFilter = "todos") {
+  const s = normScope(filters);
+  return useQuery({
+    ...FRESH,
+    queryKey: ["ar-ti-totals", scopeKey(filters), status],
+    queryFn: async (): Promise<ToInvoiceTotalRow[]> => {
+      const { data, error } = await (supabase as any).rpc("ar_to_invoice_totals", {
+        p_hotel_id: s.hotelId,
+        p_date_from: s.dateFrom,
+        p_date_to: s.dateTo,
+        p_dates: s.dates,
+        p_status: status,
+      });
+      if (error) throw error;
+      let rows = ((data ?? []) as any[]).map((r) => ({
+        hotel_id: r.hotel_id ?? null,
+        ym: r.ym ?? null,
+        total: Number(r.total ?? 0),
+        cnt: Number(r.cnt ?? 0),
+      }));
+      if (s.hotelIds) {
+        const allowed = new Set(s.hotelIds);
+        rows = rows.filter((r) => r.hotel_id && allowed.has(r.hotel_id));
+      }
+      return rows;
+    },
+  });
+}
+
+export interface ToInvoiceStatusCounts {
+  todos: number;
+  pendente: number;
+  faturado: number;
+  pago: number;
+  inadimplente: number;
+  nao_faturavel: number;
+}
+
+/** Contadores por status (COUNT no banco). */
+export function useToInvoiceStatusCounts(filters: ArScopeFilters) {
+  const s = normScope(filters);
+  return useQuery({
+    ...FRESH,
+    queryKey: ["ar-ti-status-counts", scopeKey(filters)],
+    queryFn: async (): Promise<ToInvoiceStatusCounts> => {
+      const { data, error } = await (supabase as any).rpc("ar_to_invoice_status_counts", {
+        p_hotel_id: s.hotelId,
+        p_date_from: s.dateFrom,
+        p_date_to: s.dateTo,
+        p_dates: s.dates,
+      });
+      if (error) throw error;
+      const r = (Array.isArray(data) ? data[0] : data) ?? {};
+      return {
+        todos: Number(r.todos ?? 0),
+        pendente: Number(r.pendente ?? 0),
+        faturado: Number(r.faturado ?? 0),
+        pago: Number(r.pago ?? 0),
+        inadimplente: Number(r.inadimplente ?? 0),
+        nao_faturavel: Number(r.nao_faturavel ?? 0),
+      };
+    },
+  });
+}
+
+const TI_COLS =
+  "id,upload_id,hotel_id,property_name_raw,account_number,account_name,account_type,invoice_number,invoice_status,transaction_date,amount,paid,ar_open,confirmation_number,reservation_status,departure_date,gg_status,gg_note,gg_confirmed_by,gg_confirmed_at,paid_date,paid_note,estimated_due_date,invoice_file_1,invoice_file_2,is_not_billable,not_billable_reason,not_billable_note,proof_file,is_paid,paid_at,is_defaulting,defaulting_note,defaulting_at,documents_problem_note,documents_problem_at,billed_at,nota_number,boleto_number,boleto_due_date,doc_extraction_status,created_at";
+
+export interface ToInvoiceRowsQuery extends ArScopeFilters {
+  /** YYYY-MM — restringe às linhas do mês (drill-down). */
+  month?: string | null;
+  /** Texto de busca (cliente / nº reserva / invoice / conta). */
+  search?: string | null;
+  status?: ToInvoiceStatusFilter;
+}
+
+function sanitizeSearch(q: string) {
+  return q.replace(/[,()%*\\]/g, " ").trim();
+}
+
+/** Monta a consulta de linhas com todos os filtros aplicados no servidor. */
+function buildRowsQuery(q: ToInvoiceRowsQuery, opts: { count?: boolean } = {}) {
+  const s = normScope(q);
+  let sel = supabase
+    .from("ar_to_invoice_entries")
+    .select(opts.count ? "id" : TI_COLS, opts.count ? { count: "exact", head: true } : undefined as any);
+  if (s.hotelId) sel = sel.eq("hotel_id", s.hotelId);
+  else if (s.hotelIds) sel = sel.in("hotel_id", s.hotelIds.length ? s.hotelIds : ["__none__"]);
+  if (s.dates) sel = sel.in("transaction_date", s.dates);
+  else {
+    if (s.dateFrom) sel = sel.gte("transaction_date", s.dateFrom);
+    if (s.dateTo) sel = sel.lte("transaction_date", s.dateTo);
+  }
+  if (q.month) {
+    const [y, m] = q.month.split("-").map(Number);
+    const first = `${q.month}-01`;
+    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    sel = sel.gte("transaction_date", first).lte("transaction_date", last);
+  }
+  const status = q.status ?? "todos";
+  // Filtros grosseiros no servidor (superconjunto); a regra exata continua em JS,
+  // garantindo resultado idêntico ao comportamento atual.
+  if (status === "pago") {
+    sel = sel.or("paid_date.not.is.null,is_paid.is.true,gg_status.eq.pago");
+  } else if (status === "nao_faturavel") {
+    sel = sel.or("gg_status.eq.nao_faturavel,is_not_billable.is.true");
+  } else if (status === "faturado") {
+    sel = sel.eq("gg_status", "faturado");
+  } else if (status === "pendente") {
+    sel = sel.is("paid_date", null).not("is_paid", "is", true).not("is_not_billable", "is", true);
+  } else if (status === "inadimplente") {
+    sel = sel.is("paid_date", null).not("is_paid", "is", true).not("is_not_billable", "is", true);
+  }
+  const term = q.search ? sanitizeSearch(q.search) : "";
+  if (term) {
+    sel = sel.or(
+      ["account_name", "account_number", "confirmation_number", "invoice_number"]
+        .map((c) => `${c}.ilike.*${term}*`)
+        .join(","),
+    );
+  }
+  return sel;
+}
+
+/** Aplica a regra exata de status (mesma usada hoje no navegador). */
+export function applyStatusFilter(
+  rows: ToInvoiceEntry[],
+  status: ToInvoiceStatusFilter,
+  contracts: ClientContract[] | undefined,
+): ToInvoiceEntry[] {
+  if (status === "todos") return rows;
+  if (status === "pago") return rows.filter((e) => isEntryPaid(e));
+  if (status === "inadimplente")
+    return rows.filter((e) =>
+      isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
+    );
+  if (status === "pendente")
+    return rows.filter(
+      (e) =>
+        e.gg_status !== "faturado" &&
+        e.gg_status !== "nao_faturavel" &&
+        !e.is_not_billable &&
+        !isEntryPaid(e),
+    );
+  if (status === "nao_faturavel")
+    return rows.filter((e) => e.gg_status === "nao_faturavel" || e.is_not_billable);
+  return rows.filter((e) => e.gg_status === status);
+}
+
+/** Busca paginada das linhas completas (PostgREST limita ~1000 por request). */
+export async function fetchToInvoiceRows(q: ToInvoiceRowsQuery): Promise<ToInvoiceEntry[]> {
+  const pageSize = 1000;
+  const all: ToInvoiceEntry[] = [];
+  let from = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await buildRowsQuery(q)
+      .order("transaction_date", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as ToInvoiceEntry[];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+/** Linhas do mês selecionado / da busca / do status escolhido. */
+export function useToInvoiceRows(q: ToInvoiceRowsQuery, enabled: boolean) {
+  return useQuery({
+    ...FRESH,
+    enabled,
+    queryKey: [
+      "ar-ti-rows",
+      scopeKey(q),
+      q.month ?? "",
+      (q.search ?? "").trim().toLowerCase(),
+      q.status ?? "todos",
+    ],
+    queryFn: () => fetchToInvoiceRows(q),
+  });
+}
+
+/** Quantidade de lançamentos com anexo e dados de nota/boleto incompletos. */
+export function useArDocsPendingCount(q: ToInvoiceRowsQuery, enabled = true) {
+  return useQuery({
+    ...FRESH,
+    enabled,
+    queryKey: [
+      "ar-ti-docs-pending",
+      scopeKey(q),
+      q.month ?? "",
+      (q.search ?? "").trim().toLowerCase(),
+      q.status ?? "todos",
+    ],
+    queryFn: async (): Promise<number> => {
+      const { count, error } = await buildRowsQuery(q, { count: true })
+        .or("invoice_file_1.not.is.null,invoice_file_2.not.is.null")
+        .or("nota_number.is.null,boleto_number.is.null,boleto_due_date.is.null");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
