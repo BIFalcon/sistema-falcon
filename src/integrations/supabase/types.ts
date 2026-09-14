@@ -3027,6 +3027,7 @@ export type Database = {
           p_date_to?: string
           p_dates?: string[]
           p_hotel_id?: string
+          p_status?: string
         }
         Returns: {
           cnt: number
