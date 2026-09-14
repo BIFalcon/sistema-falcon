@@ -2,7 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseArReportFile, type ParsedOpenFolioEntry, type ParsedToInvoiceEntry } from "@/lib/arReportParser";
 
-/* ──────────────── A FATURAR ──────────────── */
+/** Invalida tudo que depende do acervo de Faturamento (agregados + linhas). */
+function invalidateToInvoice(qc: ReturnType<typeof useQueryClient>) {
+  for (const k of ["ar-to-invoice", "ar-ti-totals", "ar-ti-status-counts", "ar-ti-rows", "ar-ti-docs-pending"]) {
+    qc.invalidateQueries({ queryKey: [k] });
+  }
+}
+
+/* ────────────── A FATURAR ────────────── */
 
 export interface ToInvoiceEntry {
   id: string;
@@ -163,7 +170,7 @@ export function useUploadArReport() {
       };
     },
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+      invalidateToInvoice(qc);
       qc.invalidateQueries({ queryKey: ["ar-open-folio"] });
       qc.invalidateQueries({ queryKey: ["ar-latest-upload", v.kind] });
     },
@@ -229,7 +236,7 @@ export function useSetToInvoiceGgStatus() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+      invalidateToInvoice(qc);
     },
   });
 }
@@ -246,7 +253,7 @@ export function useDeleteArUpload() {
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["ar-to-invoice"] });
+      invalidateToInvoice(qc);
       qc.invalidateQueries({ queryKey: ["ar-open-folio"] });
       qc.invalidateQueries({ queryKey: ["ar-latest-upload", v.kind] });
     },
@@ -620,7 +627,7 @@ export function useExtractArDocs() {
       }
       return { total: targets.length, ok, failed };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ar-to-invoice"] }),
+    onSuccess: () => invalidateToInvoice(qc),
   });
 }
 /* ──────────────── FATURAMENTO: CONSULTAS AGREGADAS / SOB DEMANDA ────────────────
