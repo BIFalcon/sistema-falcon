@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  logEmailFailureAlert,
+  logEmailSend,
+  sendRawEmail,
+} from "../_shared/email/send-raw-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,9 +15,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const SENDER_DOMAIN = "notify.falconhoteis.com.br";
-const FROM_ADDRESS = `Sistema Falcon <noreply@${SENDER_DOMAIN}>`;
-
 const DEFAULT_APP_BASE_URL = "https://sistema-falcon.lovable.app";
 function getAppBaseUrl(): string {
   const v = Deno.env.get("APP_BASE_URL");
@@ -20,60 +22,47 @@ function getAppBaseUrl(): string {
   return DEFAULT_APP_BASE_URL;
 }
 
-async function getUnsubscribeToken(
-  admin: ReturnType<typeof createClient>,
-  email: string,
-): Promise<string> {
-  const { data: existing } = await admin
-    .from("email_unsubscribe_tokens")
-    .select("token")
-    .eq("email", email)
-    .is("used_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existing?.token) return existing.token as string;
-  const token =
-    crypto.randomUUID().replace(/-/g, "") +
-    crypto.randomUUID().replace(/-/g, "");
-  await admin.from("email_unsubscribe_tokens").insert({ email, token });
-  return token;
-}
-
 async function enqueueInviteEmail(
   admin: ReturnType<typeof createClient>,
   args: { to: string; subject: string; html: string; text: string; label: string },
 ): Promise<boolean> {
+  const messageId = `${args.label}-${args.to}-${Date.now()}`;
   try {
-    const unsubscribeToken = await getUnsubscribeToken(admin, args.to);
-    const messageId = `${args.label}-${args.to}-${Date.now()}`;
-    const { error } = await admin.rpc("enqueue_email", {
-      queue_name: "auth_emails",
-      payload: {
-        message_id: messageId,
-        idempotency_key: messageId,
-        purpose: "transactional",
-        label: args.label,
-        to: args.to,
-        from: FROM_ADDRESS,
-        sender_domain: SENDER_DOMAIN,
-        subject: args.subject,
-        html: args.html,
-        text: args.text,
-        unsubscribe_token: unsubscribeToken,
-        queued_at: new Date().toISOString(),
-      },
+    const result = await sendRawEmail({
+      to: args.to,
+      subject: args.subject,
+      html: args.html,
+      text: args.text,
+      label: args.label,
+      idempotencyKey: messageId,
     });
-    if (error) {
-      console.error("[invite] enqueue_email failed:", error);
-      return false;
-    }
-    return true;
+    await logEmailSend(admin as never, {
+      message_id: messageId,
+      template_name: args.label,
+      recipient_email: args.to,
+      status: result.sent ? "sent" : "suppressed",
+    });
+    return result.sent;
   } catch (e) {
-    console.error("[invite] enqueue exception:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[invite] send failed:", msg);
+    await logEmailSend(admin as never, {
+      message_id: messageId,
+      template_name: args.label,
+      recipient_email: args.to,
+      status: "failed",
+      error_message: msg,
+    });
+    await logEmailFailureAlert(admin as never, {
+      to: args.to,
+      subject: args.subject,
+      label: args.label,
+      reason: msg,
+    });
     return false;
   }
 }
+
 
 type AppRole =
   | "processos"
