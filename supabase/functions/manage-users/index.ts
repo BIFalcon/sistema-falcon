@@ -36,7 +36,7 @@ async function enqueueInviteEmail(
       label: args.label,
       idempotencyKey: messageId,
     });
-    await logEmailSend(admin as never, {
+    await logEmailSend(admin, {
       message_id: messageId,
       template_name: args.label,
       recipient_email: args.to,
@@ -46,14 +46,14 @@ async function enqueueInviteEmail(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[invite] send failed:", msg);
-    await logEmailSend(admin as never, {
+    await logEmailSend(admin, {
       message_id: messageId,
       template_name: args.label,
       recipient_email: args.to,
       status: "failed",
       error_message: msg,
     });
-    await logEmailFailureAlert(admin as never, {
+    await logEmailFailureAlert(admin, {
       to: args.to,
       subject: args.subject,
       label: args.label,

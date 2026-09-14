@@ -83,11 +83,11 @@ export async function sendRawEmail(args: SendRawEmailArgs): Promise<SendRawEmail
   return { sent: true }
 }
 
-type Admin = {
-  from: (table: string) => {
-    insert: (values: Record<string, unknown>) => Promise<{ error: unknown }>
-  }
-}
+// Cliente Supabase (service role) — tipagem frouxa de propósito, os
+// chamadores usam versões diferentes do SDK.
+// deno-lint-ignore no-explicit-any
+type Admin = any
+
 
 /** Registra a tentativa de envio em email_send_log (nunca decide o resultado). */
 export async function logEmailSend(
