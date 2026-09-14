@@ -338,26 +338,57 @@ function ToInvoiceSection({
   } = useModuleFilters("financeiro");
   const hotelId = globalHotelId ?? "";
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [faturamentoFilter, setFaturamentoFilter] = useState<
-    "todos" | "pendente" | "faturado" | "pago" | "inadimplente" | "nao_faturavel"
-  >("todos");
+  const [faturamentoFilter, setFaturamentoFilter] = useState<ToInvoiceStatusFilter>("todos");
+  // Busca por cliente: consulta no banco com debounce (~400ms).
+  const [searchInput, setSearchInput] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setClientSearch(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
   // Drill por mês: quadradinhos de mês → lista corrida do mês escolhido.
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
   useEffect(() => {
     setDrillMonth(null);
   }, [hotelId]);
 
-  const { data: entries = [], isLoading } = useToInvoiceEntries({
-    hotelId: hotelId || undefined,
-    dateFrom,
-    dateTo,
-    dates: specificDates,
-  });
+  const scope = useMemo(
+    () => ({
+      hotelId: hotelId || null,
+      dateFrom,
+      dateTo,
+      dates: specificDates,
+      hotelIds: seesAllHotels ? null : restrictedHotelIds,
+    }),
+    [hotelId, dateFrom, dateTo, specificDates, seesAllHotels, restrictedHotelIds],
+  );
+
+  const searching = !!clientSearch.trim();
+  // Linhas completas só quando há drill de mês ou busca por cliente.
+  const rowsMode = searching || !!drillMonth;
+
+  const { data: totals = [], isLoading: totalsLoading } = useToInvoiceTotals(scope, faturamentoFilter);
+  const { data: statusCounts } = useToInvoiceStatusCounts(scope);
+  const { data: rawRows = [], isLoading: rowsLoading } = useToInvoiceRows(
+    {
+      ...scope,
+      month: !searching && drillMonth ? drillMonth : null,
+      search: searching ? clientSearch.trim() : null,
+      status: faturamentoFilter,
+    },
+    rowsMode,
+  );
   const { data: lastUpload } = useLatestArUpload("to_invoice");
   const { data: latestTiDate } = useLatestToInvoiceDate(hotelId || null);
   const { data: contracts } = useClientContracts(hotelId || null);
   const { data: tiUploads = [] } = useArUploadsByKind("to_invoice");
+  const [exporting, setExporting] = useState(false);
+
+  // Regra exata de status (idêntica à anterior) aplicada sobre as linhas trazidas.
+  const rows = useMemo(
+    () => applyStatusFilter(rawRows, faturamentoFilter, contracts),
+    [rawRows, faturamentoFilter, contracts],
+  );
 
   const uploadDateById = useMemo(() => {
     const m = new Map<string, string>();
@@ -376,52 +407,53 @@ function ToInvoiceSection({
   const hotelName = (id: string | null) =>
     id ? allHotels.find((h) => h.id === id)?.name ?? id : "—";
 
-  // Para o ranking consolidado, restringe entradas aos hotéis visíveis quando não master
-  const visibleEntries = useMemo(() => {
-    if (seesAllHotels) return entries;
-    const allowed = new Set(restrictedHotelIds ?? []);
-    return entries.filter((e) => e.hotel_id && allowed.has(e.hotel_id));
-  }, [entries, seesAllHotels, restrictedHotelIds]);
+  /* Ranking por hotel: agregado no banco; quando há busca, agrega as linhas encontradas. */
+  const ranking = useMemo(() => {
+    const map = new Map<string, number>();
+    const add = (id: string | null, total: number) => {
+      const k = id ?? "__unmapped__";
+      map.set(k, (map.get(k) ?? 0) + total);
+    };
+    if (searching) for (const e of rows) add(e.hotel_id, Number(e.amount ?? 0));
+    else for (const t of totals) add(t.hotel_id, t.total);
+    return Array.from(map.entries())
+      .map(([id, total]) => ({ id, name: id === "__unmapped__" ? "(não mapeado)" : hotelName(id), total }))
+      .sort((a, b) => b.total - a.total);
+  }, [searching, rows, totals, allHotels]);
 
-  const filteredToInvoice = visibleEntries;
+  /* Cards de total por mês: agregado no banco. */
+  const monthly = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of totals) {
+      if (!t.ym) continue;
+      map.set(t.ym, (map.get(t.ym) ?? 0) + t.total);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [totals]);
 
-  const finalEntries = useMemo(() => {
-    let arr = filteredToInvoice;
-    // O filtro de datas do header já é aplicado no servidor (useToInvoiceEntries).
-    if (faturamentoFilter !== "todos") {
-      if (faturamentoFilter === "pago") {
-        arr = arr.filter((e) => isEntryPaid(e));
-      } else if (faturamentoFilter === "inadimplente") {
-        arr = arr.filter((e) =>
-          isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
-        );
-      } else if (faturamentoFilter === "pendente") {
-        // "Não faturável" é um status terminal: nunca aparece como pendente.
-        arr = arr.filter(
-          (e) =>
-            e.gg_status !== "faturado" &&
-            e.gg_status !== "nao_faturavel" &&
-            !e.is_not_billable &&
-            !isEntryPaid(e),
-        );
-      } else if (faturamentoFilter === "nao_faturavel") {
-        arr = arr.filter((e) => e.gg_status === "nao_faturavel" || e.is_not_billable);
-      } else {
-        arr = arr.filter((e) => e.gg_status === faturamentoFilter);
-      }
+  const isLoading = rowsMode ? rowsLoading : totalsLoading;
+  const isEmpty = rowsMode
+    ? rows.length === 0
+    : !hotelId
+      ? ranking.length === 0
+      : monthly.length === 0;
+
+  /* Exportação: busca os dados no clique (todos os meses/hotéis do filtro atual). */
+  async function handleExportExcel() {
+    setExporting(true);
+    try {
+      const all = await fetchToInvoiceRows({
+        ...scope,
+        search: searching ? clientSearch.trim() : null,
+        status: faturamentoFilter,
+      });
+      exportToInvoiceToExcel(applyStatusFilter(all, faturamentoFilter, contracts), hotelName, contracts);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao exportar");
+    } finally {
+      setExporting(false);
     }
-    if (clientSearch.trim()) {
-      const q = clientSearch.toLowerCase();
-      arr = arr.filter(
-        (e) =>
-          e.account_name?.toLowerCase().includes(q) ||
-          e.account_number?.toLowerCase().includes(q) ||
-          e.confirmation_number?.toLowerCase().includes(q) ||
-          e.invoice_number?.toLowerCase().includes(q),
-      );
-    }
-    return arr;
-  }, [filteredToInvoice, faturamentoFilter, clientSearch, contracts]);
+  }
 
   return (
     <div className="space-y-5">
@@ -444,11 +476,11 @@ function ToInvoiceSection({
           <div className="flex items-center gap-2">
             <Input
               placeholder="Buscar por cliente, nº reserva ou invoice..."
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-72 h-9"
             />
-            <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as typeof faturamentoFilter)}>
+            <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as ToInvoiceStatusFilter)}>
               <SelectTrigger className="w-36 h-9">
                 <SelectValue />
               </SelectTrigger>
@@ -461,15 +493,21 @@ function ToInvoiceSection({
                 <SelectItem value="nao_faturavel">Não faturáveis</SelectItem>
               </SelectContent>
             </Select>
-            <ExtractDocsButton entries={finalEntries} />
+            <ExtractDocsButton
+              query={{
+                ...scope,
+                search: searching ? clientSearch.trim() : null,
+                status: faturamentoFilter,
+              }}
+            />
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
-              disabled={finalEntries.length === 0}
-              onClick={() => exportToInvoiceToExcel(finalEntries, hotelName, contracts)}
+              disabled={isEmpty || exporting}
+              onClick={handleExportExcel}
             >
-              <FileDown className="h-4 w-4" />
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
               Exportar Excel
             </Button>
             {hotelId && (
@@ -482,29 +520,25 @@ function ToInvoiceSection({
 
         {isLoading ? (
           <Table><TableBody><TableSkeleton rows={6} cols={5} /></TableBody></Table>
-        ) : finalEntries.length === 0 ? (
+        ) : isEmpty ? (
           <EmptyState text="Nenhum lançamento de faturamento para os filtros selecionados." />
         ) : !hotelId ? (
-          <ConsolidatedRanking entries={finalEntries} hotelName={hotelName} />
-        ) : !drillMonth && !clientSearch.trim() ? (
-          <MonthlyOverview entries={finalEntries} onPickMonth={setDrillMonth} />
+          <ConsolidatedRanking ranking={ranking} />
+        ) : !drillMonth && !searching ? (
+          <MonthlyOverview monthly={monthly} onPickMonth={setDrillMonth} />
         ) : (
           <DayBreakdown
-            entries={finalEntries
-              .filter((e) =>
-                clientSearch.trim() || !drillMonth
-                  ? true
-                  : e.transaction_date && ymKey(e.transaction_date) === drillMonth,
-              )
+            entries={rows
               .slice()
               .sort((a, b) =>
                 (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""),
               )}
             day={null}
             flat
-            searching={!!clientSearch.trim()}
+            searching={searching}
             contracts={contracts}
             onBack={() => {
+              setSearchInput("");
               setClientSearch("");
               setDrillMonth(null);
             }}
@@ -525,27 +559,13 @@ function ToInvoiceSection({
   );
 }
 
-function MonthlyOverview({
-  entries,
-  onPickMonth,
-}: {
-  entries: ToInvoiceEntry[];
-  onPickMonth: (m: string) => void;
-}) {
-  return _MonthlyOverviewImpl({ entries, onPickMonth });
-}
-
 /** Reprocessa a leitura automática (IA) dos anexos que ficaram sem nota/boleto/vencimento. */
-function ExtractDocsButton({ entries }: { entries: ToInvoiceEntry[] }) {
+function ExtractDocsButton({ query }: { query: ToInvoiceRowsQuery }) {
   const { isMaster, hasRole } = useAuth();
   const extract = useExtractArDocs();
   const canExtract = isMaster || hasRole("adm") || hasRole("gg") || hasRole("financeiro") || hasRole("controladoria");
-  const pending = entries.filter(
-    (e) =>
-      (e.invoice_file_1 || e.invoice_file_2) &&
-      (!e.nota_number || !e.boleto_number || !e.boleto_due_date),
-  );
-  if (!canExtract || pending.length === 0) return null;
+  const { data: pendingCount = 0 } = useArDocsPendingCount(query, canExtract);
+  if (!canExtract || pendingCount === 0) return null;
   return (
     <Button
       variant="outline"
@@ -554,33 +574,24 @@ function ExtractDocsButton({ entries }: { entries: ToInvoiceEntry[] }) {
       disabled={extract.isPending}
       title="Lê novamente nota e boleto anexados para preencher números e vencimento"
       onClick={async () => {
-        const r = await extract.mutateAsync({ entries: pending });
+        const all = await fetchToInvoiceRows(query);
+        const r = await extract.mutateAsync({ entries: all });
         toast.success(`${r.ok} documento(s) reprocessados${r.failed ? ` · ${r.failed} falha(s)` : ""}`);
       }}
     >
       {extract.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
-      Extrair dados ({pending.length})
+      Extrair dados ({pendingCount})
     </Button>
   );
 }
 
-function _MonthlyOverviewImpl({
-  entries,
+function MonthlyOverview({
+  monthly,
   onPickMonth,
 }: {
-  entries: ToInvoiceEntry[];
+  monthly: [string, number][];
   onPickMonth: (m: string) => void;
 }) {
-  const monthly = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of entries) {
-      if (!e.transaction_date) continue;
-      const k = ymKey(e.transaction_date);
-      map.set(k, (map.get(k) ?? 0) + Number(e.amount ?? 0));
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [entries]);
-
   if (!monthly.length) return <EmptyState text="Sem datas de transação." />;
   const max = Math.max(...monthly.map((m) => m[1]));
 
@@ -603,7 +614,7 @@ function _MonthlyOverviewImpl({
             <div className="mt-2 h-1.5 rounded bg-muted overflow-hidden">
               <div
                 className="h-full bg-accent"
-                style={{ width: `${(total / max) * 100}%` }}
+                style={{ width: `${max > 0 ? (total / max) * 100 : 0}%` }}
               />
             </div>
           </button>
