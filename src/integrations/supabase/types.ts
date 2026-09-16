@@ -3094,11 +3094,6 @@ export type Database = {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
         Returns: string
       }
-      delete_email: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
-      }
-      email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_ar_notification: {
         Args: {
           _body_md: string
@@ -3113,10 +3108,6 @@ export type Database = {
         Returns: number
       }
       enqueue_dre_sla_reminders: { Args: never; Returns: number }
-      enqueue_email: {
-        Args: { payload: Json; queue_name: string }
-        Returns: number
-      }
       enqueue_workflow_notification: {
         Args: {
           _body_md: string
@@ -3283,23 +3274,6 @@ export type Database = {
         Returns: undefined
       }
       month_pt: { Args: { _m: number }; Returns: string }
-      move_to_dlq: {
-        Args: {
-          dlq_name: string
-          message_id: number
-          payload: Json
-          source_queue: string
-        }
-        Returns: number
-      }
-      read_email_batch: {
-        Args: { batch_size: number; queue_name: string; vt: number }
-        Returns: {
-          message: Json
-          msg_id: number
-          read_ct: number
-        }[]
-      }
       users_with_role_for_hotel: {
         Args: {
           _hotel_id: string
