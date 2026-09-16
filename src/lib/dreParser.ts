@@ -847,7 +847,11 @@ function findMonthColumn(
     const width = Math.max(row.length, displayRow.length);
     const months = new Set<number>();
     for (let c = 0; c < width; c++) {
-      for (const cell of [row[c], displayRow[c]]) {
+      // Quando a célula crua já é uma data, ignoramos o texto formatado:
+      // formatos americanos ("5/1/25" para 01/05) invertem dia e mês e
+      // criavam colunas de mês erradas (janeiro lendo os valores de maio).
+      const cellsToCheck = row[c] instanceof Date ? [row[c]] : [row[c], displayRow[c]];
+      for (const cell of cellsToCheck) {
         // Não aceita números puros como datas (Excel serial) na detecção do
         // cabeçalho — isso faz qualquer valor monetário entre 20.000 e
         // 80.000 (ex.: R$ 75.257,05) virar "Janeiro de 2106" e contaminar
