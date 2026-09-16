@@ -771,24 +771,47 @@ function bestMonthValueColumn(
   headerRow: number,
   monthCol: number,
 ): { colIndex: number; dataCount: number } {
-  // Limita a busca ao bloco do próprio mês: nunca atravessa para outra
-  // coluna de mês ou para colunas agregadas (ACUMULADO/MÉDIA/TOTAL).
-  let maxCol = monthCol;
-  for (let c = monthCol + 1; c <= monthCol + 6; c++) {
-    const headerCell = rows[headerRow]?.[c] ?? displayRows?.[headerRow]?.[c];
-    const kind = isAggregateOrMonthHeaderCell(headerCell);
-    if (kind === "month" || kind === "aggregate") break;
-    maxCol = c;
+  // Última coluna de mês do próprio cabeçalho. Depois dela, a planilha pode
+  // conter blocos auxiliares totalmente alheios à DRE (ex.: o quadro
+  // "EXTRATO" das planilhas de Confins, com Receita/Despesa por mês em
+  // colunas soltas à direita). Sem esse limite, o mês de dezembro — que não
+  // tem outro mês à direita para servir de parada — acabava lendo valores
+  // desse bloco auxiliar.
+  const headerCellAt = (c: number) => {
+    const raw = rows[headerRow]?.[c];
+    return raw instanceof Date ? raw : (raw ?? displayRows?.[headerRow]?.[c]);
+  };
+  let lastMonthCol = monthCol;
+  const headerWidth = Math.max(rows[headerRow]?.length ?? 0, displayRows?.[headerRow]?.length ?? 0);
+  for (let c = monthCol + 1; c < headerWidth; c++) {
+    if (isAggregateOrMonthHeaderCell(headerCellAt(c)) === "month") lastMonthCol = c;
   }
-  let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
-  for (let c = monthCol; c <= maxCol; c++) {
-    const dataCount = countNumericColumnData(rows, headerRow, c);
-    const subHeader = [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
+
+  const subHeaderTextAt = (c: number) =>
+    [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
       .filter((v): v is string => typeof v === "string")
       .join(" ")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
+
+  // Limita a busca ao bloco do próprio mês: nunca atravessa para outra
+  // coluna de mês ou para colunas agregadas (ACUMULADO/MÉDIA/TOTAL).
+  let maxCol = monthCol;
+  for (let c = monthCol + 1; c <= monthCol + 6; c++) {
+    const kind = isAggregateOrMonthHeaderCell(headerCellAt(c));
+    if (kind === "month" || kind === "aggregate") break;
+    // Passou da última coluna de mês: só segue se a coluna estiver
+    // explicitamente marcada como "Realizado/Valor" (templates que quebram
+    // cada mês em subcolunas). Caso contrário, para — evita capturar blocos
+    // auxiliares da planilha.
+    if (c > lastMonthCol && !/realizado|actual|valor/.test(subHeaderTextAt(c))) break;
+    maxCol = c;
+  }
+  let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
+  for (let c = monthCol; c <= maxCol; c++) {
+    const dataCount = countNumericColumnData(rows, headerRow, c);
+    const subHeader = subHeaderTextAt(c);
     let score = dataCount;
     if (/realizado|actual|valor/.test(subHeader)) score += 1000;
     if (/orcado|budget|ano\s*anterior|desvio|varia|%/.test(subHeader)) score -= 1000;
@@ -824,7 +847,11 @@ function findMonthColumn(
     const width = Math.max(row.length, displayRow.length);
     const months = new Set<number>();
     for (let c = 0; c < width; c++) {
-      for (const cell of [row[c], displayRow[c]]) {
+      // Quando a célula crua já é uma data, ignoramos o texto formatado:
+      // formatos americanos ("5/1/25" para 01/05) invertem dia e mês e
+      // criavam colunas de mês erradas (janeiro lendo os valores de maio).
+      const cellsToCheck = row[c] instanceof Date ? [row[c]] : [row[c], displayRow[c]];
+      for (const cell of cellsToCheck) {
         // Não aceita números puros como datas (Excel serial) na detecção do
         // cabeçalho — isso faz qualquer valor monetário entre 20.000 e
         // 80.000 (ex.: R$ 75.257,05) virar "Janeiro de 2106" e contaminar
@@ -849,7 +876,8 @@ function findMonthColumn(
     const displayRow = displayRows?.[r] ?? [];
     const width = Math.max(row.length, displayRow.length);
     for (let c = 0; c < width; c++) {
-      const cells = [row[c], displayRow[c]];
+      // Mesma proteção: data crua manda, texto formatado é ignorado.
+      const cells = row[c] instanceof Date ? [row[c]] : [row[c], displayRow[c]];
       for (const cell of cells) {
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = typeof cell === "number" ? null : parseHeaderDate(cell);
