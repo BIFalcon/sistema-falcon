@@ -811,12 +811,7 @@ function bestMonthValueColumn(
   let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
   for (let c = monthCol; c <= maxCol; c++) {
     const dataCount = countNumericColumnData(rows, headerRow, c);
-    const subHeader = [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
-      .filter((v): v is string => typeof v === "string")
-      .join(" ")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
+    const subHeader = subHeaderTextAt(c);
     let score = dataCount;
     if (/realizado|actual|valor/.test(subHeader)) score += 1000;
     if (/orcado|budget|ano\s*anterior|desvio|varia|%/.test(subHeader)) score -= 1000;
