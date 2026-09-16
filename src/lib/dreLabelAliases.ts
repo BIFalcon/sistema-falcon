@@ -17,6 +17,9 @@
 export const DRE_LABEL_ALIASES: string[][] = [
   // — Indicadores topo —
   ["Número de Hóspedes", "Números de Hóspedes"],
+  ["Apartamentos Ocupados", "Roomnights", "Room Nights", "Número de Apartamentos Ocupados"],
+  ["Diária Média (ADR)", "Diária Média (em R$)", "Diária Média", "ADR"],
+  ["RevPAR", "RevPar (em R$)", "RevPar"],
   ["Resultado Operacional Bruto (GOP)", "Lucro Operacional Bruto (GOP)", "GOP"],
   ["Receita Bruta Total", "Receita Total Bruta", "RECEITA BRUTA TOTAL", "Total Das Receitas Bruta"],
   ["Receita Líquida Total", "Receita Total Líquida", "RECEITA LÍQUIDA TOTAL"],
