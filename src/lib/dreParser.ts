@@ -876,7 +876,8 @@ function findMonthColumn(
     const displayRow = displayRows?.[r] ?? [];
     const width = Math.max(row.length, displayRow.length);
     for (let c = 0; c < width; c++) {
-      const cells = [row[c], displayRow[c]];
+      // Mesma proteção: data crua manda, texto formatado é ignorado.
+      const cells = row[c] instanceof Date ? [row[c]] : [row[c], displayRow[c]];
       for (const cell of cells) {
         const label = cell instanceof Date ? cell.toISOString().slice(0, 10) : typeof cell === "string" ? cell.trim() : String(cell ?? "");
         const date = typeof cell === "number" ? null : parseHeaderDate(cell);
