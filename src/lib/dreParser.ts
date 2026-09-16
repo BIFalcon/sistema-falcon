@@ -771,13 +771,41 @@ function bestMonthValueColumn(
   headerRow: number,
   monthCol: number,
 ): { colIndex: number; dataCount: number } {
+  // Última coluna de mês do próprio cabeçalho. Depois dela, a planilha pode
+  // conter blocos auxiliares totalmente alheios à DRE (ex.: o quadro
+  // "EXTRATO" das planilhas de Confins, com Receita/Despesa por mês em
+  // colunas soltas à direita). Sem esse limite, o mês de dezembro — que não
+  // tem outro mês à direita para servir de parada — acabava lendo valores
+  // desse bloco auxiliar.
+  const headerCellAt = (c: number) => {
+    const raw = rows[headerRow]?.[c];
+    return raw instanceof Date ? raw : (raw ?? displayRows?.[headerRow]?.[c]);
+  };
+  let lastMonthCol = monthCol;
+  const headerWidth = Math.max(rows[headerRow]?.length ?? 0, displayRows?.[headerRow]?.length ?? 0);
+  for (let c = monthCol + 1; c < headerWidth; c++) {
+    if (isAggregateOrMonthHeaderCell(headerCellAt(c)) === "month") lastMonthCol = c;
+  }
+
+  const subHeaderTextAt = (c: number) =>
+    [rows[headerRow + 1]?.[c], rows[headerRow + 2]?.[c], displayRows?.[headerRow + 1]?.[c], displayRows?.[headerRow + 2]?.[c]]
+      .filter((v): v is string => typeof v === "string")
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
   // Limita a busca ao bloco do próprio mês: nunca atravessa para outra
   // coluna de mês ou para colunas agregadas (ACUMULADO/MÉDIA/TOTAL).
   let maxCol = monthCol;
   for (let c = monthCol + 1; c <= monthCol + 6; c++) {
-    const headerCell = rows[headerRow]?.[c] ?? displayRows?.[headerRow]?.[c];
-    const kind = isAggregateOrMonthHeaderCell(headerCell);
+    const kind = isAggregateOrMonthHeaderCell(headerCellAt(c));
     if (kind === "month" || kind === "aggregate") break;
+    // Passou da última coluna de mês: só segue se a coluna estiver
+    // explicitamente marcada como "Realizado/Valor" (templates que quebram
+    // cada mês em subcolunas). Caso contrário, para — evita capturar blocos
+    // auxiliares da planilha.
+    if (c > lastMonthCol && !/realizado|actual|valor/.test(subHeaderTextAt(c))) break;
     maxCol = c;
   }
   let best = { colIndex: monthCol, dataCount: countNumericColumnData(rows, headerRow, monthCol), score: -Infinity };
