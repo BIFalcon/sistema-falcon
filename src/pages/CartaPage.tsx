@@ -236,16 +236,11 @@ export default function CartaPage() {
   // RI tem acesso completo à carta em qualquer etapa de aprovação.
   const canEdit =
     hasRole("ri") ||
-    (dreReady &&
-      (isMaster ||
-        hasRole("controladoria") ||
-        hasRole("fernando") ||
-        hasRole("gg") ||
-        hasRole("gop")));
-  // Antes da prévia de DRE, somente Controladoria/Patronos (e Master) podem
-  // preencher o Fundo de Reserva — e nada além disso.
+    (dreReady && (isMaster || hasRole("fernando") || hasRole("gg") || hasRole("gop")));
+  // Controladoria e Patronos só editam o Fundo de Reserva — em qualquer etapa,
+  // inclusive antes de alguém ter editado a carta, e sem precisar de RPS.
   const canEditReserveFund =
-    !canEdit && (isMaster || hasRole("controladoria") || isPatronos);
+    isMaster || isPatronos || hasRole("controladoria") || canEdit;
 
 
 
