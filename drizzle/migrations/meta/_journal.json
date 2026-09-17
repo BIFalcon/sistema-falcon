@@ -8,6 +8,13 @@
       "when": 1789647545062,
       "tag": "0000_ri_full_access_investor_letters",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789648850772,
+      "tag": "0001_consolidado_resultados_cache",
+      "breakpoints": true
     }
   ]
 }

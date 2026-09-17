@@ -1704,6 +1704,74 @@ export type Database = {
           },
         ]
       }
+      consolidado_resultados_cache: {
+        Row: {
+          adr: number | null
+          closing_id: string | null
+          distribuicao_por_uh: number | null
+          distribuicao_total: number | null
+          fundo_reserva: number | null
+          gop: number | null
+          hotel_id: string
+          incentive_fee: number | null
+          month: number
+          ocupacao: number | null
+          receita_bruta: number | null
+          revpar: number | null
+          status_dre: string | null
+          taxa_fee: number | null
+          uhs_disponiveis: number | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          adr?: number | null
+          closing_id?: string | null
+          distribuicao_por_uh?: number | null
+          distribuicao_total?: number | null
+          fundo_reserva?: number | null
+          gop?: number | null
+          hotel_id: string
+          incentive_fee?: number | null
+          month: number
+          ocupacao?: number | null
+          receita_bruta?: number | null
+          revpar?: number | null
+          status_dre?: string | null
+          taxa_fee?: number | null
+          uhs_disponiveis?: number | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          adr?: number | null
+          closing_id?: string | null
+          distribuicao_por_uh?: number | null
+          distribuicao_total?: number | null
+          fundo_reserva?: number | null
+          gop?: number | null
+          hotel_id?: string
+          incentive_fee?: number | null
+          month?: number
+          ocupacao?: number | null
+          receita_bruta?: number | null
+          revpar?: number | null
+          status_dre?: string | null
+          taxa_fee?: number | null
+          uhs_disponiveis?: number | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consolidado_resultados_cache_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_download_log: {
         Row: {
           closing_id: string
@@ -3094,6 +3162,27 @@ export type Database = {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
         Returns: string
       }
+      consolidado_has_line: {
+        Args: { _closing_id: string; _patterns: string[]; _version: number }
+        Returns: boolean
+      }
+      consolidado_indicator: {
+        Args: { _closing_id: string; _key: string; _version: number }
+        Returns: number
+      }
+      consolidado_indicator_by_pattern: {
+        Args: {
+          _closing_id: string
+          _month: number
+          _patterns: string[]
+          _version: number
+        }
+        Returns: number
+      }
+      consolidado_line_value: {
+        Args: { _closing_id: string; _patterns: string[]; _version: number }
+        Returns: number
+      }
       enqueue_ar_notification: {
         Args: {
           _body_md: string
@@ -3274,6 +3363,10 @@ export type Database = {
         Returns: undefined
       }
       month_pt: { Args: { _m: number }; Returns: string }
+      recalc_consolidado_cache: {
+        Args: { _closing_id: string }
+        Returns: undefined
+      }
       users_with_role_for_hotel: {
         Args: {
           _hotel_id: string

@@ -161,6 +161,12 @@ const LUCRO_A_DISTRIBUIR_PATTERNS_BY_HOTEL: Record<string, RegExp[]> = {
   ],
 };
 
+/**
+ * Lê o resumo já pré-computado em `consolidado_resultados_cache`.
+ * A tabela é recalculada por trigger no banco a cada nova versão de DRE
+ * (dre_versions / dre_parsed_lines) e a cada mudança de status/distribuição
+ * do fechamento — portanto aqui basta um SELECT simples.
+ */
 export function useConsolidadoData(input: {
   hotelIds: string[];
   year: number;
@@ -169,142 +175,41 @@ export function useConsolidadoData(input: {
   return useQuery({
     enabled: input.hotelIds.length > 0,
     queryKey: ["consolidado", input.hotelIds, input.year, input.month],
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    gcTime: 60 * 1000,
+    refetchOnMount: "always",
     queryFn: async (): Promise<ConsolidadoRow[]> => {
-      const [{ data: closings, error: cErr }, { data: hotelRows }] = await Promise.all([
-        supabase
-        .from("closings")
-        .select("id, hotel_id, status_dre, final_distribution, estimated_distribution")
+      const { data, error } = await supabase
+        .from("consolidado_resultados_cache")
+        .select(
+          "hotel_id, closing_id, status_dre, ocupacao, adr, revpar, receita_bruta, taxa_fee, incentive_fee, distribuicao_total, uhs_disponiveis, distribuicao_por_uh, gop, fundo_reserva",
+        )
         .in("hotel_id", input.hotelIds)
         .eq("year", input.year)
-        .eq("month", input.month),
-        supabase
-          .from("hotels")
-          .select("id, num_apartments")
-          .in("id", input.hotelIds),
-      ]);
-      if (cErr) throw cErr;
-      const numApartmentsByHotel = new Map<string, number | null>();
-      for (const h of (hotelRows ?? []) as { id: string; num_apartments: number | null }[]) {
-        numApartmentsByHotel.set(h.id, h.num_apartments ?? null);
-      }
+        .eq("month", input.month);
+      if (error) throw error;
 
-      const closingIds = (closings ?? []).map((c) => c.id);
-      const linesByClosing = new Map<string, ParsedLine[]>();
-      if (closingIds.length > 0) {
-        const pageSize = 1000;
-        for (let from = 0; ; from += pageSize) {
-          const { data, error } = await supabase
-            .rpc("get_latest_dre_lines_by_closings", { _closing_ids: closingIds })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          const batch = (data ?? []) as ParsedLine[];
-          for (const row of batch) {
-            if (!row.closing_id) continue;
-            const list = linesByClosing.get(row.closing_id) ?? [];
-            list.push(row);
-            linesByClosing.set(row.closing_id, list);
-          }
-          if (batch.length < pageSize) break;
-        }
-      }
-
-      // Busca adicional para linhas de Taxa Fee, Incentive Fee e Distribuição
-      // que são salvas como line_type = "line" (não "indicator")
-      if (closingIds.length > 0) {
-        const { data: extraLines } = await supabase
-          .from("dre_parsed_lines")
-          .select("closing_id, line_label, line_value, line_type, version_number")
-          .in("closing_id", closingIds)
-          .eq("line_type", "line")
-          .or([
-            "line_label.ilike.%taxa%falcon%",
-            "line_label.ilike.%fee%falcon%",
-            "line_label.ilike.%taxa%sucesso%",
-            "line_label.ilike.%incentive%fee%",
-            "line_label.ilike.%distribui%",
-            "line_label.ilike.%por uh%",
-            "line_label.ilike.%por_uh%",
-            "line_label.ilike.%dividendo%",
-            "line_label.ilike.%rendimento%",
-            "line_label.ilike.%lucro%distribu%",
-            "line_label.ilike.%resultado%exerc%",
-            "line_label.ilike.%preju%distribu%",
-            "line_label.ilike.%resultado%distribu%",
-            "line_label.ilike.%taxa%administ%gop%",
-            "line_label.ilike.%fundo%reserva%",
-            "line_label.ilike.%reposi%patrimonial%",
-          ].join(","));
-
-        for (const row of (extraLines ?? []) as ParsedLine[]) {
-          if (!row.closing_id) continue;
-          const list = linesByClosing.get(row.closing_id) ?? [];
-          const existingVersions = list.filter((l) => l.line_type === "line");
-          const maxVersion = existingVersions.length > 0
-            ? Math.max(...existingVersions.map((l) => (l.version_number ?? 0) as number))
-            : (row.version_number ?? 0);
-          if ((row.version_number ?? 0) >= maxVersion) {
-            list.push(row);
-            linesByClosing.set(row.closing_id, list);
-          }
-        }
-      }
+      const byHotel = new Map(
+        (data ?? []).map((r) => [r.hotel_id as string, r]),
+      );
 
       return input.hotelIds.map((hotelId) => {
-        const closing = (closings ?? []).find((c) => c.hotel_id === hotelId) ?? null;
-        const lines: ParsedLine[] = closing ? linesByClosing.get(closing.id) ?? [] : [];
-        const ocupacao = findIndicator(lines, "ocupacao");
-        const adr = findIndicator(lines, "adr");
-        const revpar = findIndicator(lines, "revpar");
-        const receitaBruta = findIndicator(lines, "receita_bruta_total");
-        const gop = findIndicator(lines, "gop");
-        const uhsDisponiveis = findIndicator(lines, "uhs_disponiveis");
-        const distribuicaoTotal =
-          (closing?.final_distribution as number | null | undefined) ??
-          (closing?.estimated_distribution as number | null | undefined) ??
-          null;
-        const taxaFee = findLineByPattern(lines, TAXA_FEE_PATTERNS);
-        // Só cai para o indicador derivado quando NÃO existe linha contábil
-        // correspondente (caso Manhattan). Se a linha existe mas está zerada,
-        // o valor real é zero — não substituir por projeção de orçamento.
-        const incentiveFee = hasLineMatching(lines, TAXA_SUCESSO_PATTERNS)
-          ? findLineByPattern(lines, TAXA_SUCESSO_PATTERNS)
-          : findIndicatorByPattern(lines, TAXA_SUCESSO_PATTERNS, input.month);
-        const fundoReserva = findLineByPattern(lines, FUNDO_RESERVA_PATTERNS);
-        // Prioriza a linha explícita da DRE; só cai para o valor salvo no
-        // closing (que vem do lucro_liquido do estimador) quando a linha
-        // não existir.
-        const patterns =
-          LUCRO_A_DISTRIBUIR_PATTERNS_BY_HOTEL[hotelId] ?? LUCRO_A_DISTRIBUIR_PATTERNS;
-        const lucroADistribuir = findLineByPattern(lines, patterns);
-        const distribuicaoTotalFinal =
-          lucroADistribuir != null ? lucroADistribuir : distribuicaoTotal;
-        const distribuicaoPorUh = NO_DISTRIB_UH_HOTELS.has(hotelId)
-          ? null
-          : (() => {
-              const fromDre = findLineByPattern(lines, DISTRIBUICAO_POR_UH_PATTERNS);
-              if (fromDre != null) return Math.abs(fromDre);
-              // Block 12: usa nº fixo de apartamentos do hotel (não UHs do mês).
-              const numApartments = numApartmentsByHotel.get(hotelId) ?? null;
-              return distribuicaoTotalFinal != null && numApartments && numApartments > 0
-                ? distribuicaoTotalFinal / numApartments
-                : null;
-            })();
+        const r = byHotel.get(hotelId);
         return {
           hotelId,
-          closingId: closing?.id ?? null,
-          statusDre: (closing?.status_dre as string | null | undefined) ?? null,
-          ocupacao,
-          adr,
-          revpar,
-          receitaBruta,
-          taxaFee: taxaFee != null ? Math.abs(taxaFee) : null,
-          incentiveFee: incentiveFee != null ? Math.abs(incentiveFee) : null,
-          distribuicaoTotal: distribuicaoTotalFinal,
-          uhsDisponiveis,
-          distribuicaoPorUh,
-          gop,
-          fundoReserva: fundoReserva != null ? Math.abs(fundoReserva) : null,
+          closingId: r?.closing_id ?? null,
+          statusDre: r?.status_dre ?? null,
+          ocupacao: r?.ocupacao ?? null,
+          adr: r?.adr ?? null,
+          revpar: r?.revpar ?? null,
+          receitaBruta: r?.receita_bruta ?? null,
+          taxaFee: r?.taxa_fee ?? null,
+          incentiveFee: r?.incentive_fee ?? null,
+          distribuicaoTotal: r?.distribuicao_total ?? null,
+          uhsDisponiveis: r?.uhs_disponiveis ?? null,
+          distribuicaoPorUh: r?.distribuicao_por_uh ?? null,
+          gop: r?.gop ?? null,
+          fundoReserva: r?.fundo_reserva ?? null,
         } satisfies ConsolidadoRow;
       });
     },
