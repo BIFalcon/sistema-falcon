@@ -233,14 +233,15 @@ export default function CartaPage() {
   // A carta fica liberada para edição a partir do momento em que a
   // Controladoria posta a primeira prévia de DRE do mês.
   const dreReady = hasDreData || currentClosingHasDre === true;
+  // RI tem acesso completo à carta em qualquer etapa de aprovação.
   const canEdit =
-    dreReady &&
-    (isMaster ||
-      hasRole("controladoria") ||
-      hasRole("fernando") ||
-      hasRole("ri") ||
-      hasRole("gg") ||
-      hasRole("gop"));
+    hasRole("ri") ||
+    (dreReady &&
+      (isMaster ||
+        hasRole("controladoria") ||
+        hasRole("fernando") ||
+        hasRole("gg") ||
+        hasRole("gop")));
   // Antes da prévia de DRE, somente Controladoria/Patronos (e Master) podem
   // preencher o Fundo de Reserva — e nada além disso.
   const canEditReserveFund =
