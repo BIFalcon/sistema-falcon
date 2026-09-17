@@ -15,6 +15,13 @@
       "when": 1789648850772,
       "tag": "0001_consolidado_resultados_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789650941130,
+      "tag": "0002_security_fix_definer_exec_and_ap_docs_with_check",
+      "breakpoints": true
     }
   ]
 }
