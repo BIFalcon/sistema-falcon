@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     if (closing.error || !closing.data) return json({ error: "Fechamento não encontrado" }, 404);
 
     // Authorization: caller must have access to this hotel
-    const allowed = await supabase.rpc("is_hotel_allowed", {
+    const allowed = await supabase.rpc("can_view_hotel_data", {
       _user_id: userId,
       _hotel_id: closing.data.hotel_id,
     });
