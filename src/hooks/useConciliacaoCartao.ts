@@ -127,20 +127,21 @@ export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateT
     queryKey: ["conc-opera", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_opera_entries")
-        .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
-        .eq("hotel_id", hotelId!)
-        .order("business_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("business_date", days);
-      else {
-        if (dateFrom) q = q.gte("business_date", dateFrom);
-        if (dateTo) q = q.lte("business_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as OperaEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_opera_entries")
+          .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
+          .eq("hotel_id", hotelId!)
+          .order("business_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("business_date", days);
+        else {
+          if (dateFrom) q = q.gte("business_date", dateFrom);
+          if (dateTo) q = q.lte("business_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<OperaEntry>(build);
     },
   });
 }
