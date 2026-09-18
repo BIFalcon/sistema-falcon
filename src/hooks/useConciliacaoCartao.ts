@@ -803,16 +803,15 @@ export function useConcJustifications(hotelId: string | null) {
   return useQuery({
     queryKey: ["conc-justifications", hotelId ?? "none"],
     enabled: !!hotelId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_justifications")
-        .select("id, hotel_id, side, entry_id, kind, note, author_id, created_at, updated_at")
-        .eq("hotel_id", hotelId!)
-        .order("updated_at", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []) as ConcJustification[];
-    },
+    queryFn: async () =>
+      await fetchAllPaged<ConcJustification>(() =>
+        supabase
+          .from("conc_justifications")
+          .select("id, hotel_id, side, entry_id, kind, note, author_id, created_at, updated_at")
+          .eq("hotel_id", hotelId!)
+          .order("updated_at", { ascending: false })
+          .order("id", { ascending: true }),
+      ),
   });
 }
 
