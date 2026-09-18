@@ -177,20 +177,21 @@ export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo
     queryKey: ["conc-bank", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_bank_entries")
-        .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at")
-        .eq("hotel_id", hotelId!)
-        .order("line_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("line_date", days);
-      else {
-        if (dateFrom) q = q.gte("line_date", dateFrom);
-        if (dateTo) q = q.lte("line_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as BankEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_bank_entries")
+          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at")
+          .eq("hotel_id", hotelId!)
+          .order("line_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("line_date", days);
+        else {
+          if (dateFrom) q = q.gte("line_date", dateFrom);
+          if (dateTo) q = q.lte("line_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<BankEntry>(build);
     },
   });
 }
@@ -200,15 +201,14 @@ export function useAllBankEntries(enabled: boolean) {
   return useQuery({
     queryKey: ["conc-bank-all"],
     enabled,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_bank_entries")
-        .select("id, hotel_id, line_date, description, amount")
-        .gt("amount", 0)
-        .limit(50000);
-      if (error) throw error;
-      return (data ?? []) as Pick<BankEntry, "id" | "hotel_id" | "line_date" | "amount">[];
-    },
+    queryFn: async () =>
+      await fetchAllPaged<Pick<BankEntry, "id" | "hotel_id" | "line_date" | "amount">>(() =>
+        supabase
+          .from("conc_bank_entries")
+          .select("id, hotel_id, line_date, description, amount")
+          .gt("amount", 0)
+          .order("id", { ascending: true }),
+      ),
   });
 }
 
@@ -216,17 +216,18 @@ export function useConcMatches(hotelId: string | null, kind: ConcKind) {
   return useQuery({
     queryKey: ["conc-matches", hotelId ?? "none", kind],
     enabled: !!hotelId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_matches")
-        .select("id, hotel_id, kind, left_total, right_total, difference, note, matched_by, matched_at, conc_match_items(id, side, entry_id, amount)")
-        .eq("hotel_id", hotelId!)
-        .eq("kind", kind)
-        .order("matched_at", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []) as unknown as ConcMatch[];
-    },
+    queryFn: async () =>
+      (await fetchAllPaged<unknown>(() =>
+        supabase
+          .from("conc_matches")
+          .select("id, hotel_id, kind, left_total, right_total, difference, note, matched_by, matched_at, conc_match_items(id, side, entry_id, amount)")
+          .eq("hotel_id", hotelId!)
+          .eq("kind", kind)
+          .order("matched_at", { ascending: false })
+          .order("id", { ascending: true }),
+      )) as ConcMatch[],
+  });
+}
   });
 }
 
