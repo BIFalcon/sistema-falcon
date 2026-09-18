@@ -345,28 +345,24 @@ export function useImportOpera() {
   });
 }
 
-/** Descarta duplicatas de relatórios acumulados (MTD) consultando no banco as
- *  chaves exatas que estão sendo importadas. A verificação é feita pela
- *  entry_key (identidade estável da linha) e NÃO por hotel/upload, então funciona
- *  entre uploads diferentes — mesmo se um arquivo anterior foi importado em
- *  outro hotel ou paginado fora de ordem. */
+/** Descarta duplicatas de relatórios acumulados (MTD) comparando as chaves
+ *  estáveis (entry_key) já existentes para o hotel. Buscamos as chaves do hotel
+ *  página por página em vez de filtrar por milhares de chaves na URL — o filtro
+ *  gigante fazia o servidor recusar a requisição ("Bad Request"). */
 async function existingKeys(
   table: "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries",
-  keys: string[],
+  hotelId: string,
 ): Promise<Set<string>> {
-  const found = new Set<string>();
-  const unique = [...new Set(keys)];
-  const BATCH = 400;
-  for (let i = 0; i < unique.length; i += BATCH) {
-    const { data, error } = await supabase
+  const rows = await fetchAllPaged<{ entry_key: string }>(() =>
+    supabase
       .from(table)
       .select("entry_key")
-      .in("entry_key", unique.slice(i, i + BATCH));
-    if (error) throw error;
-    for (const r of data ?? []) found.add((r as { entry_key: string }).entry_key);
-  }
-  return found;
+      .eq("hotel_id", hotelId)
+      .order("entry_key", { ascending: true }),
+  );
+  return new Set(rows.map((r) => r.entry_key));
 }
+
 
 export function useImportAcquirer() {
   const qc = useQueryClient();
