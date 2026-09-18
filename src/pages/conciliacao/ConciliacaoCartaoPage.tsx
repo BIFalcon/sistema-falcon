@@ -664,9 +664,8 @@ export default function ConciliacaoCartaoPage() {
                     {trxDays.map((d) => {
                       const open = trxOpenDay === d.date;
                       return (
-                        <>
+                        <Fragment key={d.date}>
                           <TableRow
-                            key={d.date}
                             className="text-[11px] cursor-pointer hover:bg-muted/50"
                             onClick={() => setTrxOpenDay(open ? null : d.date)}
                           >
@@ -695,7 +694,7 @@ export default function ConciliacaoCartaoPage() {
                                   <TableCell className="text-right"><Money value={t.total} /></TableCell>
                                 </TableRow>
                               ))}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </TableBody>
