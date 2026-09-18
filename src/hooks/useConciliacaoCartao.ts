@@ -84,6 +84,29 @@ export interface ConcMatch {
 /* Consultas                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * O servidor devolve no máximo 1.000 linhas por requisição, mesmo com
+ * .limit(20000) — por isso hotéis com muito volume só mostravam os primeiros
+ * dias. Aqui buscamos página por página até acabar.
+ */
+const PAGE = 1000;
+
+async function fetchAllPaged<T>(
+  build: () => { range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }> },
+  maxRows = 200_000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < maxRows; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+
 export function useTrxCodeMapping() {
   return useQuery({
     queryKey: ["trx-code-mapping"],
@@ -104,20 +127,21 @@ export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateT
     queryKey: ["conc-opera", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_opera_entries")
-        .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
-        .eq("hotel_id", hotelId!)
-        .order("business_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("business_date", days);
-      else {
-        if (dateFrom) q = q.gte("business_date", dateFrom);
-        if (dateTo) q = q.lte("business_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as OperaEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_opera_entries")
+          .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
+          .eq("hotel_id", hotelId!)
+          .order("business_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("business_date", days);
+        else {
+          if (dateFrom) q = q.gte("business_date", dateFrom);
+          if (dateTo) q = q.lte("business_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<OperaEntry>(build);
     },
   });
 }
@@ -128,20 +152,21 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
     queryKey: ["conc-acquirer", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_acquirer_entries")
-        .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
-        .eq("hotel_id", hotelId!)
-        .order("sale_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("sale_date", days);
-      else {
-        if (dateFrom) q = q.gte("sale_date", dateFrom);
-        if (dateTo) q = q.lte("sale_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as AcquirerEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_acquirer_entries")
+          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
+          .eq("hotel_id", hotelId!)
+          .order("sale_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("sale_date", days);
+        else {
+          if (dateFrom) q = q.gte("sale_date", dateFrom);
+          if (dateTo) q = q.lte("sale_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<AcquirerEntry>(build);
     },
   });
 }
@@ -152,20 +177,21 @@ export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo
     queryKey: ["conc-bank", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_bank_entries")
-        .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at")
-        .eq("hotel_id", hotelId!)
-        .order("line_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("line_date", days);
-      else {
-        if (dateFrom) q = q.gte("line_date", dateFrom);
-        if (dateTo) q = q.lte("line_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as BankEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_bank_entries")
+          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at")
+          .eq("hotel_id", hotelId!)
+          .order("line_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("line_date", days);
+        else {
+          if (dateFrom) q = q.gte("line_date", dateFrom);
+          if (dateTo) q = q.lte("line_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<BankEntry>(build);
     },
   });
 }
@@ -175,15 +201,14 @@ export function useAllBankEntries(enabled: boolean) {
   return useQuery({
     queryKey: ["conc-bank-all"],
     enabled,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_bank_entries")
-        .select("id, hotel_id, line_date, description, amount")
-        .gt("amount", 0)
-        .limit(50000);
-      if (error) throw error;
-      return (data ?? []) as Pick<BankEntry, "id" | "hotel_id" | "line_date" | "amount">[];
-    },
+    queryFn: async () =>
+      await fetchAllPaged<Pick<BankEntry, "id" | "hotel_id" | "line_date" | "amount">>(() =>
+        supabase
+          .from("conc_bank_entries")
+          .select("id, hotel_id, line_date, description, amount")
+          .gt("amount", 0)
+          .order("id", { ascending: true }),
+      ),
   });
 }
 
@@ -191,17 +216,16 @@ export function useConcMatches(hotelId: string | null, kind: ConcKind) {
   return useQuery({
     queryKey: ["conc-matches", hotelId ?? "none", kind],
     enabled: !!hotelId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_matches")
-        .select("id, hotel_id, kind, left_total, right_total, difference, note, matched_by, matched_at, conc_match_items(id, side, entry_id, amount)")
-        .eq("hotel_id", hotelId!)
-        .eq("kind", kind)
-        .order("matched_at", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []) as unknown as ConcMatch[];
-    },
+    queryFn: async () =>
+      (await fetchAllPaged<unknown>(() =>
+        supabase
+          .from("conc_matches")
+          .select("id, hotel_id, kind, left_total, right_total, difference, note, matched_by, matched_at, conc_match_items(id, side, entry_id, amount)")
+          .eq("hotel_id", hotelId!)
+          .eq("kind", kind)
+          .order("matched_at", { ascending: false })
+          .order("id", { ascending: true }),
+      )) as ConcMatch[],
   });
 }
 
@@ -779,16 +803,15 @@ export function useConcJustifications(hotelId: string | null) {
   return useQuery({
     queryKey: ["conc-justifications", hotelId ?? "none"],
     enabled: !!hotelId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conc_justifications")
-        .select("id, hotel_id, side, entry_id, kind, note, author_id, created_at, updated_at")
-        .eq("hotel_id", hotelId!)
-        .order("updated_at", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []) as ConcJustification[];
-    },
+    queryFn: async () =>
+      await fetchAllPaged<ConcJustification>(() =>
+        supabase
+          .from("conc_justifications")
+          .select("id, hotel_id, side, entry_id, kind, note, author_id, created_at, updated_at")
+          .eq("hotel_id", hotelId!)
+          .order("updated_at", { ascending: false })
+          .order("id", { ascending: true }),
+      ),
   });
 }
 
@@ -833,16 +856,16 @@ export function useMatchedCountsByUpload() {
     queryFn: async () => {
       const counts = new Map<string, number>();
       for (const table of ["conc_opera_entries", "conc_acquirer_entries", "conc_bank_entries"] as const) {
-        const { data, error } = await supabase
-          .from(table)
-          .select("upload_id")
-          .not("matched_at", "is", null)
-          .not("upload_id", "is", null)
-          .limit(50000);
-        if (error) throw error;
-        for (const r of data ?? []) {
-          const id = (r as { upload_id: string }).upload_id;
-          counts.set(id, (counts.get(id) ?? 0) + 1);
+        const rows = await fetchAllPaged<{ upload_id: string }>(() =>
+          supabase
+            .from(table)
+            .select("upload_id")
+            .not("matched_at", "is", null)
+            .not("upload_id", "is", null)
+            .order("id", { ascending: true }),
+        );
+        for (const r of rows) {
+          counts.set(r.upload_id, (counts.get(r.upload_id) ?? 0) + 1);
         }
       }
       return counts;
