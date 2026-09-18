@@ -127,6 +127,8 @@ export default function FinanceiroPage() {
                 <TableHead className="text-[11px] uppercase tracking-wider">Hotel</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Lucro Líquido (DRE)</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuição DRE</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuição / UH</TableHead>
+
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuído</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Decisão</TableHead>
                 <TableHead className="text-right text-[11px] uppercase tracking-wider">Ação</TableHead>
@@ -187,6 +189,16 @@ export default function FinanceiroPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {consolidatedRow?.distribuicaoPorUh != null ? (
+                        <span className="font-medium">{formatBRL(consolidatedRow.distribuicaoPorUh)}</span>
+                      ) : isConsolidadoLoading ? (
+                        <span className="text-[11px] text-muted-foreground italic">carregando…</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+
                     <TableCell className="text-right tabular-nums">
                       {paidDistribution == null ? (
                         <span className="text-muted-foreground">—</span>
@@ -293,26 +305,11 @@ export default function FinanceiroPage() {
 
             {/* Métricas adicionais do fechamento (Bloco 4) */}
             {(() => {
-              const finalValue =
-                decision === "enviado"
-                  ? Number((valueStr || "0").replace(",", "."))
-                  : openRow?.final_distribution ??
-                    openMetrics?.distribuicaoTotal ??
-                    openRow?.estimated_distribution ??
-                    0;
-              // Se o usuário editou o valor, recalcula por UH proporcionalmente
-              // à razão do Consolidado; caso contrário, usa exatamente o mesmo
-              // valor por UH exibido no Consolidado de Resultados.
-              let distribPorUh: number | null = openMetrics?.distribuicaoPorUh ?? null;
-              if (
-                decision === "enviado" &&
-                openMetrics?.distribuicaoTotal &&
-                openMetrics.distribuicaoTotal !== 0 &&
-                distribPorUh != null &&
-                finalValue
-              ) {
-                distribPorUh = (distribPorUh * finalValue) / openMetrics.distribuicaoTotal;
-              }
+              // Distribuição / UH é sempre o valor da DRE (o mesmo que vai para
+              // o Consolidado de Resultados) — não é recalculado pelo valor
+              // digitado pelo Financeiro.
+              const distribPorUh: number | null = openMetrics?.distribuicaoPorUh ?? null;
+
               return (
                 <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/30 p-3">
                   <div>
