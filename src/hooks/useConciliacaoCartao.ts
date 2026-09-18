@@ -273,7 +273,7 @@ export function useImportOpera() {
       const parsedOpera = await parseOperaXml(file, hotelId, active);
       const { skipped, total } = parsedOpera;
       // Relatório acumulado (MTD): descarta o que já existe.
-      const knownOpera = await existingKeys("conc_opera_entries", hotelId);
+      const knownOpera = await existingKeys("conc_opera_entries", parsedOpera.rows.map((r) => r.entry_key));
       const rows = parsedOpera.rows.filter((r) => !knownOpera.has(r.entry_key));
       const duplicates = parsedOpera.rows.length - rows.length;
 
@@ -358,7 +358,7 @@ export function useImportAcquirer() {
       const { skipped, unmatched, otherHotels } = parsed;
 
       // Planilha MTD (acumulada): descarta o que já foi importado antes.
-      const known = await existingKeys("conc_acquirer_entries", hotelId);
+      const known = await existingKeys("conc_acquirer_entries", parsed.rows.map((r) => r.entry_key));
       const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
       const duplicates = parsed.rows.length - rows.length;
 
@@ -421,7 +421,7 @@ export function useImportBankStatement() {
       }
 
       // Extrato acumulado (MTD): descarta lançamentos já importados antes.
-      const knownBank = await existingKeys("conc_bank_entries", hotelId);
+      const knownBank = await existingKeys("conc_bank_entries", parsed.rows.map((r) => r.entry_key));
       const bankRows = parsed.rows.filter((r) => !knownBank.has(r.entry_key));
       const duplicates = parsed.rows.length - bankRows.length;
 
