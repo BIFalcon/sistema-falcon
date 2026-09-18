@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
-  Banknote, CalendarDays, CreditCard, Download, FileSpreadsheet, Landmark,
-  Loader2, Trash2, Undo2, Upload, Users,
+  Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
+  FileSpreadsheet, Landmark, Loader2, Trash2, Undo2, Upload, Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -343,6 +343,21 @@ export default function ConciliacaoCartaoPage() {
     return [...map.values()].sort((a, b) => (a.date === b.date ? a.code.localeCompare(b.code) : a.date.localeCompare(b.date)));
   }, [opera.data]);
 
+  /** Visão inicial: total do dia somando todos os TRX Codes. */
+  const trxDays = useMemo(() => {
+    const map = new Map<string, { date: string; total: number; count: number; codes: number }>();
+    for (const t of trxDaily) {
+      const cur = map.get(t.date) ?? { date: t.date, total: 0, count: 0, codes: 0 };
+      cur.total += t.total;
+      cur.count += t.count;
+      cur.codes += 1;
+      map.set(t.date, cur);
+    }
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [trxDaily]);
+  const [trxOpenDay, setTrxOpenDay] = useState<string | null>(null);
+
+
   const hotelName = allowedHotels.find((h) => h.id === hotelId)?.name ?? "";
   const needsHotel = !hotelId;
 
@@ -505,6 +520,7 @@ export default function ConciliacaoCartaoPage() {
                   onReconcile={doReconcile("pix_extrato")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-pix-${hotelId}.xlsx`}
+                  compareMode="equal-boxes"
                 />
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
@@ -610,7 +626,8 @@ export default function ConciliacaoCartaoPage() {
                 <div>
                   <CardTitle className="text-sm">Total diário por TRX Code</CardTitle>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Somatório dos lançamentos do Opera por dia e código de transação (respeita o período selecionado).
+                    Total do dia somando todos os TRX Codes — clique num dia para ver a quebra por código
+                    (respeita o período selecionado).
                   </p>
                 </div>
                 <Button
@@ -633,27 +650,53 @@ export default function ConciliacaoCartaoPage() {
                   <TableHeader>
                     <TableRow className="text-[11px]">
                       <TableHead>Data</TableHead>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Descrição</TableHead>
+                      <TableHead className="text-right">TRX Codes</TableHead>
                       <TableHead className="text-right">Lançamentos</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Total do dia</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {trxDaily.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                    {trxDays.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
                         Nenhum lançamento no período.
                       </TableCell></TableRow>
                     )}
-                    {trxDaily.map((t) => (
-                      <TableRow key={`${t.date}-${t.code}`} className="text-[11px]">
-                        <TableCell className="tabular-nums">{fmtDay(t.date || null)}</TableCell>
-                        <TableCell className="font-mono">{t.code}</TableCell>
-                        <TableCell className="max-w-[280px] truncate">{t.desc || "—"}</TableCell>
-                        <TableCell className="text-right">{t.count}</TableCell>
-                        <TableCell className="text-right"><Money value={t.total} /></TableCell>
-                      </TableRow>
-                    ))}
+                    {trxDays.map((d) => {
+                      const open = trxOpenDay === d.date;
+                      return (
+                        <Fragment key={d.date}>
+                          <TableRow
+                            className="text-[11px] cursor-pointer hover:bg-muted/50"
+                            onClick={() => setTrxOpenDay(open ? null : d.date)}
+                          >
+                            <TableCell className="tabular-nums font-medium">
+                              <span className="inline-flex items-center gap-1">
+                                {open
+                                  ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                  : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                                {fmtDay(d.date || null)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">{d.codes}</TableCell>
+                            <TableCell className="text-right">{d.count}</TableCell>
+                            <TableCell className="text-right font-medium"><Money value={d.total} /></TableCell>
+                          </TableRow>
+                          {open &&
+                            trxDaily
+                              .filter((t) => t.date === d.date)
+                              .map((t) => (
+                                <TableRow key={`${t.date}-${t.code}`} className="text-[11px] bg-muted/30">
+                                  <TableCell className="pl-8 font-mono">{t.code}</TableCell>
+                                  <TableCell colSpan={1} className="max-w-[280px] truncate text-muted-foreground">
+                                    {t.desc || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right">{t.count}</TableCell>
+                                  <TableCell className="text-right"><Money value={t.total} /></TableCell>
+                                </TableRow>
+                              ))}
+                        </Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

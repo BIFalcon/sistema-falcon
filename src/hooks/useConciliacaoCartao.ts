@@ -273,7 +273,7 @@ export function useImportOpera() {
       const parsedOpera = await parseOperaXml(file, hotelId, active);
       const { skipped, total } = parsedOpera;
       // Relatório acumulado (MTD): descarta o que já existe.
-      const knownOpera = await existingKeys("conc_opera_entries", hotelId);
+      const knownOpera = await existingKeys("conc_opera_entries", parsedOpera.rows.map((r) => r.entry_key));
       const rows = parsedOpera.rows.filter((r) => !knownOpera.has(r.entry_key));
       const duplicates = parsedOpera.rows.length - rows.length;
 
@@ -321,25 +321,27 @@ export function useImportOpera() {
   });
 }
 
-/** Busca as chaves já importadas para descartar duplicatas de planilhas MTD. */
+/** Descarta duplicatas de relatórios acumulados (MTD) consultando no banco as
+ *  chaves exatas que estão sendo importadas. A verificação é feita pela
+ *  entry_key (identidade estável da linha) e NÃO por hotel/upload, então funciona
+ *  entre uploads diferentes — mesmo se um arquivo anterior foi importado em
+ *  outro hotel ou paginado fora de ordem. */
 async function existingKeys(
   table: "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries",
-  hotelId: string,
+  keys: string[],
 ): Promise<Set<string>> {
-  const keys = new Set<string>();
-  let from = 0;
-  for (;;) {
+  const found = new Set<string>();
+  const unique = [...new Set(keys)];
+  const BATCH = 400;
+  for (let i = 0; i < unique.length; i += BATCH) {
     const { data, error } = await supabase
       .from(table)
       .select("entry_key")
-      .eq("hotel_id", hotelId)
-      .range(from, from + 999);
+      .in("entry_key", unique.slice(i, i + BATCH));
     if (error) throw error;
-    for (const r of data ?? []) keys.add((r as { entry_key: string }).entry_key);
-    if (!data || data.length < 1000) break;
-    from += 1000;
+    for (const r of data ?? []) found.add((r as { entry_key: string }).entry_key);
   }
-  return keys;
+  return found;
 }
 
 export function useImportAcquirer() {
@@ -356,7 +358,7 @@ export function useImportAcquirer() {
       const { skipped, unmatched, otherHotels } = parsed;
 
       // Planilha MTD (acumulada): descarta o que já foi importado antes.
-      const known = await existingKeys("conc_acquirer_entries", hotelId);
+      const known = await existingKeys("conc_acquirer_entries", parsed.rows.map((r) => r.entry_key));
       const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
       const duplicates = parsed.rows.length - rows.length;
 
@@ -410,8 +412,10 @@ export function useImportBankStatement() {
   return useMutation({
     mutationFn: async ({ file, hotelIdOverride }: { file: File; hotelIdOverride?: string | null }) => {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
-      const parsed = await parseBankStatement(file, hotels);
-      const hotelId = parsed.hotelId ?? hotelIdOverride ?? null;
+      // O hotel selecionado no filtro global manda; o nome da conta do arquivo
+      // só é usado quando nenhum hotel está selecionado.
+      const parsed = await parseBankStatement(file, hotels, hotelIdOverride ?? null);
+      const hotelId = parsed.hotelId;
       if (!hotelId) {
         throw new Error(
           `Não foi possível identificar o hotel pelo nome da conta ("${parsed.accountName || "sem nome"}"). Selecione o hotel antes de importar.`,
@@ -419,7 +423,7 @@ export function useImportBankStatement() {
       }
 
       // Extrato acumulado (MTD): descarta lançamentos já importados antes.
-      const knownBank = await existingKeys("conc_bank_entries", hotelId);
+      const knownBank = await existingKeys("conc_bank_entries", parsed.rows.map((r) => r.entry_key));
       const bankRows = parsed.rows.filter((r) => !knownBank.has(r.entry_key));
       const duplicates = parsed.rows.length - bankRows.length;
 
@@ -433,7 +437,12 @@ export function useImportBankStatement() {
           parsed_count: bankRows.length,
           skipped_count: parsed.skipped + duplicates,
           uploaded_by: user!.id,
-          metadata: { account_name: parsed.accountName, duplicates },
+          metadata: {
+            account_name: parsed.accountName,
+            duplicates,
+            selected_hotel_id: hotelIdOverride ?? null,
+            matched_hotel_id: parsed.matchedHotelId,
+          },
         })
         .select("id")
         .single();

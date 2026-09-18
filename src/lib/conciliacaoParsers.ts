@@ -356,7 +356,10 @@ const SUMMARY_LINES = ["SALDO ANTERIOR", "SALDO TOTAL DISPONIVEL DIA"];
 export async function parseBankStatement(
   file: File,
   hotels: HotelRef[],
-): Promise<{ rows: BankRow[]; hotelId: string | null; accountName: string; skipped: number }> {
+  /** Hotel selecionado no filtro global no momento do upload — tem prioridade
+   *  sobre o nome da conta lido do arquivo. */
+  targetHotelId?: string | null,
+): Promise<{ rows: BankRow[]; hotelId: string | null; accountName: string; skipped: number; matchedHotelId: string | null }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const sheetName =
     wb.SheetNames.find((n) => normText(n).startsWith("LANCAMENTOS")) ?? "";
@@ -383,7 +386,8 @@ export async function parseBankStatement(
     }
   }
 
-  const hotelId = matchHotelByText(accountName, hotels);
+  const matchedHotelId = matchHotelByText(accountName, hotels);
+  const hotelId = targetHotelId ?? matchedHotelId;
 
   // Cabeçalho na linha 10 do arquivo (índice 9); com tolerância caso o
   // arquivo venha com linhas em branco removidas.
@@ -428,5 +432,5 @@ export async function parseBankStatement(
     });
   }
 
-  return { rows, hotelId, accountName, skipped };
+  return { rows, hotelId, accountName, skipped, matchedHotelId };
 }
