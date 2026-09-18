@@ -43,6 +43,13 @@
       "when": 1789754972857,
       "tag": "0005_carta_status_starts_on_letter_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789760708638,
+      "tag": "0006_fix_process_notifications_cron_auth",
+      "breakpoints": true
     }
   ]
 }

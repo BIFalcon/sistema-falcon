@@ -38,12 +38,16 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
-  // Aceita: (a) service-role (cron/admin), (b) master autenticado.
+  // Aceita: (a) segredo do cron, (b) service-role, (c) master autenticado.
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace("Bearer ", "").trim();
+  const cronSecret = Deno.env.get("NOTIFICATIONS_CRON_SECRET");
+  const cronHeader = req.headers.get("x-cron-secret")?.trim();
   let authorized = false;
 
-  if (token && token === serviceKey) {
+  if (cronSecret && cronHeader && cronHeader === cronSecret) {
+    authorized = true;
+  } else if (token && token === serviceKey) {
     authorized = true;
   } else if (token) {
     const claims = parseJwtClaims(token);
