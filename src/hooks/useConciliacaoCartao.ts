@@ -412,8 +412,10 @@ export function useImportBankStatement() {
   return useMutation({
     mutationFn: async ({ file, hotelIdOverride }: { file: File; hotelIdOverride?: string | null }) => {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
-      const parsed = await parseBankStatement(file, hotels);
-      const hotelId = parsed.hotelId ?? hotelIdOverride ?? null;
+      // O hotel selecionado no filtro global manda; o nome da conta do arquivo
+      // só é usado quando nenhum hotel está selecionado.
+      const parsed = await parseBankStatement(file, hotels, hotelIdOverride ?? null);
+      const hotelId = parsed.hotelId;
       if (!hotelId) {
         throw new Error(
           `Não foi possível identificar o hotel pelo nome da conta ("${parsed.accountName || "sem nome"}"). Selecione o hotel antes de importar.`,
