@@ -368,14 +368,25 @@ export function ReconcilePanel({
       <Card className={cn("border-2", canReconcile ? "border-emerald-500/60" : "border-border")}>
         <CardContent className="py-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-6 text-xs">
-            <span>
-              Esquerda: <Money value={leftTotal} />{" "}
-              <span className="text-muted-foreground">({leftPicked.length})</span>
-            </span>
-            <span>
-              Direita: <Money value={rightTotal} />{" "}
-              <span className="text-muted-foreground">({rightPicked.length})</span>
-            </span>
+            {equalMode ? (
+              pickedByBox.map((p) => (
+                <span key={p.box.key}>
+                  {p.box.title}: <Money value={p.picked.reduce((s, r) => s + r.amount, 0)} />{" "}
+                  <span className="text-muted-foreground">({p.picked.length})</span>
+                </span>
+              ))
+            ) : (
+              <>
+                <span>
+                  Esquerda: <Money value={leftTotal} />{" "}
+                  <span className="text-muted-foreground">({leftPicked.length})</span>
+                </span>
+                <span>
+                  Direita: <Money value={rightTotal} />{" "}
+                  <span className="text-muted-foreground">({rightPicked.length})</span>
+                </span>
+              </>
+            )}
             <span className="font-semibold">
               Diferença:{" "}
               <span className={cn("tabular-nums", zeroDiff ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")}>
@@ -384,7 +395,9 @@ export function ReconcilePanel({
             </span>
             {!zeroDiff && (leftPicked.length > 0 || rightPicked.length > 0) && (
               <span className="text-[11px] text-destructive">
-                Só é possível conciliar com diferença zero.
+                {equalMode
+                  ? "Só é possível conciliar quando os quadros selecionados têm o mesmo total."
+                  : "Só é possível conciliar com diferença zero."}
               </span>
             )}
           </div>
