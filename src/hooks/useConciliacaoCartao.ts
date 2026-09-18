@@ -84,6 +84,29 @@ export interface ConcMatch {
 /* Consultas                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * O servidor devolve no máximo 1.000 linhas por requisição, mesmo com
+ * .limit(20000) — por isso hotéis com muito volume só mostravam os primeiros
+ * dias. Aqui buscamos página por página até acabar.
+ */
+const PAGE = 1000;
+
+async function fetchAllPaged<T>(
+  build: () => { range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }> },
+  maxRows = 200_000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < maxRows; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+
 export function useTrxCodeMapping() {
   return useQuery({
     queryKey: ["trx-code-mapping"],
