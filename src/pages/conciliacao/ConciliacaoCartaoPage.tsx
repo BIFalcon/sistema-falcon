@@ -505,6 +505,7 @@ export default function ConciliacaoCartaoPage() {
                   onReconcile={doReconcile("pix_extrato")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-pix-${hotelId}.xlsx`}
+                  compareMode="equal-boxes"
                 />
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
