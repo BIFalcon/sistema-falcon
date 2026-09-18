@@ -228,8 +228,6 @@ export function useConcMatches(hotelId: string | null, kind: ConcKind) {
       )) as ConcMatch[],
   });
 }
-  });
-}
 
 export function useConcUploads() {
   return useQuery({
