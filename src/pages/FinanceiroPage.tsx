@@ -293,26 +293,11 @@ export default function FinanceiroPage() {
 
             {/* Métricas adicionais do fechamento (Bloco 4) */}
             {(() => {
-              const finalValue =
-                decision === "enviado"
-                  ? Number((valueStr || "0").replace(",", "."))
-                  : openRow?.final_distribution ??
-                    openMetrics?.distribuicaoTotal ??
-                    openRow?.estimated_distribution ??
-                    0;
-              // Se o usuário editou o valor, recalcula por UH proporcionalmente
-              // à razão do Consolidado; caso contrário, usa exatamente o mesmo
-              // valor por UH exibido no Consolidado de Resultados.
-              let distribPorUh: number | null = openMetrics?.distribuicaoPorUh ?? null;
-              if (
-                decision === "enviado" &&
-                openMetrics?.distribuicaoTotal &&
-                openMetrics.distribuicaoTotal !== 0 &&
-                distribPorUh != null &&
-                finalValue
-              ) {
-                distribPorUh = (distribPorUh * finalValue) / openMetrics.distribuicaoTotal;
-              }
+              // Distribuição / UH é sempre o valor da DRE (o mesmo que vai para
+              // o Consolidado de Resultados) — não é recalculado pelo valor
+              // digitado pelo Financeiro.
+              const distribPorUh: number | null = openMetrics?.distribuicaoPorUh ?? null;
+
               return (
                 <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/30 p-3">
                   <div>
