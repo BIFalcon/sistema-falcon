@@ -343,6 +343,21 @@ export default function ConciliacaoCartaoPage() {
     return [...map.values()].sort((a, b) => (a.date === b.date ? a.code.localeCompare(b.code) : a.date.localeCompare(b.date)));
   }, [opera.data]);
 
+  /** Visão inicial: total do dia somando todos os TRX Codes. */
+  const trxDays = useMemo(() => {
+    const map = new Map<string, { date: string; total: number; count: number; codes: number }>();
+    for (const t of trxDaily) {
+      const cur = map.get(t.date) ?? { date: t.date, total: 0, count: 0, codes: 0 };
+      cur.total += t.total;
+      cur.count += t.count;
+      cur.codes += 1;
+      map.set(t.date, cur);
+    }
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [trxDaily]);
+  const [trxOpenDay, setTrxOpenDay] = useState<string | null>(null);
+
+
   const hotelName = allowedHotels.find((h) => h.id === hotelId)?.name ?? "";
   const needsHotel = !hotelId;
 
