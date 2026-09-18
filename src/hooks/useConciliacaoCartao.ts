@@ -856,16 +856,16 @@ export function useMatchedCountsByUpload() {
     queryFn: async () => {
       const counts = new Map<string, number>();
       for (const table of ["conc_opera_entries", "conc_acquirer_entries", "conc_bank_entries"] as const) {
-        const { data, error } = await supabase
-          .from(table)
-          .select("upload_id")
-          .not("matched_at", "is", null)
-          .not("upload_id", "is", null)
-          .limit(50000);
-        if (error) throw error;
-        for (const r of data ?? []) {
-          const id = (r as { upload_id: string }).upload_id;
-          counts.set(id, (counts.get(id) ?? 0) + 1);
+        const rows = await fetchAllPaged<{ upload_id: string }>(() =>
+          supabase
+            .from(table)
+            .select("upload_id")
+            .not("matched_at", "is", null)
+            .not("upload_id", "is", null)
+            .order("id", { ascending: true }),
+        );
+        for (const r of rows) {
+          counts.set(r.upload_id, (counts.get(r.upload_id) ?? 0) + 1);
         }
       }
       return counts;
