@@ -152,20 +152,21 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
     queryKey: ["conc-acquirer", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
     enabled: !!hotelId,
     queryFn: async () => {
-      let q = supabase
-        .from("conc_acquirer_entries")
-        .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
-        .eq("hotel_id", hotelId!)
-        .order("sale_date", { ascending: true })
-        .limit(20000);
-      if (days.length) q = q.in("sale_date", days);
-      else {
-        if (dateFrom) q = q.gte("sale_date", dateFrom);
-        if (dateTo) q = q.lte("sale_date", dateTo);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as AcquirerEntry[];
+      const build = () => {
+        let q = supabase
+          .from("conc_acquirer_entries")
+          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
+          .eq("hotel_id", hotelId!)
+          .order("sale_date", { ascending: true })
+          .order("id", { ascending: true });
+        if (days.length) q = q.in("sale_date", days);
+        else {
+          if (dateFrom) q = q.gte("sale_date", dateFrom);
+          if (dateTo) q = q.lte("sale_date", dateTo);
+        }
+        return q;
+      };
+      return await fetchAllPaged<AcquirerEntry>(build);
     },
   });
 }
