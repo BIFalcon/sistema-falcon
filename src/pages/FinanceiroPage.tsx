@@ -190,6 +190,16 @@ export default function FinanceiroPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
+                      {consolidatedRow?.distribuicaoPorUh != null ? (
+                        <span className="font-medium">{formatBRL(consolidatedRow.distribuicaoPorUh)}</span>
+                      ) : isConsolidadoLoading ? (
+                        <span className="text-[11px] text-muted-foreground italic">carregando…</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="text-right tabular-nums">
                       {paidDistribution == null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
