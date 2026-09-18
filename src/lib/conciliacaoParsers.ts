@@ -386,7 +386,8 @@ export async function parseBankStatement(
     }
   }
 
-  const hotelId = matchHotelByText(accountName, hotels);
+  const matchedHotelId = matchHotelByText(accountName, hotels);
+  const hotelId = targetHotelId ?? matchedHotelId;
 
   // Cabeçalho na linha 10 do arquivo (índice 9); com tolerância caso o
   // arquivo venha com linhas em branco removidas.
@@ -431,5 +432,5 @@ export async function parseBankStatement(
     });
   }
 
-  return { rows, hotelId, accountName, skipped };
+  return { rows, hotelId, accountName, skipped, matchedHotelId };
 }
