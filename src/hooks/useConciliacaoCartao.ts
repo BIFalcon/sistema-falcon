@@ -437,7 +437,12 @@ export function useImportBankStatement() {
           parsed_count: bankRows.length,
           skipped_count: parsed.skipped + duplicates,
           uploaded_by: user!.id,
-          metadata: { account_name: parsed.accountName, duplicates },
+          metadata: {
+            account_name: parsed.accountName,
+            duplicates,
+            selected_hotel_id: hotelIdOverride ?? null,
+            matched_hotel_id: parsed.matchedHotelId,
+          },
         })
         .select("id")
         .single();
