@@ -1772,6 +1772,21 @@ export type Database = {
           },
         ]
       }
+      cron_auth: {
+        Row: {
+          name: string
+          value: string
+        }
+        Insert: {
+          name: string
+          value: string
+        }
+        Update: {
+          name?: string
+          value?: string
+        }
+        Relationships: []
+      }
       dre_download_log: {
         Row: {
           closing_id: string
