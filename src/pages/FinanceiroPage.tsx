@@ -127,6 +127,8 @@ export default function FinanceiroPage() {
                 <TableHead className="text-[11px] uppercase tracking-wider">Hotel</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Lucro Líquido (DRE)</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuição DRE</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuição / UH</TableHead>
+
                 <TableHead className="text-[11px] uppercase tracking-wider text-right">Distribuído</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Decisão</TableHead>
                 <TableHead className="text-right text-[11px] uppercase tracking-wider">Ação</TableHead>
