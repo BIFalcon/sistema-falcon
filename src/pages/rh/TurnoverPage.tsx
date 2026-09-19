@@ -152,11 +152,30 @@ export default function TurnoverPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Ativos / Total" value={String(metrics.ativos)} />
-        <KpiCard label="Desligamentos" value={String(metrics.inativos)} sub="planilha de rescisões" />
-        <KpiCard label="% Experiência" value={formatPct(metrics.pctExperiencia)} sub="< 90 dias" />
+        <KpiCard
+          label="Ativos / Total"
+          value={String(metrics.ativos)}
+          onClick={() => setDetail({ title: "Ativos", rows: metrics.listaAtivos })}
+        />
+        <KpiCard
+          label="Desligamentos"
+          value={String(metrics.inativos)}
+          sub="planilha de rescisões"
+          onClick={() => setDetail({ title: "Desligamentos", rows: metrics.listaDesligamentos })}
+        />
+        <KpiCard
+          label="Admitidos"
+          value={String(metrics.admitidos)}
+          sub="no período"
+          onClick={() => setDetail({ title: "Admitidos", rows: metrics.listaAdmitidos })}
+        />
+        <KpiCard
+          label="Período de Experiência"
+          value={String(metrics.experiencia)}
+          sub="< 90 dias"
+          onClick={() => setDetail({ title: "Período de Experiência", rows: metrics.listaExperiencia })}
+        />
         <KpiCard label="% Turnover" value={formatPct(metrics.pctTurnover)} />
-        <KpiCard label="% Rotatividade" value={formatPct(metrics.pctRotatividade)} />
         <KpiCard label="Tempo de casa" value={`${metrics.tempoCasaMedio.toFixed(1)} a`} sub="médio (ativos)" />
       </div>
 
