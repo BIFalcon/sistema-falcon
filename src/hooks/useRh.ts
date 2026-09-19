@@ -534,17 +534,12 @@ export function calcMetrics(
       }
     }
 
-    // experiência: admitidos há menos de 90 dias
+    // experiência: admitidos há menos de 90 dias (foto do fim do período)
     if (e.admission_date) {
       const adm = new Date(e.admission_date).getTime();
-      if (!Number.isNaN(adm) && refTs - adm < ninetyMs && refTs - adm >= 0 && activeAtRef) novos++;
-    }
-
-    // movimentações do mês/ano filtrados
-    if (e.admission_date) {
-      const adm = new Date(e.admission_date);
-      if (adm.getFullYear() === targetYear && adm.getMonth() + 1 === targetMonth) {
-        admissoes++;
+      if (!Number.isNaN(adm) && refTs - adm < ninetyMs && refTs - adm >= 0 && activeAtRef) {
+        novos++;
+        listaExperiencia.push(e);
       }
     }
   }
@@ -555,6 +550,12 @@ export function calcMetrics(
     total,
     ativos,
     inativos,
+    admitidos: admissoes,
+    experiencia: novos,
+    listaAtivos,
+    listaDesligamentos,
+    listaAdmitidos,
+    listaExperiencia,
     pctExperiencia: round2((novos / safeTotal) * 100),
     // Definição validada com RH:
     //   • Turnover     = desligamentos / ativos × 100
