@@ -446,6 +446,7 @@ export function calcMetrics(
   employees: RhEmployee[],
   filterMonth?: number,
   filterYear?: number,
+  periodMonths = 1,
 ): RhMetrics {
   // Data de referência = último dia do mês/ano filtrados (ou hoje se não houver filtro).
   // Garante que ativos/sexo/faixa etária/tempo de casa reflitam o período escolhido,
