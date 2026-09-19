@@ -456,6 +456,15 @@ export function calcMetrics(
   const targetYear = filterYear ?? now.getFullYear();
   const referenceDate = new Date(targetYear, targetMonth, 0, 23, 59, 59); // último dia do mês
   const refTs = referenceDate.getTime();
+  // Janela do período: os `periodMonths` meses terminando em filterMonth/filterYear.
+  const windowStart = new Date(targetYear, targetMonth - Math.max(1, periodMonths), 1, 0, 0, 0);
+  const windowStartTs = windowStart.getTime();
+  const inWindow = (iso: string | null): boolean => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return false;
+    return t >= windowStartTs && t <= refTs;
+  };
 
   const isActiveAtRef = (e: RhEmployee): boolean => {
     const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
