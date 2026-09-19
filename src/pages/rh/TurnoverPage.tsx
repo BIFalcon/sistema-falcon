@@ -10,7 +10,8 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useRhEmployees, useUploadRhFile, calcMetrics } from "@/hooks/useRh";
+import { useRhEmployees, useUploadRhFile, calcMetrics, type RhEmployee } from "@/hooks/useRh";
+import { fmtDate } from "@/lib/formatters";
 
 const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
 const BAR_COLOR = "hsl(var(--primary))";
