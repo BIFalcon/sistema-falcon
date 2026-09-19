@@ -97,11 +97,11 @@ export default function TurnoverPage() {
     return allowedHotels
       .map((h) => {
         const emps = allEmployees.filter((e) => e.hotel_id === h.id);
-        const m = calcMetrics(emps, month, year);
+        const m = calcMetrics(emps, month, year, periodMonths);
         return { hotel: h, pctRotatividade: m.pctRotatividade, total: m.total };
       })
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
-  }, [allowedHotels, allEmployees, month, year]);
+  }, [allowedHotels, allEmployees, month, year, periodMonths]);
 
   const handleFile = async (file: File) => {
     if (!hotelId) {
