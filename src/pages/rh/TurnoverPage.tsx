@@ -19,9 +19,25 @@ function formatPct(n: number) {
   return `${n.toFixed(2).replace(".", ",")}%`;
 }
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  onClick?: () => void;
+}) {
   return (
-    <Card className="p-4 shadow-soft">
+    <Card
+      className={`p-4 shadow-soft ${onClick ? "cursor-pointer transition-colors hover:border-accent hover:bg-accent/5" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+    >
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
