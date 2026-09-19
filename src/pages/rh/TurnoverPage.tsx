@@ -287,6 +287,45 @@ export default function TurnoverPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Lista detalhada por card */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {detail?.title} — {detail?.rows.length ?? 0} colaborador(es)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            {(detail?.rows.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">Sem colaboradores neste grupo.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-3">Nome</th>
+                    <th className="py-2 pr-3">Admissão</th>
+                    <th className="py-2 pr-3">Rescisão</th>
+                    <th className="py-2 pr-3">Hotel</th>
+                    <th className="py-2">Setor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {detail?.rows.map((e) => (
+                    <tr key={e.id}>
+                      <td className="py-2 pr-3">{e.name}</td>
+                      <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
+                      <td className="py-2 pr-3">{fmtDate(e.termination_date)}</td>
+                      <td className="py-2 pr-3">{hotelNames[e.hotel_id] ?? e.hotel_id}</td>
+                      <td className="py-2">{e.department ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
