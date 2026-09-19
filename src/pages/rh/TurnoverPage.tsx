@@ -62,10 +62,16 @@ export default function TurnoverPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+  const [detail, setDetail] = useState<{ title: string; rows: RhEmployee[] } | null>(null);
 
   const rhHotelId = isRhManager ? undefined : hotelId;
-  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year);
+  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year, periodMonths);
   const upload = useUploadRhFile();
+
+  const hotelNames = useMemo(
+    () => Object.fromEntries(allowedHotels.map((h) => [h.id, h.name])),
+    [allowedHotels],
+  );
 
   const scopedEmployees = useMemo(
     () => (hotelId ? allEmployees.filter((e) => e.hotel_id === hotelId) : allEmployees),
@@ -73,8 +79,8 @@ export default function TurnoverPage() {
   );
 
   const metrics = useMemo(
-    () => calcMetrics(scopedEmployees, month, year),
-    [scopedEmployees, month, year],
+    () => calcMetrics(scopedEmployees, month, year, periodMonths),
+    [scopedEmployees, month, year, periodMonths],
   );
 
   const sexData = [
