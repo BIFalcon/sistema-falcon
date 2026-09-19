@@ -10,7 +10,8 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useRhEmployees, useUploadRhFile, calcMetrics } from "@/hooks/useRh";
+import { useRhEmployees, useUploadRhFile, calcMetrics, type RhEmployee } from "@/hooks/useRh";
+import { fmtDate } from "@/lib/formatters";
 
 const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
 const BAR_COLOR = "hsl(var(--primary))";
@@ -19,9 +20,25 @@ function formatPct(n: number) {
   return `${n.toFixed(2).replace(".", ",")}%`;
 }
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  onClick?: () => void;
+}) {
   return (
-    <Card className="p-4 shadow-soft">
+    <Card
+      className={`p-4 shadow-soft ${onClick ? "cursor-pointer transition-colors hover:border-accent hover:bg-accent/5" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+    >
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
@@ -46,10 +63,16 @@ export default function TurnoverPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+  const [detail, setDetail] = useState<{ title: string; rows: RhEmployee[] } | null>(null);
 
   const rhHotelId = isRhManager ? undefined : hotelId;
-  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year);
+  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year, periodMonths);
   const upload = useUploadRhFile();
+
+  const hotelNames = useMemo(
+    () => Object.fromEntries(allowedHotels.map((h) => [h.id, h.name])),
+    [allowedHotels],
+  );
 
   const scopedEmployees = useMemo(
     () => (hotelId ? allEmployees.filter((e) => e.hotel_id === hotelId) : allEmployees),
@@ -57,8 +80,8 @@ export default function TurnoverPage() {
   );
 
   const metrics = useMemo(
-    () => calcMetrics(scopedEmployees, month, year),
-    [scopedEmployees, month, year],
+    () => calcMetrics(scopedEmployees, month, year, periodMonths),
+    [scopedEmployees, month, year, periodMonths],
   );
 
   const sexData = [
@@ -74,11 +97,11 @@ export default function TurnoverPage() {
     return allowedHotels
       .map((h) => {
         const emps = allEmployees.filter((e) => e.hotel_id === h.id);
-        const m = calcMetrics(emps, month, year);
+        const m = calcMetrics(emps, month, year, periodMonths);
         return { hotel: h, pctRotatividade: m.pctRotatividade, total: m.total };
       })
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
-  }, [allowedHotels, allEmployees, month, year]);
+  }, [allowedHotels, allEmployees, month, year, periodMonths]);
 
   const handleFile = async (file: File) => {
     if (!hotelId) {
@@ -129,11 +152,30 @@ export default function TurnoverPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Ativos / Total" value={String(metrics.ativos)} />
-        <KpiCard label="Desligamentos" value={String(metrics.inativos)} sub="planilha de rescisões" />
-        <KpiCard label="% Experiência" value={formatPct(metrics.pctExperiencia)} sub="< 90 dias" />
+        <KpiCard
+          label="Ativos / Total"
+          value={String(metrics.ativos)}
+          onClick={() => setDetail({ title: "Ativos", rows: metrics.listaAtivos })}
+        />
+        <KpiCard
+          label="Desligamentos"
+          value={String(metrics.inativos)}
+          sub="planilha de rescisões"
+          onClick={() => setDetail({ title: "Desligamentos", rows: metrics.listaDesligamentos })}
+        />
+        <KpiCard
+          label="Admitidos"
+          value={String(metrics.admitidos)}
+          sub="no período"
+          onClick={() => setDetail({ title: "Admitidos", rows: metrics.listaAdmitidos })}
+        />
+        <KpiCard
+          label="Período de Experiência"
+          value={String(metrics.experiencia)}
+          sub="< 90 dias"
+          onClick={() => setDetail({ title: "Período de Experiência", rows: metrics.listaExperiencia })}
+        />
         <KpiCard label="% Turnover" value={formatPct(metrics.pctTurnover)} />
-        <KpiCard label="% Rotatividade" value={formatPct(metrics.pctRotatividade)} />
         <KpiCard label="Tempo de casa" value={`${metrics.tempoCasaMedio.toFixed(1)} a`} sub="médio (ativos)" />
       </div>
 
@@ -242,6 +284,45 @@ export default function TurnoverPage() {
                 <p className="text-sm font-semibold">{formatPct(r.pctRotatividade)}</p>
               </div>
             ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lista detalhada por card */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {detail?.title} — {detail?.rows.length ?? 0} colaborador(es)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            {(detail?.rows.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">Sem colaboradores neste grupo.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-3">Nome</th>
+                    <th className="py-2 pr-3">Admissão</th>
+                    <th className="py-2 pr-3">Rescisão</th>
+                    <th className="py-2 pr-3">Hotel</th>
+                    <th className="py-2">Setor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {detail?.rows.map((e) => (
+                    <tr key={e.id}>
+                      <td className="py-2 pr-3">{e.name}</td>
+                      <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
+                      <td className="py-2 pr-3">{fmtDate(e.termination_date)}</td>
+                      <td className="py-2 pr-3">{hotelNames[e.hotel_id] ?? e.hotel_id}</td>
+                      <td className="py-2">{e.department ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -81,19 +81,65 @@ export interface RhPolicy {
 
 // ---------- queries ----------
 
-export function useRhEmployees(hotelId?: string, referenceMonth?: number, referenceYear?: number) {
+/** Lista os meses (month/year) da janela de `periodMonths` terminando em month/year. */
+export function periodWindowMonths(month: number, year: number, periodMonths: number) {
+  const out: Array<{ month: number; year: number }> = [];
+  for (let i = periodMonths - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1 - i, 1);
+    out.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+  }
+  return out;
+}
+
+export function useRhEmployees(
+  hotelId?: string,
+  referenceMonth?: number,
+  referenceYear?: number,
+  periodMonths = 1,
+) {
   return useQuery({
-    queryKey: ["rh", "employees", hotelId ?? "all", referenceYear ?? "all-years", referenceMonth ?? "all-months"],
+    queryKey: [
+      "rh",
+      "employees",
+      hotelId ?? "all",
+      referenceYear ?? "all-years",
+      referenceMonth ?? "all-months",
+      periodMonths,
+    ],
     queryFn: async () => {
       // RPC com máscara: GG vê a lista sem CPF/salário/data de nascimento/dados
       // de demissão. RH/Master continuam vendo tudo.
-      const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
-        _hotel_id: hotelId ?? null,
-        _reference_month: referenceMonth ?? null,
-        _reference_year: referenceYear ?? null,
-      });
-      if (error) throw error;
-      return (data ?? []) as unknown as RhEmployee[];
+      const months =
+        referenceMonth && referenceYear && periodMonths > 1
+          ? periodWindowMonths(referenceMonth, referenceYear, periodMonths)
+          : [{ month: referenceMonth as number | undefined, year: referenceYear as number | undefined }];
+
+      const results = await Promise.all(
+        months.map(async ({ month, year }) => {
+          const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
+            _hotel_id: hotelId ?? null,
+            _reference_month: month ?? null,
+            _reference_year: year ?? null,
+          });
+          if (error) throw error;
+          return (data ?? []) as unknown as RhEmployee[];
+        }),
+      );
+
+      // Dedup por hotel+matrícula mantendo a referência mais recente (que já
+      // carrega a rescisão, quando houver).
+      const byKey = new Map<string, RhEmployee>();
+      for (const e of results.flat()) {
+        const key = `${e.hotel_id}|${e.employee_key || e.id}`;
+        const prev = byKey.get(key);
+        if (!prev) {
+          byKey.set(key, e);
+          continue;
+        }
+        const rank = (x: RhEmployee) => (x.reference_year ?? 0) * 12 + (x.reference_month ?? 0);
+        if (rank(e) > rank(prev) || (!prev.termination_date && e.termination_date)) byKey.set(key, e);
+      }
+      return Array.from(byKey.values());
     },
   });
 }
@@ -357,12 +403,18 @@ export interface RhMetrics {
   total: number;
   ativos: number;
   inativos: number;
+  admitidos: number;            // admissões dentro da janela do período
+  experiencia: number;          // nº de ativos com admissão < 90 dias
   pctExperiencia: number;       // % com admissão < 90 dias
   pctTurnover: number;          // (adm + desl) / 2 / total * 100
   pctRotatividade: number;      // desligamentos / total * 100
   porSexo: { M: number; F: number; N: number };
   porFaixaEtaria: Record<string, number>;
   tempoCasaMedio: number;       // em anos, considerando ativos
+  listaAtivos: RhEmployee[];
+  listaDesligamentos: RhEmployee[];
+  listaAdmitidos: RhEmployee[];
+  listaExperiencia: RhEmployee[];
 }
 
 const FAIXAS = [
@@ -394,6 +446,7 @@ export function calcMetrics(
   employees: RhEmployee[],
   filterMonth?: number,
   filterYear?: number,
+  periodMonths = 1,
 ): RhMetrics {
   // Data de referência = último dia do mês/ano filtrados (ou hoje se não houver filtro).
   // Garante que ativos/sexo/faixa etária/tempo de casa reflitam o período escolhido,
@@ -403,6 +456,15 @@ export function calcMetrics(
   const targetYear = filterYear ?? now.getFullYear();
   const referenceDate = new Date(targetYear, targetMonth, 0, 23, 59, 59); // último dia do mês
   const refTs = referenceDate.getTime();
+  // Janela do período: os `periodMonths` meses terminando em filterMonth/filterYear.
+  const windowStart = new Date(targetYear, targetMonth - Math.max(1, periodMonths), 1, 0, 0, 0);
+  const windowStartTs = windowStart.getTime();
+  const inWindow = (iso: string | null): boolean => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return false;
+    return t >= windowStartTs && t <= refTs;
+  };
 
   const isActiveAtRef = (e: RhEmployee): boolean => {
     const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
@@ -423,15 +485,23 @@ export function calcMetrics(
   // refletem exatamente isso:
   //   • Ativos = Total      → linhas sem termination_date (ativos no mês)
   //   • Desligamentos       → linhas com termination_date no upload do mês
-  const ativos = knownAtRef.filter((e) => !e.termination_date).length;
-  const desligamentosTotais = knownAtRef.filter((e) => !!e.termination_date).length;
+  const listaAtivos = knownAtRef.filter((e) => !e.termination_date);
+  // Numa janela de mais de um mês, os desligamentos somam todos os eventos
+  // ocorridos dentro da janela (não apenas o último mês).
+  const listaDesligamentos = knownAtRef.filter(
+    (e) => !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)),
+  );
+  const ativos = listaAtivos.length;
+  const desligamentosTotais = listaDesligamentos.length;
   const total = ativos;          // denominador = quadro ativo
   const inativos = desligamentosTotais;
 
   const ninetyMs = 90 * 86400000;
 
+  const listaAdmitidos = knownAtRef.filter((e) => inWindow(e.admission_date));
+  const listaExperiencia: RhEmployee[] = [];
   let novos = 0;
-  let admissoes = 0;
+  const admissoes = listaAdmitidos.length;
   const desligamentos = desligamentosTotais;
   const porSexo = { M: 0, F: 0, N: 0 };
   const porFaixaEtaria: Record<string, number> = Object.fromEntries(FAIXAS.map((f) => [f.label, 0]));
@@ -464,17 +534,12 @@ export function calcMetrics(
       }
     }
 
-    // experiência: admitidos há menos de 90 dias
+    // experiência: admitidos há menos de 90 dias (foto do fim do período)
     if (e.admission_date) {
       const adm = new Date(e.admission_date).getTime();
-      if (!Number.isNaN(adm) && refTs - adm < ninetyMs && refTs - adm >= 0 && activeAtRef) novos++;
-    }
-
-    // movimentações do mês/ano filtrados
-    if (e.admission_date) {
-      const adm = new Date(e.admission_date);
-      if (adm.getFullYear() === targetYear && adm.getMonth() + 1 === targetMonth) {
-        admissoes++;
+      if (!Number.isNaN(adm) && refTs - adm < ninetyMs && refTs - adm >= 0 && activeAtRef) {
+        novos++;
+        listaExperiencia.push(e);
       }
     }
   }
@@ -485,6 +550,12 @@ export function calcMetrics(
     total,
     ativos,
     inativos,
+    admitidos: admissoes,
+    experiencia: novos,
+    listaAtivos,
+    listaDesligamentos,
+    listaAdmitidos,
+    listaExperiencia,
     pctExperiencia: round2((novos / safeTotal) * 100),
     // Definição validada com RH:
     //   • Turnover     = desligamentos / ativos × 100
