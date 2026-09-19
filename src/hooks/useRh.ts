@@ -403,12 +403,18 @@ export interface RhMetrics {
   total: number;
   ativos: number;
   inativos: number;
+  admitidos: number;            // admissões dentro da janela do período
+  experiencia: number;          // nº de ativos com admissão < 90 dias
   pctExperiencia: number;       // % com admissão < 90 dias
   pctTurnover: number;          // (adm + desl) / 2 / total * 100
   pctRotatividade: number;      // desligamentos / total * 100
   porSexo: { M: number; F: number; N: number };
   porFaixaEtaria: Record<string, number>;
   tempoCasaMedio: number;       // em anos, considerando ativos
+  listaAtivos: RhEmployee[];
+  listaDesligamentos: RhEmployee[];
+  listaAdmitidos: RhEmployee[];
+  listaExperiencia: RhEmployee[];
 }
 
 const FAIXAS = [
