@@ -81,19 +81,65 @@ export interface RhPolicy {
 
 // ---------- queries ----------
 
-export function useRhEmployees(hotelId?: string, referenceMonth?: number, referenceYear?: number) {
+/** Lista os meses (month/year) da janela de `periodMonths` terminando em month/year. */
+export function periodWindowMonths(month: number, year: number, periodMonths: number) {
+  const out: Array<{ month: number; year: number }> = [];
+  for (let i = periodMonths - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1 - i, 1);
+    out.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+  }
+  return out;
+}
+
+export function useRhEmployees(
+  hotelId?: string,
+  referenceMonth?: number,
+  referenceYear?: number,
+  periodMonths = 1,
+) {
   return useQuery({
-    queryKey: ["rh", "employees", hotelId ?? "all", referenceYear ?? "all-years", referenceMonth ?? "all-months"],
+    queryKey: [
+      "rh",
+      "employees",
+      hotelId ?? "all",
+      referenceYear ?? "all-years",
+      referenceMonth ?? "all-months",
+      periodMonths,
+    ],
     queryFn: async () => {
       // RPC com máscara: GG vê a lista sem CPF/salário/data de nascimento/dados
       // de demissão. RH/Master continuam vendo tudo.
-      const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
-        _hotel_id: hotelId ?? null,
-        _reference_month: referenceMonth ?? null,
-        _reference_year: referenceYear ?? null,
-      });
-      if (error) throw error;
-      return (data ?? []) as unknown as RhEmployee[];
+      const months =
+        referenceMonth && referenceYear && periodMonths > 1
+          ? periodWindowMonths(referenceMonth, referenceYear, periodMonths)
+          : [{ month: referenceMonth as number | undefined, year: referenceYear as number | undefined }];
+
+      const results = await Promise.all(
+        months.map(async ({ month, year }) => {
+          const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
+            _hotel_id: hotelId ?? null,
+            _reference_month: month ?? null,
+            _reference_year: year ?? null,
+          });
+          if (error) throw error;
+          return (data ?? []) as unknown as RhEmployee[];
+        }),
+      );
+
+      // Dedup por hotel+matrícula mantendo a referência mais recente (que já
+      // carrega a rescisão, quando houver).
+      const byKey = new Map<string, RhEmployee>();
+      for (const e of results.flat()) {
+        const key = `${e.hotel_id}|${e.employee_key || e.id}`;
+        const prev = byKey.get(key);
+        if (!prev) {
+          byKey.set(key, e);
+          continue;
+        }
+        const rank = (x: RhEmployee) => (x.reference_year ?? 0) * 12 + (x.reference_month ?? 0);
+        if (rank(e) > rank(prev) || (!prev.termination_date && e.termination_date)) byKey.set(key, e);
+      }
+      return Array.from(byKey.values());
     },
   });
 }
