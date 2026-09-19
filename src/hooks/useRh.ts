@@ -485,15 +485,23 @@ export function calcMetrics(
   // refletem exatamente isso:
   //   • Ativos = Total      → linhas sem termination_date (ativos no mês)
   //   • Desligamentos       → linhas com termination_date no upload do mês
-  const ativos = knownAtRef.filter((e) => !e.termination_date).length;
-  const desligamentosTotais = knownAtRef.filter((e) => !!e.termination_date).length;
+  const listaAtivos = knownAtRef.filter((e) => !e.termination_date);
+  // Numa janela de mais de um mês, os desligamentos somam todos os eventos
+  // ocorridos dentro da janela (não apenas o último mês).
+  const listaDesligamentos = knownAtRef.filter(
+    (e) => !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)),
+  );
+  const ativos = listaAtivos.length;
+  const desligamentosTotais = listaDesligamentos.length;
   const total = ativos;          // denominador = quadro ativo
   const inativos = desligamentosTotais;
 
   const ninetyMs = 90 * 86400000;
 
+  const listaAdmitidos = knownAtRef.filter((e) => inWindow(e.admission_date));
+  const listaExperiencia: RhEmployee[] = [];
   let novos = 0;
-  let admissoes = 0;
+  const admissoes = listaAdmitidos.length;
   const desligamentos = desligamentosTotais;
   const porSexo = { M: 0, F: 0, N: 0 };
   const porFaixaEtaria: Record<string, number> = Object.fromEntries(FAIXAS.map((f) => [f.label, 0]));
