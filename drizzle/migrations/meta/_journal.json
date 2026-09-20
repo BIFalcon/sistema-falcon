@@ -64,6 +64,13 @@
       "when": 1789923985807,
       "tag": "0008_fix_purge_cron_run_history",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789924168549,
+      "tag": "0009_conciliacao_pagination_indexes",
+      "breakpoints": true
     }
   ]
 }
