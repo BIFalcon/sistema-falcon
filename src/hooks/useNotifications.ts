@@ -113,6 +113,9 @@ export function usePendingNotificationCount() {
       return count ?? 0;
     },
     enabled: !!user?.id,
+    // Só consulta quando a aba está em foco; evita tráfego de abas esquecidas abertas.
     refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
+    staleTime: 120_000,
   });
 }
