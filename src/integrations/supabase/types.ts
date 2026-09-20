@@ -3378,6 +3378,7 @@ export type Database = {
         Returns: undefined
       }
       month_pt: { Args: { _m: number }; Returns: string }
+      purge_cron_run_history: { Args: never; Returns: number }
       recalc_consolidado_cache: {
         Args: { _closing_id: string }
         Returns: undefined

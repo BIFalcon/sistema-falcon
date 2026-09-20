@@ -50,6 +50,13 @@
       "when": 1789760708638,
       "tag": "0006_fix_process_notifications_cron_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789923967354,
+      "tag": "0007_fix_dre_sla_job_and_cron_retention",
+      "breakpoints": true
     }
   ]
 }
