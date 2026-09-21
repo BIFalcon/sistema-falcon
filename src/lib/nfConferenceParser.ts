@@ -43,6 +43,8 @@ export interface PrefeituraNota {
   guestNameExtracted: string | null;
   checkIn: string | null;
   checkOut: string | null;
+  /** Chave estável entre uploads MTD — impede duplicidade. */
+  entryKey: string;
 }
 
 function toIsoDate(raw: unknown): string {
@@ -54,7 +56,10 @@ function toIsoDate(raw: unknown): string {
   }
   const s = String(raw ?? "").trim();
   if (!s) return "";
-  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  // Já vem em ISO (ex.: "2026-08-29" ou "2026-08-29 00:00:00")
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
   if (m) {
     const dd = m[1].padStart(2, "0");
     const mm = m[2].padStart(2, "0");
@@ -77,8 +82,11 @@ const CONF_RE = /CONFIRMA[ÇC][ÃA]O:?\s*(\d{4,})/i;
 const RESERVA_RE = /RESERVA:?\s*(\d{4,})/i;
 const CHECKIN_RE = /CHECK-?IN:?\s*([\d./\-]{6,10})/i;
 const CHECKOUT_RE = /CHECK-?OUT:?\s*([\d./\-]{6,10})/i;
-const NAME_RE_1 = /H[OÓ]SPEDE:?\s+([A-ZÀ-Ú\s]+?)\s*\/\s*CPF/i;
-const NAME_RE_2 = /H[OÓ]SPEDE:?\s*([A-ZÀ-Ú\s]+?)\s*CONFIRMA/i;
+/** RPS gravado dentro do texto do serviço (ex.: "... / RPS: 1979 / ..."). */
+const RPS_IN_DESC_RE = /\bRPS:?\s*(\d+)/i;
+const NAME_RE_1 = /H[OÓ]SPEDE:?\s+([A-ZÀ-Úa-zà-ú\s]+?)\s*\/\s*CPF/i;
+const NAME_RE_2 = /H[OÓ]SPEDE:?\s*([A-ZÀ-Úa-zà-ú\s]+?)\s*\/\s*CONFIRMA/i;
+const NAME_RE_3 = /H[OÓ]SPEDE:?\s*([A-ZÀ-Úa-zà-ú\s]+?)\s*CONFIRMA/i;
 
 function extractConfirmationNumber(desc: string): string | null {
   const m = CONF_RE.exec(desc) || RESERVA_RE.exec(desc);
@@ -86,8 +94,13 @@ function extractConfirmationNumber(desc: string): string | null {
 }
 
 function extractGuestName(desc: string): string | null {
-  const m = NAME_RE_1.exec(desc) || NAME_RE_2.exec(desc);
+  const m = NAME_RE_1.exec(desc) || NAME_RE_2.exec(desc) || NAME_RE_3.exec(desc);
   return m ? m[1].trim().replace(/\s+/g, " ") : null;
+}
+
+function extractRpsFromDescricao(desc: string): string | null {
+  const m = RPS_IN_DESC_RE.exec(desc);
+  return m ? m[1].replace(/^0+/, "") || m[1] : null;
 }
 
 function extractCheckDate(desc: string, re: RegExp): string | null {
@@ -97,7 +110,13 @@ function extractCheckDate(desc: string, re: RegExp): string | null {
   return iso || null;
 }
 
-export function parseOperaReservations(file: File): Promise<OperaReservation[]> {
+const scopePrefix = (s: NfScope) =>
+  `${s.hotelId}|${s.refYear}-${String(s.refMonth).padStart(2, "0")}`;
+
+export function parseOperaReservations(
+  file: File,
+  scope: NfScope,
+): Promise<OperaReservation[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -113,8 +132,6 @@ export function parseOperaReservations(file: File): Promise<OperaReservation[]> 
 
         // O relatório do Oracle às vezes traz linhas de título antes do
         // cabeçalho real (ex.: "Conferência de Notas Fiscais" na linha 1).
-        // Detecta a primeira linha que contém "confirmation" + "property"
-        // ou "fiscal bill".
         const headerIdx = rows.findIndex((r) => {
           const cells = (r ?? []).map((c) => String(c ?? "").toLowerCase());
           const joined = cells.join("|");
@@ -149,20 +166,42 @@ export function parseOperaReservations(file: File): Promise<OperaReservation[]> 
         const iPayment = col("payment amount", "payment");
 
         const byConf = new Map<string, OperaReservation>();
+        const prefix = scopePrefix(scope);
+        const occ = new Map<string, number>();
 
         for (const row of rows.slice(headerRowIndex + 1)) {
           const conf = String(row[iConf] ?? "").trim();
           if (!conf) continue;
 
+          const fiscalRaw = String(row[iFiscal] ?? "").trim();
+          const fiscal = fiscalRaw && fiscalRaw.toLowerCase() !== "none" ? fiscalRaw : "";
+          const netAmount = parseMoney(row[iNet]);
+          const arrival = toIsoDate(row[iArrival]);
+          const departure = toIsoDate(row[iDeparture]);
+
+          // Chave estável: só depende do conteúdo da linha e do escopo.
+          const base = [
+            prefix,
+            conf,
+            fiscal,
+            arrival,
+            departure,
+            netAmount.toFixed(2),
+          ].join("|");
+          const seq = (occ.get(base) ?? 0) + 1;
+          occ.set(base, seq);
+          const entryKey = `${base}|${seq}`;
+
           const line: OperaLine = {
             property: String(row[iProperty] ?? "").trim(),
             confirmationNumber: conf,
             guestName: String(row[iGuest] ?? "").trim(),
-            arrival: toIsoDate(row[iArrival]),
-            departure: toIsoDate(row[iDeparture]),
-            fiscalBillNumber: String(row[iFiscal] ?? "").trim(),
-            netAmount: parseMoney(row[iNet]),
+            arrival,
+            departure,
+            fiscalBillNumber: fiscal,
+            netAmount,
             paymentAmount: parseMoney(row[iPayment]),
+            entryKey,
           };
 
           const existing = byConf.get(conf);
@@ -194,7 +233,10 @@ export function parseOperaReservations(file: File): Promise<OperaReservation[]> 
   });
 }
 
-export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
+export function parsePrefeituraNotas(
+  file: File,
+  scope: NfScope,
+): Promise<PrefeituraNota[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -249,6 +291,8 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
         const iRps = col("rps nº", "rps n", "rps");
 
         const notas: PrefeituraNota[] = [];
+        const prefix = scopePrefix(scope);
+
         for (const row of rows.slice(headerRowIndex + 1)) {
           const numero = String(row[iNumero] ?? "").trim();
           if (!numero) continue;
@@ -257,12 +301,23 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
           if (!situacao.includes("Gerada")) continue;
 
           const descricao = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
-          const rpsRaw =
-            iRps >= 0 ? row[iRps] : iDps >= 0 ? row[iDps] : null;
-          const rps =
-            rpsRaw != null && String(rpsRaw).trim() !== ""
-              ? String(rpsRaw).trim().replace(/^0+/, "")
-              : null;
+
+          // Resolução do RPS, na ordem: coluna RPS própria → número dentro do
+          // texto do serviço → DPS (e nunca DPS quando ele é o próprio número
+          // da nota, caso em que não corresponde ao Fiscal Bill do Opera).
+          const clean = (v: unknown) => {
+            const s = String(v ?? "").trim();
+            if (!s) return null;
+            return s.replace(/^0+/, "") || s;
+          };
+          const fromRpsCol = iRps >= 0 ? clean(row[iRps]) : null;
+          const fromDesc = extractRpsFromDescricao(descricao);
+          const dpsRaw = iDps >= 0 ? clean(row[iDps]) : null;
+          const fromDps =
+            dpsRaw && dpsRaw !== clean(numero) ? dpsRaw : null;
+          const rps = fromRpsCol ?? fromDesc ?? fromDps;
+
+          const entryKey = `${prefix}|nfse|${numero}`;
 
           notas.push({
             numeroNfse: numero,
@@ -276,6 +331,7 @@ export function parsePrefeituraNotas(file: File): Promise<PrefeituraNota[]> {
             guestNameExtracted: extractGuestName(descricao),
             checkIn: extractCheckDate(descricao, CHECKIN_RE),
             checkOut: extractCheckDate(descricao, CHECKOUT_RE),
+            entryKey,
           });
         }
 
