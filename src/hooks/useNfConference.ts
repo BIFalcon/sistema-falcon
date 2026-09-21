@@ -118,6 +118,24 @@ export function useNfConference(
         notasDaReserva.push(n);
       }
 
+      // 3) Fallback por hóspede + valor: alguns relatórios da prefeitura vêm
+      // sem descrição do serviço (sem RPS e sem confirmação) e só trazem o
+      // nome do tomador e o valor. Nesse caso cruzamos por nome + valor.
+      if (notasDaReserva.length === 0) {
+        for (const n of notasSemChave) {
+          if (claimed.has(n.numeroNfse)) continue;
+          if (namesMatch(n.guestNameExtracted, reservation.guestName) !== true) continue;
+          const valorBate =
+            valueMatchesAnyLine(n.valorServico, reservation) ||
+            Math.abs(n.valorServico - reservation.totalNet) < VALUE_TOLERANCE ||
+            Math.abs(n.valorServico - reservation.totalPayment) < VALUE_TOLERANCE;
+          if (!valorBate) continue;
+          seen.add(n.numeroNfse);
+          claimed.add(n.numeroNfse);
+          notasDaReserva.push(n);
+        }
+      }
+
       if (notasDaReserva.length === 0) {
         semNota.push({
           status: "sem_nota",
@@ -130,6 +148,7 @@ export function useNfConference(
         });
         continue;
       }
+
 
       const motivos: string[] = [];
       let nameOk: boolean | null = true;
