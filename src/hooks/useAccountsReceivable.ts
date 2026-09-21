@@ -694,19 +694,17 @@ export function useToInvoiceTotals(filters: ArScopeFilters, status: ToInvoiceSta
         p_date_to: s.dateTo,
         p_dates: s.dates,
         p_status: status,
+        // Escopo de hotéis visíveis aplicado no banco, para o ranking e os
+        // contadores baterem exatamente com a lista exibida.
+        p_hotel_ids: s.hotelIds,
       });
       if (error) throw error;
-      let rows = ((data ?? []) as any[]).map((r) => ({
+      return ((data ?? []) as any[]).map((r) => ({
         hotel_id: r.hotel_id ?? null,
         ym: r.ym ?? null,
         total: Number(r.total ?? 0),
         cnt: Number(r.cnt ?? 0),
       }));
-      if (s.hotelIds) {
-        const allowed = new Set(s.hotelIds);
-        rows = rows.filter((r) => r.hotel_id && allowed.has(r.hotel_id));
-      }
-      return rows;
     },
   });
 }
@@ -732,6 +730,7 @@ export function useToInvoiceStatusCounts(filters: ArScopeFilters) {
         p_date_from: s.dateFrom,
         p_date_to: s.dateTo,
         p_dates: s.dates,
+        p_hotel_ids: s.hotelIds,
       });
       if (error) throw error;
       const r = (Array.isArray(data) ? data[0] : data) ?? {};
