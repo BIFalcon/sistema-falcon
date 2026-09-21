@@ -234,6 +234,19 @@ export function useUploadNfFiles() {
         return data.id as string;
       };
 
+      const scopeCount = async (table: "nf_opera_entries" | "nf_nota_entries") => {
+        const { count, error } = await supabase
+          .from(table)
+          .select("*", { count: "exact", head: true })
+          .eq("hotel_id", scope.hotelId)
+          .eq("ref_year", scope.refYear)
+          .eq("ref_month", scope.refMonth);
+        if (error) throw error;
+        return count ?? 0;
+      };
+      const operaBefore = await scopeCount("nf_opera_entries");
+      const notaBefore = await scopeCount("nf_nota_entries");
+
       const operaLines = reservations.flatMap((r) => r.lines);
       const operaUploadId = await insertUpload("opera", operaFile.name, operaLines.length);
       const notaUploadId = await insertUpload("nota", prefeituraFile.name, notas.length);
