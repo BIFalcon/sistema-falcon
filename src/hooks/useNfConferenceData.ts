@@ -251,7 +251,6 @@ export function useUploadNfFiles() {
       const operaUploadId = await insertUpload("opera", operaFile.name, operaLines.length);
       const notaUploadId = await insertUpload("nota", prefeituraFile.name, notas.length);
 
-      let operaInserted = 0;
       for (let i = 0; i < operaLines.length; i += CHUNK) {
         const batch = operaLines.slice(i, i + CHUNK).map((l) => ({
           hotel_id: scope.hotelId,
