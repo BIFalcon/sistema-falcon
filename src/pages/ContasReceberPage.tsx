@@ -488,7 +488,7 @@ function ToInvoiceSection({
               className="w-72 h-9"
             />
             <Select value={faturamentoFilter} onValueChange={(v) => setFaturamentoFilter(v as ToInvoiceStatusFilter)}>
-              <SelectTrigger className="w-36 h-9">
+              <SelectTrigger className="w-48 h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
