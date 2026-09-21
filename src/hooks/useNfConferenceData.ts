@@ -216,6 +216,18 @@ export function useUploadNfFiles() {
         parsePrefeituraNotas(prefeituraFile, scope),
       ]);
 
+      if (!reservations.length) {
+        throw new Error(
+          `Não foi possível ler nenhuma reserva no arquivo do Opera (${operaFile.name}). Confira se é o relatório de Conferência de Notas Fiscais.`,
+        );
+      }
+      if (!notas.length) {
+        throw new Error(
+          `Não foi possível ler nenhuma nota no arquivo da Prefeitura (${prefeituraFile.name}). O layout desse arquivo pode ser diferente — envie o arquivo para análise.`,
+        );
+      }
+
+
       const insertUpload = async (kind: "opera" | "nota", fileName: string, total: number) => {
         const { data, error } = await supabase
           .from("nf_uploads")
