@@ -102,9 +102,9 @@ export function useNfConference(
         const found = notasByRps.get(k);
         if (!found) continue;
         for (const n of found) {
-          if (seen.has(n.numeroNfse)) continue;
+          if (seen.has(n.numeroNfse) || claimed.has(n.numeroNfse)) continue;
           seen.add(n.numeroNfse);
-          usedNota.add(`rps:${k}:${n.numeroNfse}`);
+          claimed.add(n.numeroNfse);
           notasDaReserva.push(n);
         }
       }
@@ -112,12 +112,11 @@ export function useNfConference(
       const confKey = normKey(reservation.confirmationNumber);
       const byConf = confKey ? notasByConf.get(confKey) ?? [] : [];
       for (const n of byConf) {
-        if (seen.has(n.numeroNfse)) continue;
+        if (seen.has(n.numeroNfse) || claimed.has(n.numeroNfse)) continue;
         seen.add(n.numeroNfse);
-        usedNota.add(`conf:${confKey}:${n.numeroNfse}`);
+        claimed.add(n.numeroNfse);
         notasDaReserva.push(n);
       }
-      if (confKey) notasByConf.delete(confKey);
 
       if (notasDaReserva.length === 0) {
         semNota.push({
