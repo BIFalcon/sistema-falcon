@@ -281,12 +281,23 @@ export function parsePrefeituraNotas(
           return -1;
         };
 
-        const iNumero = col("número nfs-e", "numero nfs-e", "nfs-e");
-        const iDataGeracao = col("data geração", "data geracao");
+        const iNumero = col(
+          "número nfs-e",
+          "numero nfs-e",
+          "nfs-e",
+          "número da nota",
+          "numero da nota",
+          "número",
+          "numero",
+        );
+        const iDataGeracao = col("data geração", "data geracao", "data emissão", "data emissao");
         const iCompetencia = col("competência", "competencia");
-        const iSituacao = col("situação nfs-e", "situacao nfs-e");
-        const iValor = col("valor do serviço", "valor do servico");
-        const iDescricao = col("descrição do serviço", "descricao do servico");
+        const iSituacao = col("situação nfs-e", "situacao nfs-e", "situação", "situacao");
+        const iValor = col("valor do serviço", "valor do servico", "valor total", "valor");
+        const iDescricao = col("descrição do serviço", "descricao do servico", "discriminação", "discriminacao");
+        // Em várias prefeituras o detalhamento (hóspede, confirmação, RPS)
+        // vem em "Informações Complementares", não na descrição do serviço.
+        const iInfoCompl = col("informações complementares", "informacoes complementares", "observa");
         const iDps = col("dps nº", "dps n", "dps");
         const iRps = col("rps nº", "rps n", "rps");
 
@@ -294,13 +305,18 @@ export function parsePrefeituraNotas(
         const prefix = scopePrefix(scope);
 
         for (const row of rows.slice(headerRowIndex + 1)) {
-          const numero = String(row[iNumero] ?? "").trim();
+          const numero = iNumero >= 0 ? String(row[iNumero] ?? "").trim() : "";
           if (!numero) continue;
 
-          const situacao = String(row[iSituacao] ?? "").trim();
-          if (!situacao.includes("Gerada")) continue;
+          const situacao = iSituacao >= 0 ? String(row[iSituacao] ?? "").trim() : "";
+          // Só descarta o que está explicitamente cancelado/substituído.
+          const sitLower = situacao.toLowerCase();
+          if (/cancel|substitu/.test(sitLower)) continue;
 
-          const descricao = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
+          const descBase = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
+          const descInfo = iInfoCompl >= 0 ? String(row[iInfoCompl] ?? "").trim() : "";
+          const descricao = [descBase, descInfo].filter(Boolean).join(" / ");
+
 
           // Resolução do RPS, na ordem: coluna RPS própria → número dentro do
           // texto do serviço → DPS (e nunca DPS quando ele é o próprio número
