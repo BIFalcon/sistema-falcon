@@ -63,7 +63,10 @@ export function useNfConference(
   return useMemo(() => {
     if (!reservations.length && !notas.length) return null;
 
-    // Indexa notas por RPS (chave primária) e por confirmação (fallback).
+    // Indexa cada nota pelos DOIS critérios ao mesmo tempo (RPS e confirmação).
+    // Antes era "RPS ou senão confirmação": quando o RPS vinha errado (ex.: o
+    // relatório trazia o próprio número da nota), o cruzamento por confirmação
+    // nunca era tentado e nada conciliava.
     const notasByRps = new Map<string, PrefeituraNota[]>();
     const notasByConf = new Map<string, PrefeituraNota[]>();
     const notasSemChave: PrefeituraNota[] = [];
@@ -74,15 +77,16 @@ export function useNfConference(
         const arr = notasByRps.get(rpsKey) ?? [];
         arr.push(n);
         notasByRps.set(rpsKey, arr);
-      } else if (confKey) {
+      }
+      if (confKey) {
         const arr = notasByConf.get(confKey) ?? [];
         arr.push(n);
         notasByConf.set(confKey, arr);
-      } else {
-        notasSemChave.push(n);
       }
+      if (!rpsKey && !confKey) notasSemChave.push(n);
     }
-    const usedNota = new Set<string>();
+    // Uma nota só pode ser reivindicada por uma reserva.
+    const claimed = new Set<string>();
 
     const conciliados: NfMatchDetail[] = [];
     const divergencias: NfMatchDetail[] = [];
@@ -98,9 +102,9 @@ export function useNfConference(
         const found = notasByRps.get(k);
         if (!found) continue;
         for (const n of found) {
-          if (seen.has(n.numeroNfse)) continue;
+          if (seen.has(n.numeroNfse) || claimed.has(n.numeroNfse)) continue;
           seen.add(n.numeroNfse);
-          usedNota.add(`rps:${k}:${n.numeroNfse}`);
+          claimed.add(n.numeroNfse);
           notasDaReserva.push(n);
         }
       }
@@ -108,12 +112,11 @@ export function useNfConference(
       const confKey = normKey(reservation.confirmationNumber);
       const byConf = confKey ? notasByConf.get(confKey) ?? [] : [];
       for (const n of byConf) {
-        if (seen.has(n.numeroNfse)) continue;
+        if (seen.has(n.numeroNfse) || claimed.has(n.numeroNfse)) continue;
         seen.add(n.numeroNfse);
-        usedNota.add(`conf:${confKey}:${n.numeroNfse}`);
+        claimed.add(n.numeroNfse);
         notasDaReserva.push(n);
       }
-      if (confKey) notasByConf.delete(confKey);
 
       if (notasDaReserva.length === 0) {
         semNota.push({
@@ -177,32 +180,22 @@ export function useNfConference(
       }
     }
 
-    // Notas remanescentes: sobrou RPS não encontrado no Opera OU confirmação sobrando.
+    // Notas remanescentes: nenhuma reserva do Opera as reivindicou.
     const semReservaOpera: NfMatchDetail[] = [];
-    for (const [rps, ns] of notasByRps.entries()) {
-      const remaining = ns.filter(
-        (n) => !usedNota.has(`rps:${rps}:${n.numeroNfse}`),
-      );
-      if (remaining.length === 0) continue;
+    const semChaveSet = new Set(notasSemChave.map((n) => n.numeroNfse));
+    for (const n of notas) {
+      if (claimed.has(n.numeroNfse) || semChaveSet.has(n.numeroNfse)) continue;
+      const motivo = n.rps
+        ? `RPS ${n.rps} não encontrado como Fiscal Bill Number no Opera`
+        : `Confirmação ${n.confirmationNumber} não encontrada no Opera`;
       semReservaOpera.push({
         status: "sem_reserva_opera",
         reservation: null,
-        notas: remaining,
+        notas: [n],
         nameOk: null,
         dateOk: null,
         valueOk: null,
-        motivos: [`RPS ${rps} não encontrado como Fiscal Bill Number no Opera`],
-      });
-    }
-    for (const [conf, ns] of notasByConf.entries()) {
-      semReservaOpera.push({
-        status: "sem_reserva_opera",
-        reservation: null,
-        notas: ns,
-        nameOk: null,
-        dateOk: null,
-        valueOk: null,
-        motivos: [`Confirmação ${conf} não encontrada no Opera`],
+        motivos: [motivo],
       });
     }
     const semConfirmacaoIdentificada = notasSemChave;

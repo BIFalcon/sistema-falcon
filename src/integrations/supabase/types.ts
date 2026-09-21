@@ -2377,6 +2377,200 @@ export type Database = {
         }
         Relationships: []
       }
+      nf_nota_entries: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          competencia: string | null
+          confirmation_number: string | null
+          created_at: string
+          data_geracao: string | null
+          descricao: string | null
+          entry_key: string
+          guest_name_extracted: string | null
+          hotel_id: string
+          id: string
+          numero_nfse: string
+          ref_month: number
+          ref_year: number
+          rps: string | null
+          situacao: string | null
+          upload_id: string | null
+          valor_servico: number
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          competencia?: string | null
+          confirmation_number?: string | null
+          created_at?: string
+          data_geracao?: string | null
+          descricao?: string | null
+          entry_key: string
+          guest_name_extracted?: string | null
+          hotel_id: string
+          id?: string
+          numero_nfse: string
+          ref_month: number
+          ref_year: number
+          rps?: string | null
+          situacao?: string | null
+          upload_id?: string | null
+          valor_servico?: number
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          competencia?: string | null
+          confirmation_number?: string | null
+          created_at?: string
+          data_geracao?: string | null
+          descricao?: string | null
+          entry_key?: string
+          guest_name_extracted?: string | null
+          hotel_id?: string
+          id?: string
+          numero_nfse?: string
+          ref_month?: number
+          ref_year?: number
+          rps?: string | null
+          situacao?: string | null
+          upload_id?: string | null
+          valor_servico?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_nota_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nf_nota_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "nf_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nf_opera_entries: {
+        Row: {
+          arrival: string | null
+          confirmation_number: string
+          created_at: string
+          departure: string | null
+          entry_key: string
+          fiscal_bill_number: string | null
+          guest_name: string | null
+          hotel_id: string
+          id: string
+          net_amount: number
+          payment_amount: number
+          property: string | null
+          ref_month: number
+          ref_year: number
+          upload_id: string | null
+        }
+        Insert: {
+          arrival?: string | null
+          confirmation_number: string
+          created_at?: string
+          departure?: string | null
+          entry_key: string
+          fiscal_bill_number?: string | null
+          guest_name?: string | null
+          hotel_id: string
+          id?: string
+          net_amount?: number
+          payment_amount?: number
+          property?: string | null
+          ref_month: number
+          ref_year: number
+          upload_id?: string | null
+        }
+        Update: {
+          arrival?: string | null
+          confirmation_number?: string
+          created_at?: string
+          departure?: string | null
+          entry_key?: string
+          fiscal_bill_number?: string | null
+          guest_name?: string | null
+          hotel_id?: string
+          id?: string
+          net_amount?: number
+          payment_amount?: number
+          property?: string | null
+          ref_month?: number
+          ref_year?: number
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_opera_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nf_opera_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "nf_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nf_uploads: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          hotel_id: string
+          id: string
+          kind: string
+          ref_month: number
+          ref_year: number
+          rows_inserted: number
+          rows_total: number
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          hotel_id: string
+          id?: string
+          kind: string
+          ref_month: number
+          ref_year: number
+          rows_inserted?: number
+          rows_total?: number
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          hotel_id?: string
+          id?: string
+          kind?: string
+          ref_month?: number
+          ref_year?: number
+          rows_inserted?: number
+          rows_total?: number
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_uploads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_queue: {
         Row: {
           body_md: string

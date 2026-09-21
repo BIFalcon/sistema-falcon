@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Upload,
@@ -14,6 +14,13 @@ import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,14 +29,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import {
-  parseOperaReservations,
-  parsePrefeituraNotas,
-  type OperaReservation,
-  type PrefeituraNota,
-} from "@/lib/nfConferenceParser";
 import { useNfConference } from "@/hooks/useNfConference";
+import {
+  useNfScopeCounts,
+  useNfScopeData,
+  useNfUploads,
+  useUploadNfFiles,
+} from "@/hooks/useNfConferenceData";
+import { useModuleFilters } from "@/contexts/FilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { fmtBRL } from "@/lib/formatters";
+
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+const PAGE_SIZE = 50;
 
 function DropZone({
   label,
@@ -111,46 +127,80 @@ function SectionCard({
   );
 }
 
+/** Lista paginada de verdade (mostra em blocos, não o acervo inteiro). */
+function Paged<T>({
+  rows,
+  children,
+}: {
+  rows: T[];
+  children: (visible: T[]) => React.ReactNode;
+}) {
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  return (
+    <div className="space-y-3">
+      {children(rows.slice(0, limit))}
+      {rows.length > limit && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => setLimit((l) => l + PAGE_SIZE)}
+        >
+          Mostrar mais ({rows.length - limit} restantes)
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function ConferenciaNotasFiscaisPage() {
+  const { allowedHotels } = useAuth();
+  const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("global");
   const [operaFile, setOperaFile] = useState<File | null>(null);
   const [prefeituraFile, setPrefeituraFile] = useState<File | null>(null);
-  const [reservations, setReservations] = useState<OperaReservation[]>([]);
-  const [notas, setNotas] = useState<PrefeituraNota[]>([]);
-  const [processing, setProcessing] = useState(false);
-  const [processed, setProcessed] = useState(false);
 
+  const upload = useUploadNfFiles();
+  const { data: counts } = useNfScopeCounts(hotelId, year, month);
+  const { data: scopeData, isLoading } = useNfScopeData(hotelId, year, month);
+  const { data: uploads = [] } = useNfUploads(hotelId, year, month);
+
+  const reservations = scopeData?.reservations ?? [];
+  const notas = scopeData?.notas ?? [];
   const result = useNfConference(reservations, notas);
 
+  const hotelName = useMemo(
+    () => allowedHotels.find((h) => h.id === hotelId)?.name ?? null,
+    [allowedHotels, hotelId],
+  );
+
+  const years = useMemo(() => {
+    const y = new Date().getFullYear();
+    return [y + 1, y, y - 1, y - 2];
+  }, []);
+
   const handleProcess = async () => {
+    // Escopo capturado no instante do clique — nunca de estado antigo.
+    const scope = { hotelId: hotelId ?? "", refYear: year, refMonth: month };
+    if (!scope.hotelId) {
+      toast.error("Selecione um hotel antes de enviar os arquivos");
+      return;
+    }
     if (!operaFile || !prefeituraFile) {
       toast.error("Selecione os dois arquivos (Opera R&A e Prefeitura)");
       return;
     }
-    setProcessing(true);
     try {
-      const [res, nfs] = await Promise.all([
-        parseOperaReservations(operaFile),
-        parsePrefeituraNotas(prefeituraFile),
-      ]);
-      setReservations(res);
-      setNotas(nfs);
-      setProcessed(true);
+      const res = await upload.mutateAsync({ scope, operaFile, prefeituraFile });
       toast.success(
-        `Processado: ${res.length} reservas do Opera, ${nfs.length} notas da Prefeitura`,
+        `${hotelName ?? scope.hotelId} · ${MONTHS[month - 1]}/${year}: ` +
+          `${res.operaInserted} de ${res.operaTotal} linhas do Opera e ` +
+          `${res.notaInserted} de ${res.notaTotal} notas gravadas (repetidas ignoradas)`,
       );
+      setOperaFile(null);
+      setPrefeituraFile(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
-    } finally {
-      setProcessing(false);
     }
-  };
-
-  const handleReset = () => {
-    setOperaFile(null);
-    setPrefeituraFile(null);
-    setReservations([]);
-    setNotas([]);
-    setProcessed(false);
   };
 
   const handleExport = () => {
@@ -204,8 +254,13 @@ export default function ConferenciaNotasFiscaisPage() {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Conferência NF");
-    XLSX.writeFile(wb, `conferencia-notas-fiscais-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `conferencia-notas-fiscais-${hotelId ?? "hotel"}-${year}-${String(month).padStart(2, "0")}.xlsx`,
+    );
   };
+
+  const hasData = (counts?.operaRows ?? 0) > 0 || (counts?.notaRows ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -220,37 +275,121 @@ export default function ConferenciaNotasFiscaisPage() {
         </p>
       </div>
 
-      {!processed ? (
-        <Card className="p-6 shadow-soft space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Hospedagens — Oracle R&A (obrigatório)
-              </p>
-              <DropZone
-                label="Relatório de hospedagens (.xlsx)"
-                file={operaFile}
-                onFile={setOperaFile}
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Notas Fiscais — Prefeitura (obrigatório)
-              </p>
-              <DropZone
-                label="Relatório de NFS-e emitidas (.xlsx)"
-                file={prefeituraFile}
-                onFile={setPrefeituraFile}
-              />
-            </div>
+      <Card className="p-4 shadow-soft">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Hotel
+            </p>
+            <Select value={hotelId ?? ""} onValueChange={(v) => setHotelId(v || null)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o hotel" />
+              </SelectTrigger>
+              <SelectContent>
+                {allowedHotels.map((h) => (
+                  <SelectItem key={h.id} value={h.id}>
+                    {h.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Button
-            onClick={handleProcess}
-            disabled={!operaFile || !prefeituraFile || processing}
-            className="w-full"
-          >
-            {processing ? "Processando..." : "Analisar conferência"}
-          </Button>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Mês de referência
+            </p>
+            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={m} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Ano
+            </p>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Os arquivos enviados ficam gravados para{" "}
+          <strong>{hotelName ?? "o hotel selecionado"}</strong> em{" "}
+          <strong>{MONTHS[month - 1]} de {year}</strong>. Reenviar o relatório do mês (MTD) apenas
+          acrescenta as linhas novas — nada duplica.
+          {counts && (
+            <>
+              {" "}Hoje há {counts.operaRows} linha(s) do Opera e {counts.notaRows} nota(s) gravadas
+              neste período.
+            </>
+          )}
+        </p>
+      </Card>
+
+      <Card className="p-6 shadow-soft space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Hospedagens — Oracle R&A (obrigatório)
+            </p>
+            <DropZone
+              label="Relatório de hospedagens (.xlsx)"
+              file={operaFile}
+              onFile={setOperaFile}
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Notas Fiscais — Prefeitura (obrigatório)
+            </p>
+            <DropZone
+              label="Relatório de NFS-e emitidas (.xlsx)"
+              file={prefeituraFile}
+              onFile={setPrefeituraFile}
+            />
+          </div>
+        </div>
+        <Button
+          onClick={handleProcess}
+          disabled={!hotelId || !operaFile || !prefeituraFile || upload.isPending}
+          className="w-full"
+        >
+          {upload.isPending ? "Processando..." : "Enviar e analisar conferência"}
+        </Button>
+        {uploads.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Último envio: {new Date(uploads[0].created_at).toLocaleString("pt-BR")} ·{" "}
+            {uploads[0].file_name}
+          </p>
+        )}
+      </Card>
+
+      {!hotelId ? (
+        <Card className="p-6 shadow-soft text-sm text-muted-foreground">
+          Selecione um hotel para ver a conferência.
+        </Card>
+      ) : isLoading ? (
+        <Card className="p-6 shadow-soft text-sm text-muted-foreground">Carregando…</Card>
+      ) : !hasData ? (
+        <Card className="p-6 shadow-soft text-sm text-muted-foreground">
+          Nenhum arquivo enviado para {hotelName} em {MONTHS[month - 1]} de {year}.
         </Card>
       ) : (
         <>
@@ -301,15 +440,10 @@ export default function ConferenciaNotasFiscaisPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleReset}>
-                Nova análise
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
           </div>
 
           <div className="space-y-3">
@@ -319,39 +453,43 @@ export default function ConferenciaNotasFiscaisPage() {
               colorClass="text-destructive"
               count={result?.semNota.length ?? 0}
             >
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Confirmação</TableHead>
-                    <TableHead>RPS</TableHead>
-                    <TableHead>Hóspede</TableHead>
-                    <TableHead>Check-in</TableHead>
-                    <TableHead>Check-out</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(result?.semNota ?? []).map((item) => (
-                    <TableRow
-                      key={item.reservation!.confirmationNumber}
-                      className="bg-red-50/50 dark:bg-red-900/10"
-                    >
-                      <TableCell className="font-mono text-xs">
-                        {item.reservation!.confirmationNumber}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
-                      </TableCell>
-                      <TableCell>{item.reservation!.guestName}</TableCell>
-                      <TableCell>{item.reservation!.arrival}</TableCell>
-                      <TableCell>{item.reservation!.departure}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {fmtBRL(item.reservation!.totalNet)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Paged rows={result?.semNota ?? []}>
+                {(visible) => (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Confirmação</TableHead>
+                        <TableHead>RPS</TableHead>
+                        <TableHead>Hóspede</TableHead>
+                        <TableHead>Check-in</TableHead>
+                        <TableHead>Check-out</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visible.map((item) => (
+                        <TableRow
+                          key={item.reservation!.confirmationNumber}
+                          className="bg-red-50/50 dark:bg-red-900/10"
+                        >
+                          <TableCell className="font-mono text-xs">
+                            {item.reservation!.confirmationNumber}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
+                          </TableCell>
+                          <TableCell>{item.reservation!.guestName}</TableCell>
+                          <TableCell>{item.reservation!.arrival}</TableCell>
+                          <TableCell>{item.reservation!.departure}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {fmtBRL(item.reservation!.totalNet)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Paged>
             </SectionCard>
 
             <SectionCard
@@ -360,28 +498,32 @@ export default function ConferenciaNotasFiscaisPage() {
               colorClass="text-amber-700 dark:text-amber-400"
               count={result?.divergencias.length ?? 0}
             >
-              <div className="space-y-3">
-                {(result?.divergencias ?? []).map((item) => (
-                  <div
-                    key={item.reservation!.confirmationNumber}
-                    className="text-sm border rounded-md p-3 bg-amber-50/40 dark:bg-amber-900/10"
-                  >
-                    <p className="font-medium">
-                      {item.reservation!.confirmationNumber} · {item.reservation!.guestName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      RPS: {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
-                      {" · Nota: "}
-                      {item.notas.map((n) => n.numeroNfse).join(", ") || "—"}
-                    </p>
-                    <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
-                      {item.motivos.map((m, i) => (
-                        <li key={i}>{m}</li>
-                      ))}
-                    </ul>
+              <Paged rows={result?.divergencias ?? []}>
+                {(visible) => (
+                  <div className="space-y-3">
+                    {visible.map((item) => (
+                      <div
+                        key={item.reservation!.confirmationNumber}
+                        className="text-sm border rounded-md p-3 bg-amber-50/40 dark:bg-amber-900/10"
+                      >
+                        <p className="font-medium">
+                          {item.reservation!.confirmationNumber} · {item.reservation!.guestName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          RPS: {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
+                          {" · Nota: "}
+                          {item.notas.map((n) => n.numeroNfse).join(", ") || "—"}
+                        </p>
+                        <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
+                          {item.motivos.map((m, i) => (
+                            <li key={i}>{m}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </Paged>
             </SectionCard>
 
             {(result?.conciliados.length ?? 0) > 0 && (
@@ -404,28 +546,32 @@ export default function ConferenciaNotasFiscaisPage() {
               colorClass="text-blue-700 dark:text-blue-400"
               count={result?.semConfirmacaoIdentificada.length ?? 0}
             >
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nota</TableHead>
-                    <TableHead>RPS</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(result?.semConfirmacaoIdentificada ?? []).map((nota) => (
-                    <TableRow key={nota.numeroNfse}>
-                      <TableCell className="font-mono text-xs">{nota.numeroNfse}</TableCell>
-                      <TableCell className="font-mono text-xs">{nota.rps ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{nota.descricao}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {fmtBRL(nota.valorServico)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Paged rows={result?.semConfirmacaoIdentificada ?? []}>
+                {(visible) => (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nota</TableHead>
+                        <TableHead>RPS</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visible.map((nota) => (
+                        <TableRow key={nota.numeroNfse}>
+                          <TableCell className="font-mono text-xs">{nota.numeroNfse}</TableCell>
+                          <TableCell className="font-mono text-xs">{nota.rps ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{nota.descricao}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {fmtBRL(nota.valorServico)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Paged>
             </SectionCard>
 
             <SectionCard
@@ -434,30 +580,34 @@ export default function ConferenciaNotasFiscaisPage() {
               colorClass="text-muted-foreground"
               count={result?.semReservaOpera.length ?? 0}
             >
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>RPS / Confirmação</TableHead>
-                    <TableHead>Nota(s)</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(result?.semReservaOpera ?? []).map((item) => (
-                    <TableRow key={item.motivos[0]}>
-                      <TableCell className="font-mono text-xs">
-                        {item.notas[0]?.rps ?? item.notas[0]?.confirmationNumber ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {item.notas.map((n) => n.numeroNfse).join(", ")}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {fmtBRL(item.notas.reduce((sum, n) => sum + n.valorServico, 0))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Paged rows={result?.semReservaOpera ?? []}>
+                {(visible) => (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>RPS / Confirmação</TableHead>
+                        <TableHead>Nota(s)</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visible.map((item) => (
+                        <TableRow key={item.notas.map((n) => n.numeroNfse).join("-")}>
+                          <TableCell className="font-mono text-xs">
+                            {item.notas[0]?.rps ?? item.notas[0]?.confirmationNumber ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {item.notas.map((n) => n.numeroNfse).join(", ")}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {fmtBRL(item.notas.reduce((sum, n) => sum + n.valorServico, 0))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Paged>
             </SectionCard>
           </div>
         </>

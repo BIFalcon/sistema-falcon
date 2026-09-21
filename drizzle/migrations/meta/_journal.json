@@ -78,6 +78,13 @@
       "when": 1789924190321,
       "tag": "0010_notification_and_ar_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789991010802,
+      "tag": "0011_nf_conference_persistence",
+      "breakpoints": true
     }
   ]
 }
