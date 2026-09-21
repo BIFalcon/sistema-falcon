@@ -260,11 +260,17 @@ export function parsePrefeituraNotas(
             .join("|");
           return (
             joined.includes("nfs-e") ||
+            joined.includes("nfse") ||
             joined.includes("valor do servi") ||
             joined.includes("descrição do servi") ||
-            joined.includes("descricao do servi")
+            joined.includes("descricao do servi") ||
+            joined.includes("discrimina") ||
+            (joined.includes("situa") && joined.includes("nota")) ||
+            (joined.includes("competên") && joined.includes("valor")) ||
+            (joined.includes("competen") && joined.includes("valor"))
           );
         });
+
         const headerRowIndex = headerIdx >= 0 ? headerIdx : 0;
         const header = (rows[headerRowIndex] ?? []).map((c) =>
           String(c ?? "").toLowerCase().trim(),
