@@ -99,6 +99,13 @@
       "when": 1790013690024,
       "tag": "0013_drop_old_ar_to_invoice_overloads",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790018508888,
+      "tag": "0014_optimize_ar_totals_for_authenticated_scope",
+      "breakpoints": true
     }
   ]
 }
