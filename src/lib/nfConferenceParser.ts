@@ -359,7 +359,10 @@ export function parsePrefeituraNotas(
             descricao,
             rps,
             confirmationNumber: extractConfirmationNumber(descricao),
-            guestNameExtracted: extractGuestName(descricao),
+            guestNameExtracted:
+              extractGuestName(descricao) ??
+              (iTomador >= 0 ? String(row[iTomador] ?? "").trim() || null : null),
+
             checkIn: extractCheckDate(descricao, CHECKIN_RE),
             checkOut: extractCheckDate(descricao, CHECKOUT_RE),
             entryKey,
