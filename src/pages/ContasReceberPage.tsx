@@ -1887,19 +1887,29 @@ function ConsolidatedRanking({
         <span className="text-xs text-muted-foreground">Total: <strong>{fmtBRL(grand)}</strong></span>
       </div>
       <div className="space-y-2">
-        {ranking.map((r) => (
-          <div key={r.id} className="flex items-center gap-3">
-            <div className="w-48 text-sm truncate">{r.name}</div>
-            <div className="flex-1 h-7 rounded bg-muted/40 overflow-hidden relative">
-              <div
-                className="h-full bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground"
-                style={{ width: `${Math.max(2, (r.total / max) * 100)}%` }}
-              >
-                {fmtBRL(r.total)}
+        {ranking.map((r) => {
+          const pct = max > 0 ? (r.total / max) * 100 : 0;
+          // Barras curtas não têm espaço para o valor dentro: mostra ao lado.
+          const inside = pct >= 30;
+          return (
+            <div key={r.id} className="flex items-center gap-3">
+              <div className="w-48 text-sm truncate">{r.name}</div>
+              <div className="flex-1 h-7 rounded bg-muted/40 overflow-hidden relative flex items-center">
+                <div
+                  className="h-7 bg-accent/80 flex items-center justify-end pr-2 text-[11px] font-semibold text-accent-foreground shrink-0"
+                  style={{ width: `${Math.max(2, pct)}%` }}
+                >
+                  {inside ? fmtBRL(r.total) : null}
+                </div>
+                {!inside && (
+                  <span className="pl-2 text-[11px] font-semibold text-foreground whitespace-nowrap">
+                    {fmtBRL(r.total)}
+                  </span>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
