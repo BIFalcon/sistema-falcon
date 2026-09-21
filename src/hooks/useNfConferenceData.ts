@@ -292,13 +292,15 @@ export function useUploadNfFiles() {
           check_in: n.checkIn,
           check_out: n.checkOut,
         }));
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("nf_nota_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true })
-          .select("id");
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
         if (error) throw error;
-        notaInserted += data?.length ?? 0;
       }
+
+      // Linhas realmente novas = diferença medida no banco (repetidas são ignoradas).
+      const operaInserted = (await scopeCount("nf_opera_entries")) - operaBefore;
+      const notaInserted = (await scopeCount("nf_nota_entries")) - notaBefore;
 
       await Promise.all([
         supabase.from("nf_uploads").update({ rows_inserted: operaInserted }).eq("id", operaUploadId),
