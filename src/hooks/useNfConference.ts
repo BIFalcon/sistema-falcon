@@ -180,32 +180,22 @@ export function useNfConference(
       }
     }
 
-    // Notas remanescentes: sobrou RPS não encontrado no Opera OU confirmação sobrando.
+    // Notas remanescentes: nenhuma reserva do Opera as reivindicou.
     const semReservaOpera: NfMatchDetail[] = [];
-    for (const [rps, ns] of notasByRps.entries()) {
-      const remaining = ns.filter(
-        (n) => !usedNota.has(`rps:${rps}:${n.numeroNfse}`),
-      );
-      if (remaining.length === 0) continue;
+    const semChaveSet = new Set(notasSemChave.map((n) => n.numeroNfse));
+    for (const n of notas) {
+      if (claimed.has(n.numeroNfse) || semChaveSet.has(n.numeroNfse)) continue;
+      const motivo = n.rps
+        ? `RPS ${n.rps} não encontrado como Fiscal Bill Number no Opera`
+        : `Confirmação ${n.confirmationNumber} não encontrada no Opera`;
       semReservaOpera.push({
         status: "sem_reserva_opera",
         reservation: null,
-        notas: remaining,
+        notas: [n],
         nameOk: null,
         dateOk: null,
         valueOk: null,
-        motivos: [`RPS ${rps} não encontrado como Fiscal Bill Number no Opera`],
-      });
-    }
-    for (const [conf, ns] of notasByConf.entries()) {
-      semReservaOpera.push({
-        status: "sem_reserva_opera",
-        reservation: null,
-        notas: ns,
-        nameOk: null,
-        dateOk: null,
-        valueOk: null,
-        motivos: [`Confirmação ${conf} não encontrada no Opera`],
+        motivos: [motivo],
       });
     }
     const semConfirmacaoIdentificada = notasSemChave;
