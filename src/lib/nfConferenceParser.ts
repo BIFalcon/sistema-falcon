@@ -299,11 +299,17 @@ export function parsePrefeituraNotas(
         const iDataGeracao = col("data geração", "data geracao", "data emissão", "data emissao");
         const iCompetencia = col("competência", "competencia");
         const iSituacao = col("situação nfs-e", "situacao nfs-e", "situação", "situacao");
+        // Alguns exports deixam "Situação NFS-e" vazia e informam o estado na
+        // coluna final "Situação" (Normal / Cancelada) — olhamos todas.
+        const situacaoCols = header
+          .map((h, i) => (h.includes("situa") ? i : -1))
+          .filter((i) => i >= 0);
         const iValor = col("valor do serviço", "valor do servico", "valor total", "valor");
         const iDescricao = col("descrição do serviço", "descricao do servico", "discriminação", "discriminacao");
         // Em várias prefeituras o detalhamento (hóspede, confirmação, RPS)
         // vem em "Informações Complementares", não na descrição do serviço.
         const iInfoCompl = col("informações complementares", "informacoes complementares", "observa");
+        const iTomador = col("nome tomador", "nome do tomador", "tomador");
         const iDps = col("dps nº", "dps n", "dps");
         const iRps = col("rps nº", "rps n", "rps");
 
@@ -316,8 +322,11 @@ export function parsePrefeituraNotas(
 
           const situacao = iSituacao >= 0 ? String(row[iSituacao] ?? "").trim() : "";
           // Só descarta o que está explicitamente cancelado/substituído.
-          const sitLower = situacao.toLowerCase();
-          if (/cancel|substitu/.test(sitLower)) continue;
+          const sitAll = situacaoCols
+            .map((i) => String(row[i] ?? "").toLowerCase())
+            .join(" ");
+          if (/cancel|substitu/.test(sitAll)) continue;
+
 
           const descBase = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
           const descInfo = iInfoCompl >= 0 ? String(row[iInfoCompl] ?? "").trim() : "";
