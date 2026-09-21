@@ -92,6 +92,13 @@
       "when": 1790013660508,
       "tag": "0012_ar_to_invoice_totals_single_pass_and_pendente_rule",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790013690024,
+      "tag": "0013_drop_old_ar_to_invoice_overloads",
+      "breakpoints": true
     }
   ]
 }
