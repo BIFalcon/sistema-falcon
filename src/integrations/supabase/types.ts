@@ -3282,37 +3282,72 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      ar_to_invoice_status_counts: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_dates?: string[]
-          p_hotel_id?: string
-        }
-        Returns: {
-          faturado: number
-          inadimplente: number
-          nao_faturavel: number
-          pago: number
-          pendente: number
-          todos: number
-        }[]
-      }
-      ar_to_invoice_totals: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_dates?: string[]
-          p_hotel_id?: string
-          p_status?: string
-        }
-        Returns: {
-          cnt: number
-          hotel_id: string
-          total: number
-          ym: string
-        }[]
-      }
+      ar_to_invoice_status_counts:
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_dates?: string[]
+              p_hotel_id?: string
+            }
+            Returns: {
+              faturado: number
+              inadimplente: number
+              nao_faturavel: number
+              pago: number
+              pendente: number
+              todos: number
+            }[]
+          }
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_dates?: string[]
+              p_hotel_id?: string
+              p_hotel_ids?: string[]
+            }
+            Returns: {
+              faturado: number
+              inadimplente: number
+              nao_faturavel: number
+              pago: number
+              pendente: number
+              todos: number
+            }[]
+          }
+      ar_to_invoice_totals:
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_dates?: string[]
+              p_hotel_id?: string
+              p_status?: string
+            }
+            Returns: {
+              cnt: number
+              hotel_id: string
+              total: number
+              ym: string
+            }[]
+          }
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_dates?: string[]
+              p_hotel_id?: string
+              p_hotel_ids?: string[]
+              p_status?: string
+            }
+            Returns: {
+              cnt: number
+              hotel_id: string
+              total: number
+              ym: string
+            }[]
+          }
       be_eight_dre_latest_lines: {
         Args: {
           _after_closing_id?: string

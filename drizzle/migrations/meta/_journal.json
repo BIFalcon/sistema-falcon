@@ -85,6 +85,13 @@
       "when": 1789991010802,
       "tag": "0011_nf_conference_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790013660508,
+      "tag": "0012_ar_to_invoice_totals_single_pass_and_pendente_rule",
+      "breakpoints": true
     }
   ]
 }
