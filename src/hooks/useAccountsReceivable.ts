@@ -694,19 +694,17 @@ export function useToInvoiceTotals(filters: ArScopeFilters, status: ToInvoiceSta
         p_date_to: s.dateTo,
         p_dates: s.dates,
         p_status: status,
+        // Escopo de hotéis visíveis aplicado no banco, para o ranking e os
+        // contadores baterem exatamente com a lista exibida.
+        p_hotel_ids: s.hotelIds,
       });
       if (error) throw error;
-      let rows = ((data ?? []) as any[]).map((r) => ({
+      return ((data ?? []) as any[]).map((r) => ({
         hotel_id: r.hotel_id ?? null,
         ym: r.ym ?? null,
         total: Number(r.total ?? 0),
         cnt: Number(r.cnt ?? 0),
       }));
-      if (s.hotelIds) {
-        const allowed = new Set(s.hotelIds);
-        rows = rows.filter((r) => r.hotel_id && allowed.has(r.hotel_id));
-      }
-      return rows;
     },
   });
 }
@@ -732,6 +730,7 @@ export function useToInvoiceStatusCounts(filters: ArScopeFilters) {
         p_date_from: s.dateFrom,
         p_date_to: s.dateTo,
         p_dates: s.dates,
+        p_hotel_ids: s.hotelIds,
       });
       if (error) throw error;
       const r = (Array.isArray(data) ? data[0] : data) ?? {};
@@ -791,7 +790,13 @@ function buildRowsQuery(q: ToInvoiceRowsQuery, opts: { count?: boolean } = {}) {
   } else if (status === "faturado") {
     sel = sel.eq("gg_status", "faturado");
   } else if (status === "pendente") {
-    sel = sel.is("paid_date", null).not("is_paid", "is", true).not("is_not_billable", "is", true);
+    sel = sel
+      .is("paid_date", null)
+      .not("is_paid", "is", true)
+      .not("is_not_billable", "is", true)
+      .is("billed_at", null)
+      .is("invoice_file_1", null)
+      .is("invoice_file_2", null);
   } else if (status === "inadimplente") {
     sel = sel.is("paid_date", null).not("is_paid", "is", true).not("is_not_billable", "is", true);
   }
@@ -819,13 +824,22 @@ export function applyStatusFilter(
       isEntryDefaulting(e, resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name))),
     );
   if (status === "pendente")
-    return rows.filter(
-      (e) =>
-        e.gg_status !== "faturado" &&
-        e.gg_status !== "nao_faturavel" &&
-        !e.is_not_billable &&
-        !isEntryPaid(e),
-    );
+    // Pendente = sem nenhuma outra situação: não pago, não faturado (nem com
+    // documentos enviados/anexos), não inadimplente e não "não faturável".
+    return rows.filter((e) => {
+      if (isEntryPaid(e)) return false;
+      if (e.gg_status === "nao_faturavel" || e.is_not_billable) return false;
+      const billed =
+        e.gg_status === "faturado" ||
+        e.gg_status === "documentos_enviados" ||
+        e.gg_status === "inadimplente" ||
+        !!e.billed_at ||
+        !!e.invoice_file_1 ||
+        !!e.invoice_file_2;
+      if (billed) return false;
+      const due = resolveDueDate(e, findContractTerm(contracts, e.account_number, e.account_name));
+      return !isEntryDefaulting(e, due);
+    });
   if (status === "nao_faturavel")
     return rows.filter((e) => e.gg_status === "nao_faturavel" || e.is_not_billable);
   return rows.filter((e) => e.gg_status === status);

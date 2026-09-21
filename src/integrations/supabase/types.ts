@@ -3288,6 +3288,7 @@ export type Database = {
           p_date_to?: string
           p_dates?: string[]
           p_hotel_id?: string
+          p_hotel_ids?: string[]
         }
         Returns: {
           faturado: number
@@ -3304,6 +3305,7 @@ export type Database = {
           p_date_to?: string
           p_dates?: string[]
           p_hotel_id?: string
+          p_hotel_ids?: string[]
           p_status?: string
         }
         Returns: {
