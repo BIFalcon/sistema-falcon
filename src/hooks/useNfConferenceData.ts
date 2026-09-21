@@ -234,11 +234,23 @@ export function useUploadNfFiles() {
         return data.id as string;
       };
 
+      const scopeCount = async (table: "nf_opera_entries" | "nf_nota_entries") => {
+        const { count, error } = await supabase
+          .from(table)
+          .select("*", { count: "exact", head: true })
+          .eq("hotel_id", scope.hotelId)
+          .eq("ref_year", scope.refYear)
+          .eq("ref_month", scope.refMonth);
+        if (error) throw error;
+        return count ?? 0;
+      };
+      const operaBefore = await scopeCount("nf_opera_entries");
+      const notaBefore = await scopeCount("nf_nota_entries");
+
       const operaLines = reservations.flatMap((r) => r.lines);
       const operaUploadId = await insertUpload("opera", operaFile.name, operaLines.length);
       const notaUploadId = await insertUpload("nota", prefeituraFile.name, notas.length);
 
-      let operaInserted = 0;
       for (let i = 0; i < operaLines.length; i += CHUNK) {
         const batch = operaLines.slice(i, i + CHUNK).map((l) => ({
           hotel_id: scope.hotelId,
@@ -255,15 +267,12 @@ export function useUploadNfFiles() {
           net_amount: l.netAmount,
           payment_amount: l.paymentAmount,
         }));
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("nf_opera_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true })
-          .select("id");
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
         if (error) throw error;
-        operaInserted += data?.length ?? 0;
       }
 
-      let notaInserted = 0;
       for (let i = 0; i < notas.length; i += CHUNK) {
         const batch = notas.slice(i, i + CHUNK).map((n) => ({
           hotel_id: scope.hotelId,
@@ -283,13 +292,15 @@ export function useUploadNfFiles() {
           check_in: n.checkIn,
           check_out: n.checkOut,
         }));
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("nf_nota_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true })
-          .select("id");
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
         if (error) throw error;
-        notaInserted += data?.length ?? 0;
       }
+
+      // Linhas realmente novas = diferença medida no banco (repetidas são ignoradas).
+      const operaInserted = (await scopeCount("nf_opera_entries")) - operaBefore;
+      const notaInserted = (await scopeCount("nf_nota_entries")) - notaBefore;
 
       await Promise.all([
         supabase.from("nf_uploads").update({ rows_inserted: operaInserted }).eq("id", operaUploadId),
