@@ -1,5 +1,12 @@
 import * as XLSX from "xlsx";
 
+/** Escopo (hotel + período) vindo do filtro no momento exato do upload. */
+export interface NfScope {
+  hotelId: string;
+  refYear: number;
+  refMonth: number;
+}
+
 export interface OperaLine {
   property: string;
   confirmationNumber: string;
@@ -9,6 +16,8 @@ export interface OperaLine {
   fiscalBillNumber: string;
   netAmount: number;
   paymentAmount: number;
+  /** Chave estável entre uploads MTD — impede duplicidade. */
+  entryKey: string;
 }
 
 export interface OperaReservation {
