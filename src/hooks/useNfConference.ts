@@ -63,7 +63,10 @@ export function useNfConference(
   return useMemo(() => {
     if (!reservations.length && !notas.length) return null;
 
-    // Indexa notas por RPS (chave primária) e por confirmação (fallback).
+    // Indexa cada nota pelos DOIS critérios ao mesmo tempo (RPS e confirmação).
+    // Antes era "RPS ou senão confirmação": quando o RPS vinha errado (ex.: o
+    // relatório trazia o próprio número da nota), o cruzamento por confirmação
+    // nunca era tentado e nada conciliava.
     const notasByRps = new Map<string, PrefeituraNota[]>();
     const notasByConf = new Map<string, PrefeituraNota[]>();
     const notasSemChave: PrefeituraNota[] = [];
@@ -74,15 +77,16 @@ export function useNfConference(
         const arr = notasByRps.get(rpsKey) ?? [];
         arr.push(n);
         notasByRps.set(rpsKey, arr);
-      } else if (confKey) {
+      }
+      if (confKey) {
         const arr = notasByConf.get(confKey) ?? [];
         arr.push(n);
         notasByConf.set(confKey, arr);
-      } else {
-        notasSemChave.push(n);
       }
+      if (!rpsKey && !confKey) notasSemChave.push(n);
     }
-    const usedNota = new Set<string>();
+    // Uma nota só pode ser reivindicada por uma reserva.
+    const claimed = new Set<string>();
 
     const conciliados: NfMatchDetail[] = [];
     const divergencias: NfMatchDetail[] = [];
