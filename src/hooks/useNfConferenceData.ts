@@ -267,15 +267,12 @@ export function useUploadNfFiles() {
           net_amount: l.netAmount,
           payment_amount: l.paymentAmount,
         }));
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("nf_opera_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true })
-          .select("id");
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
         if (error) throw error;
-        operaInserted += data?.length ?? 0;
       }
 
-      let notaInserted = 0;
       for (let i = 0; i < notas.length; i += CHUNK) {
         const batch = notas.slice(i, i + CHUNK).map((n) => ({
           hotel_id: scope.hotelId,
