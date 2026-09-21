@@ -118,6 +118,24 @@ export function useNfConference(
         notasDaReserva.push(n);
       }
 
+      // 3) Fallback por hóspede + valor: alguns relatórios da prefeitura vêm
+      // sem descrição do serviço (sem RPS e sem confirmação) e só trazem o
+      // nome do tomador e o valor. Nesse caso cruzamos por nome + valor.
+      if (notasDaReserva.length === 0) {
+        for (const n of notasSemChave) {
+          if (claimed.has(n.numeroNfse)) continue;
+          if (namesMatch(n.guestNameExtracted, reservation.guestName) !== true) continue;
+          const valorBate =
+            valueMatchesAnyLine(n.valorServico, reservation) ||
+            Math.abs(n.valorServico - reservation.totalNet) < VALUE_TOLERANCE ||
+            Math.abs(n.valorServico - reservation.totalPayment) < VALUE_TOLERANCE;
+          if (!valorBate) continue;
+          seen.add(n.numeroNfse);
+          claimed.add(n.numeroNfse);
+          notasDaReserva.push(n);
+        }
+      }
+
       if (notasDaReserva.length === 0) {
         semNota.push({
           status: "sem_nota",
@@ -130,6 +148,7 @@ export function useNfConference(
         });
         continue;
       }
+
 
       const motivos: string[] = [];
       let nameOk: boolean | null = true;
@@ -182,12 +201,13 @@ export function useNfConference(
 
     // Notas remanescentes: nenhuma reserva do Opera as reivindicou.
     const semReservaOpera: NfMatchDetail[] = [];
-    const semChaveSet = new Set(notasSemChave.map((n) => n.numeroNfse));
     for (const n of notas) {
-      if (claimed.has(n.numeroNfse) || semChaveSet.has(n.numeroNfse)) continue;
+      if (claimed.has(n.numeroNfse)) continue;
       const motivo = n.rps
         ? `RPS ${n.rps} não encontrado como Fiscal Bill Number no Opera`
-        : `Confirmação ${n.confirmationNumber} não encontrada no Opera`;
+        : n.confirmationNumber
+          ? `Confirmação ${n.confirmationNumber} não encontrada no Opera`
+          : `Nota sem RPS/confirmação no relatório da Prefeitura — sem par por hóspede e valor no Opera`;
       semReservaOpera.push({
         status: "sem_reserva_opera",
         reservation: null,
@@ -198,7 +218,10 @@ export function useNfConference(
         motivos: [motivo],
       });
     }
-    const semConfirmacaoIdentificada = notasSemChave;
+    const semConfirmacaoIdentificada = notasSemChave.filter(
+      (n) => !claimed.has(n.numeroNfse),
+    );
+
 
     const sumRes = (arr: NfMatchDetail[]) =>
       arr.reduce((s, d) => s + (d.reservation?.totalNet ?? 0), 0);
