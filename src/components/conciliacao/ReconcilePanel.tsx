@@ -85,7 +85,7 @@ function exportBoxes(boxes: { title: string; rows: ReconcileRow[] }[], fileName:
   for (const b of boxes) {
     const rows = sheetRows(b.rows);
     const total = b.rows.reduce((s, r) => s + r.amount, 0);
-    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Valor: total });
+    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Origem: "", Valor: total });
     const name = b.title.replace(/[\\/?*[\]:]/g, "").slice(0, 28) || "Quadro";
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
   }
