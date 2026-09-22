@@ -24,7 +24,7 @@ import { ConciliadosPairs } from "@/components/conciliacao/ConciliadosPairs";
 import { JustificationsPanel } from "@/components/conciliacao/JustificationsPanel";
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import {
-  useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer,
+  useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile,
   useAutoReconcile, useConcJustifications, useSaveJustification, useSetB2B, useSetDirectBankBulk,
   useMarkCashPaid, useCashProofUrl, useMatchedCountsByUpload,
@@ -201,6 +201,7 @@ export default function ConciliacaoCartaoPage() {
       title: e.categoria || e.bandeira || "—",
       subtitle: [e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
       tag: e.categoria ?? undefined,
+      origin: e.source === "b2b" ? "B2B" : "Rede",
     })),
     [acquirer.data],
   );
