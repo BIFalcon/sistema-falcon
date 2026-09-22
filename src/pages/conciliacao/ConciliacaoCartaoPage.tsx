@@ -159,6 +159,7 @@ export default function ConciliacaoCartaoPage() {
 
   const importOpera = useImportOpera();
   const importAcquirer = useImportAcquirer();
+  const importB2B = useImportB2B();
   const importBank = useImportBankStatement();
   const autoReconcile = useAutoReconcile();
   const uploads = useConcUploads();
