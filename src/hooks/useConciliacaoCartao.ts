@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   parseAcquirerExcel,
+  parseB2BExcel,
   parseBankStatement,
   parseOperaXml,
   normText,
@@ -54,6 +55,7 @@ export interface AcquirerEntry {
   matched_at: string | null;
   b2b: boolean;
   b2b_at: string | null;
+  source: "rede" | "b2b" | string | null;
 }
 
 
@@ -155,7 +157,7 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
       const build = () => {
         let q = supabase
           .from("conc_acquirer_entries")
-          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
+          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at, source")
           .eq("hotel_id", hotelId!)
           .order("sale_date", { ascending: true })
           .order("id", { ascending: true });
