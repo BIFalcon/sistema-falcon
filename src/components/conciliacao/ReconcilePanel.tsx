@@ -60,6 +60,7 @@ function sheetRows(rows: ReconcileRow[]) {
     Descrição: r.title,
     Detalhe: r.subtitle ?? "",
     Categoria: r.tag ?? "",
+    Origem: r.origin ?? "",
     Valor: r.amount,
   }));
 }
