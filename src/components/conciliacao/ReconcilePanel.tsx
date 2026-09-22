@@ -68,9 +68,9 @@ function sheetRows(rows: ReconcileRow[]) {
 function exportRows(rows: ReconcileRow[], fileName: string, extraSummary?: Record<string, number>) {
   const data: Record<string, string | number | null>[] = sheetRows(rows);
   if (extraSummary) {
-    data.push({ Data: "", Descrição: "", Detalhe: "", Categoria: "", Valor: null });
+    data.push({ Data: "", Descrição: "", Detalhe: "", Categoria: "", Origem: "", Valor: null });
     for (const [k, v] of Object.entries(extraSummary)) {
-      data.push({ Data: "", Descrição: k, Detalhe: "", Categoria: "", Valor: v });
+      data.push({ Data: "", Descrição: k, Detalhe: "", Categoria: "", Origem: "", Valor: v });
     }
   }
   const ws = XLSX.utils.json_to_sheet(data);
