@@ -377,7 +377,7 @@ export default function ConciliacaoCartaoPage() {
 
   const cardBoxes: BoxConfig[] = [
     {
-      key: "acq-card", title: "Adquirente", subtitle: "Operadora (Rede) — vendas de cartão",
+      key: "acq-card", title: "Adquirente", subtitle: "Vendas de cartão — Rede e B2B",
       position: "left", rows: acquirerCartao,
       actions: [{
         label: "Classificar como B2B",
