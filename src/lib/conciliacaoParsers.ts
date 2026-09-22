@@ -222,6 +222,8 @@ export interface AcquirerRow {
   categoria: string;
   status: string;
   cnpj: string;
+  /** Origem do arquivo: relatório da Rede ou relatório B2B. */
+  source: "rede" | "b2b";
 }
 
 const findCol = (header: string[], ...names: string[]): number => {
@@ -333,11 +335,86 @@ export async function parseAcquirerExcel(
       categoria,
       status: String(r[iStatus] ?? "").trim(),
       cnpj,
+      source: "rede",
     });
   }
 
   return { rows, skipped, unmatched: [...unmatched], otherHotels };
 }
+
+/* ------------------------------------------------------------------ *
+ * 2b. Relatório B2B (Excel) — mesmo destino das vendas da operadora
+ * ------------------------------------------------------------------ */
+
+/**
+ * Relatório B2B. O arquivo não identifica o hotel (sem CNPJ nem nome de
+ * estabelecimento), então o hotel vem do filtro global no momento do upload.
+ * Só linhas com Status = "Sucesso" entram; modalidade é sempre "Crédito".
+ */
+export async function parseB2BExcel(
+  file: File,
+  hotelId: string,
+): Promise<{ rows: AcquirerRow[]; skipped: number }> {
+  const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+    header: 1, blankrows: false, defval: null, raw: true,
+  });
+
+  // Cabeçalho: primeira linha que contenha "DATA DA TRANSACAO".
+  let headerIdx = grid.findIndex((r) =>
+    (r ?? []).some((c) => normText(c).includes("DATA DA TRANSACAO")),
+  );
+  if (headerIdx === -1) headerIdx = 0;
+  const header = (grid[headerIdx] ?? []).map((c) => normText(c));
+
+  const iDate = findCol(header, "data da transacao", "data");
+  const iStatus = findCol(header, "status");
+  const iAmount = findCol(header, "valor da transacao", "valor");
+  const iBandeira = findCol(header, "bandeira");
+  const iKey = findCol(header, "chave da transacao");
+
+  if (iDate === -1 || iStatus === -1 || iAmount === -1) {
+    throw new Error("Cabeçalho do relatório B2B não reconhecido (esperado 'Data da transação', 'Status' e 'Valor da transação').");
+  }
+
+  const rows: AcquirerRow[] = [];
+  const occ = makeOccCounter();
+  let skipped = 0;
+
+  for (const r of grid.slice(headerIdx + 1)) {
+    const status = String(r[iStatus] ?? "").trim();
+    if (!status) continue;
+    if (!normText(status).includes("SUCESSO")) { skipped++; continue; }
+
+    const saleDate = toIso(r[iDate]);
+    const amount = parseMoney(r[iAmount]);
+    const bandeira = iBandeira !== -1 ? String(r[iBandeira] ?? "").trim() : "";
+    const modalidade = "Crédito";
+    const txKey = iKey !== -1 ? String(r[iKey] ?? "").trim() : "";
+
+    rows.push({
+      entry_key: (() => {
+        if (txKey) return hashKey([hotelId, "b2b", txKey]);
+        const base = [hotelId, "b2b", saleDate, amount.toFixed(2), bandeira].join("|");
+        return hashKey([base, occ(base)]);
+      })(),
+      hotel_id: hotelId,
+      establishment_raw: "",
+      sale_date: saleDate,
+      amount,
+      bandeira,
+      modalidade,
+      categoria: bandeira ? normCategoria(`${bandeira} ${modalidade}`) : normCategoria(modalidade),
+      status,
+      cnpj: "",
+      source: "b2b",
+    });
+  }
+
+  return { rows, skipped };
+}
+
 
 
 /* ------------------------------------------------------------------ *

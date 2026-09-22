@@ -1167,6 +1167,7 @@ export type Database = {
           modalidade: string | null
           raw: Json
           sale_date: string | null
+          source: string
           status: string | null
           upload_id: string | null
         }
@@ -1186,6 +1187,7 @@ export type Database = {
           modalidade?: string | null
           raw?: Json
           sale_date?: string | null
+          source?: string
           status?: string | null
           upload_id?: string | null
         }
@@ -1205,6 +1207,7 @@ export type Database = {
           modalidade?: string | null
           raw?: Json
           sale_date?: string | null
+          source?: string
           status?: string | null
           upload_id?: string | null
         }

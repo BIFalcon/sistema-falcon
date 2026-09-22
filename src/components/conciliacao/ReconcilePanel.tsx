@@ -18,6 +18,8 @@ export interface ReconcileRow {
   title: string;
   subtitle?: string;
   tag?: string;
+  /** Origem do lançamento (ex.: "Rede" ou "B2B") — exibida como badge. */
+  origin?: string;
   extra?: React.ReactNode;
 }
 
@@ -58,6 +60,7 @@ function sheetRows(rows: ReconcileRow[]) {
     Descrição: r.title,
     Detalhe: r.subtitle ?? "",
     Categoria: r.tag ?? "",
+    Origem: r.origin ?? "",
     Valor: r.amount,
   }));
 }
@@ -65,9 +68,9 @@ function sheetRows(rows: ReconcileRow[]) {
 function exportRows(rows: ReconcileRow[], fileName: string, extraSummary?: Record<string, number>) {
   const data: Record<string, string | number | null>[] = sheetRows(rows);
   if (extraSummary) {
-    data.push({ Data: "", Descrição: "", Detalhe: "", Categoria: "", Valor: null });
+    data.push({ Data: "", Descrição: "", Detalhe: "", Categoria: "", Origem: "", Valor: null });
     for (const [k, v] of Object.entries(extraSummary)) {
-      data.push({ Data: "", Descrição: k, Detalhe: "", Categoria: "", Valor: v });
+      data.push({ Data: "", Descrição: k, Detalhe: "", Categoria: "", Origem: "", Valor: v });
     }
   }
   const ws = XLSX.utils.json_to_sheet(data);
@@ -82,7 +85,7 @@ function exportBoxes(boxes: { title: string; rows: ReconcileRow[] }[], fileName:
   for (const b of boxes) {
     const rows = sheetRows(b.rows);
     const total = b.rows.reduce((s, r) => s + r.amount, 0);
-    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Valor: total });
+    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Origem: "", Valor: total });
     const name = b.title.replace(/[\\/?*[\]:]/g, "").slice(0, 28) || "Quadro";
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
   }
@@ -227,8 +230,15 @@ function SideBox({
                     <span className="font-medium truncate">{r.title}</span>
                   </div>
                   {r.subtitle && <p className="text-muted-foreground truncate">{r.subtitle}</p>}
-                  {r.tag && (
-                    <Badge variant="outline" className="mt-1 text-[9px] px-1 py-0 h-4">{r.tag}</Badge>
+                  {(r.tag || r.origin) && (
+                    <div className="mt-1 flex items-center gap-1">
+                      {r.tag && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{r.tag}</Badge>
+                      )}
+                      {r.origin && (
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">{r.origin}</Badge>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1">

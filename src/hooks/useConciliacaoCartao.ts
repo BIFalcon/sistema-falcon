@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   parseAcquirerExcel,
+  parseB2BExcel,
   parseBankStatement,
   parseOperaXml,
   normText,
@@ -54,6 +55,7 @@ export interface AcquirerEntry {
   matched_at: string | null;
   b2b: boolean;
   b2b_at: string | null;
+  source: "rede" | "b2b" | string | null;
 }
 
 
@@ -155,7 +157,7 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
       const build = () => {
         let q = supabase
           .from("conc_acquirer_entries")
-          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at")
+          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at, source")
           .eq("hotel_id", hotelId!)
           .order("sale_date", { ascending: true })
           .order("id", { ascending: true });
@@ -411,6 +413,7 @@ export function useImportAcquirer() {
         modalidade: r.modalidade,
         categoria: r.categoria,
         status: r.status,
+        source: r.source,
         raw: r as unknown as Record<string, unknown>,
       })));
 
@@ -425,6 +428,67 @@ export function useImportAcquirer() {
     },
   });
 }
+
+/** Relatório B2B — mesmo destino da Rede, marcado com source = 'b2b'. */
+export function useImportB2B() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
+      const parsed = await parseB2BExcel(file, hotelId);
+      const { skipped } = parsed;
+      if (parsed.rows.length === 0 && skipped === 0) {
+        throw new Error("Nenhuma linha reconhecida no relatório B2B — confira o arquivo enviado.");
+      }
+
+      // Relatório acumulado: descarta o que já foi importado antes.
+      const known = await existingKeys("conc_acquirer_entries", hotelId);
+      const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
+      const duplicates = parsed.rows.length - rows.length;
+
+      const { data: up, error: upErr } = await supabase
+        .from("conc_uploads")
+        .insert({
+          hotel_id: hotelId,
+          kind: "acquirer",
+          file_name: file.name,
+          file_size: file.size,
+          parsed_count: rows.length,
+          skipped_count: skipped + duplicates,
+          uploaded_by: user!.id,
+          metadata: { source: "b2b", hotel_ids: [hotelId], duplicates },
+        })
+        .select("id")
+        .single();
+      if (upErr) throw upErr;
+
+      await upsertChunks("conc_acquirer_entries", rows.map((r) => ({
+        hotel_id: hotelId,
+        upload_id: up.id,
+        entry_key: r.entry_key,
+        establishment_raw: r.establishment_raw,
+        sale_date: r.sale_date || null,
+        amount: r.amount,
+        bandeira: r.bandeira,
+        modalidade: r.modalidade,
+        categoria: r.categoria,
+        status: r.status,
+        source: r.source,
+        raw: r as unknown as Record<string, unknown>,
+      })));
+
+      const autoMatched = await runAutoReconcile(hotelId);
+      return { inserted: rows.length, skipped, autoMatched, duplicates };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+      qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-matches"] });
+    },
+  });
+}
+
 
 export function useImportBankStatement() {
   const qc = useQueryClient();
