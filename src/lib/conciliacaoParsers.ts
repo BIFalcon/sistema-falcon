@@ -222,6 +222,8 @@ export interface AcquirerRow {
   categoria: string;
   status: string;
   cnpj: string;
+  /** Origem do arquivo: relatório da Rede ou relatório B2B. */
+  source: "rede" | "b2b";
 }
 
 const findCol = (header: string[], ...names: string[]): number => {
