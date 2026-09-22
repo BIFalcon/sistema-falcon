@@ -18,6 +18,8 @@ export interface ReconcileRow {
   title: string;
   subtitle?: string;
   tag?: string;
+  /** Origem do lançamento (ex.: "Rede" ou "B2B") — exibida como badge. */
+  origin?: string;
   extra?: React.ReactNode;
 }
 
@@ -227,8 +229,15 @@ function SideBox({
                     <span className="font-medium truncate">{r.title}</span>
                   </div>
                   {r.subtitle && <p className="text-muted-foreground truncate">{r.subtitle}</p>}
-                  {r.tag && (
-                    <Badge variant="outline" className="mt-1 text-[9px] px-1 py-0 h-4">{r.tag}</Badge>
+                  {(r.tag || r.origin) && (
+                    <div className="mt-1 flex items-center gap-1">
+                      {r.tag && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{r.tag}</Badge>
+                      )}
+                      {r.origin && (
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">{r.origin}</Badge>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1">
