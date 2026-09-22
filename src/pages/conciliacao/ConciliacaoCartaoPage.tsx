@@ -708,7 +708,7 @@ export default function ConciliacaoCartaoPage() {
 
         {/* ---------------- Importações ---------------- */}
         <TabsContent value="importacoes" className="mt-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Relatório do Opera (XML)</CardTitle></CardHeader>
               <CardContent>
@@ -744,6 +744,27 @@ export default function ConciliacaoCartaoPage() {
                     importAcquirer.mutate({ file: f, hotelId }, {
                       onSuccess: (r) => toast.success(
                         `${r.inserted} venda(s) importada(s) · ${r.otherHotels} de outros CNPJs descartada(s)` +
+                        ` · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s) automaticamente`,
+                      ),
+                      onError: (e: Error) => toast.error(e.message),
+                    });
+                  }}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Relatório B2B (Excel)</CardTitle></CardHeader>
+              <CardContent>
+                <DropZone
+                  label="Enviar Excel do B2B"
+                  hint={hotelId ? `Lançado em ${hotelName} · só status "Sucesso"` : "Selecione o hotel no filtro do topo antes de importar"}
+                  accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
+                  busy={importB2B.isPending}
+                  onFile={(f) => {
+                    if (!hotelId) { toast.error("Selecione o hotel antes de importar o relatório B2B."); return; }
+                    importB2B.mutate({ file: f, hotelId }, {
+                      onSuccess: (r) => toast.success(
+                        `${r.inserted} venda(s) B2B importada(s) · ${r.skipped} sem status "Sucesso" descartada(s)` +
                         ` · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s) automaticamente`,
                       ),
                       onError: (e: Error) => toast.error(e.message),
