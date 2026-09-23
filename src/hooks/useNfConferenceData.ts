@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { computeNfConference } from "@/hooks/useNfConference";
 import {
   parseOperaReservations,
   parsePrefeituraNotas,
@@ -166,6 +167,85 @@ export function useNfScopeData(hotelId: string | null, year: number, month: numb
         reservations: rowsToReservations(operaRows),
         notas: rowsToNotas(notaRows),
       };
+    },
+  });
+}
+
+export interface NfConsolidatedRow {
+  hotelId: string;
+  conciliadas: number;
+  soOpera: number;
+  soPrefeitura: number;
+}
+
+/**
+ * Visão consolidada da rede: uma leitura paginada por período para todos os
+ * hotéis permitidos, agregada por hotel. Só roda quando a visão é aberta.
+ */
+export function useNfConsolidated(
+  hotelIds: string[],
+  year: number,
+  month: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["nf-consolidated", year, month, hotelIds.join(",")],
+    enabled: enabled && hotelIds.length > 0,
+    ...FRESH,
+    queryFn: async (): Promise<NfConsolidatedRow[]> => {
+      const [operaRows, notaRows] = await Promise.all([
+        fetchAllPaged<OperaRow & { hotel_id: string }>(() =>
+          supabase
+            .from("nf_opera_entries")
+            .select(
+              "hotel_id, property, confirmation_number, guest_name, arrival, departure, fiscal_bill_number, net_amount, payment_amount, entry_key",
+            )
+            .in("hotel_id", hotelIds)
+            .eq("ref_year", year)
+            .eq("ref_month", month)
+            .order("id", { ascending: true }),
+        ),
+        fetchAllPaged<NotaRow & { hotel_id: string }>(() =>
+          supabase
+            .from("nf_nota_entries")
+            .select(
+              "hotel_id, numero_nfse, data_geracao, competencia, situacao, valor_servico, descricao, rps, confirmation_number, guest_name_extracted, check_in, check_out, entry_key",
+            )
+            .in("hotel_id", hotelIds)
+            .eq("ref_year", year)
+            .eq("ref_month", month)
+            .order("id", { ascending: true }),
+        ),
+      ]);
+
+      const operaByHotel = new Map<string, OperaRow[]>();
+      for (const r of operaRows) {
+        const arr = operaByHotel.get(r.hotel_id) ?? [];
+        arr.push(r);
+        operaByHotel.set(r.hotel_id, arr);
+      }
+      const notasByHotel = new Map<string, NotaRow[]>();
+      for (const r of notaRows) {
+        const arr = notasByHotel.get(r.hotel_id) ?? [];
+        arr.push(r);
+        notasByHotel.set(r.hotel_id, arr);
+      }
+
+      const hotels = new Set([...operaByHotel.keys(), ...notasByHotel.keys()]);
+      const out: NfConsolidatedRow[] = [];
+      for (const hid of hotels) {
+        const res = computeNfConference(
+          rowsToReservations(operaByHotel.get(hid) ?? []),
+          rowsToNotas(notasByHotel.get(hid) ?? []),
+        );
+        out.push({
+          hotelId: hid,
+          conciliadas: res?.conciliados.length ?? 0,
+          soOpera: (res?.semNota.length ?? 0) + (res?.divergencias.length ?? 0),
+          soPrefeitura: res?.semReservaOpera.length ?? 0,
+        });
+      }
+      return out.sort((a, b) => a.hotelId.localeCompare(b.hotelId));
     },
   });
 }

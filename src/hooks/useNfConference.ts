@@ -18,7 +18,6 @@ export interface NfConferenceResult {
   divergencias: NfMatchDetail[];
   semNota: NfMatchDetail[];
   semReservaOpera: NfMatchDetail[];
-  semConfirmacaoIdentificada: PrefeituraNota[];
   totals: {
     reservationsTotal: number;
     notasTotal: number;
@@ -60,7 +59,15 @@ export function useNfConference(
   reservations: OperaReservation[],
   notas: PrefeituraNota[],
 ): NfConferenceResult | null {
-  return useMemo(() => {
+  return useMemo(() => computeNfConference(reservations, notas), [reservations, notas]);
+}
+
+/** Mesma lógica de cruzamento, reutilizável fora de componentes (visão consolidada). */
+export function computeNfConference(
+  reservations: OperaReservation[],
+  notas: PrefeituraNota[],
+): NfConferenceResult | null {
+  {
     if (!reservations.length && !notas.length) return null;
 
     // Indexa cada nota pelos DOIS critérios ao mesmo tempo (RPS e confirmação).
@@ -218,11 +225,6 @@ export function useNfConference(
         motivos: [motivo],
       });
     }
-    const semConfirmacaoIdentificada = notasSemChave.filter(
-      (n) => !claimed.has(n.numeroNfse),
-    );
-
-
     const sumRes = (arr: NfMatchDetail[]) =>
       arr.reduce((s, d) => s + (d.reservation?.totalNet ?? 0), 0);
     const sumNotas = (arr: NfMatchDetail[]) =>
@@ -233,7 +235,6 @@ export function useNfConference(
       divergencias,
       semNota,
       semReservaOpera,
-      semConfirmacaoIdentificada,
       totals: {
         reservationsTotal: reservations.reduce((s, r) => s + r.totalNet, 0),
         notasTotal: notas.reduce((s, n) => s + n.valorServico, 0),
@@ -243,5 +244,5 @@ export function useNfConference(
         semReservaTotal: sumNotas(semReservaOpera),
       },
     };
-  }, [reservations, notas]);
+  }
 }

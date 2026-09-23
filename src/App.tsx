@@ -178,7 +178,7 @@ const App = () => (
               <Route path="/marketing/padroes-marca" element={<RoleGuard roles={["controladoria","patronos","marketing","gop","gg","ri","fernando","operacoes","rh","viewer"]}><PadroesMarcaPage /></RoleGuard>} />
               <Route path="/controladoria" element={<EmBreve />} />
               <Route path="/controladoria/conciliacao" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConciliacaoPage /></RoleGuard>} />
-              <Route path="/controladoria/conferencia-notas-fiscais" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ConferenciaNotasFiscaisPage /></RoleGuard>} />
+              <Route path="/controladoria/conferencia-notas-fiscais" element={<RoleGuard roles={["controladoria","patronos","gop","gg","adm","viewer"]}><ConferenciaNotasFiscaisPage /></RoleGuard>} />
 
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />
