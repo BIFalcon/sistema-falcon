@@ -237,19 +237,6 @@ export default function ConferenciaNotasFiscaisPage() {
         item.motivos.join(" | ") || (item.status === "conciliado" ? "OK" : ""),
       ]);
     }
-    for (const nota of result.semConfirmacaoIdentificada) {
-      rows.push([
-        "Revisão manual",
-        "—",
-        nota.rps ?? "—",
-        nota.numeroNfse,
-        nota.descricao.slice(0, 60),
-        "—",
-        "—",
-        nota.valorServico,
-        `Nota ${nota.numeroNfse} sem confirmação identificável no texto`,
-      ]);
-    }
     if (rows.length === 1) return;
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -459,10 +446,13 @@ export default function ConferenciaNotasFiscaisPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Confirmação</TableHead>
-                        <TableHead>RPS</TableHead>
+                        <TableHead>RPS / Fiscal Bill</TableHead>
                         <TableHead>Hóspede</TableHead>
+                        <TableHead>Propriedade</TableHead>
                         <TableHead>Check-in</TableHead>
                         <TableHead>Check-out</TableHead>
+                        <TableHead className="text-right">Linhas</TableHead>
+                        <TableHead className="text-right">Pago</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -479,8 +469,17 @@ export default function ConferenciaNotasFiscaisPage() {
                             {item.reservation!.lines.map((l) => l.fiscalBillNumber).filter(Boolean).join(", ") || "—"}
                           </TableCell>
                           <TableCell>{item.reservation!.guestName}</TableCell>
+                          <TableCell className="text-xs">
+                            {item.reservation!.property || "—"}
+                          </TableCell>
                           <TableCell>{item.reservation!.arrival}</TableCell>
                           <TableCell>{item.reservation!.departure}</TableCell>
+                          <TableCell className="text-right text-xs">
+                            {item.reservation!.lines.length}
+                          </TableCell>
+                          <TableCell className="text-right text-xs">
+                            {fmtBRL(item.reservation!.totalPayment)}
+                          </TableCell>
                           <TableCell className="text-right font-semibold">
                             {fmtBRL(item.reservation!.totalNet)}
                           </TableCell>
@@ -540,39 +539,6 @@ export default function ConferenciaNotasFiscaisPage() {
               </Card>
             )}
 
-            <SectionCard
-              title="Notas sem confirmação identificável (revisão manual)"
-              icon={<HelpCircle className="h-5 w-5 text-blue-500 shrink-0" />}
-              colorClass="text-blue-700 dark:text-blue-400"
-              count={result?.semConfirmacaoIdentificada.length ?? 0}
-            >
-              <Paged rows={result?.semConfirmacaoIdentificada ?? []}>
-                {(visible) => (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nota</TableHead>
-                        <TableHead>RPS</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visible.map((nota) => (
-                        <TableRow key={nota.numeroNfse}>
-                          <TableCell className="font-mono text-xs">{nota.numeroNfse}</TableCell>
-                          <TableCell className="font-mono text-xs">{nota.rps ?? "—"}</TableCell>
-                          <TableCell className="text-xs">{nota.descricao}</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {fmtBRL(nota.valorServico)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </Paged>
-            </SectionCard>
 
             <SectionCard
               title="Notas sem reserva correspondente no Opera"
@@ -585,25 +551,43 @@ export default function ConferenciaNotasFiscaisPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>RPS / Confirmação</TableHead>
-                        <TableHead>Nota(s)</TableHead>
+                        <TableHead>Nota</TableHead>
+                        <TableHead>RPS</TableHead>
+                        <TableHead>Confirmação</TableHead>
+                        <TableHead>Hóspede (descrição)</TableHead>
+                        <TableHead>Check-in</TableHead>
+                        <TableHead>Check-out</TableHead>
+                        <TableHead>Emissão</TableHead>
+                        <TableHead>Competência</TableHead>
+                        <TableHead>Situação</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
+                        <TableHead>Motivo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {visible.map((item) => (
-                        <TableRow key={item.notas.map((n) => n.numeroNfse).join("-")}>
-                          <TableCell className="font-mono text-xs">
-                            {item.notas[0]?.rps ?? item.notas[0]?.confirmationNumber ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {item.notas.map((n) => n.numeroNfse).join(", ")}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {fmtBRL(item.notas.reduce((sum, n) => sum + n.valorServico, 0))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {visible.flatMap((item) =>
+                        item.notas.map((n) => (
+                          <TableRow key={n.numeroNfse}>
+                            <TableCell className="font-mono text-xs">{n.numeroNfse}</TableCell>
+                            <TableCell className="font-mono text-xs">{n.rps ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {n.confirmationNumber ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">{n.guestNameExtracted ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{n.checkIn ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{n.checkOut ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{n.dataGeracao || "—"}</TableCell>
+                            <TableCell className="text-xs">{n.competencia || "—"}</TableCell>
+                            <TableCell className="text-xs">{n.situacao || "—"}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {fmtBRL(n.valorServico)}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {item.motivos.join(" | ")}
+                            </TableCell>
+                          </TableRow>
+                        )),
+                      )}
                     </TableBody>
                   </Table>
                 )}
