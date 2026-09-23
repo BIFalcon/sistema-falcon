@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { useNfConference } from "@/hooks/useNfConference";
 import {
+  useNfConsolidated,
   useNfScopeCounts,
   useNfScopeData,
   useNfUploads,
@@ -154,10 +155,23 @@ function Paged<T>({
 }
 
 export default function ConferenciaNotasFiscaisPage() {
-  const { allowedHotels } = useAuth();
+  const { allowedHotels, isMaster, hasRole } = useAuth();
   const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("global");
   const [operaFile, setOperaFile] = useState<File | null>(null);
   const [prefeituraFile, setPrefeituraFile] = useState<File | null>(null);
+  const [showConsolidated, setShowConsolidated] = useState(false);
+
+  // GOP, GG e ADM enxergam apenas os hotéis da carteira/unidade deles e não
+  // podem enviar arquivo — somente visualizar.
+  const canUpload = isMaster || hasRole("controladoria") || hasRole("patronos");
+
+  const hotelIds = useMemo(() => allowedHotels.map((h) => h.id), [allowedHotels]);
+  const { data: consolidated = [], isLoading: consolidatedLoading } = useNfConsolidated(
+    hotelIds,
+    year,
+    month,
+    showConsolidated,
+  );
 
   const upload = useUploadNfFiles();
   const { data: counts } = useNfScopeCounts(hotelId, year, month);
@@ -330,6 +344,70 @@ export default function ConferenciaNotasFiscaisPage() {
         </p>
       </Card>
 
+      <Card className="p-4 shadow-soft space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Visão consolidada — todos os hotéis</p>
+            <p className="text-xs text-muted-foreground">
+              Conciliadas, só no Opera e só na Prefeitura por hotel em{" "}
+              {MONTHS[month - 1]} de {year}.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowConsolidated((v) => !v)}>
+            {showConsolidated ? "Ocultar" : "Mostrar"}
+          </Button>
+        </div>
+        {showConsolidated && (
+          consolidatedLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : consolidated.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum dado gravado neste período.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Hotel</TableHead>
+                  <TableHead className="text-right">Conciliadas</TableHead>
+                  <TableHead className="text-right">Só no Opera</TableHead>
+                  <TableHead className="text-right">Só na Prefeitura</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {consolidated.map((row) => (
+                  <TableRow key={row.hotelId}>
+                    <TableCell className="text-sm">
+                      {allowedHotels.find((h) => h.id === row.hotelId)?.name ?? row.hotelId}
+                    </TableCell>
+                    <TableCell className="text-right text-emerald-600 dark:text-emerald-400">
+                      {row.conciliadas}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">{row.soOpera}</TableCell>
+                    <TableCell className="text-right text-blue-600 dark:text-blue-400">
+                      {row.soPrefeitura}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-semibold bg-muted/40">
+                  <TableCell>Total da rede</TableCell>
+                  <TableCell className="text-right">
+                    {consolidated.reduce((s, r) => s + r.conciliadas, 0)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {consolidated.reduce((s, r) => s + r.soOpera, 0)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {consolidated.reduce((s, r) => s + r.soPrefeitura, 0)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          )
+        )}
+      </Card>
+
+      {canUpload && (
       <Card className="p-6 shadow-soft space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -367,6 +445,7 @@ export default function ConferenciaNotasFiscaisPage() {
           </p>
         )}
       </Card>
+      )}
 
       {!hotelId ? (
         <Card className="p-6 shadow-soft text-sm text-muted-foreground">
