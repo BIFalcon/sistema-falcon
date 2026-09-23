@@ -18,7 +18,6 @@ export interface NfConferenceResult {
   divergencias: NfMatchDetail[];
   semNota: NfMatchDetail[];
   semReservaOpera: NfMatchDetail[];
-  semConfirmacaoIdentificada: PrefeituraNota[];
   totals: {
     reservationsTotal: number;
     notasTotal: number;
