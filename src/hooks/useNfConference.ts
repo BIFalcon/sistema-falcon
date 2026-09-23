@@ -59,7 +59,15 @@ export function useNfConference(
   reservations: OperaReservation[],
   notas: PrefeituraNota[],
 ): NfConferenceResult | null {
-  return useMemo(() => {
+  return useMemo(() => computeNfConference(reservations, notas), [reservations, notas]);
+}
+
+/** Mesma lógica de cruzamento, reutilizável fora de componentes (visão consolidada). */
+export function computeNfConference(
+  reservations: OperaReservation[],
+  notas: PrefeituraNota[],
+): NfConferenceResult | null {
+  {
     if (!reservations.length && !notas.length) return null;
 
     // Indexa cada nota pelos DOIS critérios ao mesmo tempo (RPS e confirmação).
