@@ -315,6 +315,18 @@ export function parsePrefeituraNotas(
 
         const notas: PrefeituraNota[] = [];
         const prefix = scopePrefix(scope);
+        const semDescricao: string[] = [];
+
+        if (iDescricao < 0 && iInfoCompl < 0) {
+          reject(
+            new Error(
+              'O arquivo da Prefeitura não tem a coluna "Descrição do Serviço". ' +
+                "Ela é obrigatória e precisa vir preenchida com RPS, check-in e check-out " +
+                "de cada nota — sem isso o cruzamento com o Opera não é possível.",
+            ),
+          );
+          return;
+        }
 
         for (const row of rows.slice(headerRowIndex + 1)) {
           const numero = iNumero >= 0 ? String(row[iNumero] ?? "").trim() : "";
