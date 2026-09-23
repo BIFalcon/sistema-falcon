@@ -117,10 +117,10 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Controladoria",
         url: "/controladoria",
         icon: ShieldCheck,
-        allowedRoles: ["controladoria","viewer"] as AppRole[],
+        allowedRoles: ["controladoria","patronos","gop","gg","adm","viewer"] as AppRole[],
         children: [
-          { title: "Conciliação TOTVS × Opera", url: "/controladoria/conciliacao", icon: GitCompare },
-          { title: "Conferência de Notas Fiscais", url: "/controladoria/conferencia-notas-fiscais", icon: FileCheck2 },
+          { title: "Conciliação TOTVS × Opera", url: "/controladoria/conciliacao", icon: GitCompare, allowedRoles: ["controladoria","viewer"] as AppRole[] },
+          { title: "Conferência de Notas Fiscais", url: "/controladoria/conferencia-notas-fiscais", icon: FileCheck2, allowedRoles: ["controladoria","patronos","gop","gg","adm","viewer"] as AppRole[] },
         ],
       },
     ],
