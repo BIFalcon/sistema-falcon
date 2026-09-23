@@ -217,11 +217,6 @@ export function useNfConference(
         motivos: [motivo],
       });
     }
-    const semConfirmacaoIdentificada = notasSemChave.filter(
-      (n) => !claimed.has(n.numeroNfse),
-    );
-
-
     const sumRes = (arr: NfMatchDetail[]) =>
       arr.reduce((s, d) => s + (d.reservation?.totalNet ?? 0), 0);
     const sumNotas = (arr: NfMatchDetail[]) =>
@@ -232,7 +227,6 @@ export function useNfConference(
       divergencias,
       semNota,
       semReservaOpera,
-      semConfirmacaoIdentificada,
       totals: {
         reservationsTotal: reservations.reduce((s, r) => s + r.totalNet, 0),
         notasTotal: notas.reduce((s, n) => s + n.valorServico, 0),
