@@ -244,5 +244,5 @@ export function computeNfConference(
         semReservaTotal: sumNotas(semReservaOpera),
       },
     };
-  }, [reservations, notas]);
+  }
 }
