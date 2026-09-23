@@ -343,6 +343,11 @@ export function parsePrefeituraNotas(
           const descBase = iDescricao >= 0 ? String(row[iDescricao] ?? "").trim() : "";
           const descInfo = iInfoCompl >= 0 ? String(row[iInfoCompl] ?? "").trim() : "";
           const descricao = [descBase, descInfo].filter(Boolean).join(" / ");
+          if (!descricao) {
+            semDescricao.push(numero);
+            continue;
+          }
+
 
 
           // Resolução do RPS, na ordem: coluna RPS própria → número dentro do
@@ -379,6 +384,18 @@ export function parsePrefeituraNotas(
             checkOut: extractCheckDate(descricao, CHECKOUT_RE),
             entryKey,
           });
+        }
+
+        if (semDescricao.length) {
+          reject(
+            new Error(
+              `${semDescricao.length} nota(s) do arquivo da Prefeitura estão com a "Descrição do Serviço" vazia ` +
+                `(ex.: ${semDescricao.slice(0, 5).join(", ")}). ` +
+                "O arquivo não foi processado: a descrição precisa vir preenchida com RPS, check-in e check-out " +
+                "para o cruzamento com o Opera funcionar. Gere o relatório novamente com esses dados.",
+            ),
+          );
+          return;
         }
 
         resolve(notas);
