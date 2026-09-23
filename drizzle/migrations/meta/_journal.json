@@ -113,6 +113,13 @@
       "when": 1790080014097,
       "tag": "0015_acquirer_source_rede_b2b",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790165090195,
+      "tag": "0016_nf_conference_readonly_for_gop_gg_adm",
+      "breakpoints": true
     }
   ]
 }
