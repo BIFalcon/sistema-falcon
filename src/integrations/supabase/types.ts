@@ -3285,6 +3285,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ar_to_invoice_daily_totals: {
+        Args: {
+          p_dates?: string[]
+          p_from: string
+          p_hotel_id: string
+          p_to: string
+        }
+        Returns: {
+          day: string
+          n: number
+          total: number
+        }[]
+      }
       ar_to_invoice_status_counts: {
         Args: {
           p_date_from?: string
@@ -3371,6 +3384,13 @@ export type Database = {
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
         Returns: number
+      }
+      conc_matched_counts_by_upload: {
+        Args: { p_upload_ids: string[] }
+        Returns: {
+          n: number
+          upload_id: string
+        }[]
       }
       conc_reconcile_manual: {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
