@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -274,7 +275,16 @@ export default function ContasReceberPage() {
   const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);
   const canConciliar = isMaster || isPatronos || isFernando || hasRole("controladoria") || hasRole("financeiro");
-  const [tab, setTab] = useState<"to_invoice" | "open_folio" | "conciliacao">("to_invoice");
+  // Aba na URL (?aba=) para o cabeçalho saber quando esconder o seletor de período duplicado.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("aba");
+  const tab: "to_invoice" | "open_folio" | "conciliacao" =
+    rawTab === "open_folio" || (rawTab === "conciliacao" && canConciliar) ? rawTab : "to_invoice";
+  const setTab = (v: typeof tab) => {
+    const next = new URLSearchParams(searchParams);
+    if (v === "to_invoice") next.delete("aba"); else next.set("aba", v);
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <div className="space-y-6">
