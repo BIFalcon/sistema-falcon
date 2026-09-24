@@ -141,12 +141,15 @@ export default function ConciliacaoCartaoPage() {
     setDateTo(to);
   };
 
+  const [mainTab, setMainTab] = useState("cartao");
   const opera = useOperaEntries(hotelId, dateFrom, dateTo, specificDates);
   const acquirer = useAcquirerEntries(hotelId, dateFrom, dateTo, specificDates);
   const bank = useBankEntries(hotelId, dateFrom, dateTo, specificDates);
-  const cardMatches = useConcMatches(hotelId, "cartao");
-  const pixMatches = useConcMatches(hotelId, "pix_extrato");
-  const cashMatches = useConcMatches(hotelId, "dinheiro");
+  // Conciliações só são buscadas quando a aba correspondente está aberta.
+  const cardMatches = useConcMatches(hotelId, "cartao", mainTab === "cartao");
+  const pixMatches = useConcMatches(hotelId, "pix_extrato", mainTab === "pix");
+  const cashMatches = useConcMatches(hotelId, "dinheiro", mainTab === "dinheiro");
+  const aFaturar = useAFaturarDaily(hotelId, dateFrom, dateTo, specificDates, mainTab === "trx-diario");
   const justifications = useConcJustifications(hotelId);
   const saveJustification = useSaveJustification();
 
@@ -163,7 +166,10 @@ export default function ConciliacaoCartaoPage() {
   const importBank = useImportBankStatement();
   const autoReconcile = useAutoReconcile();
   const uploads = useConcUploads();
-  const matchedByUpload = useMatchedCountsByUpload();
+  const matchedByUpload = useMatchedCountsByUpload(
+    (uploads.data ?? []).map((u) => u.id as string),
+    mainTab === "importacoes",
+  );
   const deleteUpload = useDeleteConcUpload();
   const trxCodes = useTrxCodeMapping();
   const updateTrx = useUpdateTrxCode();
@@ -342,8 +348,12 @@ export default function ConciliacaoCartaoPage() {
       cur.count += 1;
       map.set(key, cur);
     }
+    // 9003 — A Faturar: total lançado em Faturamento no dia (não vem dos arquivos importados).
+    for (const f of aFaturar.data ?? []) {
+      map.set(`${f.day}|9003`, { date: f.day, code: "9003", desc: "A Faturar", total: f.total, count: f.n });
+    }
     return [...map.values()].sort((a, b) => (a.date === b.date ? a.code.localeCompare(b.code) : a.date.localeCompare(b.date)));
-  }, [opera.data]);
+  }, [opera.data, aFaturar.data]);
 
   /** Visão inicial: total do dia somando todos os TRX Codes. */
   const trxDays = useMemo(() => {
@@ -443,7 +453,7 @@ export default function ConciliacaoCartaoPage() {
         />
       </div>
 
-      <Tabs defaultValue="cartao">
+      <Tabs value={mainTab} onValueChange={setMainTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="cartao" className="text-xs"><CreditCard className="h-3.5 w-3.5 mr-1" /> Cartão</TabsTrigger>
           <TabsTrigger value="pix" className="text-xs"><Landmark className="h-3.5 w-3.5 mr-1" /> PIX</TabsTrigger>
