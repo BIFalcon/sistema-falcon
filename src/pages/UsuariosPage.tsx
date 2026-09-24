@@ -57,6 +57,7 @@ import {
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import {
   useManagedUsers,
   useInviteUser,
@@ -114,16 +115,20 @@ export default function UsuariosPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
 
+  // Hotel do filtro global do cabeçalho: mostra só usuários vinculados a ele.
+  const { hotelId: filterHotelId } = useModuleFilters("global");
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
+    const byHotel = filterHotelId ? users.filter((u) => u.hotel_ids.includes(filterHotelId)) : users;
+    if (!q) return byHotel;
+    return byHotel.filter(
       (u) =>
         u.email?.toLowerCase().includes(q) ||
         u.display_name?.toLowerCase().includes(q) ||
         u.roles.some((r) => r.includes(q)),
     );
-  }, [users, search]);
+  }, [users, search, filterHotelId]);
 
   if (!canManage) return <Navigate to="/" replace />;
 

@@ -177,8 +177,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
     items: [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, requireMaster: true },
       { title: "Hotéis", url: "/configuracoes/hoteis", icon: Hotel, requireMaster: true },
-      { title: "Notificações", url: "/configuracoes/notificacoes", icon: Mail, requireMaster: true },
-      { title: "Monitor de E-mails", url: "/configuracoes/emails", icon: Inbox, requireMaster: true },
+      { title: "Notificações e E-mails", url: "/configuracoes/notificacoes", icon: Mail, requireMaster: true },
     ],
   },
 ];

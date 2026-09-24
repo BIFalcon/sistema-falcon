@@ -17,8 +17,7 @@ import PerformanceSlaPage from "./pages/PerformanceSlaPage";
 import ConsolidadoPage from "./pages/ConsolidadoPage";
 import HoteisPage from "./pages/HoteisPage";
 import UsuariosPage from "./pages/UsuariosPage";
-import NotificacoesPage from "./pages/NotificacoesPage";
-import EmailMonitoringPage from "./pages/EmailMonitoringPage";
+import NotificacoesEmailsPage from "./pages/NotificacoesEmailsPage";
 import ContasPagarPage from "./pages/ContasPagarPage";
 import ContasReceberPage from "./pages/ContasReceberPage";
 import ClientesPage from "./pages/ClientesPage";
@@ -183,8 +182,8 @@ const App = () => (
               {/* Configurações */}
               <Route path="/configuracoes/usuarios" element={<RoleGuard masterOnly><UsuariosPage /></RoleGuard>} />
               <Route path="/configuracoes/hoteis" element={<RoleGuard masterOnly><HoteisPage /></RoleGuard>} />
-              <Route path="/configuracoes/notificacoes" element={<RoleGuard masterOnly><NotificacoesPage /></RoleGuard>} />
-              <Route path="/configuracoes/emails" element={<RoleGuard masterOnly><EmailMonitoringPage /></RoleGuard>} />
+              <Route path="/configuracoes/notificacoes" element={<RoleGuard masterOnly><NotificacoesEmailsPage /></RoleGuard>} />
+              <Route path="/configuracoes/emails" element={<Navigate to="/configuracoes/notificacoes?aba=emails" replace />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
               <Route path="/perfil" element={<PerfilPage />} />
             </Route>
