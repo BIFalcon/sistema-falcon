@@ -214,10 +214,10 @@ export function useAllBankEntries(enabled: boolean) {
   });
 }
 
-export function useConcMatches(hotelId: string | null, kind: ConcKind) {
+export function useConcMatches(hotelId: string | null, kind: ConcKind, enabled = true) {
   return useQuery({
     queryKey: ["conc-matches", hotelId ?? "none", kind],
-    enabled: !!hotelId,
+    enabled: !!hotelId && enabled,
     queryFn: async () =>
       (await fetchAllPaged<unknown>(() =>
         supabase
@@ -910,25 +910,39 @@ export function useSaveJustification() {
 /* Conciliados por importação (coluna "Conciliados" na Central)         */
 /* ------------------------------------------------------------------ */
 
-export function useMatchedCountsByUpload() {
+/** Contagem de lançamentos conciliados por upload — agregada no banco, só p/ os uploads listados. */
+export function useMatchedCountsByUpload(uploadIds: string[], enabled = true) {
+  const ids = [...uploadIds].sort();
   return useQuery({
-    queryKey: ["conc-matched-by-upload"],
+    queryKey: ["conc-matched-by-upload", ids.join(",")],
+    enabled: enabled && ids.length > 0,
     queryFn: async () => {
       const counts = new Map<string, number>();
-      for (const table of ["conc_opera_entries", "conc_acquirer_entries", "conc_bank_entries"] as const) {
-        const rows = await fetchAllPaged<{ upload_id: string }>(() =>
-          supabase
-            .from(table)
-            .select("upload_id")
-            .not("matched_at", "is", null)
-            .not("upload_id", "is", null)
-            .order("id", { ascending: true }),
-        );
-        for (const r of rows) {
-          counts.set(r.upload_id, (counts.get(r.upload_id) ?? 0) + 1);
-        }
-      }
+      const { data, error } = await supabase.rpc("conc_matched_counts_by_upload", { p_upload_ids: ids });
+      if (error) throw error;
+      for (const r of (data ?? []) as { upload_id: string; n: number }[]) counts.set(r.upload_id, Number(r.n));
       return counts;
+    },
+  });
+}
+
+/** Código 9003 — "A Faturar": total diário lançado em Faturamento (agregado no banco). */
+export function useAFaturarDaily(hotelId: string | null, dateFrom?: string, dateTo?: string, dates?: string[], enabled = true) {
+  const days = dates ?? [];
+  return useQuery({
+    queryKey: ["conc-a-faturar", hotelId ?? "none", dateFrom ?? "", dateTo ?? "", days.join(",")],
+    enabled: enabled && !!hotelId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("ar_to_invoice_daily_totals", {
+        p_hotel_id: hotelId!,
+        p_from: days.length ? null : dateFrom || null,
+        p_to: days.length ? null : dateTo || null,
+        p_dates: days.length ? days : null,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as { day: string; total: number; n: number }[]).map((r) => ({
+        day: r.day, total: Number(r.total), n: Number(r.n),
+      }));
     },
   });
 }

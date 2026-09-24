@@ -44,7 +44,7 @@ function getModuleFromPath(pathname: string): FilterModule {
 }
 
 export function AppHeader() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
   const { allowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz } = useAuth();
@@ -53,6 +53,16 @@ export function AppHeader() {
   const isIndicadores = pathname.startsWith("/indicadores");
   const isHomePage = pathname === "/" || pathname === "/home";
   const isMarketing = pathname.startsWith("/marketing");
+  // Telas sem filtro global (têm filtros próprios ou não são filtradas).
+  const isHoteisConfig = pathname.startsWith("/configuracoes/hoteis");
+  const isNotificacoesConfig = pathname.startsWith("/configuracoes/notificacoes") || pathname.startsWith("/configuracoes/emails");
+  const isConferenciaNf = pathname.startsWith("/controladoria/conferencia-notas-fiscais");
+  const hideAllFilters = isHomePage || isMarketing || isHoteisConfig || isNotificacoesConfig || isConferenciaNf;
+  // Usuários: só hotel. Conciliação (em Contas a Receber): período fica dentro da tela.
+  const isUsuarios = pathname.startsWith("/configuracoes/usuarios");
+  const isConciliacaoAr =
+    pathname.startsWith("/financeiro/contas-receber") && new URLSearchParams(search).get("aba") === "conciliacao";
+  const hidePeriod = isUsuarios || isConciliacaoAr;
   const isRhTurnover = pathname.startsWith("/rh/turnover");
   const showMatrizOption = isRhTurnover && canSeeMatriz && !!matrizHotel;
   const { data: pendingCount = 0 } = usePendingNotificationCount();
@@ -102,7 +112,7 @@ export function AppHeader() {
   return (
     <header className="h-16 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-30">
       <div className="flex items-center gap-2 flex-1">
-        {!isHomePage && !isMarketing && (
+        {!hideAllFilters && (
         <>
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden md:inline">
           Filtros
@@ -232,7 +242,7 @@ export function AppHeader() {
           </Select>
         )}
 
-        {isFinanceiro ? (
+        {hidePeriod ? null : isFinanceiro ? (
           <DateFilterPicker
             dateFrom={dateFrom}
             dateTo={dateTo}

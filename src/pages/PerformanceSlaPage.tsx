@@ -247,6 +247,52 @@ export default function PerformanceSlaPage() {
       });
   }, [activity, closings, userFilter]);
 
+  // Usuário × etapa: tempo de resposta separado por estágio do fluxo (SLA próprio de cada um).
+  const userStageRows = useMemo(() => {
+    if (!activity) return [];
+    const closingMap = new Map(closings.map((c) => [c.id, c]));
+    const stageOf = (stage: string, prevStatus: string | null | undefined): string => {
+      if (stage === "carta") return "Carta";
+      switch (prevStatus) {
+        case "aguardando_comentarios": return "Comentários";
+        case "aguardando_controladoria": return "Controladoria";
+        case "aguardando_gop": return "GOP";
+        case "aguardando_fernando": return "Fernando";
+        default: return "Outras (DRE)";
+      }
+    };
+    type S = { userId: string; name: string; etapa: string; sla: number; hours: number[]; onTime: number; overdue: number };
+    const map = new Map<string, S>();
+    activity.approvals.forEach((a) => {
+      const prevLogs = activity.logs.filter(
+        (l) => l.closing_id === a.closing_id && l.field === `status_${a.stage}` && new Date(l.created_at) < new Date(a.created_at),
+      );
+      const prev = prevLogs[prevLogs.length - 1];
+      const etapa = stageOf(a.stage, prev?.new_value);
+      const sla = a.stage === "carta" ? 24 : 48;
+      const key = `${a.approved_by}|${etapa}`;
+      const s = map.get(key) ?? {
+        userId: a.approved_by, name: activity.profilesMap.get(a.approved_by) ?? a.approved_by.slice(0, 8),
+        etapa, sla, hours: [], onTime: 0, overdue: 0,
+      };
+      const h = diffHours(prev?.created_at ?? closingMap.get(a.closing_id)?.created_at ?? null, a.created_at);
+      if (h != null) {
+        s.hours.push(h);
+        if (h <= sla) s.onTime++; else s.overdue++;
+      }
+      map.set(key, s);
+    });
+    const order = ["Comentários", "Controladoria", "GOP", "Fernando", "Carta", "Outras (DRE)"];
+    return Array.from(map.values())
+      .filter((s) => (userFilter === "__all" ? true : s.userId === userFilter))
+      .map((s) => ({
+        ...s,
+        avg: s.hours.length ? s.hours.reduce((x, y) => x + y, 0) / s.hours.length : null,
+        pct: s.onTime + s.overdue > 0 ? (s.onTime / (s.onTime + s.overdue)) * 100 : null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name) || order.indexOf(a.etapa) - order.indexOf(b.etapa));
+  }, [activity, closings, userFilter]);
+
   // Lista de usuários únicos (para filtro)
   const userOptions = useMemo(() => {
     if (!activity) return [];
@@ -508,6 +554,47 @@ export default function PerformanceSlaPage() {
                           )}
                         </TableCell>
                         <TableCell>{formatHours(u.avgResponse)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Tempo por usuário e etapa
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {userStageRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">Sem aprovações no período.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>Etapa</TableHead>
+                      <TableHead>SLA</TableHead>
+                      <TableHead>Respostas</TableHead>
+                      <TableHead>No prazo</TableHead>
+                      <TableHead>Atrasadas</TableHead>
+                      <TableHead>% no prazo</TableHead>
+                      <TableHead>Tempo médio</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userStageRows.map((r) => (
+                      <TableRow key={`${r.userId}-${r.etapa}`}>
+                        <TableCell className="font-medium">{r.name}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs">{r.etapa}</Badge></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.sla}h</TableCell>
+                        <TableCell>{r.hours.length}</TableCell>
+                        <TableCell className="text-emerald-600">{r.onTime}</TableCell>
+                        <TableCell className="text-red-600">{r.overdue}</TableCell>
+                        <TableCell>{r.pct == null ? "—" : `${r.pct.toFixed(0)}%`}</TableCell>
+                        <TableCell>{formatHours(r.avg)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
