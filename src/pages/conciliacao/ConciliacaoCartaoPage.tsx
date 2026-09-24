@@ -27,7 +27,7 @@ import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile,
   useAutoReconcile, useConcJustifications, useSaveJustification, useSetB2B, useSetDirectBankBulk,
-  useMarkCashPaid, useCashProofUrl, useMatchedCountsByUpload,
+  useMarkCashPaid, useCashProofUrl, useMatchedCountsByUpload, useAFaturarDaily,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch, type ConcSide,
 } from "@/hooks/useConciliacaoCartao";
