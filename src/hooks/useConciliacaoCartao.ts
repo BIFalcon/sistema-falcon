@@ -231,13 +231,15 @@ export function useConcMatches(hotelId: string | null, kind: ConcKind, enabled =
   });
 }
 
-export function useConcUploads() {
+export function useConcUploads(hotelId?: string | null) {
   return useQuery({
-    queryKey: ["conc-uploads"],
+    queryKey: ["conc-uploads", hotelId ?? "all"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("conc_uploads")
-        .select("id, hotel_id, kind, file_name, parsed_count, skipped_count, parse_error, uploaded_at, metadata")
+        .select("id, hotel_id, kind, file_name, parsed_count, skipped_count, parse_error, uploaded_at, metadata");
+      if (hotelId) q = q.eq("hotel_id", hotelId);
+      const { data, error } = await q
         .order("uploaded_at", { ascending: false })
         .limit(50);
       if (error) throw error;

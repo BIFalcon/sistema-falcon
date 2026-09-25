@@ -165,7 +165,7 @@ export default function ConciliacaoCartaoPage() {
   const importB2B = useImportB2B();
   const importBank = useImportBankStatement();
   const autoReconcile = useAutoReconcile();
-  const uploads = useConcUploads();
+  const uploads = useConcUploads(hotelId);
   const matchedByUpload = useMatchedCountsByUpload(
     (uploads.data ?? []).map((u) => u.id as string),
     mainTab === "importacoes",
