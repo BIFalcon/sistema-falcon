@@ -15,7 +15,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
-import { useGopManagers } from "@/hooks/useGopManagers";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
 import { MONTHS_PT } from "@/lib/constants";
 import { fmtBRL } from "@/lib/formatters";
@@ -37,6 +36,60 @@ const CATEGORY_ORDER = ["Topline", "Receitas", "Despesas", "Despesas Específica
 type CardDef =
   | { title: string; format: "pct" | "brl"; agg: "sum" | "avg"; labels: string[] }
   | { title: string; format: "pct"; agg: "ratio"; numLabels: string[]; denLabels: string[] };
+
+/**
+ * Mesma ordem de busca da aba Fechamento/DRE (indicador `lucro_liquido`,
+ * regex /^lucro\s+líquido/ → /^resultado\s+líquido do exerc/ → /^resultado\s+líquido/).
+ * "Lucro / Prejuízo a Distribuir" NÃO entra: pode vir com distribuição aplicada.
+ */
+const NET_PROFIT_LABELS = [
+  "Lucro Líquido / Prejuízo do Exercício",
+  "Lucro Líquido",
+  "Resultado Líquido do Exercício",
+  "Resultado Líquido",
+];
+const REVENUE_LABELS = ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"];
+const LODGING_LABELS = [
+  "Receita de Hospedagem", "Receitas de Hospedagem", "Receita Hospedagem",
+  "Receita de Diárias", "Receita de Hospedagens", "Hospedagem",
+];
+const OCCUPIED_LABELS = ["Apartamentos Ocupados", "Apartamentos ocupados", "Room Nights", "Roomnights", "UHs Ocupadas"];
+const AVAILABLE_LABELS = [
+  "Número de apartamentos disponíveis", "Numero de apartamentos disponiveis",
+  "Apartamentos Disponíveis", "UHs Disponíveis", "Quartos Disponíveis",
+];
+const GOP_LABELS = ["GOP", "Resultado Operacional Bruto"];
+
+/**
+ * Indicadores de razão: em qualquer agregação de período são sempre
+ * soma(numerador) ÷ soma(denominador) — nunca média dos valores mensais.
+ */
+const RATIO_SPECS: Array<{ rx: RegExp; num: string[]; den: string[]; scale: number }> = [
+  { rx: /taxa\s*de\s*ocupa/i, num: OCCUPIED_LABELS, den: AVAILABLE_LABELS, scale: 100 },
+  { rx: /revpar/i, num: LODGING_LABELS, den: AVAILABLE_LABELS, scale: 1 },
+  { rx: /di[áa]ria\s*m[ée]dia|\badr\b/i, num: LODGING_LABELS, den: OCCUPIED_LABELS, scale: 1 },
+  { rx: /%\s*gop|margem\s*gop/i, num: GOP_LABELS, den: REVENUE_LABELS, scale: 100 },
+  { rx: /margem\s*l[íi]quida/i, num: NET_PROFIT_LABELS, den: REVENUE_LABELS, scale: 100 },
+];
+
+/**
+ * Retorna `undefined` se o rótulo não é um indicador de razão.
+ * Retorna `null` ("sem dado") se faltar numerador/denominador na DRE.
+ */
+function ratioOverMonths(
+  label: string,
+  dataset: ReturnType<typeof useDreAnalytics>["data"],
+  key: DreSeriesKey,
+  months: number[],
+): number | null | undefined {
+  const spec = RATIO_SPECS.find((s) => s.rx.test(label));
+  if (!spec) return undefined;
+  const num = pickLine(dataset, spec.num);
+  const den = pickLine(dataset, spec.den);
+  if (!num || !den) return null;
+  const v = aggregateRatio(num.series[key], den.series[key], months);
+  return v == null ? null : (v / 100) * spec.scale;
+}
 
 const CARD_LINES: CardDef[] = [
   { title: "Taxa de Ocupação", format: "pct", agg: "avg", labels: ["Taxa de Ocupação"] },
@@ -61,11 +114,7 @@ const CARD_LINES: CardDef[] = [
     format: "brl",
     agg: "sum",
     labels: [
-      "Lucro / Prejuízo a Distribuir",
-      "Lucro Líquido",
-      "Resultado Líquido do Exercício",
-      "Lucro/ (Prejuízo) da Sociedade no Exercício",
-      "Resultado Líquido",
+      ...NET_PROFIT_LABELS,
     ],
   },
   {
@@ -73,13 +122,9 @@ const CARD_LINES: CardDef[] = [
     format: "pct",
     agg: "ratio",
     numLabels: [
-      "Lucro / Prejuízo a Distribuir",
-      "Lucro Líquido",
-      "Resultado Líquido do Exercício",
-      "Lucro/ (Prejuízo) da Sociedade no Exercício",
-      "Resultado Líquido",
+      ...NET_PROFIT_LABELS,
     ],
-    denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
+    denLabels: REVENUE_LABELS,
   },
 ];
 
@@ -278,26 +323,9 @@ function computeCardValue(
   if (!line) return null;
   const v = aggregateSeries(line.series[series], months, card.agg);
   if (v == null) return null;
-  // Para períodos com múltiplos meses, usa média ponderada por RN
+  // Períodos com múltiplos meses: Ocupação/ADR/RevPAR = soma(num) ÷ soma(den)
   if (months.length > 1 && (card.title === "Taxa de Ocupação" || card.title === "ADR" || card.title === "RevPAR")) {
-    const rnLine = pickLine(dataset, ["Apartamentos Ocupados", "Apartamentos ocupados", "Room Nights"]);
-    if (rnLine) {
-      let sumWeighted = 0;
-      let sumWeights = 0;
-      for (const m of months) {
-        const val = line.series[series][m - 1];
-        const rn = rnLine.series[series][m - 1];
-        if (val != null && rn != null && Number.isFinite(val) && Number.isFinite(rn) && rn > 0) {
-          sumWeighted += val * rn;
-          sumWeights += rn;
-        }
-      }
-      if (sumWeights > 0) {
-        const weighted = sumWeighted / sumWeights;
-        if (card.title === "Taxa de Ocupação") return weighted <= 1 ? weighted * 100 : weighted;
-        return weighted;
-      }
-    }
+    return ratioOverMonths(card.title, dataset, series, months) ?? null;
   }
   // Taxa de Ocupação vem em fração ou %; normaliza para %
   if (card.title === "Taxa de Ocupação") return v <= 1 ? v * 100 : v;
@@ -367,7 +395,16 @@ function isCountLineLabel(label: string) {
   );
 }
 
-function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]): number | null {
+function computeNodeValue(
+  node: DreLineNode,
+  key: DreSeriesKey,
+  months: number[],
+  dataset?: ReturnType<typeof useDreAnalytics>["data"],
+): number | null {
+  if (months.length > 1) {
+    const r = ratioOverMonths(node.label, dataset, key, months);
+    if (r !== undefined) return r;
+  }
   const agg = getAggType(node.label);
   const baseAgg: "sum" | "avg" = agg === "sum" ? "sum" : "avg";
   const v = aggregateSeries(node.series[key], months, baseAgg);
@@ -377,7 +414,7 @@ function computeNodeValue(node: DreLineNode, key: DreSeriesKey, months: number[]
 }
 
 function fmtNodeValue(node: DreLineNode, v: number | null): string {
-  if (v == null || !Number.isFinite(v)) return "—";
+  if (v == null || !Number.isFinite(v)) return "sem dado";
   if (isPctLineLabel(node.label)) return `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   if (isCountLineLabel(node.label))
     return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
@@ -391,7 +428,9 @@ function DreComparativeRow({
   expanded,
   toggle,
   isExpense,
+  dataset,
 }: {
+  dataset?: ReturnType<typeof useDreAnalytics>["data"];
   node: DreLineNode;
   depth: number;
   months: number[];
@@ -399,9 +438,9 @@ function DreComparativeRow({
   toggle: (id: string) => void;
   isExpense: boolean;
 }) {
-  const cur = computeNodeValue(node, "current", months);
-  const bud = computeNodeValue(node, "budget", months);
-  const prev = computeNodeValue(node, "previous", months);
+  const cur = computeNodeValue(node, "current", months, dataset);
+  const bud = computeNodeValue(node, "budget", months, dataset);
+  const prev = computeNodeValue(node, "previous", months, dataset);
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.id);
   return (
@@ -426,7 +465,7 @@ function DreComparativeRow({
         <TableCell className="text-right text-sm"><VariationPill value={variationFor(cur, prev, isExpense)} isExpense={isExpense} /></TableCell>
       </TableRow>
       {isOpen && hasChildren && node.children.map((child) => (
-        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} isExpense={isExpense} />
+        <DreComparativeRow key={child.id} node={child} depth={depth + 1} months={months} expanded={expanded} toggle={toggle} isExpense={isExpense} dataset={dataset} />
       ))}
     </>
   );
@@ -462,21 +501,9 @@ function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedId
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, hotelIds: selectedHotelIds, gopId, month, year, setHotelId } = useModuleFilters("indicadores");
+  const { hotelId, hotelIds: selectedHotelIds, month, year, setHotelId } = useModuleFilters("indicadores");
   const queryClient = useQueryClient();
-  const { data: gopManagers = [] } = useGopManagers();
-  const selectedGop = useMemo(
-    () => gopManagers.find((g) => g.user_id === gopId),
-    [gopManagers, gopId],
-  );
-  const gopHotelIds = useMemo(
-    () => (selectedGop ? new Set(selectedGop.hotel_ids) : null),
-    [selectedGop],
-  );
-  const hotelOptions = useMemo(
-    () => (gopHotelIds ? allowedHotels.filter((h) => gopHotelIds.has(h.id)) : allowedHotels),
-    [allowedHotels, gopHotelIds],
-  );
+  const hotelOptions = allowedHotels;
   const [retroOpen, setRetroOpen] = useState(false);
   const [retroHotelId, setRetroHotelId] = useState<string>("");
   const [retroYear, setRetroYear] = useState<number>(new Date().getFullYear());
@@ -492,7 +519,8 @@ export default function IndicadoresDrePage() {
   const [period, setPeriod] = useState<PeriodKey>("1");
   // Seleção múltipla de meses — quando preenchida, substitui a janela do período
   const [customMonths, setCustomMonths] = useState<number[]>([]);
-  const showAsPct = divider === "revenue";
+  const showAsPct = divider === "revenue" || divider === "lodging" || divider === "netprofit";
+  const hasDivider = divider !== "none";
   const hotelIds = useMemo(() => {
     if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
     if (hotelId) return [hotelId];
@@ -526,16 +554,11 @@ export default function IndicadoresDrePage() {
   }, [selectedNodes]);
   const divisorLine = useMemo(() => {
     if (!dataset || divider === "none") return undefined;
-    if (divider === "roomnights") return findDreLine(dataset, "Apartamentos ocupados");
-    if (divider === "uhs") return findDreLine(dataset, "Número de apartamentos disponíveis");
-    if (divider === "netprofit")
-      return (
-        findDreLine(dataset, "Lucro Líquido / Prejuízo do Exercício") ??
-        findDreLine(dataset, "Lucro Líquido") ??
-        findDreLine(dataset, "Lucro / Prejuízo a Distribuir do período")
-      );
-    if (divider === "lodging") return findDreLine(dataset, "Receita de Hospedagem");
-    return findDreLine(dataset, "RECEITA BRUTA TOTAL");
+    if (divider === "roomnights") return pickLine(dataset, OCCUPIED_LABELS);
+    if (divider === "uhs") return pickLine(dataset, AVAILABLE_LABELS);
+    if (divider === "netprofit") return pickLine(dataset, NET_PROFIT_LABELS);
+    if (divider === "lodging") return pickLine(dataset, LODGING_LABELS);
+    return pickLine(dataset, REVENUE_LABELS);
   }, [dataset, divider]);
 
   // IDs de todas as linhas que descendem de um bloco de Despesas
@@ -631,10 +654,16 @@ export default function IndicadoresDrePage() {
     const baseBudget = divideSeries(aggregateSelectedSeries(lines, "budget", dataset), divisorLine, "budget");
     const basePrevious = divideSeries(aggregateSelectedSeries(lines, "previous", dataset), divisorLine, "previous");
 
+    const ratioLabel =
+      !divisorLine && lines.length === 1 && RATIO_SPECS.some((s) => s.rx.test(lines[0].label)) ? lines[0].label : null;
+    const pointValue = (base: DreMonthValue[], months: number[], key: DreSeriesKey) => {
+      if (ratioLabel && months.length > 1) return ratioOverMonths(ratioLabel, dataset, key, months) ?? null;
+      return aggPoint(base, months, lineAgg, rnNode?.series[key]);
+    };
     return points.map(({ label, months }) => {
-      const cur = aggPoint(baseCurrent, months, lineAgg, rnNode?.series.current);
-      const bud = aggPoint(baseBudget, months, lineAgg, rnNode?.series.budget);
-      const prev = aggPoint(basePrevious, months, lineAgg, rnNode?.series.previous);
+      const cur = pointValue(baseCurrent, months, "current");
+      const bud = pointValue(baseBudget, months, "budget");
+      const prev = pointValue(basePrevious, months, "previous");
       return {
         month: label,
         current: cur,
@@ -695,6 +724,8 @@ export default function IndicadoresDrePage() {
         const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
         return `${normalized.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
       }
+      // Com divisor (ex.: ÷ UHs), valores pequenos não podem ser arredondados para 0
+      if (hasDivider) return numeric.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (isCount) return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
       return numeric.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
     };
@@ -1138,6 +1169,7 @@ export default function IndicadoresDrePage() {
                               node={node}
                               depth={0}
                               months={monthsWindow}
+                              dataset={dataset}
                               expanded={expandedRows}
                               isExpense={isExpenseNode(node)}
                               toggle={(id) =>

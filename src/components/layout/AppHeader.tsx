@@ -223,7 +223,7 @@ export function AppHeader() {
           </Select>
         )}
 
-        {isIndicadores && !isGg && gopManagers.length > 0 && (
+        {false && isIndicadores && !isGg && gopManagers.length > 0 && (
           <Select
             value={gopId ?? "__all__"}
             onValueChange={(v) => setGopId(v === "__all__" ? null : v)}
