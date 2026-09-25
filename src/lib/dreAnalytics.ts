@@ -303,11 +303,55 @@ export function mergeDreDatasets(datasets: DreAnalyticsDataset[]): DreAnalyticsD
     });
   }
 
+  recomputeRatiosFromComponents(merged);
   return buildDataset(
     merged,
     datasets.reduce((s, d) => s + d.hotelCount, 0),
     datasets.flatMap((d) => d.sourceNames),
   );
+}
+
+/**
+ * Na consolidação de vários hotéis, Ocupação/ADR/RevPAR/margens não podem ser
+ * a média simples entre hotéis: recalcula soma(num) ÷ soma(den) por mês.
+ * Sem componentes, o valor fica "sem dado" (null) em vez de uma média errada.
+ */
+function recomputeRatiosFromComponents(nodes: DreLineNode[]) {
+  const find = (labels: RegExp[]) => {
+    for (const rx of labels) {
+      const n = nodes.find((x) => rx.test(normalize(x.label)));
+      if (n) return n;
+    }
+    return undefined;
+  };
+  const occ = find([/^apartamentos ocupados/, /^room ?nights/, /^uhs? ocupad/]);
+  const avail = find([/^numero de apartamentos disponiveis/, /^apartamentos disponiveis/, /^uhs? disponive/]);
+  const lodging = find([/^receitas? de hospedage/, /^receita hospedagem/, /^receita de diarias/]);
+  const gop = find([/^gop$/, /^resultado operacional bruto/]);
+  const rev = find([/^receita bruta total/, /^receita total bruta/]);
+  const net = find([/^lucro liquido/, /^resultado liquido do exerc/, /^resultado liquido/]);
+  const specs: Array<{ rx: RegExp; num?: DreLineNode; den?: DreLineNode; pct: boolean }> = [
+    { rx: /taxa de ocupa/, num: occ, den: avail, pct: true },
+    { rx: /revpar/, num: lodging, den: avail, pct: false },
+    { rx: /diaria media|\badr\b/, num: lodging, den: occ, pct: false },
+    { rx: /% ?gop|margem gop/, num: gop, den: rev, pct: true },
+    { rx: /margem liquida/, num: net, den: rev, pct: true },
+  ];
+  for (const node of nodes) {
+    const label = normalize(node.label);
+    const spec = specs.find((s) => s.rx.test(label));
+    if (!spec) continue;
+    for (const key of ["current", "budget", "previous"] as DreSeriesKey[]) {
+      const asFraction = node.series[key].every((v) => v == null || Math.abs(v) <= 1);
+      node.series[key] = node.series[key].map((_, m) => {
+        const n = spec.num?.series[key][m];
+        const d = spec.den?.series[key][m];
+        if (n == null || d == null || d === 0) return null;
+        const r = n / d;
+        return spec.pct && !asFraction ? r * 100 : r;
+      });
+    }
+  }
 }
 
 function buildDataset(nodes: DreLineNode[], hotelCount: number, sourceNames: string[]): DreAnalyticsDataset {

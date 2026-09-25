@@ -73,6 +73,11 @@ export function AppHeader() {
     ? allowedHotels.filter((h) => gopHotelIds.has(h.id))
     : allowedHotels;
 
+  // Filtro de GOP removido de Indicadores: limpa seleção antiga persistida
+  useEffect(() => {
+    if (isIndicadores && gopId) setGopId(null);
+  }, [isIndicadores, gopId, setGopId]);
+
   // Se hotel atual não pertence à carteira do GOP, limpar
   useEffect(() => {
     if (gopHotelIds && hotelId && !gopHotelIds.has(hotelId)) {
