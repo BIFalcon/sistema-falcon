@@ -29,18 +29,21 @@ export function ConciliadosPairs({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const groups = matches.map((m) => {
-    const items = m.conc_match_items.map((i) => ({
-      side: i.side as string,
-      amount: Number(i.amount),
-      row: rowById.get(i.entry_id),
-    }));
-    return {
-      match: m,
-      left: items.filter((i) => leftSides.includes(i.side)),
-      right: items.filter((i) => !leftSides.includes(i.side)),
-    };
-  });
+  // Só mostra conciliações com ao menos um lançamento dentro do filtro atual (hotel/período).
+  const groups = matches
+    .filter((m) => m.conc_match_items.some((i) => rowById.has(i.entry_id)))
+    .map((m) => {
+      const items = m.conc_match_items.map((i) => ({
+        side: i.side as string,
+        amount: Number(i.amount),
+        row: rowById.get(i.entry_id),
+      }));
+      return {
+        match: m,
+        left: items.filter((i) => leftSides.includes(i.side)),
+        right: items.filter((i) => !leftSides.includes(i.side)),
+      };
+    });
 
   const leftSum = groups.reduce((s, g) => s + g.left.reduce((a, i) => a + i.amount, 0), 0);
   const rightSum = groups.reduce((s, g) => s + g.right.reduce((a, i) => a + i.amount, 0), 0);
