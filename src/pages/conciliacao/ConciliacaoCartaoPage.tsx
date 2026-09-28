@@ -720,12 +720,12 @@ export default function ConciliacaoCartaoPage() {
         <TabsContent value="importacoes" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Relatório do Opera (XML)</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Opera (XML) ou TOTVS (Excel)</CardTitle></CardHeader>
               <CardContent>
                 <DropZone
-                  label="Enviar XML do Opera"
+                  label="Enviar XML do Opera ou Excel TOTVS"
                   hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel no filtro do topo antes de importar"}
-                  accept={{ "application/xml": [".xml"], "text/xml": [".xml"] }}
+                  accept={{ "application/xml": [".xml"], "text/xml": [".xml"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
                   busy={importOpera.isPending}
                   onFile={(f) => {
                     if (!hotelId) { toast.error("Selecione o hotel antes de importar o XML do Opera."); return; }
@@ -733,7 +733,8 @@ export default function ConciliacaoCartaoPage() {
                       onSuccess: (r) => toast.success(
                         `${r.inserted} transação(ões) importada(s) · ${r.skipped} fora do mapeamento` +
                         ` · ${r.duplicates} já existente(s)` +
-                        ` · ${r.autoMatched} conciliada(s) automaticamente`,
+                        ` · ${r.autoMatched} conciliada(s) automaticamente` +
+                        ("unclassified" in r && r.unclassified?.length ? ` · sem categoria: ${r.unclassified.join(", ")}` : ""),
                       ),
                       onError: (e: Error) => toast.error(e.message),
                     });
