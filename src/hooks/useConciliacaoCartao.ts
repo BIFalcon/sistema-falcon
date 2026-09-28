@@ -6,6 +6,7 @@ import {
   parseB2BExcel,
   parseBankStatement,
   parseOperaXml,
+  parseTotvsExcel,
   normText,
   type HotelRef,
 } from "@/lib/conciliacaoParsers";
@@ -285,11 +286,50 @@ async function upsertChunks<T>(table: "conc_opera_entries" | "conc_acquirer_entr
   }
 }
 
+async function importTotvs(file: File, hotelId: string, userId: string) {
+  const parsed = await parseTotvsExcel(file, hotelId);
+  const known = await existingKeys("conc_opera_entries", hotelId);
+  const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
+  const duplicates = parsed.rows.length - rows.length;
+  const { data: up, error: upErr } = await supabase
+    .from("conc_uploads")
+    .insert({
+      hotel_id: hotelId,
+      kind: "opera",
+      file_name: file.name,
+      file_size: file.size,
+      parsed_count: rows.length,
+      skipped_count: parsed.skipped + duplicates,
+      uploaded_by: userId,
+      metadata: { format: "totvs", total_rows: parsed.total, duplicates, unclassified: parsed.unclassified },
+    })
+    .select("id")
+    .single();
+  if (upErr) throw upErr;
+  await upsertChunks("conc_opera_entries", rows.map((r) => ({
+    hotel_id: hotelId,
+    upload_id: up.id,
+    entry_key: r.entry_key,
+    trx_code: r.trx_code,
+    trx_desc: r.trx_desc,
+    categoria: r.categoria,
+    amount: r.amount,
+    business_date: r.business_date || null,
+    room: null,
+    guest_full_name: null,
+    receipt_no: null,
+    raw: { ...r, source: "totvs" } as unknown as Record<string, unknown>,
+  })));
+  const autoMatched = await runAutoReconcile(hotelId);
+  return { inserted: rows.length, skipped: parsed.skipped, autoMatched, duplicates, unclassified: parsed.unclassified };
+}
+
 export function useImportOpera() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
+      if (/\.xlsx?$/i.test(file.name)) return await importTotvs(file, hotelId, user!.id);
       const { data: map, error: mapErr } = await supabase
         .from("trx_code_mapping")
         .select("trx_code, categoria, ativo")
