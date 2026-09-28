@@ -511,3 +511,87 @@ export async function parseBankStatement(
 
   return { rows, hotelId, accountName, skipped, matchedHotelId };
 }
+
+/* ------------------------------------------------------------------ *
+ * 1b. Relatório TOTVS "Documentos Lançados" (Excel sem cabeçalho)
+ * ------------------------------------------------------------------ */
+
+export interface TotvsRow {
+  entry_key: string;
+  trx_code: string;
+  trx_desc: string;
+  categoria: string;
+  amount: number;
+  business_date: string;
+  documento: string;
+  historico: string;
+  reserva: string | null;
+}
+
+const BANDEIRAS: [RegExp, string][] = [
+  [/\bMASTER(CARD)?\b/, "MASTERCARD"],
+  [/\bVISA\b/, "VISA"],
+  [/\bELO\b/, "ELO"],
+  [/\b(AMEX|AMERICAN)\b/, "AMEX"],
+  [/\bDINERS\b/, "DINERS"],
+  [/\bHIPERCARD\b/, "HIPERCARD"],
+];
+
+/** Classifica o texto de CLIENTE na mesma categoria usada pela operadora. */
+export function classifyTotvsCliente(cliente: string): string {
+  const t = normText(cliente);
+  if (!t) return "";
+  if (/\bPIX\b/.test(t)) return "PIX";
+  if (/\b(DINHEIRO|CASH|ESPECIE)\b/.test(t)) return "DINHEIRO";
+  if (t.includes("CARTAO") || BANDEIRAS.some(([re]) => re.test(t))) {
+    const b = BANDEIRAS.find(([re]) => re.test(t))?.[1] ?? "";
+    const m = /DEBITO/.test(t) ? "DEBITO" : /CREDITO/.test(t) ? "CREDITO" : "";
+    return [b, m].filter(Boolean).join(" ") || "CARTAO";
+  }
+  return "";
+}
+
+export async function parseTotvsExcel(
+  file: File,
+  hotelId: string,
+): Promise<{ rows: TotvsRow[]; skipped: number; total: number; unclassified: string[] }> {
+  const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+    header: 1, blankrows: false, defval: null, raw: true,
+  });
+
+  const rows: TotvsRow[] = [];
+  const unclassified = new Set<string>();
+  let skipped = 0;
+  let total = 0;
+
+  for (const r of grid) {
+    const cliente = String(r?.[0] ?? "").trim();
+    const documento = String(r?.[1] ?? "").trim();
+    const businessDate = toIso(r?.[3]);
+    // Ignora linhas sem data válida (títulos/totais eventuais).
+    if (!cliente || !businessDate) continue;
+    total++;
+    const amount = parseMoney(r?.[6]);
+    const historico = String(r?.[10] ?? "").trim();
+    const pms = String(r?.[12] ?? "").trim().replace(/\.0+$/, "");
+    const reserva = pms || historico.match(/reserva\s*n\.?\s*'?(\d+)/i)?.[1] || null;
+    const categoria = classifyTotvsCliente(cliente);
+    if (!categoria) unclassified.add(cliente);
+
+    rows.push({
+      entry_key: hashKey([hotelId, "totvs", documento, businessDate, amount.toFixed(2)]),
+      trx_code: "TOTVS",
+      trx_desc: cliente,
+      categoria,
+      amount,
+      business_date: businessDate,
+      documento,
+      historico,
+      reserva,
+    });
+  }
+  if (total === 0) skipped = grid.length;
+  return { rows, skipped, total, unclassified: [...unclassified] };
+}
