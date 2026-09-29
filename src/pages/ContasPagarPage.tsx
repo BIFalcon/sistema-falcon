@@ -653,13 +653,18 @@ export default function ContasPagarPage() {
     }
     const prevStatus = previousByEntry.get(ids[0]) ?? "em_aprovacao";
     try {
+      // Ao marcar Pago/Quitado, preserva juros, valor novo e data de agendamento
+      // já gravados; só sobrescreve quando um valor foi digitado na janela.
+      const preserve = newStatus === "pago" || newStatus === "quitado";
+      const keepOr = <T,>(v: T | null | undefined): T | null | undefined =>
+        v != null ? v : preserve ? undefined : null;
       await setPaymentStatus.mutateAsync({
         hotelId: hotelId ?? "",
         entryIds: ids,
         status: newStatus,
-        scheduledDate: extra?.scheduledDate ?? null,
-        paidInterest: extra?.paidInterest ?? null,
-        paidAmount: extra?.paidAmount ?? null,
+        scheduledDate: keepOr(extra?.scheduledDate || null),
+        paidInterest: keepOr(extra?.paidInterest),
+        paidAmount: keepOr(extra?.paidAmount),
         paidDate: extra?.paidDate ?? undefined,
       });
       setSelectedIds(new Set());
