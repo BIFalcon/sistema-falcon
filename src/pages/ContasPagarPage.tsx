@@ -336,8 +336,25 @@ export default function ContasPagarPage() {
   // do valor de origem continua salva em `original_amount` no banco.
   const showOriginalAmount = false;
   void showOriginalAmountRaw;
-  const showPaidAmount = showPaidAmountRaw || showPaid;
-  const showPaidInterest = showPaidInterestRaw || showPaid;
+  void showPaidAmountRaw;
+  void showPaidInterestRaw;
+  // Colunas Valor Novo / Juros aparecem só se algum lançamento DENTRO do que
+  // está filtrado na tela tiver juros/desconto (evita coluna "sumir e aparecer").
+  const filteredHasInterest = useMemo(
+    () => filtered.some((e) => e.paid_interest != null && Number(e.paid_interest) !== 0),
+    [filtered],
+  );
+  const showPaidAmount = filteredHasInterest || showPaid;
+  const showPaidInterest = filteredHasInterest || showPaid;
+
+  // 1.1 — Qualquer troca de filtro limpa a seleção múltipla (todas as abas).
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [
+    period, selectedStatuses, selectedCategories, searchText, hideTrivial,
+    dateFrom, dateTo, specificDates, scheduledFrom, scheduledTo,
+    paidDateFrom, paidDateTo, showPaid, showOmieRemoved,
+  ]);
 
   // Aplica ordenação por coluna em cima do displayRows derivado.
   // Linhas do tipo "group" são mantidas no topo (a ordenação só altera entre singles).
@@ -1508,16 +1525,6 @@ export default function ContasPagarPage() {
  className="h-9 w-[160px]"
  />
                 </div>
-                {(paidDateFrom || paidDateTo) && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-9"
-                    onClick={() => { setPaidDateFrom(""); setPaidDateTo(""); }}
-                  >
-                    Limpar
-                  </Button>
-                )}
                 <p className="text-[11px] text-muted-foreground ml-auto">
                   Filtra apenas pela <strong>data efetiva de pagamento</strong> dos lançamentos arquivados.
                 </p>
@@ -1577,19 +1584,6 @@ export default function ContasPagarPage() {
                           {opt.label}
                         </DropdownMenuCheckboxItem>
                       ))}
-                      {selectedStatuses.length > 0 && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start h-7 px-2 text-xs"
-                            onClick={() => setSelectedStatuses([])}
-                          >
-                            Limpar
-                          </Button>
-                        </>
-                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 );
@@ -1629,17 +1623,7 @@ export default function ContasPagarPage() {
                         </DropdownMenuCheckboxItem>
                       ))}
                       {selectedCategories.length > 0 && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start h-7 px-2 text-xs"
-                            onClick={() => setSelectedCategories([])}
-                          >
-                            Limpar
-                          </Button>
-                        </>
+                        null
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1662,16 +1646,6 @@ export default function ContasPagarPage() {
  value={scheduledTo}
  onChange={setScheduledTo}
  />
-                {(scheduledFrom || scheduledTo) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => { setScheduledFrom(""); setScheduledTo(""); }}
-                  >
-                    Limpar
-                  </Button>
-                )}
               </label>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <Checkbox checked={hideTrivial} onCheckedChange={(c) => setHideTrivial(!!c)} />
@@ -1686,6 +1660,11 @@ export default function ContasPagarPage() {
                 selectedCategories.length > 0,
                 searchText !== "",
                 !hideTrivial,
+                !!(dateFrom || dateTo || (specificDates && specificDates.length > 0)),
+                !!(scheduledFrom || scheduledTo),
+                !!(paidDateFrom || paidDateTo),
+                showPaid,
+                showOmieRemoved,
               ].filter(Boolean).length;
               const hasActiveFilters = activeFilterCount > 0;
               if (!hasActiveFilters) return null;
@@ -1709,6 +1688,16 @@ export default function ContasPagarPage() {
                       setPeriod("all");
                       setSelectedStatuses([]);
                       setSelectedCategories([]);
+                      setDateFrom("");
+                      setDateTo("");
+                      if (specificDates && specificDates.length > 0) setSpecificDates([]);
+                      setScheduledFrom("");
+                      setScheduledTo("");
+                      setPaidDateFrom("");
+                      setPaidDateTo("");
+                      setShowPaid(false);
+                      setShowOmieRemoved(false);
+                      setSelectedIds(new Set());
                       setSearchText("");
                       setHideTrivial(true);
                     }}
