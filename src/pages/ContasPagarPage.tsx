@@ -516,9 +516,23 @@ export default function ContasPagarPage() {
     };
     for (const e of entries) add(e);
     for (const e of distributionEntries) add(e);
-    for (const e of salaryEntries) add(e);
     return sum;
-  }, [selectedIds, entries, distributionEntries, salaryEntries]);
+  }, [selectedIds, entries, distributionEntries]);
+
+  // Parte da seleção que é Salários RH (mostrada em separado na barra de lote).
+  const selectedSalaryTotal = useMemo(() => {
+    let sum = 0;
+    for (const e of salaryEntries) {
+      if (!selectedIds.has(e.id) || e.is_transfer) continue;
+      const hasInterest = e.paid_interest != null && Number(e.paid_interest) !== 0;
+      sum += hasInterest && e.paid_amount != null ? Number(e.paid_amount) : Number(e.amount ?? 0);
+    }
+    return sum;
+  }, [selectedIds, salaryEntries]);
+  const selectedSalaryCount = useMemo(
+    () => salaryEntries.filter((e) => selectedIds.has(e.id)).length,
+    [selectedIds, salaryEntries],
+  );
 
   // Quando o usuário seleciona alguns lançamentos dentro do período filtrado,
   // o "Total a pagar no período" passa a refletir apenas a seleção; caso
@@ -1716,7 +1730,9 @@ export default function ContasPagarPage() {
                 <div className="flex items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30 flex-wrap">
                   <div className="text-xs text-muted-foreground">
                     {selectedIds.size > 0
-                      ? `${selectedIds.size} selecionado(s) · soma ${fmtBRL(selectedTotal)}`
+                      ? selectedSalaryCount > 0 && selectedSalaryCount < selectedIds.size
+                        ? <span>{selectedIds.size} selecionado(s) · Total selecionado <strong className="text-foreground">{fmtBRL(selectedTotal - selectedSalaryTotal)}</strong> · <span className="text-pink-700 dark:text-pink-300">Total Salários RH <strong>{fmtBRL(selectedSalaryTotal)}</strong></span></span>
+                        : `${selectedIds.size} selecionado(s) · soma ${fmtBRL(selectedTotal)}`
                       : "Selecione lançamentos para marcar status em lote"}
                   </div>
                   <div className="flex items-center gap-2">
@@ -2021,139 +2037,6 @@ export default function ContasPagarPage() {
             )}
           </Card>
         </>
-      )}
-
-      {/* Tabela de Salários RH */}
-      {hotelId && salaryEntries.length > 0 && (
-        <Card className="p-5 shadow-soft space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider">
-              Salários RH
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {salaryEntries.length} lançamento(s) · total {fmtBRL(
-                salaryEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),
-              )}
-            </p>
-          </div>
-          {(canMarkInsertedAgendado || canMarkPaid) && (
-            <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md bg-muted/30 flex-wrap">
-              <div className="text-xs text-muted-foreground">
-                {Array.from(selectedIds).filter((id) => salaryEntries.some((e) => e.id === id)).length > 0
-                  ? `${Array.from(selectedIds).filter((id) => salaryEntries.some((e) => e.id === id)).length} selecionado(s)`
-                  : "Selecione salários para marcar status em lote"}
-              </div>
-              <div className="flex items-center gap-2">
-                {canMarkAutorizado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 h-8 border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-400"
-                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
-                    onClick={() => handleBulkPaymentStatus("autorizado")}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" /> Autorizado
-                  </Button>
-                )}
-                {canMarkInsertedAgendado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 h-8"
-                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
-                    onClick={() => handleBulkPaymentStatus("agendado")}
-                  >
-                    <CalendarClock className="h-3.5 w-3.5" /> Agendado
-                  </Button>
-                )}
-                {canMarkInsertedAgendado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 h-8 border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-400"
-                    disabled={selectedIds.size === 0 || unscheduleEntries.isPending}
-                    onClick={handleBulkUnschedule}
-                  >
-                    <CalendarX className="h-3.5 w-3.5" /> Desagendar
-                  </Button>
-                )}
-                {selectedIds.size > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 h-8 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
-                    disabled={setPending.isPending}
-                    onClick={handleBulkPending}
-                  >
-                    <Clock className="h-3.5 w-3.5" /> Pendente
-                  </Button>
-                )}
-                {canMarkPaid && (
-                  <Button
-                    size="sm"
-                    className="gap-1 h-8"
-                    disabled={selectedIds.size === 0 || setPaymentStatus.isPending}
-                    onClick={() => handleBulkPaymentStatus("pago")}
-                  >
-                    <Banknote className="h-3.5 w-3.5" /> Marcar Pago
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="border rounded-md overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {(canMarkInsertedAgendado || canMarkPaid) && (
-                    <TableHead className="w-8">
-                      <Checkbox
-                        checked={
-                          salaryEntries.length > 0 &&
-                          salaryEntries.every((e) => selectedIds.has(e.id))
-                        }
-                        onCheckedChange={(c) => {
-                          setSelectedIds((prev) => {
-                            const next = new Set(prev);
-                            if (c) salaryEntries.forEach((e) => next.add(e.id));
-                            else salaryEntries.forEach((e) => next.delete(e.id));
-                            return next;
-                          });
-                        }}
-                        aria-label="Selecionar todos salários"
-                      />
-                    </TableHead>
-                  )}
-                  <TableHead>Fornecedor</TableHead>
-                  <TableHead className="hidden md:table-cell">Nº Doc</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="hidden lg:table-cell">Categoria</TableHead>
-                  <TableHead className="hidden md:table-cell">Agendado para</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salaryEntries.map((e) => (
-                  <ApEntryRow
-                    key={e.id}
-                    entry={e}
-                    sourceSystem={sourceSystem}
-                    showApproval={false}
-                    selectable={canMarkInsertedAgendado || canMarkPaid}
-                    selected={selectedIds.has(e.id)}
-                    onToggleSelected={(v) => toggleSelected(e.id, v)}
-                    showBank={false}
-                    canEditObservation={canManage}
-                    canManageCategory={canManage}
-                    canManage={canManage}
-                    onEditSchedule={canMarkInsertedAgendado ? openEditSchedule : undefined}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
       )}
 
       {/* Tabela de Distribuição de Lucros */}
