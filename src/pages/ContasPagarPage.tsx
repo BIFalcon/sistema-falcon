@@ -1495,7 +1495,7 @@ export default function ContasPagarPage() {
             {!showOmieRemoved && (
             <>
             {/* Filtros (sticky) */}
-            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-5 px-5 pt-2 pb-3 border-b space-y-3">
+            <div className="sticky top-[76px] z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-5 px-5 pt-2 pb-3 border-b space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
