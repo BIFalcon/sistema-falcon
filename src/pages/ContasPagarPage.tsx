@@ -927,8 +927,9 @@ export default function ContasPagarPage() {
           {/* Saldo bancário (Itaú + Santander) — apenas com hotel selecionado */}
           {hotelId && (
           <>
-          <Card className="p-5 shadow-soft space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="sticky top-0 z-30 -mx-1 px-1 py-1 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <Card className="px-4 py-2.5 shadow-soft">
+            <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 items-center">
               <Stat label="Saldo total (Itaú + Santander)" value={fmtBRL(balanceTotal)} />
               <Stat
                 label={
@@ -943,19 +944,37 @@ export default function ContasPagarPage() {
                 value={balanceDiffComputed !== null ? fmtBRL(balanceDiffComputed) : "—"}
                 tone={balanceDiffComputed !== null && balanceDiffComputed < 0 ? "danger" : "neutral"}
               />
+              <Stat
+                label={
+                  cardReceivables[0]
+                    ? `Cartão a receber (${fmtDate(cardReceivables[0].date_from)} – ${fmtDate(cardReceivables[0].date_to)})`
+                    : "Cartão a receber"
+                }
+                value={cardReceivables[0] ? fmtBRL(Number(cardReceivables[0].amount)) : "—"}
+              />
+              {canManage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 text-xs gap-1 justify-self-end"
+                  onClick={() => setBalanceExpanded(true)}
+                >
+                  <Pencil className="h-3 w-3" /> Editar
+                </Button>
+              )}
             </div>
-            <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs gap-1 text-muted-foreground"
-                onClick={() => setBalanceExpanded((p) => !p)}
-              >
-                {balanceExpanded ? "Ocultar saldos bancários" : "Atualizar saldos bancários"}
-                {balanceExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </Button>
-            </div>
-            {balanceExpanded && (
+          </Card>
+          </div>
+
+          <Dialog open={balanceExpanded} onOpenChange={setBalanceExpanded}>
+            <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Editar saldos e cartão a receber</DialogTitle>
+                <DialogDescription>Atualize os saldos bancários e o cartão a receber deste hotel.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><Wallet className="h-3.5 w-3.5" /> Saldos bancários</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
                 <BankBalanceField
                 bankName="itau"
@@ -1006,34 +1025,9 @@ export default function ContasPagarPage() {
                 }}
               />
               </div>
-            )}
-          </Card>
-
-          {/* Cartão a receber — compacto */}
-          <Collapsible>
-            <div className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs">
-              <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
-                <CreditCard className="h-3.5 w-3.5 text-accent" />
-                {cardReceivables[0] ? (
-                  <span>
-                    Cartão a receber:{" "}
-                    <strong className="text-foreground">{fmtBRL(Number(cardReceivables[0].amount))}</strong>{" "}
-                    ({fmtDate(cardReceivables[0].date_from)} – {fmtDate(cardReceivables[0].date_to)})
-                  </span>
-                ) : (
-                  <span>Cartão a receber: nenhum registro</span>
-                )}
-              </div>
-              {canManage && (
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-                    Editar <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </CollapsibleTrigger>
-              )}
-            </div>
-            <CollapsibleContent>
-            <Card className="p-4 mt-2 shadow-soft space-y-3">
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><CreditCard className="h-3.5 w-3.5 text-accent" /> Cartão a receber</p>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Valor</label>
@@ -1137,9 +1131,10 @@ export default function ContasPagarPage() {
                 </div>
               </div>
             )}
-            </Card>
-            </CollapsibleContent>
-          </Collapsible>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           </>
           )}
 
