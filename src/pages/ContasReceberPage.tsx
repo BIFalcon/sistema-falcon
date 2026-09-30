@@ -859,7 +859,7 @@ function DayBreakdown({
             </div>
           )}
           <div className="rounded-lg border overflow-hidden">
-            <Table>
+            <Table className="text-xs [&_th]:text-xs [&_th]:px-2 [&_td]:px-2 [&_button]:text-[11px]">
               <TableHeader>
                 <TableRow>
                   {canShowActions && (
