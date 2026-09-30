@@ -85,7 +85,7 @@ export function ApEntryRow({
 
   return (
     <TableRow
-      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
+      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""} ${entry.category === "Salários RH" ? "bg-pink-50 dark:bg-pink-950/30 border-l-2 border-l-pink-400" : ""}`}
     >
       {selectable && (
         <TableCell className="w-8 px-2 py-1.5">
