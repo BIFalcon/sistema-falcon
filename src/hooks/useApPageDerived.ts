@@ -114,15 +114,13 @@ export function useApPageDerived(opts: {
     () => activeEntries.filter((e) => !e.is_distribution),
     [activeEntries],
   );
-  // Salários RH ficam em aba separada (abaixo de Lançamentos, acima de Distribuição)
+  // Subconjunto de Salários RH (já incluído em `entries`) — usado para totais separados
   const salaryEntries = useMemo(
     () => allEntriesNoDist.filter((e) => e.category === "Salários RH"),
     [allEntriesNoDist],
   );
-  const entries = useMemo(
-    () => allEntriesNoDist.filter((e) => e.category !== "Salários RH"),
-    [allEntriesNoDist],
-  );
+  // Salários RH aparecem na lista principal junto com os demais (Bloco 2.4).
+  const entries = allEntriesNoDist;
 
   // ── Documentos ─────────────────────────────────────────────────────────
   const allDocsByEntry = useMemo(() => {
@@ -425,8 +423,8 @@ export function useApPageDerived(opts: {
       list
         .filter((e) => !isTransfer(e) && inPeriod(e))
         .reduce((s, e) => s + Number(e.amount ?? 0), 0);
-    return sum(entries) + sum(salaryEntries) + sum(distributionEntries);
-  }, [entries, salaryEntries, distributionEntries, dateFrom, dateTo, specificDates]);
+    return sum(entries) + sum(distributionEntries);
+  }, [entries, distributionEntries, dateFrom, dateTo, specificDates]);
 
   const distributionTotal = useMemo(
     () => distributionEntries.reduce((s, e) => s + Number(e.amount ?? 0), 0),

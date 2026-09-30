@@ -85,7 +85,7 @@ export function ApEntryRow({
 
   return (
     <TableRow
-      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""}`}
+      className={`${paymentRowClass} ${!paymentRowClass && overdue ? "bg-destructive/5" : ""} ${archived ? "opacity-60" : ""} ${entry.category === "Salários RH" ? "bg-pink-50 dark:bg-pink-950/30 border-l-2 border-l-pink-400" : ""}`}
     >
       {selectable && (
         <TableCell className="w-8 px-2 py-1.5">
@@ -179,8 +179,8 @@ export function ApEntryRow({
       <TableCell className="text-right font-mono text-xs px-2 py-1.5">
         <div className="flex items-center justify-end gap-1">
           <span>{fmtBRL(Number(entry.amount))}</span>
-          {canManage && !archived && (Number(entry.amount) === 0.01 || entry.is_manual) && (
-            <EditAmountButton entry={entry} allowAny={!!entry.is_manual} />
+          {canManage && !archived && !entry.is_manual && Number(entry.amount) === 0.01 && (
+            <EditAmountButton entry={entry} />
           )}
         </div>
       </TableCell>
