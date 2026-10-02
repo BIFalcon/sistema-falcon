@@ -150,6 +150,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         allowedRoles: ["processos","fernando","controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"] as AppRole[],
         children: [
           { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
+          { title: "Custo e Folha", url: "/rh/custo-folha", icon: Wallet },
           { title: "Organograma", url: "/rh/organograma", icon: Network },
           { title: "Treinamentos", url: "/rh/treinamentos", icon: GraduationCap },
           { title: "Políticas", url: "/rh/politicas", icon: FileText },
