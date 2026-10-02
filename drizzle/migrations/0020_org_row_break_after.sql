@@ -1,0 +1,1 @@
+ALTER TABLE public.rh_org_nodes ADD COLUMN IF NOT EXISTS row_break_after boolean NOT NULL DEFAULT false;

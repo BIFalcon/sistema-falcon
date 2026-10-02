@@ -2895,6 +2895,7 @@ export type Database = {
           phone: string | null
           photo_url: string | null
           position: string | null
+          row_break_after: boolean
           sort_order: number
           updated_at: string
         }
@@ -2911,6 +2912,7 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           position?: string | null
+          row_break_after?: boolean
           sort_order?: number
           updated_at?: string
         }
@@ -2927,6 +2929,7 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           position?: string | null
+          row_break_after?: boolean
           sort_order?: number
           updated_at?: string
         }
