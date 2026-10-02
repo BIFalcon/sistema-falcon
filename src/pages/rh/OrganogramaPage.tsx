@@ -52,6 +52,16 @@ function useResponsibilities(nodeId: string | null) {
   });
 }
 
+const GROUP_ORDER = ["standard", "gerente_comercial", "matriz", "account_executive"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  standard: "Gerentes Gerais",
+  gerente_comercial: "Gerentes Comerciais",
+  matriz: "Matriz",
+  account_executive: "Executivos de Contas",
+};
+const normType = (t?: string | null) =>
+  (GROUP_ORDER as readonly string[]).includes(t ?? "") ? (t as string) : "standard";
+
 function OrgNode({
   node,
   canEdit,
@@ -62,26 +72,23 @@ function OrgNode({
   onEdit: (n: NodeWithChildren) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<{ standard: boolean; execs: boolean }>({
-    standard: true,
-    execs: false,
-  });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const hasChildren = node.children.length > 0;
   const isVacant = node.is_open_position;
   const isAccountExecutive = node.node_type === "account_executive";
   const photoUrl = useSignedPrivateUrl(node.photo_url, "rh-photos");
 
-  const standardChildren = node.children.filter((c) => c.node_type !== "account_executive");
-  const execChildren = node.children.filter((c) => c.node_type === "account_executive");
-  const hasBothGroups = standardChildren.length > 0 && execChildren.length > 0;
+  const groups = GROUP_ORDER.map((type) => ({
+    type,
+    items: node.children.filter((c) => normType(c.node_type) === type),
+  })).filter((g) => g.items.length > 0);
+  const hasMultipleGroups = groups.length > 1;
 
   const renderChildrenRow = (list: NodeWithChildren[]) => (
-    <div className={list.length > 4 ? "grid grid-cols-3 gap-4 justify-items-center" : "flex flex-row items-start gap-4"}>
+    <div className="flex flex-row flex-nowrap items-start gap-4">
       {list.map((child) => (
-        <div key={child.id} className="flex flex-col items-center">
-          {list.length > 1 && list.length <= 4 && (
-            <div className="h-4 border-l border-border" />
-          )}
+        <div key={child.id} className="flex flex-col items-center shrink-0">
+          {list.length > 1 && <div className="h-4 border-l border-border" />}
           <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
         </div>
       ))}
@@ -146,40 +153,31 @@ function OrgNode({
       {expanded && hasChildren && (
         <div className="flex flex-col items-center mt-5">
           <div className="h-5 border-l border-border" />
-          {hasBothGroups ? (
+          {hasMultipleGroups ? (
             <div className="flex flex-col items-center gap-4">
-              {/* Grupo Padrão / GGs — nível hierárquico principal */}
-              <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() => setExpandedGroups((s) => ({ ...s, standard: !s.standard }))}
-                  className="text-[11px] font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-3 py-1 hover:bg-primary/20 transition-colors"
-                >
-                  {expandedGroups.standard ? "▾" : "▸"} Gerentes Gerais ({standardChildren.length})
-                </button>
-                {expandedGroups.standard && (
-                  <div className="flex flex-col items-center mt-3">
-                    <div className="h-3 border-l border-border" />
-                    {renderChildrenRow(standardChildren)}
+              {groups.map((g) => {
+                const isExec = g.type === "account_executive";
+                const open = expandedGroups[g.type] ?? !isExec;
+                return (
+                  <div key={g.type} className="flex flex-col items-center">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedGroups((s) => ({ ...s, [g.type]: !open }))}
+                      className={isExec
+                        ? "text-[11px] font-semibold uppercase tracking-wider text-orange-600 bg-orange-50 dark:bg-orange-950/30 border border-dashed border-orange-300 rounded-full px-3 py-1 hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+                        : "text-[11px] font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-3 py-1 hover:bg-primary/20 transition-colors"}
+                    >
+                      {open ? "▾" : "▸"} {GROUP_LABELS[g.type] ?? g.type} ({g.items.length})
+                    </button>
+                    {open && (
+                      <div className="flex flex-col items-center mt-3">
+                        <div className={`h-3 border-l ${isExec ? "border-dashed border-orange-300" : "border-border"}`} />
+                        {renderChildrenRow(g.items)}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {/* Grupo Execs. de Conta — nível de assessoria/staff */}
-              <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() => setExpandedGroups((s) => ({ ...s, execs: !s.execs }))}
-                  className="text-[11px] font-semibold uppercase tracking-wider text-orange-600 bg-orange-50 dark:bg-orange-950/30 border border-dashed border-orange-300 rounded-full px-3 py-1 hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
-                >
-                  {expandedGroups.execs ? "▾" : "▸"} Executivos de Conta ({execChildren.length})
-                </button>
-                {expandedGroups.execs && (
-                  <div className="flex flex-col items-center mt-3">
-                    <div className="h-3 border-l border-dashed border-orange-300" />
-                    {renderChildrenRow(execChildren)}
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </div>
           ) : (
             renderChildrenRow(node.children)

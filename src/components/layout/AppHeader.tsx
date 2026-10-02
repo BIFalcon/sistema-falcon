@@ -57,7 +57,8 @@ export function AppHeader() {
   const isHoteisConfig = pathname.startsWith("/configuracoes/hoteis");
   const isNotificacoesConfig = pathname.startsWith("/configuracoes/notificacoes") || pathname.startsWith("/configuracoes/emails");
   const isConferenciaNf = pathname.startsWith("/controladoria/conferencia-notas-fiscais");
-  const hideAllFilters = isHomePage || isMarketing || isHoteisConfig || isNotificacoesConfig || isConferenciaNf;
+  const isOrganograma = pathname.startsWith("/rh/organograma");
+  const hideAllFilters = isHomePage || isMarketing || isHoteisConfig || isNotificacoesConfig || isConferenciaNf || isOrganograma;
   // Usuários: só hotel. Conciliação (em Contas a Receber): período fica dentro da tela.
   const isUsuarios = pathname.startsWith("/configuracoes/usuarios");
   const isConciliacaoAr =
