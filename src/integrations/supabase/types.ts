@@ -3538,6 +3538,10 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_payroll_hotel: {
+        Args: { _hotel_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_view_rh_directory: { Args: { _user_id: string }; Returns: boolean }
       conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       conc_auto_reconcile_impl: {

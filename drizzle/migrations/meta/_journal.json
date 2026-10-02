@@ -134,6 +134,13 @@
       "when": 1790942602345,
       "tag": "0018_rh_payroll_panel",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790943921973,
+      "tag": "0019_payroll_hotel_access",
+      "breakpoints": true
     }
   ]
 }
