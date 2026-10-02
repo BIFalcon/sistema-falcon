@@ -2972,6 +2972,129 @@ export type Database = {
           },
         ]
       }
+      rh_payroll_entries: {
+        Row: {
+          admission_date: string | null
+          base_salary: number | null
+          bond: string | null
+          cnpj: string | null
+          company: string | null
+          created_at: string
+          department: string | null
+          employee_name: string
+          fgts: number | null
+          hotel_id: string
+          id: string
+          inss_patronal: number | null
+          match_key: string
+          position: string | null
+          reference_month: number
+          reference_year: number
+          salary_base: number | null
+          termination_date: string | null
+          total_cost: number
+          upload_id: string
+        }
+        Insert: {
+          admission_date?: string | null
+          base_salary?: number | null
+          bond?: string | null
+          cnpj?: string | null
+          company?: string | null
+          created_at?: string
+          department?: string | null
+          employee_name: string
+          fgts?: number | null
+          hotel_id: string
+          id?: string
+          inss_patronal?: number | null
+          match_key: string
+          position?: string | null
+          reference_month: number
+          reference_year: number
+          salary_base?: number | null
+          termination_date?: string | null
+          total_cost?: number
+          upload_id: string
+        }
+        Update: {
+          admission_date?: string | null
+          base_salary?: number | null
+          bond?: string | null
+          cnpj?: string | null
+          company?: string | null
+          created_at?: string
+          department?: string | null
+          employee_name?: string
+          fgts?: number | null
+          hotel_id?: string
+          id?: string
+          inss_patronal?: number | null
+          match_key?: string
+          position?: string | null
+          reference_month?: number
+          reference_year?: number
+          salary_base?: number | null
+          termination_date?: string | null
+          total_cost?: number
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rh_payroll_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rh_payroll_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "rh_payroll_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rh_payroll_uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          has_termination_column: boolean
+          hotels_imported: string[]
+          id: string
+          reference_month: number
+          reference_year: number
+          rows_imported: number
+          sheets_ignored: string[]
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          has_termination_column?: boolean
+          hotels_imported?: string[]
+          id?: string
+          reference_month: number
+          reference_year: number
+          rows_imported?: number
+          sheets_ignored?: string[]
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          has_termination_column?: boolean
+          hotels_imported?: string[]
+          id?: string
+          reference_month?: number
+          reference_year?: number
+          rows_imported?: number
+          sheets_ignored?: string[]
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       rh_policies: {
         Row: {
           category: string | null
@@ -3098,6 +3221,42 @@ export type Database = {
           reference_year?: number | null
           uploaded_at?: string
           uploaded_by?: string
+        }
+        Relationships: []
+      }
+      sensitive_export_log: {
+        Row: {
+          created_at: string
+          details: Json
+          export_format: string
+          hotel_id: string | null
+          id: string
+          module: string
+          reference_month: number | null
+          reference_year: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          export_format: string
+          hotel_id?: string | null
+          id?: string
+          module: string
+          reference_month?: number | null
+          reference_year?: number | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          export_format?: string
+          hotel_id?: string | null
+          id?: string
+          module?: string
+          reference_month?: number | null
+          reference_year?: number | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -3526,6 +3685,18 @@ export type Database = {
           updated_at: string
           upload_id: string
         }[]
+      }
+      get_rh_payroll_history: {
+        Args: { _hotel_id: string; _year: number }
+        Returns: {
+          headcount: number
+          reference_month: number
+          total_cost: number
+        }[]
+      }
+      get_rh_payroll_summary: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: Json
       }
       get_year_latest_dre_lines: {
         Args: { _hotel_id: string; _year: number }

@@ -127,6 +127,13 @@
       "when": 1790251072547,
       "tag": "0017_conc_perf_and_a_faturar",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790942602345,
+      "tag": "0018_rh_payroll_panel",
+      "breakpoints": true
     }
   ]
 }
