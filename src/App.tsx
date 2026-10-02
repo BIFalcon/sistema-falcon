@@ -166,7 +166,7 @@ const App = () => (
               <Route path="/financeiro/contas-receber/conciliacao" element={<Navigate to="/financeiro/contas-receber" replace />} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
               <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
-              <Route path="/rh/custo-folha" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><CustoFolhaPage /></RoleGuard>} />
+              <Route path="/rh/custo-folha" element={<RoleGuard roles={["rh","gop","gg","viewer"]}><CustoFolhaPage /></RoleGuard>} />
               <Route path="/perfil-hotel/contexto" element={<RoleGuard roles={["gg","gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelPage /></RoleGuard>} />
               <Route path="/perfil-hotel/contexto/consolidado" element={<RoleGuard roles={["gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelExportPage /></RoleGuard>} />
               <Route path="/rh/calendario" element={<Navigate to="/marketing/calendario" replace />} />
