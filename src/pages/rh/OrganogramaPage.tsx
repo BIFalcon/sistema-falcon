@@ -52,6 +52,16 @@ function useResponsibilities(nodeId: string | null) {
   });
 }
 
+const GROUP_ORDER = ["standard", "gerente_comercial", "matriz", "account_executive"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  standard: "Gerentes Gerais",
+  gerente_comercial: "Gerentes Comerciais",
+  matriz: "Matriz",
+  account_executive: "Executivos de Contas",
+};
+const normType = (t?: string | null) =>
+  (GROUP_ORDER as readonly string[]).includes(t ?? "") ? (t as string) : "standard";
+
 function OrgNode({
   node,
   canEdit,
