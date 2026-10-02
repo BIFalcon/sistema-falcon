@@ -84,16 +84,27 @@ function OrgNode({
   })).filter((g) => g.items.length > 0);
   const hasMultipleGroups = groups.length > 1;
 
-  const renderChildrenRow = (list: NodeWithChildren[]) => (
-    <div className="flex flex-row flex-nowrap items-start gap-4">
-      {list.map((child) => (
-        <div key={child.id} className="flex flex-col items-center shrink-0">
-          {list.length > 1 && <div className="h-4 border-l border-border" />}
-          <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
-        </div>
-      ))}
-    </div>
-  );
+  const renderChildrenRow = (list: NodeWithChildren[]) => {
+    const rows: NodeWithChildren[][] = [[]];
+    list.forEach((child, i) => {
+      rows[rows.length - 1].push(child);
+      if ((child as any).row_break_after && i < list.length - 1) rows.push([]);
+    });
+    return (
+      <div className="flex flex-col items-center gap-4">
+        {rows.map((row, ri) => (
+          <div key={ri} className="flex flex-row flex-nowrap items-start gap-4">
+            {row.map((child) => (
+              <div key={child.id} className="flex flex-col items-center shrink-0">
+                {list.length > 1 && <div className="h-4 border-l border-border" />}
+                <OrgNode node={child} canEdit={canEdit} onEdit={onEdit} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col items-center">
@@ -204,6 +215,7 @@ export default function OrganogramaPage() {
     phone: "",
     node_type: "standard",
     parent_id: "" as string,
+    row_break_after: false,
   });
   const [addingNode, setAddingNode] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -254,6 +266,7 @@ export default function OrganogramaPage() {
       phone: n.phone ?? "",
       node_type: n.node_type ?? "standard",
       parent_id: n.parent_id ?? "",
+      row_break_after: !!(n as any).row_break_after,
     });
   };
 
@@ -281,6 +294,7 @@ export default function OrganogramaPage() {
         phone: form.phone || null,
         node_type: form.node_type || "standard",
         parent_id: form.parent_id || null,
+        row_break_after: form.row_break_after,
       }).eq("id", editing.id);
       if (error) throw error;
 
@@ -387,6 +401,14 @@ export default function OrganogramaPage() {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.row_break_after}
+                onChange={(e) => setForm({ ...form, row_break_after: e.target.checked })}
+              />
+              Quebrar linha depois deste cartão
+            </label>
             <div>
               <Label>Superior (Gerente)</Label>
               <Select
