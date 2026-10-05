@@ -201,11 +201,6 @@ export default function ContasPagarPage() {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Trocar de hotel = nova sessão: limpar seleções para evitar aplicar ações
-  // (ex.: agendar com juros) em lançamentos de hotéis diferentes.
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [hotelId]);
   const [reimportConfirmOpen, setReimportConfirmOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
@@ -262,6 +257,23 @@ export default function ContasPagarPage() {
 
   // Toggle "Removidos do OMIE" — lançamentos arquivados que não foram pagos
   const [showOmieRemoved, setShowOmieRemoved] = useState(false);
+
+  // Trocar de hotel = nova sessão: limpar seleções e filtros internos da página
+  // (o período do topo — dateFrom/dateTo/specificDates — é compartilhado e fica como está).
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setPeriod("all");
+    setSelectedStatuses([]);
+    setSelectedCategories([]);
+    setSearchText("");
+    setScheduledFrom("");
+    setScheduledTo("");
+    setShowPaid(false);
+    setPaidDateFrom("");
+    setPaidDateTo("");
+    setShowOmieRemoved(false);
+    setHideTrivial(true);
+  }, [hotelId]);
   const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
     hotelId,
     showOmieRemoved,

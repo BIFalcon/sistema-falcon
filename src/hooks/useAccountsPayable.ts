@@ -1115,6 +1115,31 @@ export function useUpdateManualEntry() {
   return useUpdateManualEntryImpl();
 }
 
+/** Exclui um lançamento MANUAL. Nunca apaga lançamentos importados (OMIE/TOTVS). */
+export function useDeleteManualEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entryId: string; hotelId: string }) => {
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .delete()
+        .eq("id", input.entryId)
+        .eq("is_manual", true)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Lançamento não excluído (apenas lançamentos manuais podem ser excluídos).");
+      }
+    },
+    onSuccess: (_n, v) => {
+      qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-paid", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-paid-all"] });
+    },
+  });
+}
+
 function detectIsDistribution(category?: string | null, description?: string | null): boolean {
   const toAscii = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
