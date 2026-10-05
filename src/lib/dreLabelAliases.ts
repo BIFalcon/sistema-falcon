@@ -15,6 +15,8 @@
  *   - variações singular/plural quando o significado é o mesmo
  */
 export const DRE_LABEL_ALIASES: string[][] = [
+  // — Custo de café da manhã (6 nomes na base histórica; "(+)/(-) Café da Manhã" são receita/dedução e ficam fora) —
+  ["(-) Custo com Café da manhã", "Custo com Café da Manhã", "Custos de café da manhã"],
   // — Indicadores topo —
   ["Número de Hóspedes", "Números de Hóspedes"],
   ["Apartamentos Ocupados", "Roomnights", "Room Nights", "Número de Apartamentos Ocupados"],
