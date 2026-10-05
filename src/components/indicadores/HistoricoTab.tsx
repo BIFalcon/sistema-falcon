@@ -75,6 +75,9 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
   const periods: Period[] = monthly
     ? allYm.map(([y, m]) => ({ key: `${y}-${m}`, label: `${MONTHS_SHORT[m - 1]}/${String(y).slice(2)}`, ym: [[y, m]] }))
     : years.map((y) => ({ key: String(y), label: String(y), ym: allYm.filter(([yy, m]) => yy === y && monthsSet.has(m)) }));
+  // Mês só conta se a DRE trouxe receita nele (meses futuros zerados não entram).
+  const revCls = REVENUE_LABELS.map(cleanLabel);
+  for (const p of periods) p.ym = p.ym.filter(([y, m]) => { const row = store.get(`${y}-${m}`); return !!row && revCls.some((c) => (row.get(c) ?? 0) !== 0); });
 
   const sum = (p: Period, labels: string[], abs = false): number | null => {
     const cls = labels.map(cleanLabel);
@@ -88,6 +91,26 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
       }
     }
     return any ? total : null;
+  };
+  /** Soma todas as linhas da lista (modelo antigo quebra encargos/benefícios em várias linhas). */
+  const sumAll = (p: Period, labels: string[]): number | null => {
+    let t = 0, any = false;
+    for (const l of labels) { const v = sum(p, [l], true); if (v != null) { t += v; any = true; } }
+    return any ? t : null;
+  };
+  /** UHs disponíveis; no modelo antigo (sem a linha) deriva de Roomnights ÷ Taxa de Ocupação, mês a mês. */
+  const avail = (p: Period): number | null => {
+    const direct = sum(p, AVAILABLE_LABELS);
+    if (direct != null) return direct;
+    let t = 0, any = false;
+    for (const ym of p.ym) {
+      const one: Period = { key: "", label: "", ym: [ym] };
+      const r = sum(one, OCCUPIED_LABELS); let o = sum(one, ["Taxa de Ocupação"]);
+      if (r == null || o == null || o === 0) continue;
+      if (o > 1) o = o / 100;
+      t += r / o; any = true;
+    }
+    return any ? t : null;
   };
   const groupSum = (p: Period, g: string): number | null => {
     let t = 0, any = false;
@@ -105,6 +128,8 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
   const lodging = (p: Period) => sum(p, LODGING_LABELS);
   const guests = (p: Period) => sum(p, GUESTS_LABELS);
   const abCost = (p: Period) => {
+    const total = sum(p, ["Despesas de Alimentos e Bebidas (A&B)"], true);
+    if (total != null) return total;
     const a = sum(p, CMV_LABELS, true); const b = sum(p, BREAKFAST_COST_LABELS, true);
     return a == null && b == null ? null : (a ?? 0) + (b ?? 0);
   };
@@ -119,9 +144,9 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
   const blocks: Array<{ title: string; rows: Row[] }> = [
     { title: "Receita e operação", rows: [
       { label: "Roomnights", f: "int", v: rn },
-      { label: "Ocupação", f: "pct", v: (p) => div(rn(p), sum(p, AVAILABLE_LABELS), 100) },
+      { label: "Ocupação", f: "pct", v: (p) => div(rn(p), avail(p), 100) },
       { label: "Diária Média", f: "brl2", v: (p) => div(lodging(p), rn(p)) },
-      { label: "RevPAR", f: "brl2", v: (p) => div(lodging(p), sum(p, AVAILABLE_LABELS)) },
+      { label: "RevPAR", f: "brl2", v: (p) => div(lodging(p), avail(p)) },
       { label: "Receita Bruta Total", f: "brl", v: rev },
       { label: "Receita de Hospedagem", f: "brl", v: lodging },
       { label: "Receita Total por RN", f: "brl2", v: (p) => div(rev(p), rn(p)) },
@@ -138,9 +163,9 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
     ] },
     { title: "Folha", rows: [
       { label: "Folha total", f: "brl", v: labor, cost: true },
-      { label: "Salários", f: "brl", v: (p) => sum(p, ["Salários"], true), cost: true },
-      { label: "Encargos", f: "brl", v: (p) => sum(p, ["Encargos"], true), cost: true },
-      { label: "Benefícios", f: "brl", v: (p) => sum(p, ["Benefícios"], true), cost: true },
+      { label: "Salários", f: "brl", v: (p) => sum(p, ["Salários", "Salários e Ordenados"], true), cost: true },
+      { label: "Encargos", f: "brl", v: (p) => sum(p, ["Encargos"], true) ?? sumAll(p, ["FGTS", "INSS", "Provisão 13º e Encargos"]), cost: true },
+      { label: "Benefícios", f: "brl", v: (p) => sum(p, ["Benefícios"], true) ?? sumAll(p, ["Assistência Médica Social", "Vale Transporte", "Despesas com Alimenteção", "Despesas com Alimentação"]), cost: true },
       { label: "Folha % da receita total", f: "pct", v: (p) => div(labor(p), rev(p), 100), cost: true },
       { label: "Folha por RN", f: "brl2", v: (p) => div(labor(p), rn(p)), cost: true },
     ] },

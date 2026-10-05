@@ -23,12 +23,12 @@ export const AVAILABLE_LABELS = [
 ];
 export const GOP_LABELS = ["Resultado Operacional Bruto (GOP)", "Lucro Operacional Bruto (GOP)", "GOP", "Resultado Operacional Bruto"];
 export const GUESTS_LABELS = ["Número de Hóspedes", "Número de hóspedes", "Números de Hóspedes"];
-export const AB_REVENUE_LABELS = ["Receita Bruta A&B", "Receita de A&B", "Receita A&B"];
+export const AB_REVENUE_LABELS = ["Receita Bruta A&B", "Receitas de Alimentos e Bebidas (A&B)", "Receita de A&B", "Receita A&B"];
 export const LABOR_LABELS = ["Despesas com Pessoal"];
-export const CMV_LABELS = ["(-) Custo das Mercadorias Vendidas", "(-) Custo com Mercadorias Vendidas", "Custo das Mercadorias Vendidas"];
+export const CMV_LABELS = ["(-) Custo das Mercadorias Vendidas", "(-) Custo com Mercadorias Vendidas", "Custo das Mercadorias Vendidas", "Custos de restaurante"];
 /** 6 nomes do café da manhã na base; os de custo ficam aqui. */
 export const BREAKFAST_COST_LABELS = ["(-) Custo com Café da manhã", "Custo com Café da Manhã", "Custos de café da manhã"];
-export const LODGING_COST_LABELS = ["Custos de Hospedagem"];
+export const LODGING_COST_LABELS = ["Custos de Hospedagem", "Despesas de Hospedagem"];
 export const FIXED_COST_LABELS = ["DESPESAS FIXAS TOTAIS"];
 export const VARIABLE_COST_LABELS = ["DESPESAS VARIÁVEIS TOTAL"];
 
