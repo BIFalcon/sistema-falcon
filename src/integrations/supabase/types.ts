@@ -1035,6 +1035,7 @@ export type Database = {
           financeiro_started_at: string | null
           hotel_id: string
           id: string
+          is_historical: boolean
           month: number
           status_carta: Database["public"]["Enums"]["closing_status"]
           status_dre: Database["public"]["Enums"]["closing_status"]
@@ -1063,6 +1064,7 @@ export type Database = {
           financeiro_started_at?: string | null
           hotel_id: string
           id?: string
+          is_historical?: boolean
           month: number
           status_carta?: Database["public"]["Enums"]["closing_status"]
           status_dre?: Database["public"]["Enums"]["closing_status"]
@@ -1091,6 +1093,7 @@ export type Database = {
           financeiro_started_at?: string | null
           hotel_id?: string
           id?: string
+          is_historical?: boolean
           month?: number
           status_carta?: Database["public"]["Enums"]["closing_status"]
           status_dre?: Database["public"]["Enums"]["closing_status"]
@@ -1837,6 +1840,50 @@ export type Database = {
             columns: ["dre_version_id"]
             isOneToOne: false
             referencedRelation: "dre_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dre_entity_history: {
+        Row: {
+          created_at: string
+          entity: string
+          hotel_id: string
+          id: string
+          line_label: string
+          line_value: number | null
+          month: number
+          panel_group: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          entity: string
+          hotel_id: string
+          id?: string
+          line_label: string
+          line_value?: number | null
+          month: number
+          panel_group?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          entity?: string
+          hotel_id?: string
+          id?: string
+          line_label?: string
+          line_value?: number | null
+          month?: number
+          panel_group?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_entity_history_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
         ]
@@ -3621,6 +3668,7 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_dre_history: { Args: { _hotel_id: string }; Returns: Json }
       get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
       get_hotel_financial: {
         Args: { _hotel_id: string }

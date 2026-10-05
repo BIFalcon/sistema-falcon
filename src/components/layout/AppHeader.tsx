@@ -248,7 +248,7 @@ export function AppHeader() {
           </Select>
         )}
 
-        {hidePeriod ? null : isFinanceiro ? (
+        {hidePeriod || isIndicadores ? null : isFinanceiro ? (
           <DateFilterPicker
             dateFrom={dateFrom}
             dateTo={dateTo}

@@ -21,6 +21,11 @@ import { fmtBRL } from "@/lib/formatters";
 import { uploadRetroactiveDre } from "@/lib/retroactiveDreUpload";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PeriodBar, describeMonths } from "@/components/indicadores/PeriodBar";
+import { ComparativoTab } from "@/components/indicadores/ComparativoTab";
+import { HistoricoTab } from "@/components/indicadores/HistoricoTab";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
@@ -68,7 +73,7 @@ const RATIO_SPECS: Array<{ rx: RegExp; num: string[]; den: string[]; scale: numb
   { rx: /taxa\s*de\s*ocupa/i, num: OCCUPIED_LABELS, den: AVAILABLE_LABELS, scale: 100 },
   { rx: /revpar/i, num: LODGING_LABELS, den: AVAILABLE_LABELS, scale: 1 },
   { rx: /di[áa]ria\s*m[ée]dia|\badr\b/i, num: LODGING_LABELS, den: OCCUPIED_LABELS, scale: 1 },
-  { rx: /%\s*gop|margem\s*gop/i, num: GOP_LABELS, den: REVENUE_LABELS, scale: 100 },
+  { rx: /%\s*gop|margem\s*gop|margem\s*bruta/i, num: GOP_LABELS, den: REVENUE_LABELS, scale: 100 },
   { rx: /margem\s*l[íi]quida/i, num: NET_PROFIT_LABELS, den: REVENUE_LABELS, scale: 100 },
 ];
 
@@ -149,14 +154,6 @@ function getAggType(label: string): AggType {
   return "sum"; // default: receitas, despesas, GOP, etc.
 }
 
-type PeriodKey = "1" | "2" | "3" | "6" | "12";
-const PERIOD_OPTIONS: { value: PeriodKey; label: string; months: number }[] = [
-  { value: "1", label: "Mensal", months: 1 },
-  { value: "2", label: "Bimestral", months: 2 },
-  { value: "3", label: "Trimestral", months: 3 },
-  { value: "6", label: "Semestral", months: 6 },
-  { value: "12", label: "Anual", months: 12 },
-];
 
 const chartConfig = {
   current:  { label: "Realizado",    color: "#1D4ED8" },
@@ -501,7 +498,14 @@ function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedId
 
 export default function IndicadoresDrePage() {
   const { allowedHotels, isMaster, user } = useAuth();
-  const { hotelId, hotelIds: selectedHotelIds, month, year, setHotelId } = useModuleFilters("indicadores");
+  const { hotelId, hotelIds: selectedHotelIds, month: filterMonth, year: filterYear } = useModuleFilters("indicadores");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = ["resumo", "comparativo", "historico"].includes(searchParams.get("aba") ?? "") ? searchParams.get("aba")! : "resumo";
+  const setTab = (v: string) => { const n = new URLSearchParams(searchParams); n.set("aba", v); setSearchParams(n, { replace: true }); };
+  const [year, setYear] = useState<number>(filterYear);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([filterMonth >= 1 && filterMonth <= 12 ? filterMonth : new Date().getMonth() + 1]);
+  const month = Math.max(...selectedMonths);
+  const yearOptions = useMemo(() => { const now = new Date().getFullYear(); return Array.from({ length: now - 2019 }, (_, i) => now - i); }, []);
   const queryClient = useQueryClient();
   const hotelOptions = allowedHotels;
   const [retroOpen, setRetroOpen] = useState(false);
@@ -516,9 +520,6 @@ export default function IndicadoresDrePage() {
   const [visible, setVisible] = useState<Record<DreSeriesKey, boolean>>({ current: true, budget: true, previous: true });
   
   const [divider, setDivider] = useState("none");
-  const [period, setPeriod] = useState<PeriodKey>("1");
-  // Seleção múltipla de meses — quando preenchida, substitui a janela do período
-  const [customMonths, setCustomMonths] = useState<number[]>([]);
   const showAsPct = divider === "revenue" || divider === "lodging" || divider === "netprofit";
   const hasDivider = divider !== "none";
   const hotelIds = useMemo(() => {
@@ -527,12 +528,11 @@ export default function IndicadoresDrePage() {
     return [];
   }, [hotelOptions, hotelId, selectedHotelIds]);
   const noHotelSelected = hotelIds.length === 0;
-  const periodCfg = PERIOD_OPTIONS.find((p) => p.value === period) ?? PERIOD_OPTIONS[0];
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
     year,
     month,
-    periodMonths: periodCfg.months,
+    periodMonths: month,
   });
 
   const selectedNodes = useMemo(() => {
@@ -589,35 +589,11 @@ export default function IndicadoresDrePage() {
   }, [hotelKey]);
 
   const buildChartData = (lines: DreLineNode[]) => {
-    const pMonths = periodCfg.months;
     type ChartPoint = { label: string; months: number[] };
-    let points: ChartPoint[];
-    if (pMonths === 1) {
-      points = MONTHS_SHORT.map((m, i) => ({ label: m, months: [i + 1] }));
-    } else if (pMonths === 2) {
-      points = [
-        { label: "B1", months: [1, 2] },
-        { label: "B2", months: [3, 4] },
-        { label: "B3", months: [5, 6] },
-        { label: "B4", months: [7, 8] },
-        { label: "B5", months: [9, 10] },
-        { label: "B6", months: [11, 12] },
-      ];
-    } else if (pMonths === 3) {
-      points = [
-        { label: "T1", months: [1, 2, 3] },
-        { label: "T2", months: [4, 5, 6] },
-        { label: "T3", months: [7, 8, 9] },
-        { label: "T4", months: [10, 11, 12] },
-      ];
-    } else if (pMonths === 6) {
-      points = [
-        { label: "S1", months: [1, 2, 3, 4, 5, 6] },
-        { label: "S2", months: [7, 8, 9, 10, 11, 12] },
-      ];
-    } else {
-      points = [{ label: String(year), months: Array.from({ length: 12 }, (_, i) => i + 1) }];
-    }
+    // 1 mês marcado: mostra o ano inteiro mês a mês (contexto). Vários: um ponto por mês marcado.
+    const points: ChartPoint[] = selectedMonths.length === 1
+      ? MONTHS_SHORT.map((m, i) => ({ label: m, months: [i + 1] }))
+      : selectedMonths.map((m) => ({ label: MONTHS_SHORT[m - 1], months: [m] }));
 
     function aggPoint(
       series: DreMonthValue[],
@@ -738,24 +714,8 @@ export default function IndicadoresDrePage() {
       return next;
     });
 
-  const monthsWindow = useMemo(
-    () =>
-      customMonths.length > 0
-        ? [...customMonths].sort((a, b) => a - b)
-        : periodMonths(month, periodCfg.months),
-    [month, periodCfg.months, customMonths],
-  );
-  const periodLabel = useMemo(() => {
-    if (customMonths.length > 0) {
-      const sorted = [...customMonths].sort((a, b) => a - b);
-      return `${sorted.map((m) => MONTHS_SHORT[m - 1]).join(" + ")} de ${year}`;
-    }
-    if (monthsWindow.length === 12) return `Acumulado de ${year}`;
-    if (monthsWindow.length === 1) return `${MONTHS_PT[monthsWindow[0] - 1]} de ${year}`;
-    const first = MONTHS_PT[monthsWindow[0] - 1];
-    const last = MONTHS_PT[monthsWindow[monthsWindow.length - 1] - 1];
-    return `${first}–${last} de ${year}`;
-  }, [monthsWindow, year, customMonths]);
+  const monthsWindow = selectedMonths;
+  const periodLabel = describeMonths(selectedMonths, year);
 
   return (
     <div className="space-y-6">
@@ -763,7 +723,7 @@ export default function IndicadoresDrePage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Análise</p>
           <h1 className="text-2xl font-semibold text-foreground">Indicadores DRE</h1>
-          <p className="text-sm text-muted-foreground">{hotelId ? "Hotel selecionado" : `${hotelIds.length} hotéis`} · {month === 0 ? "Acumulado do ano" : MONTHS_PT[month - 1]} de {year}</p>
+          <p className="text-sm text-muted-foreground">{periodLabel}</p>
         </div>
         {isMaster && (
           <Dialog open={retroOpen} onOpenChange={setRetroOpen}>
@@ -883,7 +843,20 @@ export default function IndicadoresDrePage() {
         )}
       </div>
 
-      {noHotelSelected ? (
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="resumo">Resumo</TabsTrigger>
+          <TabsTrigger value="comparativo">Comparativo</TabsTrigger>
+          <TabsTrigger value="historico">Histórico por hotel</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} />
+
+      {tab === "comparativo" ? (
+        <ComparativoTab hotels={allowedHotels} year={year} months={selectedMonths} initial={hotelIds} />
+      ) : tab === "historico" ? (
+        <HistoricoTab hotels={allowedHotels} defaultHotelId={hotelIds[0] ?? null} months={selectedMonths} />
+      ) : noHotelSelected ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
           <BarChart2 className="h-12 w-12 opacity-20" />
           <p className="text-sm">Selecione um hotel no filtro acima para ver os indicadores.</p>
@@ -896,79 +869,6 @@ export default function IndicadoresDrePage() {
         </Card>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Período
-              </span>
-              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
-                <SelectTrigger className="w-[180px] h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIOD_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    {customMonths.length === 0
-                      ? "Meses (múltiplos)"
-                      : `${customMonths.length} mês(es) somados`}
-                    <ChevronDown className="h-4 w-4 ml-1.5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[260px] bg-popover" align="start">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Somar meses
-                    </span>
-                    {customMonths.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => setCustomMonths([])}
-                      >
-                        Limpar
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1">
-                    {MONTHS_PT.map((label, i) => {
-                      const m = i + 1;
-                      const checked = customMonths.includes(m);
-                      return (
-                        <label
-                          key={m}
-                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/70 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={() =>
-                              setCustomMonths((prev) =>
-                                prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
-                              )
-                            }
-                          />
-                          {label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Ao selecionar meses aqui, o período acima é ignorado.
-                  </p>
-                </PopoverContent>
-              </Popover>
-              <span className="text-xs text-muted-foreground">{periodLabel}</span>
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {CARD_LINES.map((card) => {
               const cur = computeCardValue(card, dataset, monthsWindow, "current");
