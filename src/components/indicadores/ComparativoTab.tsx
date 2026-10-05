@@ -9,6 +9,7 @@ type HotelLite = { id: string; name: string; brand?: string | null };
 
 function brandGroup(h: HotelLite): string {
   const s = `${h.brand ?? ""} ${h.name}`.toLowerCase();
+  if (s.includes("3 rios")) return "Outros";
   if (s.includes("styles")) return "ibis Styles";
   if (s.includes("budget")) return "ibis budget";
   if (s.includes("ibis")) return "ibis";
@@ -34,7 +35,11 @@ function HotelColumn({ hotelIds, year, months, title }: { hotelIds: string[]; ye
   );
 }
 
-export function ComparativoTab({ hotels, year, months, initial }: { hotels: HotelLite[]; year: number; months: number[]; initial: string[] }) {
+/** Condomínio Cuiabá é uso do financeiro e não recebe DRE de hotel — fica fora do comparativo. */
+const isExcluded = (h: HotelLite) => h.name.toLowerCase().includes("condom");
+
+export function ComparativoTab({ hotels: allHotels, year, months, initial }: { hotels: HotelLite[]; year: number; months: number[]; initial: string[] }) {
+  const hotels = useMemo(() => allHotels.filter((h) => !isExcluded(h)), [allHotels]);
   const [selected, setSelected] = useState<string[]>(initial.length >= 2 ? initial : []);
   useEffect(() => { if (initial.length >= 2) setSelected(initial); }, [initial.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const groups = useMemo(() => {
