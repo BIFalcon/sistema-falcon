@@ -715,7 +715,7 @@ export default function IndicadoresDrePage() {
     });
 
   const monthsWindow = selectedMonths;
-  const periodLabel = describeMonths(selectedMonths, year);
+  const periodLabel = tab === "historico" ? describeMonths(selectedMonths, year).replace(/ de \d{4}/, "") + " · todos os anos" : describeMonths(selectedMonths, year);
 
   return (
     <div className="space-y-6">
