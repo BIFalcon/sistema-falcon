@@ -3766,6 +3766,10 @@ export type Database = {
           version_number: number
         }[]
       }
+      get_year_latest_dre_lines_json: {
+        Args: { _hotel_id: string; _year: number }
+        Returns: Json
+      }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_global_data_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {

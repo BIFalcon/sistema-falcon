@@ -173,6 +173,8 @@ export function useUploadDre() {
       qc.invalidateQueries({ queryKey: ["closing", vars.closingId] });
       qc.invalidateQueries({ queryKey: ["closings"] });
       qc.invalidateQueries({ queryKey: ["dre-indicators", vars.closingId] });
+      invalidateYearLatestDreLines();
+      qc.invalidateQueries({ queryKey: ["dre-analytics"] });
     },
   });
 }
@@ -236,22 +238,44 @@ async function fetchLatestDreParsedLinesByClosingIds(closingIds: string[]): Prom
  * única de verdade — cada nova DRE traz o acumulado atualizado dos
  * meses anteriores).
  */
+// Cache compartilhado (hotel×ano) entre Resumo, Comparativo e Rede: evita
+// baixar a mesma DRE várias vezes quando a combinação de hotéis muda.
+const yearLinesCache = new Map<string, { at: number; p: Promise<DreParsedLineRecord[]> }>();
+const YEAR_LINES_TTL = 5 * 60 * 1000;
+
+export function invalidateYearLatestDreLines() {
+  yearLinesCache.clear();
+}
+
 async function fetchYearLatestDreLines(
   hotelId: string,
   year: number,
 ): Promise<DreParsedLineRecord[]> {
-  const rows: DreParsedLineRecord[] = [];
-  const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .rpc("get_year_latest_dre_lines", { _hotel_id: hotelId, _year: year })
-      .range(from, from + pageSize - 1);
+  const key = `${hotelId}|${year}`;
+  const hit = yearLinesCache.get(key);
+  if (hit && Date.now() - hit.at < YEAR_LINES_TTL) return hit.p;
+  const p = (async () => {
+    // Uma única chamada compacta (antes: ~6 páginas sequenciais de 1.000 linhas).
+    const { data, error } = await supabase.rpc(
+      "get_year_latest_dre_lines_json" as never,
+      { _hotel_id: hotelId, _year: year } as never,
+    );
     if (error) throw error;
-    const batch = (data ?? []) as DreParsedLineRecord[];
-    rows.push(...batch);
-    if (batch.length < pageSize) break;
-  }
-  return rows;
+    const arr = (data ?? []) as unknown as unknown[][];
+    return arr.map((r) => ({
+      closing_id: r[0],
+      version_number: r[1],
+      line_label: r[2],
+      line_value: r[3] == null ? null : Number(r[3]),
+      line_type: r[4],
+      line_level: r[5],
+      line_category: r[6],
+      line_segment: r[7],
+    })) as unknown as DreParsedLineRecord[];
+  })();
+  yearLinesCache.set(key, { at: Date.now(), p });
+  p.catch(() => yearLinesCache.delete(key));
+  return p;
 }
 
 export function useDreIndicators(closingId: string | null | undefined) {
