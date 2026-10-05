@@ -22,7 +22,7 @@ import { uploadRetroactiveDre } from "@/lib/retroactiveDreUpload";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeriodBar, describeMonths } from "@/components/indicadores/PeriodBar";
 import { ComparativoTab } from "@/components/indicadores/ComparativoTab";
 import { HistoricoTab } from "@/components/indicadores/HistoricoTab";
@@ -73,7 +73,7 @@ const RATIO_SPECS: Array<{ rx: RegExp; num: string[]; den: string[]; scale: numb
   { rx: /taxa\s*de\s*ocupa/i, num: OCCUPIED_LABELS, den: AVAILABLE_LABELS, scale: 100 },
   { rx: /revpar/i, num: LODGING_LABELS, den: AVAILABLE_LABELS, scale: 1 },
   { rx: /di[áa]ria\s*m[ée]dia|\badr\b/i, num: LODGING_LABELS, den: OCCUPIED_LABELS, scale: 1 },
-  { rx: /%\s*gop|margem\s*gop/i, num: GOP_LABELS, den: REVENUE_LABELS, scale: 100 },
+  { rx: /%\s*gop|margem\s*gop|margem\s*bruta/i, num: GOP_LABELS, den: REVENUE_LABELS, scale: 100 },
   { rx: /margem\s*l[íi]quida/i, num: NET_PROFIT_LABELS, den: REVENUE_LABELS, scale: 100 },
 ];
 
@@ -154,14 +154,6 @@ function getAggType(label: string): AggType {
   return "sum"; // default: receitas, despesas, GOP, etc.
 }
 
-type PeriodKey = "1" | "2" | "3" | "6" | "12";
-const PERIOD_OPTIONS: { value: PeriodKey; label: string; months: number }[] = [
-  { value: "1", label: "Mensal", months: 1 },
-  { value: "2", label: "Bimestral", months: 2 },
-  { value: "3", label: "Trimestral", months: 3 },
-  { value: "6", label: "Semestral", months: 6 },
-  { value: "12", label: "Anual", months: 12 },
-];
 
 const chartConfig = {
   current:  { label: "Realizado",    color: "#1D4ED8" },
