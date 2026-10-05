@@ -239,7 +239,7 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
             <Table>
               <TableHeader><TableRow><TableHead>Linha</TableHead>{yrs.map((y) => <TableHead key={y} className="text-right">{y}</TableHead>)}</TableRow></TableHeader>
               <TableBody>
-                {[["Receita Bruta Total", REVENUE_LABELS], ["GOP", GOP_LABELS], ["Lucro Líquido", NET_PROFIT_LABELS]].map(([lbl, labels]) => (
+                {([["Receita de Hospedagem", LODGING_LABELS], ["Receita Bruta Total", REVENUE_LABELS], ["Receita Líquida", ["(=) Receita Líquida", "RECEITA LÍQUIDA TOTAL (RECEITA - DEDUÇÕES)"]], ["GOP", GOP_LABELS], ["Resultado Operacional Líquido", ["Resultado Operacional Líquido"]], ["Lucro Líquido", NET_PROFIT_LABELS]] as [string, string[]][]).filter(([, labels]) => yrs.some((y) => get(y, labels) != null)).map(([lbl, labels]) => (
                   <TableRow key={lbl as string}>
                     <TableCell>{lbl as string}</TableCell>
                     {yrs.map((y) => <TableCell key={y} className="text-right tabular-nums">{fmt(get(y, labels as string[]), "brl")}</TableCell>)}
