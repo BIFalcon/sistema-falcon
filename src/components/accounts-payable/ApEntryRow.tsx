@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, useUpdateManualEntry, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { useUpdateEntryObservation, useUpdateEntryCategory, useUngroupEntries, useUpdateEntryAmount, useUpdateEntryPaidValues, useUpdateManualEntry, useDeleteManualEntry, type ApEntry, type ApPaymentStatus, type FinancialSystem } from "@/hooks/useAccountsPayable";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import type { IssueCategory } from "@/lib/apIssueCategories";
 import {
@@ -707,6 +708,7 @@ export function PaymentStatusBadge({
 function EditManualEntryButton({ entry }: { entry: ApEntry }) {
   const [open, setOpen] = useState(false);
   const update = useUpdateManualEntry();
+  const del = useDeleteManualEntry();
   const [form, setForm] = useState({
     supplier: entry.supplier ?? "",
     cnpj: entry.cnpj ?? "",
@@ -811,7 +813,36 @@ function EditManualEntryButton({ entry }: { entry: ApEntry }) {
               <Textarea rows={2} value={form.observation} onChange={(e) => setForm({ ...form, observation: e.target.value })} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-between">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={del.isPending}>Excluir lançamento</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+                  <AlertDialogDescription>Tem certeza? Esta ação não pode ser desfeita.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={async () => {
+                      try {
+                        await del.mutateAsync({ entryId: entry.id, hotelId: entry.hotel_id });
+                        toast.success("Lançamento excluído");
+                        setOpen(false);
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+                      }
+                    }}
+                  >
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
               disabled={
@@ -847,6 +878,7 @@ function EditManualEntryButton({ entry }: { entry: ApEntry }) {
             >
               Salvar
             </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
