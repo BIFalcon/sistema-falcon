@@ -162,6 +162,13 @@
       "when": 1791203051177,
       "tag": "0022_dre_history_plain_monthly",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791207805902,
+      "tag": "0023_dre_year_latest_bulk",
+      "breakpoints": true
     }
   ]
 }
