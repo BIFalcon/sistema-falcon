@@ -41,6 +41,7 @@ export function useEnvioQueue(params: {
         .eq("month", month)
         .eq("year", year)
         .in("status_carta", ["aprovado", "nao_aplicavel"])
+        .eq("is_historical", false)
         .order("hotel_id");
       if (hotelId) q = q.eq("hotel_id", hotelId);
       const { data, error } = await q;

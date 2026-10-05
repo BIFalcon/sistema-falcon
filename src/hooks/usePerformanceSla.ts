@@ -77,7 +77,8 @@ export function usePerfClosings(month: number, year: number) {
           "id,hotel_id,month,year,status_dre,status_carta,status_financeiro,status_envio,dre_started_at,dre_approved_at,carta_started_at,carta_approved_at,financeiro_started_at,financeiro_resolved_at,envio_sent_at,created_at,updated_at",
         )
         .eq("month", month)
-        .eq("year", year);
+        .eq("year", year)
+        .eq("is_historical", false);
       if (error) throw error;
       return (data ?? []) as PerfClosing[];
     },
