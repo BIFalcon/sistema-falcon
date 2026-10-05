@@ -99,154 +99,7 @@ export function useUploadDre() {
         });
         template = parsed.template;
         parseWarnings = parsed.warnings;
-        // Persist key indicators + raw lines (limita a 200 linhas para não estourar)
-        const indicatorRows = Object.values(parsed.indicators)
-          .filter((i): i is NonNullable<typeof i> => !!i)
-          .map((i) => ({
-            closing_id: closingId,
-            version_number: nextVersion,
-            line_label: `[${i.key}] ${i.label}`,
-            line_type: "indicator",
-            line_value: i.value,
-          }));
-        // Limite alto para garantir que linhas no fim da DRE (ex.: "Por UH",
-        // que aparece após "Lucro / Prejuízo a Distribuir no Período") sejam
-        // persistidas e exibidas na tabela DRE da Carta ao Investidor.
-        const KEY_LINE_RX = [
-          /^por\s+uh$/i,
-          /distribui[çc][ãa]o\s+por\s+uh/i,
-          /distribui[çc][ãa]o\s+\/\s*uh/i,
-          /resultado\s+por\s+uh/i,
-        ];
-        const baseRows = parsed.lines.slice(0, 1000);
-        const baseSet = new Set(baseRows.map((l) => l.row));
-        const extraKeyRows = parsed.lines.filter(
-          (l) => !baseSet.has(l.row) && KEY_LINE_RX.some((rx) => rx.test(l.label)),
-        );
-        const otherRows = [...baseRows, ...extraKeyRows].map((l) => {
-          const cat = getDreLineCategorization(l.label);
-          return {
-            closing_id: closingId,
-            version_number: nextVersion,
-            line_label: l.label,
-            line_type: "line",
-            line_value: l.value,
-            line_level: l.level ?? 3,
-            line_category: cat?.catMacro ?? getDreLineCategory(l.label),
-            line_segment: cat?.segment ?? null,
-          };
-        });
-        // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
-        // comparativos da Carta. Persistidas como indicadores extras com prefixo
-        // [series_<scope>_<key>_<mes>] (mes 1..12).
-        const seriesRows: typeof indicatorRows = [];
-        const pushSeries = (
-          scope: "cur" | "prev" | "budget",
-          map: typeof parsed.currentSeries,
-        ) => {
-          for (const [k, arr] of Object.entries(map ?? {})) {
-            if (!arr) continue;
-            arr.forEach((v, i) => {
-              if (v == null) return;
-              seriesRows.push({
-                closing_id: closingId,
-                version_number: nextVersion,
-                line_label: `[series_${scope}_${k}_${i + 1}]`,
-                line_type: "indicator",
-                line_value: v,
-              });
-            });
-          }
-        };
-        pushSeries("cur", parsed.currentSeries);
-        pushSeries("prev", parsed.previousSeries);
-        pushSeries("budget", parsed.budgetSeries);
-        // Indicadores orçados do mês
-        const budgetIndicatorRows: typeof indicatorRows = [];
-        for (const [k, v] of Object.entries(parsed.budgetIndicators ?? {})) {
-          if (v == null) continue;
-          budgetIndicatorRows.push({
-            closing_id: closingId,
-            version_number: nextVersion,
-            line_label: `[budget_${k}]`,
-            line_type: "indicator",
-            line_value: v,
-          });
-        }
-        // Indicadores do mesmo mês do ano anterior (p/ painel "Indicadores
-        // extraídos" e prompt da IA): persistidos com prefixo [prev_<key>].
-        const prevIndicatorRows: typeof indicatorRows = [];
-        for (const [k, v] of Object.entries(parsed.previousIndicators ?? {})) {
-          if (v == null) continue;
-          prevIndicatorRows.push({
-            closing_id: closingId,
-            version_number: nextVersion,
-            line_label: `[prev_${k}]`,
-            line_type: "indicator",
-            line_value: v,
-          });
-        }
-        // Linhas detalhadas do Orçamento — série anual (Jan-Dez por linha)
-        const budgetLineRows: typeof otherRows = [];
-        for (const bl of parsed.budgetLines ?? []) {
-          const cat = getDreLineCategorization(bl.label);
-          for (const [monthStr, val] of Object.entries(bl.values)) {
-            if (val == null) continue;
-            budgetLineRows.push({
-              closing_id: closingId,
-              version_number: nextVersion,
-              line_label: `[bline_${monthStr}] ${bl.label}`,
-              line_type: "indicator",
-              line_value: val,
-              line_level: bl.level ?? 3,
-              line_category: cat?.catMacro ?? "Outros",
-              line_segment: cat?.segment ?? null,
-            });
-          }
-        }
-        // Linhas detalhadas do ANO ANTERIOR — série anual
-        const prevLineRows2: typeof otherRows = [];
-        for (const pl of parsed.prevLines ?? []) {
-          const cat = getDreLineCategorization(pl.label);
-          for (const [monthStr, val] of Object.entries(pl.values)) {
-            if (val == null) continue;
-            prevLineRows2.push({
-              closing_id: closingId,
-              version_number: nextVersion,
-              line_label: `[pline_${monthStr}] ${pl.label}`,
-              line_type: "indicator",
-              line_value: val,
-              line_level: pl.level ?? 3,
-              line_category: cat?.catMacro ?? "Outros",
-              line_segment: cat?.segment ?? null,
-            });
-          }
-        }
-        // Linhas detalhadas do REALIZADO — série anual (Jan-Dez por linha).
-        // Permite que qualquer mês do ano seja reconstruído a partir da
-        // versão mais recente do ano (que carrega o acumulado atualizado).
-        const currentLineRows: typeof otherRows = [];
-        for (const cl of parsed.currentLines ?? []) {
-          const cat = getDreLineCategorization(cl.label);
-          for (const [monthStr, val] of Object.entries(cl.values)) {
-            if (val == null) continue;
-            currentLineRows.push({
-              closing_id: closingId,
-              version_number: nextVersion,
-              line_label: `[cline_${monthStr}] ${cl.label}`,
-              line_type: "indicator",
-              line_value: val,
-              line_level: cl.level ?? 3,
-              line_category: cat?.catMacro ?? "Outros",
-              line_segment: cat?.segment ?? null,
-            });
-          }
-        }
-        if (indicatorRows.length || otherRows.length || seriesRows.length || prevIndicatorRows.length || budgetIndicatorRows.length || budgetLineRows.length || prevLineRows2.length) {
-          await supabase.from("dre_parsed_lines").insert([
-            ...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2, ...currentLineRows,
-          ]);
-        }
+        await insertDreParsedRows(buildDreParsedRows(parsed, closingId, nextVersion));
 
         // === Estimativa de distribuição ===
         // Buscar até 3 fechamentos aprovados anteriores do mesmo hotel para
@@ -1087,4 +940,160 @@ export function useDreDownloadLog(closingId?: string | null) {
     },
     staleTime: 30 * 1000,
   });
+}
+
+/** Monta todas as linhas de dre_parsed_lines a partir do parse da DRE. */
+export function buildDreParsedRows(parsed: Awaited<ReturnType<typeof parseDreExcel>>, closingId: string, nextVersion: number) {
+        // Persist key indicators + raw lines (limita a 200 linhas para não estourar)
+        const indicatorRows = Object.values(parsed.indicators)
+          .filter((i): i is NonNullable<typeof i> => !!i)
+          .map((i) => ({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[${i.key}] ${i.label}`,
+            line_type: "indicator",
+            line_value: i.value,
+          }));
+        // Limite alto para garantir que linhas no fim da DRE (ex.: "Por UH",
+        // que aparece após "Lucro / Prejuízo a Distribuir no Período") sejam
+        // persistidas e exibidas na tabela DRE da Carta ao Investidor.
+        const KEY_LINE_RX = [
+          /^por\s+uh$/i,
+          /distribui[çc][ãa]o\s+por\s+uh/i,
+          /distribui[çc][ãa]o\s+\/\s*uh/i,
+          /resultado\s+por\s+uh/i,
+        ];
+        const baseRows = parsed.lines.slice(0, 1000);
+        const baseSet = new Set(baseRows.map((l) => l.row));
+        const extraKeyRows = parsed.lines.filter(
+          (l) => !baseSet.has(l.row) && KEY_LINE_RX.some((rx) => rx.test(l.label)),
+        );
+        const otherRows = [...baseRows, ...extraKeyRows].map((l) => {
+          const cat = getDreLineCategorization(l.label);
+          return {
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: l.label,
+            line_type: "line",
+            line_value: l.value,
+            line_level: l.level ?? 3,
+            line_category: cat?.catMacro ?? getDreLineCategory(l.label),
+            line_segment: cat?.segment ?? null,
+          };
+        });
+        // Séries mensais Jan-Dez (current e previous) para alimentar gráficos
+        // comparativos da Carta. Persistidas como indicadores extras com prefixo
+        // [series_<scope>_<key>_<mes>] (mes 1..12).
+        const seriesRows: typeof indicatorRows = [];
+        const pushSeries = (
+          scope: "cur" | "prev" | "budget",
+          map: typeof parsed.currentSeries,
+        ) => {
+          for (const [k, arr] of Object.entries(map ?? {})) {
+            if (!arr) continue;
+            arr.forEach((v, i) => {
+              if (v == null) return;
+              seriesRows.push({
+                closing_id: closingId,
+                version_number: nextVersion,
+                line_label: `[series_${scope}_${k}_${i + 1}]`,
+                line_type: "indicator",
+                line_value: v,
+              });
+            });
+          }
+        };
+        pushSeries("cur", parsed.currentSeries);
+        pushSeries("prev", parsed.previousSeries);
+        pushSeries("budget", parsed.budgetSeries);
+        // Indicadores orçados do mês
+        const budgetIndicatorRows: typeof indicatorRows = [];
+        for (const [k, v] of Object.entries(parsed.budgetIndicators ?? {})) {
+          if (v == null) continue;
+          budgetIndicatorRows.push({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[budget_${k}]`,
+            line_type: "indicator",
+            line_value: v,
+          });
+        }
+        // Indicadores do mesmo mês do ano anterior (p/ painel "Indicadores
+        // extraídos" e prompt da IA): persistidos com prefixo [prev_<key>].
+        const prevIndicatorRows: typeof indicatorRows = [];
+        for (const [k, v] of Object.entries(parsed.previousIndicators ?? {})) {
+          if (v == null) continue;
+          prevIndicatorRows.push({
+            closing_id: closingId,
+            version_number: nextVersion,
+            line_label: `[prev_${k}]`,
+            line_type: "indicator",
+            line_value: v,
+          });
+        }
+        // Linhas detalhadas do Orçamento — série anual (Jan-Dez por linha)
+        const budgetLineRows: typeof otherRows = [];
+        for (const bl of parsed.budgetLines ?? []) {
+          const cat = getDreLineCategorization(bl.label);
+          for (const [monthStr, val] of Object.entries(bl.values)) {
+            if (val == null) continue;
+            budgetLineRows.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[bline_${monthStr}] ${bl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: bl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
+        // Linhas detalhadas do ANO ANTERIOR — série anual
+        const prevLineRows2: typeof otherRows = [];
+        for (const pl of parsed.prevLines ?? []) {
+          const cat = getDreLineCategorization(pl.label);
+          for (const [monthStr, val] of Object.entries(pl.values)) {
+            if (val == null) continue;
+            prevLineRows2.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[pline_${monthStr}] ${pl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: pl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
+        // Linhas detalhadas do REALIZADO — série anual (Jan-Dez por linha).
+        // Permite que qualquer mês do ano seja reconstruído a partir da
+        // versão mais recente do ano (que carrega o acumulado atualizado).
+        const currentLineRows: typeof otherRows = [];
+        for (const cl of parsed.currentLines ?? []) {
+          const cat = getDreLineCategorization(cl.label);
+          for (const [monthStr, val] of Object.entries(cl.values)) {
+            if (val == null) continue;
+            currentLineRows.push({
+              closing_id: closingId,
+              version_number: nextVersion,
+              line_label: `[cline_${monthStr}] ${cl.label}`,
+              line_type: "indicator",
+              line_value: val,
+              line_level: cl.level ?? 3,
+              line_category: cat?.catMacro ?? "Outros",
+              line_segment: cat?.segment ?? null,
+            });
+          }
+        }
+  return [...indicatorRows, ...otherRows, ...seriesRows, ...prevIndicatorRows, ...budgetIndicatorRows, ...budgetLineRows, ...prevLineRows2, ...currentLineRows];
+}
+
+/** Grava em blocos (um insert único de ~5 mil linhas falhava em silêncio) e propaga erro. */
+export async function insertDreParsedRows(rows: ReturnType<typeof buildDreParsedRows>) {
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from("dre_parsed_lines").insert(rows.slice(i, i + 500));
+    if (error) throw new Error(`Falha ao gravar linhas da DRE: ${error.message}`);
+  }
 }
