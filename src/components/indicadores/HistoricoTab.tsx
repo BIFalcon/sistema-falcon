@@ -46,7 +46,8 @@ function fmt(v: number | null, f: Fmt) {
 }
 
 export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: HotelLite[]; defaultHotelId: string | null; months: number[] }) {
-  const [hotelId, setHotelId] = useState<string | null>(defaultHotelId ?? hotels[0]?.id ?? null);
+  // Hotel vem do filtro global do topo (sem seletor duplicado aqui).
+  const hotelId = defaultHotelId ?? hotels[0]?.id ?? null;
   const { data, isLoading } = useHistory(hotelId);
   // Anos ocultos pelo usuário; por padrão todos os anos com dado aparecem.
   const [hiddenYears, setHiddenYears] = useState<number[]>([]);
@@ -194,12 +195,6 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={hotelId ?? ""} onValueChange={setHotelId}>
-          <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="Escolha o hotel" /></SelectTrigger>
-          <SelectContent className="bg-popover">
-            {hotels.map((h) => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
         <span className="text-xs text-muted-foreground">
           {monthly ? "Hotel recente: colunas mês a mês (todos os meses com dado)." : "Colunas ano a ano, somando só os meses marcados acima. Meses sem DRE ficam de fora — nunca contam como zero."}
         </span>

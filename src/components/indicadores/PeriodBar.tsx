@@ -16,8 +16,9 @@ export function describeMonths(months: number[], year: number) {
 
 /** Barra única de período: Ano + meses marcáveis (vale para as três abas). */
 export function PeriodBar({
-  year, setYear, months, setMonths, years,
+  year, setYear, months, setMonths, years, hideYear = false,
 }: {
+  hideYear?: boolean;
   year: number;
   setYear: (y: number) => void;
   months: number[];
@@ -31,12 +32,12 @@ export function PeriodBar({
   };
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
-      <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+      {!hideYear && <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
         <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
         <SelectContent className="bg-popover">
           {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
         </SelectContent>
-      </Select>
+      </Select>}
       <div className="flex flex-wrap gap-1" role="group" aria-label="Meses">
         {MONTHS_SHORT.map((label, i) => {
           const m = i + 1;
@@ -61,7 +62,7 @@ export function PeriodBar({
         <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setMonths(Array.from({ length: 12 }, (_, i) => i + 1))}>Ano todo</Button>
         <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setMonths([months[months.length - 1] ?? 1])}>Só 1 mês</Button>
       </div>
-      <span className="text-xs text-muted-foreground">{describeMonths(months, year)}</span>
+      <span className="text-xs text-muted-foreground">{hideYear ? describeMonths(months, year).replace(/ de \d{4}/, "").replace("Ano todo", "Ano todo") : describeMonths(months, year)}</span>
     </div>
   );
 }

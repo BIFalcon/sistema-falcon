@@ -850,7 +850,7 @@ export default function IndicadoresDrePage() {
           <TabsTrigger value="historico">Histórico por hotel</TabsTrigger>
         </TabsList>
       </Tabs>
-      <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} />
+      <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} hideYear={tab === "historico"} />
 
       {tab === "comparativo" ? (
         <ComparativoTab hotels={allowedHotels} year={year} months={selectedMonths} initial={hotelIds} />
