@@ -715,7 +715,7 @@ export default function IndicadoresDrePage() {
     });
 
   const monthsWindow = selectedMonths;
-  const periodLabel = describeMonths(selectedMonths, year);
+  const periodLabel = tab === "historico" ? describeMonths(selectedMonths, year).replace(/ de \d{4}/, "") + " · todos os anos" : describeMonths(selectedMonths, year);
 
   return (
     <div className="space-y-6">
@@ -850,7 +850,7 @@ export default function IndicadoresDrePage() {
           <TabsTrigger value="historico">Histórico por hotel</TabsTrigger>
         </TabsList>
       </Tabs>
-      <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} />
+      <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} hideYear={tab === "historico"} />
 
       {tab === "comparativo" ? (
         <ComparativoTab hotels={allowedHotels} year={year} months={selectedMonths} initial={hotelIds} />
