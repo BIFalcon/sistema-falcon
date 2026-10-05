@@ -173,6 +173,8 @@ export function useUploadDre() {
       qc.invalidateQueries({ queryKey: ["closing", vars.closingId] });
       qc.invalidateQueries({ queryKey: ["closings"] });
       qc.invalidateQueries({ queryKey: ["dre-indicators", vars.closingId] });
+      invalidateYearLatestDreLines();
+      qc.invalidateQueries({ queryKey: ["dre-analytics"] });
     },
   });
 }
