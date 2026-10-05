@@ -38,6 +38,7 @@ export function useClosings(params: { month: number; year: number; hotelId?: str
         .from("closings")
         .select("*")
         .eq("year", year)
+        .eq("is_historical", false)
         .order("month");
       if (error) throw error;
       return (data ?? []) as ClosingRow[];
