@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +48,8 @@ function fmt(v: number | null, f: Fmt) {
 export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: HotelLite[]; defaultHotelId: string | null; months: number[] }) {
   const [hotelId, setHotelId] = useState<string | null>(defaultHotelId ?? hotels[0]?.id ?? null);
   const { data, isLoading } = useHistory(hotelId);
+  // Anos ocultos pelo usuário; por padrão todos os anos com dado aparecem.
+  const [hiddenYears, setHiddenYears] = useState<number[]>([]);
 
   const { store, years, groupStore } = useMemo(() => {
     const store: Store = new Map();
@@ -74,7 +77,7 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
   const monthsSet = new Set(months);
   const periods: Period[] = monthly
     ? allYm.map(([y, m]) => ({ key: `${y}-${m}`, label: `${MONTHS_SHORT[m - 1]}/${String(y).slice(2)}`, ym: [[y, m]] }))
-    : years.map((y) => ({ key: String(y), label: String(y), ym: allYm.filter(([yy, m]) => yy === y && monthsSet.has(m)) }));
+    : years.filter((y) => !hiddenYears.includes(y)).map((y) => ({ key: String(y), label: String(y), ym: allYm.filter(([yy, m]) => yy === y && monthsSet.has(m)) }));
   // Mês só conta se a DRE trouxe receita nele (meses futuros zerados não entram).
   const revCls = REVENUE_LABELS.map(cleanLabel);
   for (const p of periods) p.ym = p.ym.filter(([y, m]) => { const row = store.get(`${y}-${m}`); return !!row && revCls.some((c) => (row.get(c) ?? 0) !== 0); });
@@ -201,6 +204,23 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
           {monthly ? "Hotel recente: colunas mês a mês (todos os meses com dado)." : "Colunas ano a ano, somando só os meses marcados acima. Meses sem DRE ficam de fora — nunca contam como zero."}
         </span>
       </div>
+      {!monthly && years.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-1">Anos</span>
+          {years.map((y) => {
+            const on = !hiddenYears.includes(y);
+            return (
+              <Button key={y} size="sm" variant={on ? "default" : "outline"} className="h-7 px-2.5 text-xs"
+                onClick={() => setHiddenYears((p) => on ? (years.length - p.length > 1 ? [...p, y] : p) : p.filter((x) => x !== y))}>
+                {y}
+              </Button>
+            );
+          })}
+          {hiddenYears.length > 0 && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setHiddenYears([])}>Todos os anos</Button>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">Carregando histórico…</Card>
