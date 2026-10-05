@@ -159,7 +159,7 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
     { title: "A&B, CMV e hóspedes", rows: [
       { label: "Receita de A&B", f: "brl", v: (p) => sum(p, AB_REVENUE_LABELS) },
       { label: "Custo de A&B (CMV + café)", f: "brl", v: abCost, cost: true },
-      { label: "CMV", f: "brl", v: (p) => sum(p, CMV_LABELS, true), cost: true },
+      { label: "CMV", f: "pct", v: (p) => div(abCost(p), sum(p, AB_REVENUE_LABELS), 100), cost: true },
       { label: "Hóspedes", f: "int", v: guests },
       { label: "Receita de A&B por hóspede", f: "brl2", v: (p) => div(sum(p, AB_REVENUE_LABELS), guests(p)) },
       { label: "Custo de A&B por hóspede", f: "brl2", v: (p) => div(abCost(p), guests(p)), cost: true },
@@ -172,7 +172,7 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
       { label: "Folha % da receita total", f: "pct", v: (p) => div(labor(p), rev(p), 100), cost: true },
       { label: "Folha por RN", f: "brl2", v: (p) => div(labor(p), rn(p)), cost: true },
     ] },
-    { title: "Custos por roomnight", rows: allGroups.map((g) => ({ label: g, f: "brl2" as Fmt, v: (p: Period) => div(groupSum(p, g), rn(p)), cost: true })) },
+    { title: "Custos por roomnight", rows: allGroups.filter((g) => g !== "A&B custo").map((g) => ({ label: g, f: "brl2" as Fmt, v: (p: Period) => div(groupSum(p, g), rn(p)), cost: true })) },
     { title: "Custos que dependem da tarifa (% da receita de hospedagem)", rows: TARIFF_GROUPS.map((g) => ({ label: g, f: "pct" as Fmt, v: (p: Period) => div(groupSum(p, g), lodging(p), 100), cost: true })) },
   ];
 
