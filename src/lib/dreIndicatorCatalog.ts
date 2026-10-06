@@ -120,11 +120,27 @@ export function computeIndicator(
   if (def.unavailableNote) return null;
   const num = findNode(flat, def.num);
   const den = findNode(flat, def.den);
-  return ratioOver(num?.series[key], den?.series[key], months, def.scale, def.absolute);
+  const denSeries = den?.series[key] ?? (def.den === AVAILABLE_LABELS ? deriveAvailable(flat, key) : undefined);
+  return ratioOver(num?.series[key], denSeries, months, def.scale, def.absolute);
 }
 
 export function formatIndicator(def: { format: IndicatorFormat }, v: number | null): string {
   if (v == null || !Number.isFinite(v)) return "sem dado";
   if (def.format === "pct") return `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * DREs sem linha de apartamentos disponíveis (ex.: Confins): disponíveis = Roomnights ÷ Taxa de Ocupação.
+ */
+export function deriveAvailable(flat: DreLineNode[] | undefined, key: DreSeriesKey = "current"): DreMonthValue[] | undefined {
+  const occ = findNode(flat, OCCUPIED_LABELS)?.series[key];
+  const rate = findNode(flat, ["Taxa de Ocupação"])?.series[key];
+  if (!occ || !rate) return undefined;
+  return occ.map((o, i) => {
+    let r = rate[i];
+    if (o == null || r == null || !Number.isFinite(o) || !Number.isFinite(r) || r === 0) return null;
+    if (r > 1.5) r = r / 100;
+    return o / r;
+  }) as DreMonthValue[];
 }
