@@ -78,7 +78,7 @@ const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
   { value: "ri", label: "Relações com Investidores", scope: "Acesso a todos os hotéis" },
   { value: "gop", label: "Gerente de Operações (GOP)", scope: "Acesso à cartela de hotéis definida" },
   { value: "gg", label: "Gerente Geral (GG)", scope: "Acesso a um ou mais hotéis da cartela" },
-  { value: "adm", label: "Administrativo do Hotel (Adm)", scope: "Acesso apenas ao próprio hotel" },
+  { value: "adm", label: "Administrativo do Hotel (Adm)", scope: "Acesso apenas aos hotéis selecionados" },
   { value: "rh", label: "RH & People", scope: "Acesso a todos os hotéis" },
   { value: "marketing", label: "Marketing", scope: "Acesso ao módulo de Marketing em todos os hotéis" },
   { value: "operacoes", label: "Operações", scope: "Acesso a todos os hotéis" },
@@ -504,7 +504,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
     isMasterFlag ||
     hasGlobalAccess ||
     (primaryRole === "gg" && hotelIds.length >= 1) ||
-    (primaryRole === "adm" && hotelIds.length === 1) ||
+    (primaryRole === "adm" && hotelIds.length >= 1) ||
     (primaryRole === "gop" && hotelIds.length >= 1);
 
   async function handleSubmit() {
@@ -732,10 +732,8 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
               ) : (
                 <div className="space-y-2">
                   <Label>
-                     {primaryRole === "gg"
-                       ? "Selecione um ou mais hotéis"
-                       : primaryRole === "adm"
-                      ? "Selecione 1 hotel"
+                    {primaryRole === "gg" || primaryRole === "adm"
+                      ? "Selecione um ou mais hotéis"
                       : "Selecione os hotéis da cartela"}
                   </Label>
                   <div className="border rounded-lg max-h-72 overflow-auto divide-y">
@@ -748,14 +746,10 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
                         >
                           <Checkbox
                             checked={checked}
-                             onCheckedChange={(v) => {
-                               if (primaryRole === "adm") {
-                                setHotelIds(v ? [h.id] : []);
-                              } else {
-                                setHotelIds(
-                                  v ? [...hotelIds, h.id] : hotelIds.filter((x) => x !== h.id),
-                                );
-                              }
+                            onCheckedChange={(v) => {
+                              setHotelIds(
+                                v ? [...hotelIds, h.id] : hotelIds.filter((x) => x !== h.id),
+                              );
                             }}
                           />
                           <span className="text-sm flex-1">{h.name}</span>
