@@ -535,7 +535,6 @@ export default function IndicadoresDrePage() {
     month,
     periodMonths: month,
   });
-  (window as unknown as { __dre?: unknown }).__dre = dataset; // DEBUG-TMP
 
   const selectedNodes = useMemo(() => {
     if (!dataset || selectedIds.size === 0) return [] as DreLineNode[];
