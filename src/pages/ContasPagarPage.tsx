@@ -828,6 +828,7 @@ export default function ContasPagarPage() {
       // Guarda a categoria original de forma persistente (só se ainda não houver uma salva)
       const savedIds: string[] = [];
       for (const { id, prev } of prevCategories) {
+        if (prev === category) continue; // já está nessa categoria — não salvar como "original"
         const { data, error } = await supabase
           .from("ap_entries")
           .update({ previous_category: prev ?? "" })
