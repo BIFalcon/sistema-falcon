@@ -120,7 +120,10 @@ export function computeIndicator(
   if (def.unavailableNote) return null;
   const num = findNode(flat, def.num);
   const den = findNode(flat, def.den);
-  const denSeries = den?.series[key] ?? (def.den === AVAILABLE_LABELS ? deriveAvailable(flat, key) : undefined);
+  const direct = den?.series[key];
+  const hasDirect = !!direct && months.some((m) => direct[m - 1] != null && Number.isFinite(direct[m - 1] as number) && direct[m - 1] !== 0);
+  // Linha de disponíveis pode existir só no orçamento (ex.: Confins) — então deriva do realizado.
+  const denSeries = hasDirect ? direct : (def.den === AVAILABLE_LABELS ? deriveAvailable(flat, key) ?? direct : direct);
   return ratioOver(num?.series[key], denSeries, months, def.scale, def.absolute);
 }
 
