@@ -849,6 +849,9 @@ function useDreAnalyticsImpl(input: {
               if (v != null && Number.isFinite(v) && v !== 0) finite.push({ i, v });
             }
             if (finite.length < 4) return series;
+            // Linhas de resultado (GOP, lucro) oscilam entre prejuízo e lucro:
+            // um mês bom pode ser 5× a mediana sem ser erro. Só limpa séries de sinal único.
+            if (finite.some((p) => p.v > 0) && finite.some((p) => p.v < 0)) return series;
             const absSorted = finite.map((p) => Math.abs(p.v)).sort((a, b) => a - b);
             const median = absSorted[Math.floor(absSorted.length / 2)];
             if (median <= 0) return series;
