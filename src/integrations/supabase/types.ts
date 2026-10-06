@@ -271,6 +271,7 @@ export type Database = {
           payment_method: string | null
           payment_paid_at: string | null
           payment_status: Database["public"]["Enums"]["ap_payment_status"]
+          previous_category: string | null
           primary_document_id: string | null
           raw: Json
           scheduled_date: string | null
@@ -322,6 +323,7 @@ export type Database = {
           payment_method?: string | null
           payment_paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
+          previous_category?: string | null
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null
@@ -373,6 +375,7 @@ export type Database = {
           payment_method?: string | null
           payment_paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
+          previous_category?: string | null
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null

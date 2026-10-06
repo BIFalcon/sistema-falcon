@@ -17,6 +17,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -824,6 +825,18 @@ export default function ContasPagarPage() {
       prev: allEntries.find((e) => e.id === id)?.category ?? null,
     }));
     try {
+      // Guarda a categoria original de forma persistente (só se ainda não houver uma salva)
+      const savedIds: string[] = [];
+      for (const { id, prev } of prevCategories) {
+        const { data, error } = await supabase
+          .from("ap_entries")
+          .update({ previous_category: prev ?? "" })
+          .eq("id", id)
+          .is("previous_category", null)
+          .select("id");
+        if (error) throw error;
+        if (data && data.length > 0) savedIds.push(id);
+      }
       for (const id of ids) {
         await updateCategory.mutateAsync({ entryId: id, hotelId, category });
       }
@@ -837,6 +850,9 @@ export default function ContasPagarPage() {
               for (const { id, prev } of prevCategories) {
                 await updateCategory.mutateAsync({ entryId: id, hotelId, category: prev });
               }
+              if (savedIds.length > 0) {
+                await supabase.from("ap_entries").update({ previous_category: null }).in("id", savedIds);
+              }
               qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
               toast.success("Marcação desfeita.");
             } catch (e) {
@@ -847,6 +863,29 @@ export default function ContasPagarPage() {
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar categoria");
+    }
+  }
+
+  // Reverte para a categoria original salva em previous_category (sem limite de tempo)
+  async function handleRevertCategory() {
+    if (!hotelId) return;
+    const allEntries = [...entries, ...salaryEntries, ...distributionEntries];
+    const targets = allEntries.filter(
+      (e) => selectedIds.has(e.id) && (e as { previous_category?: string | null }).previous_category != null,
+    ) as Array<{ id: string; previous_category?: string | null }>;
+    if (targets.length === 0) return;
+    try {
+      for (const t of targets) {
+        const prev = t.previous_category === "" ? null : t.previous_category ?? null;
+        await updateCategory.mutateAsync({ entryId: t.id, hotelId, category: prev });
+        const { error } = await supabase.from("ap_entries").update({ previous_category: null }).eq("id", t.id);
+        if (error) throw error;
+      }
+      qc.invalidateQueries({ queryKey: ["ap-entries", hotelId] });
+      setSelectedIds(new Set());
+      toast.success(`${targets.length} lançamento(s) voltaram à categoria original.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao reverter categoria");
     }
   }
 
@@ -1867,6 +1906,20 @@ export default function ContasPagarPage() {
                         onClick={() => handleBulkCategory("Salários RH")}
                       >
                         Salários RH
+                      </Button>
+                    )}
+                    {selectedIds.size > 0 && canManage &&
+                      [...entries, ...salaryEntries, ...distributionEntries].some(
+                        (e) => selectedIds.has(e.id) && (e as { previous_category?: string | null }).previous_category != null,
+                      ) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={updateCategory.isPending}
+                        onClick={handleRevertCategory}
+                      >
+                        Reverter categoria
                       </Button>
                     )}
                     {selectedIds.size > 0 && (

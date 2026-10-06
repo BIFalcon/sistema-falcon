@@ -1,0 +1,2 @@
+ALTER TABLE public.ap_entries ADD COLUMN IF NOT EXISTS previous_category text;
+COMMENT ON COLUMN public.ap_entries.previous_category IS 'Categoria original antes da classificação em lote; string vazia = sem categoria.';
