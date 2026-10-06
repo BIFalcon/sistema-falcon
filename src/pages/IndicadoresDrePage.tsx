@@ -58,10 +58,11 @@ const LODGING_LABELS = [
   "Receita de Hospedagem", "Receitas de Hospedagem", "Receita Hospedagem",
   "Receita de Diárias", "Receita de Hospedagens", "Hospedagem",
 ];
-const OCCUPIED_LABELS = ["Apartamentos Ocupados", "Apartamentos ocupados", "Room Nights", "Roomnights", "UHs Ocupadas"];
+const OCCUPIED_LABELS = ["Apartamentos Ocupados", "Apartamentos ocupados", "UHs Ocupadas"];
 const AVAILABLE_LABELS = [
   "Número de apartamentos disponíveis", "Numero de apartamentos disponiveis",
   "Apartamentos Disponíveis", "UHs Disponíveis", "Quartos Disponíveis",
+  "Roomnights", "Room Nights",
 ];
 const GOP_LABELS = ["GOP", "Resultado Operacional Bruto"];
 
