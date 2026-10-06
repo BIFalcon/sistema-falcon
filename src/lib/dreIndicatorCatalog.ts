@@ -29,8 +29,8 @@ export const CMV_LABELS = ["(-) Custo das Mercadorias Vendidas", "(-) Custo com 
 /** 6 nomes do café da manhã na base; os de custo ficam aqui. */
 export const BREAKFAST_COST_LABELS = ["(-) Custo com Café da manhã", "Custo com Café da Manhã", "Custos de café da manhã"];
 export const LODGING_COST_LABELS = ["Custos de Hospedagem", "Despesas de Hospedagem"];
-export const FIXED_COST_LABELS = ["DESPESAS FIXAS TOTAIS"];
-export const VARIABLE_COST_LABELS = ["DESPESAS VARIÁVEIS TOTAL"];
+export const FIXED_COST_LABELS = ["DESPESAS FIXAS TOTAIS", "Total Despesas Fixas"];
+export const VARIABLE_COST_LABELS = ["DESPESAS VARIÁVEIS TOTAL", "Total de despesas Operacionais Variáveis"];
 
 export type IndicatorFormat = "pct" | "brl" | "brl2";
 
