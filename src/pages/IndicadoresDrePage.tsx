@@ -63,7 +63,7 @@ const AVAILABLE_LABELS = [
   "Número de apartamentos disponíveis", "Numero de apartamentos disponiveis",
   "Apartamentos Disponíveis", "UHs Disponíveis", "Quartos Disponíveis",
 ];
-const GOP_LABELS = ["GOP", "Resultado Operacional Bruto"];
+const GOP_LABELS = ["Resultado Operacional Bruto (GOP)", "GOP", "Resultado Operacional Bruto"];
 
 /**
  * Indicadores de razão: em qualquer agregação de período são sempre
@@ -106,12 +106,12 @@ const CARD_LINES: CardDef[] = [
     agg: "sum",
     labels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
-  { title: "GOP", format: "brl", agg: "sum", labels: ["GOP", "Resultado Operacional Bruto"] },
+  { title: "GOP", format: "brl", agg: "sum", labels: ["Resultado Operacional Bruto (GOP)", "GOP", "Resultado Operacional Bruto"] },
   {
     title: "%GOP",
     format: "pct",
     agg: "ratio",
-    numLabels: ["GOP", "Resultado Operacional Bruto"],
+    numLabels: ["Resultado Operacional Bruto (GOP)", "GOP", "Resultado Operacional Bruto"],
     denLabels: ["Receita Bruta Total", "RECEITA BRUTA TOTAL", "Receita Total Bruta"],
   },
   {
@@ -229,9 +229,10 @@ function pickLine(
   const flat = dataset?.flat ?? [];
   for (const lbl of labels) {
     const needle = lbl.toLowerCase().replace(/[^a-z0-9]+/gi, "");
-    const exact = flat.find(
-      (l) => l.label.toLowerCase().replace(/[^a-z0-9]+/gi, "") === needle,
-    );
+    const same = (l: DreLineNode) => l.label.toLowerCase().replace(/[^a-z0-9]+/gi, "") === needle;
+    // Prefere a linha que tem realizado (algumas DREs repetem o rótulo em blocos só de orçamento).
+    const exact = flat.find((l) => same(l) && l.series.current.some((v) => v != null && v !== 0))
+      ?? flat.find(same);
     if (exact) return exact;
   }
   for (const lbl of labels) {
