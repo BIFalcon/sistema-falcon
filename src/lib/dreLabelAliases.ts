@@ -19,8 +19,7 @@ export const DRE_LABEL_ALIASES: string[][] = [
   ["(-) Custo com Café da manhã", "Custo com Café da Manhã", "Custos de café da manhã"],
   // — Indicadores topo —
   ["Número de Hóspedes", "Números de Hóspedes"],
-  ["Apartamentos Ocupados", "Número de Apartamentos Ocupados"],
-  ["Número de apartamentos disponíveis", "Apartamentos Disponíveis", "Roomnights", "Room Nights"],
+  ["Apartamentos Ocupados", "Roomnights", "Room Nights", "Número de Apartamentos Ocupados"],
   ["Diária Média (ADR)", "Diária Média (em R$)", "Diária Média", "ADR"],
   ["RevPAR", "RevPar (em R$)", "RevPar"],
   ["Resultado Operacional Bruto (GOP)", "Lucro Operacional Bruto (GOP)", "GOP"],

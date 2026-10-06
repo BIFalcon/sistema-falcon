@@ -16,12 +16,10 @@ export const LODGING_LABELS = [
   "Receita de Hospedagem", "Receitas de Hospedagem", "Receita Hospedagem",
   "Receita de Diárias", "Receita de Hospedagens", "Hospedagem",
 ];
-export const OCCUPIED_LABELS = ["Apartamentos Ocupados", "Apartamentos ocupados", "UHs Ocupadas"];
+export const OCCUPIED_LABELS = ["Apartamentos Ocupados", "Apartamentos ocupados", "Room Nights", "Roomnights", "UHs Ocupadas"];
 export const AVAILABLE_LABELS = [
   "Número de apartamentos disponíveis", "Numero de apartamentos disponiveis",
   "Apartamentos Disponíveis", "UHs Disponíveis", "Quartos Disponíveis",
-  // Roomnights = apartamentos disponíveis (confirmado pela Controladoria)
-  "Roomnights", "Room Nights",
 ];
 export const GOP_LABELS = ["Resultado Operacional Bruto (GOP)", "Lucro Operacional Bruto (GOP)", "GOP", "Resultado Operacional Bruto"];
 export const GUESTS_LABELS = ["Número de Hóspedes", "Número de hóspedes", "Números de Hóspedes"];
