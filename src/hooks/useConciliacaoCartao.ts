@@ -68,6 +68,8 @@ export interface BankEntry {
   description: string | null;
   amount: number;
   matched_at: string | null;
+  billing_pix?: boolean;
+  billing_pix_at?: string | null;
 }
 
 export interface ConcMatch {
@@ -183,7 +185,7 @@ export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo
       const build = () => {
         let q = supabase
           .from("conc_bank_entries")
-          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at")
+          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at")
           .eq("hotel_id", hotelId!)
           .order("line_date", { ascending: true })
           .order("id", { ascending: true });
@@ -986,5 +988,52 @@ export function useAFaturarDaily(hotelId: string | null, dateFrom?: string, date
         day: r.day, total: Number(r.total), n: Number(r.n),
       }));
     },
+  });
+}
+
+/** Busca lançamentos pareados (Adquirente/Extrato/Opera) pelo id, independente do período filtrado. */
+export function useEntriesByIds(ids: string[]) {
+  const sorted = [...new Set(ids)].sort();
+  return useQuery({
+    queryKey: ["conc-entries-by-ids", sorted.join(",")],
+    enabled: sorted.length > 0,
+    queryFn: async () => {
+      const chunks: string[][] = [];
+      for (let i = 0; i < sorted.length; i += 200) chunks.push(sorted.slice(i, i + 200));
+      const acq: AcquirerEntry[] = [];
+      const bank: BankEntry[] = [];
+      const opera: OperaEntry[] = [];
+      for (const c of chunks) {
+        const [a, b, o] = await Promise.all([
+          supabase.from("conc_acquirer_entries").select("*").in("id", c),
+          supabase.from("conc_bank_entries").select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at").in("id", c),
+          supabase.from("conc_opera_entries").select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at").in("id", c),
+        ]);
+        if (a.error) throw a.error;
+        if (b.error) throw b.error;
+        if (o.error) throw o.error;
+        acq.push(...((a.data ?? []) as unknown as AcquirerEntry[]));
+        bank.push(...((b.data ?? []) as unknown as BankEntry[]));
+        opera.push(...((o.data ?? []) as unknown as OperaEntry[]));
+      }
+      return { acq, bank, opera };
+    },
+  });
+}
+
+/** Marca / desmarca lançamentos do extrato como pagamento de Faturamento (PIX sem par). */
+export function useSetBillingPix() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error } = await supabase
+          .from("conc_bank_entries")
+          .update({ billing_pix: value, billing_pix_at: value ? new Date().toISOString() : null })
+          .in("id", ids.slice(i, i + 200));
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-bank"] }),
   });
 }
