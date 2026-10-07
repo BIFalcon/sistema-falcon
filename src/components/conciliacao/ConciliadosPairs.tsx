@@ -17,10 +17,12 @@ const SIDE_LABEL: Record<string, string> = {
 
 /** Conciliados: mostra os dois lados da equação, com desfazer individual ou em lote. */
 export function ConciliadosPairs({
-  matches, rowById, title, leftSides, exportName, onUndoMany, undoing,
+  matches, rowById, periodIds, title, leftSides, exportName, onUndoMany, undoing,
 }: {
   matches: ConcMatch[];
   rowById: Map<string, ReconcileRow>;
+  /** Ids dentro do filtro atual; a data do Opera define o período. */
+  periodIds?: Set<string>;
   title: string;
   leftSides: string[];
   exportName: string;
@@ -29,9 +31,15 @@ export function ConciliadosPairs({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Só mostra conciliações com ao menos um lançamento dentro do filtro atual (hotel/período).
+  // O período é definido pelo lançamento do Opera; sem Opera, vale qualquer lado.
+  const inPeriod = periodIds ?? rowById;
   const groups = matches
-    .filter((m) => m.conc_match_items.some((i) => rowById.has(i.entry_id)))
+    .filter((m) => {
+      const op = m.conc_match_items.filter((i) => i.side === "opera");
+      return op.length
+        ? op.some((i) => inPeriod.has(i.entry_id))
+        : m.conc_match_items.some((i) => inPeriod.has(i.entry_id));
+    })
     .map((m) => {
       const items = m.conc_match_items.map((i) => ({
         side: i.side as string,

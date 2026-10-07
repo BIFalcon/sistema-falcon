@@ -1238,6 +1238,8 @@ export type Database = {
         Row: {
           account_name_raw: string | null
           amount: number
+          billing_pix: boolean
+          billing_pix_at: string | null
           created_at: string
           description: string | null
           entry_key: string
@@ -1251,6 +1253,8 @@ export type Database = {
         Insert: {
           account_name_raw?: string | null
           amount?: number
+          billing_pix?: boolean
+          billing_pix_at?: string | null
           created_at?: string
           description?: string | null
           entry_key: string
@@ -1264,6 +1268,8 @@ export type Database = {
         Update: {
           account_name_raw?: string | null
           amount?: number
+          billing_pix?: boolean
+          billing_pix_at?: string | null
           created_at?: string
           description?: string | null
           entry_key?: string

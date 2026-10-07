@@ -176,6 +176,13 @@
       "when": 1791297163356,
       "tag": "0024_ap_entries_previous_category",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791395706314,
+      "tag": "0025_conc_auto_reconcile_rules_and_bank_billing",
+      "breakpoints": true
     }
   ]
 }

@@ -26,7 +26,7 @@ import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile,
-  useAutoReconcile, useConcJustifications, useSaveJustification, useSetB2B, useSetDirectBankBulk,
+  useAutoReconcile, useEntriesByIds, useSetBillingPix, useConcJustifications, useSaveJustification, useSetB2B, useSetDirectBankBulk,
   useMarkCashPaid, useCashProofUrl, useMatchedCountsByUpload, useAFaturarDaily,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch, type ConcSide,
@@ -157,6 +157,7 @@ export default function ConciliacaoCartaoPage() {
   const undo = useUndoReconcile();
   const setDirectBulk = useSetDirectBankBulk();
   const setB2B = useSetB2B();
+  const setBillingPix = useSetBillingPix();
   const markCash = useMarkCashPaid();
   const proofUrl = useCashProofUrl();
 
@@ -230,6 +231,44 @@ export default function ConciliacaoCartaoPage() {
     return m;
   }, [operaRows, acquirerRows, bankRows]);
 
+  // Conciliados: a data do Opera define o período. Busca os pares fora do filtro.
+  const activeMatches = mainTab === "cartao" ? cardMatches.data : mainTab === "pix" ? pixMatches.data : mainTab === "dinheiro" ? cashMatches.data : undefined;
+  const missingIds = useMemo(() => {
+    const out: string[] = [];
+    for (const m of activeMatches ?? []) {
+      const items = m.conc_match_items;
+      const operaItems = items.filter((i) => i.side === "opera");
+      const inPeriod = operaItems.length
+        ? operaItems.some((i) => rowById.has(i.entry_id))
+        : items.some((i) => rowById.has(i.entry_id));
+      if (!inPeriod) continue;
+      for (const i of items) if (!rowById.has(i.entry_id)) out.push(i.entry_id);
+    }
+    return out;
+  }, [activeMatches, rowById]);
+  const partners = useEntriesByIds(missingIds);
+  const matchRowById = useMemo(() => {
+    const m = new Map(rowById);
+    const d = partners.data;
+    if (!d) return m;
+    for (const e of d.acq) m.set(e.id, {
+      id: e.id, side: "acquirer", date: e.sale_date, amount: Number(e.amount),
+      title: e.categoria || e.bandeira || "—",
+      subtitle: [e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
+    });
+    for (const e of d.bank) m.set(e.id, {
+      id: e.id, side: "bank", date: e.line_date, amount: Number(e.amount),
+      title: e.description ?? "—", subtitle: e.account_name_raw ?? undefined,
+    });
+    for (const e of d.opera) m.set(e.id, {
+      id: e.id, side: "opera", date: e.business_date, amount: Number(e.amount),
+      title: e.trx_desc || e.trx_code,
+      subtitle: [e.room && `UH ${e.room}`, e.guest_full_name, e.receipt_no && `Rec. ${e.receipt_no}`].filter(Boolean).join(" · "),
+    });
+    return m;
+  }, [rowById, partners.data]);
+  const periodRowIds = useMemo(() => new Set(rowById.keys()), [rowById]);
+
   /* ---------------- Pendências ---------------- */
 
   const operaPendentesAll = operaRows.filter((r) => {
@@ -240,7 +279,7 @@ export default function ConciliacaoCartaoPage() {
     const e = acquirerById.get(r.id);
     return e && !e.matched_at && !e.b2b;
   });
-  const bankPendentes = bankRows.filter((r) => !bankById.get(r.id)?.matched_at);
+  const bankPendentes = bankRows.filter((r) => { const e = bankById.get(r.id); return e && !e.matched_at && !e.billing_pix; });
 
   // Cartão: sem PIX e sem dinheiro (cada um tem sua tela).
   const operaCartao = operaPendentesAll.filter((r) => {
@@ -269,6 +308,18 @@ export default function ConciliacaoCartaoPage() {
   const directBankRows = operaRows
     .filter((r) => operaById.get(r.id)?.direct_bank)
     .map((r) => ({ ...r, info: "Recebido direto no banco" }));
+  const billingPixRows = bankRows
+    .filter((r) => bankById.get(r.id)?.billing_pix)
+    .map((r) => ({ ...r, info: "Pagamento de Faturamento (PIX)" }));
+  const markBillingPix = (rows: ReconcileRow[], value: boolean) => {
+    setBillingPix.mutate(
+      { ids: rows.map((r) => r.id), value },
+      {
+        onSuccess: () => toast.success(value ? `${rows.length} lançamento(s) marcado(s) como Faturamento` : "Marcação removida"),
+        onError: (e: Error) => toast.error(e.message),
+      },
+    );
+  };
   const cashPaidRows = operaRows
     .filter((r) => operaById.get(r.id)?.cash_paid_at)
     .map((r) => {
@@ -420,7 +471,15 @@ export default function ConciliacaoCartaoPage() {
         onRun: (rows) => markDirectBank(rows, true),
       }],
     },
-    { key: "bank-pix", title: "Extrato Bancário", subtitle: 'Lançamentos com "PIX" na descrição', position: "right", rows: bankPix },
+    {
+      key: "bank-pix", title: "Extrato Bancário", subtitle: 'Lançamentos com "PIX" na descrição', position: "right", rows: bankPix,
+      actions: [{
+        label: "Marcar como Faturamento",
+        icon: <FileSpreadsheet className="h-3 w-3 mr-1" />,
+        disabled: setBillingPix.isPending,
+        onRun: (rows) => markBillingPix(rows, true),
+      }],
+    },
   ];
 
   const cashBoxes: BoxConfig[] = [
@@ -493,7 +552,8 @@ export default function ConciliacaoCartaoPage() {
               <TabsContent value="conciliados" className="mt-4">
                 <ConciliadosPairs
                   matches={cardMatches.data ?? []}
-                  rowById={rowById}
+                  rowById={matchRowById}
+                  periodIds={periodRowIds}
                   leftSides={["acquirer"]}
                   title="Cartões conciliados — Adquirente × Front Caixa"
                   exportName={`cartoes-conciliados-${hotelId}.xlsx`}
@@ -525,6 +585,7 @@ export default function ConciliacaoCartaoPage() {
                 <TabsTrigger value="justificativa" className="text-[11px]">Justificativa</TabsTrigger>
                 <TabsTrigger value="conciliados" className="text-[11px]">PIX Conciliados</TabsTrigger>
                 <TabsTrigger value="direto" className="text-[11px]">Direto no banco</TabsTrigger>
+                <TabsTrigger value="faturamento" className="text-[11px]">Faturamento (PIX)</TabsTrigger>
               </TabsList>
               <TabsContent value="pendentes" className="mt-4">
                 <ReconcilePanel
@@ -547,7 +608,8 @@ export default function ConciliacaoCartaoPage() {
               <TabsContent value="conciliados" className="mt-4">
                 <ConciliadosPairs
                   matches={pixMatches.data ?? []}
-                  rowById={rowById}
+                  rowById={matchRowById}
+                  periodIds={periodRowIds}
                   leftSides={["opera", "acquirer"]}
                   title="PIX conciliados — Opera/Adquirente × Extrato Bancário"
                   exportName={`pix-conciliados-${hotelId}.xlsx`}
@@ -564,6 +626,17 @@ export default function ConciliacaoCartaoPage() {
                   busy={setDirectBulk.isPending}
                   onAction={(r) => markDirectBank([r], false)}
                   exportName={`direto-no-banco-${hotelId}.xlsx`}
+                />
+              </TabsContent>
+              <TabsContent value="faturamento" className="mt-4">
+                <ClassifiedList
+                  title="PIX do extrato marcados como Faturamento"
+                  subtitle="Lançamentos do extrato retirados das pendências (não excluídos)"
+                  rows={billingPixRows}
+                  actionLabel="Desmarcar"
+                  busy={setBillingPix.isPending}
+                  onAction={(r) => markBillingPix([r], false)}
+                  exportName={`pix-faturamento-${hotelId}.xlsx`}
                 />
               </TabsContent>
             </Tabs>
@@ -618,7 +691,8 @@ export default function ConciliacaoCartaoPage() {
               <TabsContent value="conciliados" className="mt-4">
                 <ConciliadosPairs
                   matches={cashMatches.data ?? []}
-                  rowById={rowById}
+                  rowById={matchRowById}
+                  periodIds={periodRowIds}
                   leftSides={["opera"]}
                   title="Dinheiro conciliado — Opera × Extrato Bancário"
                   exportName={`dinheiro-conciliado-${hotelId}.xlsx`}
