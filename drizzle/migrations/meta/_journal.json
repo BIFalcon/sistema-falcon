@@ -183,6 +183,13 @@
       "when": 1791395706314,
       "tag": "0025_conc_auto_reconcile_rules_and_bank_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791459932644,
+      "tag": "0026_trx_code_omie_fields",
+      "breakpoints": true
     }
   ]
 }

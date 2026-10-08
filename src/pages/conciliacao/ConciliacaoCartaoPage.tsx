@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Trash2, Undo2, Upload, Users,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload, Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +23,8 @@ import { ReconcilePanel, Money, fmtDay, type BoxConfig, type ReconcileRow } from
 import { ConciliadosPairs } from "@/components/conciliacao/ConciliadosPairs";
 import { JustificationsPanel } from "@/components/conciliacao/JustificationsPanel";
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
+import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
+import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile,
@@ -175,7 +177,7 @@ export default function ConciliacaoCartaoPage() {
   const trxCodes = useTrxCodeMapping();
   const updateTrx = useUpdateTrxCode();
   const [trxSearch, setTrxSearch] = useState("");
-  const [trxActivate, setTrxActivate] = useState<{ id: string; code: string; categoria: string } | null>(null);
+  const [trxEdit, setTrxEdit] = useState<{ code: TrxCodeMap | null; activate?: boolean } | null>(null);
   const [cashDialog, setCashDialog] = useState<ReconcileRow[] | null>(null);
 
   const uploadHotelLabel = (u: Record<string, unknown>): string => {
@@ -222,8 +224,8 @@ export default function ConciliacaoCartaoPage() {
     [bank.data],
   );
 
-  const isPix = (categoria?: string | null) => (categoria ?? "").includes("PIX");
-  const isCash = (categoria?: string | null) => (categoria ?? "").includes("DINHEIRO");
+  const isPix = (categoria?: string | null) => (categoria ?? "").trim().toUpperCase().includes("PIX");
+  const isCash = (categoria?: string | null) => (categoria ?? "").trim().toUpperCase().includes("DINHEIRO");
 
   const rowById = useMemo(() => {
     const m = new Map<string, ReconcileRow>();
@@ -427,7 +429,7 @@ export default function ConciliacaoCartaoPage() {
   const trxVisible = (trxCodes.data ?? []).filter((c) => {
     const t = trxSearch.trim().toLowerCase();
     if (!t) return true;
-    return [c.trx_code, c.descricao, c.categoria].filter(Boolean).some((v) => String(v).toLowerCase().includes(t));
+    return [c.trx_code, c.descricao, c.categoria, c.categoria_omie, c.conta_corrente_omie].filter(Boolean).some((v) => String(v).toLowerCase().includes(t));
   });
 
   const NoHotel = (
@@ -806,6 +808,7 @@ export default function ConciliacaoCartaoPage() {
                     importOpera.mutate({ file: f, hotelId }, {
                       onSuccess: (r) => toast.success(
                         `${r.inserted} transação(ões) importada(s) · ${r.skipped} fora do mapeamento` +
+                        ("skippedCodes" in r && r.skippedCodes?.length ? ` (códigos: ${r.skippedCodes.join(", ")})` : "") +
                         ` · ${r.duplicates} já existente(s)` +
                         ` · ${r.autoMatched} conciliada(s) automaticamente` +
                         ("unclassified" in r && r.unclassified?.length ? ` · sem categoria: ${r.unclassified.join(", ")}` : ""),
@@ -961,8 +964,13 @@ export default function ConciliacaoCartaoPage() {
                   Somente códigos ativos entram na conciliação — ativar exige categoria definida.
                 </p>
               </div>
-              <Input value={trxSearch} onChange={(e) => setTrxSearch(e.target.value)}
-                placeholder="Buscar código ou categoria…" className="h-8 w-[240px] text-xs" />
+              <div className="flex items-center gap-2">
+                <Input value={trxSearch} onChange={(e) => setTrxSearch(e.target.value)}
+                  placeholder="Buscar código ou base…" className="h-8 w-[240px] text-xs" />
+                <Button size="sm" className="h-8 text-xs" onClick={() => setTrxEdit({ code: null })}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Novo código
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0 max-h-[560px] overflow-auto">
               <Table>
@@ -970,8 +978,11 @@ export default function ConciliacaoCartaoPage() {
                   <TableRow className="text-[11px]">
                     <TableHead>Código</TableHead>
                     <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead>Base de Conciliação</TableHead>
+                    <TableHead>Categoria OMIE</TableHead>
+                    <TableHead>Conta Corrente OMIE</TableHead>
                     <TableHead className="text-right">Ativo</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -982,12 +993,14 @@ export default function ConciliacaoCartaoPage() {
                       <TableCell>
                         {c.categoria ? <Badge variant="outline" className="text-[10px]">{c.categoria}</Badge> : "—"}
                       </TableCell>
+                      <TableCell>{c.categoria_omie ?? "—"}</TableCell>
+                      <TableCell>{c.conta_corrente_omie ?? "—"}</TableCell>
                       <TableCell className="text-right">
                         <Switch
                           checked={c.ativo}
                           onCheckedChange={(v) => {
                             if (v && !c.categoria) {
-                              setTrxActivate({ id: c.id, code: c.trx_code, categoria: "" });
+                              setTrxEdit({ code: c, activate: true });
                               return;
                             }
                             updateTrx.mutate({ id: c.id, ativo: v }, {
@@ -995,6 +1008,12 @@ export default function ConciliacaoCartaoPage() {
                             });
                           }}
                         />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Editar ${c.trx_code}`}
+                          onClick={() => setTrxEdit({ code: c })}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1030,48 +1049,8 @@ export default function ConciliacaoCartaoPage() {
         }}
       />
 
-      {/* Ativar código TRX exige categoria */}
-      <Dialog open={!!trxActivate} onOpenChange={(v) => !v && setTrxActivate(null)}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle className="text-sm">Ativar código {trxActivate?.code}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 text-xs">
-            <p className="text-muted-foreground">Defina a categoria antes de ativar o código.</p>
-            <Label className="text-xs">Categoria</Label>
-            <Input
-              className="h-9 text-xs"
-              placeholder="CARTAO, PIX, DINHEIRO, FATURADO…"
-              value={trxActivate?.categoria ?? ""}
-              onChange={(e) => setTrxActivate((p) => (p ? { ...p, categoria: e.target.value } : p))}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setTrxActivate(null)}>Cancelar</Button>
-            <Button
-              size="sm"
-              disabled={!trxActivate?.categoria.trim() || updateTrx.isPending}
-              onClick={() => {
-                if (!trxActivate) return;
-                updateTrx.mutate(
-                  {
-                    id: trxActivate.id,
-                    ativo: true,
-                    categoria: trxActivate.categoria
-                      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim(),
-                  },
-                  {
-                    onSuccess: () => { toast.success("Código ativado"); setTrxActivate(null); },
-                    onError: (e: Error) => toast.error(e.message),
-                  },
-                );
-              }}
-            >
-              Ativar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TrxCodeDialog open={!!trxEdit} onOpenChange={(v) => !v && setTrxEdit(null)}
+        code={trxEdit?.code ?? null} activate={trxEdit?.activate} />
     </div>
   );
 }

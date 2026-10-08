@@ -1,0 +1,1 @@
+ALTER TABLE public.trx_code_mapping ADD COLUMN IF NOT EXISTS categoria_omie text, ADD COLUMN IF NOT EXISTS conta_corrente_omie text;
