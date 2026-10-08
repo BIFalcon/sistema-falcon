@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Trash2, Undo2, Upload, Users,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload, Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1051,33 +1051,6 @@ export default function ConciliacaoCartaoPage() {
 
       <TrxCodeDialog open={!!trxEdit} onOpenChange={(v) => !v && setTrxEdit(null)}
         code={trxEdit?.code ?? null} activate={trxEdit?.activate} />
-    </div>
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setTrxActivate(null)}>Cancelar</Button>
-            <Button
-              size="sm"
-              disabled={!trxActivate?.categoria.trim() || updateTrx.isPending}
-              onClick={() => {
-                if (!trxActivate) return;
-                updateTrx.mutate(
-                  {
-                    id: trxActivate.id,
-                    ativo: true,
-                    categoria: trxActivate.categoria
-                      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim(),
-                  },
-                  {
-                    onSuccess: () => { toast.success("Código ativado"); setTrxActivate(null); },
-                    onError: (e: Error) => toast.error(e.message),
-                  },
-                );
-              }}
-            >
-              Ativar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
