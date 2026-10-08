@@ -524,7 +524,7 @@ export function useImportB2B() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, autoMatched, duplicates, skippedCodes: parsedOpera.skippedCodes };
+      return { inserted: rows.length, skipped, autoMatched, duplicates };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
