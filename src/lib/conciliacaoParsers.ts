@@ -155,7 +155,7 @@ export async function parseOperaXml(
   file: File,
   hotelId: string,
   activeCodes: Set<string>,
-): Promise<{ rows: OperaRow[]; skipped: number; total: number }> {
+): Promise<{ rows: OperaRow[]; skipped: number; total: number; skippedCodes: string[] }> {
   const text = await file.text();
   const doc = new DOMParser().parseFromString(text, "application/xml");
   if (doc.getElementsByTagName("parsererror").length > 0) {
@@ -173,12 +173,14 @@ export async function parseOperaXml(
   const rows: OperaRow[] = [];
   const occ = makeOccCounter();
   let skipped = 0;
+  const skippedCodes = new Set<string>();
 
   for (const el of rowEls) {
     const trxCode = tagValue(el, "TRX_CODE").replace(/\.0+$/, "").trim();
     if (!trxCode) continue;
     if (!activeCodes.has(trxCode)) {
       skipped++;
+      skippedCodes.add(trxCode);
       continue;
     }
     const credit = parseMoney(tagValue(el, "CASHIER_CREDIT"));
@@ -204,7 +206,7 @@ export async function parseOperaXml(
     });
   }
 
-  return { rows, skipped, total: rowEls.length };
+  return { rows, skipped, total: rowEls.length, skippedCodes: [...skippedCodes].sort() };
 }
 
 /* ------------------------------------------------------------------ *

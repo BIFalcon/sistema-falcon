@@ -20,6 +20,8 @@ export interface TrxCodeMap {
   descricao: string | null;
   categoria: string | null;
   ativo: boolean;
+  categoria_omie: string | null;
+  conta_corrente_omie: string | null;
 }
 
 export interface OperaEntry {
@@ -118,7 +120,7 @@ export function useTrxCodeMapping() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trx_code_mapping")
-        .select("id, trx_code, descricao, categoria, ativo")
+        .select("id, trx_code, descricao, categoria, ativo, categoria_omie, conta_corrente_omie")
         .order("trx_code");
       if (error) throw error;
       return (data ?? []) as TrxCodeMap[];
@@ -337,7 +339,7 @@ export function useImportOpera() {
         .select("trx_code, categoria, ativo")
         .eq("ativo", true);
       if (mapErr) throw mapErr;
-      const byCode = new Map((map ?? []).map((m) => [m.trx_code, m.categoria]));
+      const byCode = new Map((map ?? []).map((m) => [m.trx_code.trim(), m.categoria]));
       const active = new Set(byCode.keys());
 
       const parsedOpera = await parseOperaXml(file, hotelId, active);
@@ -379,7 +381,7 @@ export function useImportOpera() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, autoMatched, duplicates };
+      return { inserted: rows.length, skipped, autoMatched, duplicates, skippedCodes: parsedOpera.skippedCodes };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
@@ -522,7 +524,7 @@ export function useImportB2B() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, autoMatched, duplicates };
+      return { inserted: rows.length, skipped, autoMatched, duplicates, skippedCodes: parsedOpera.skippedCodes };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
@@ -737,6 +739,33 @@ export function useUpdateTrxCode() {
       if (categoria !== undefined) patch.categoria = categoria;
       const { error } = await supabase.from("trx_code_mapping").update(patch).eq("id", id);
       if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["trx-code-mapping"] }),
+  });
+}
+
+export interface TrxCodeInput {
+  id?: string;
+  trx_code: string;
+  descricao: string | null;
+  categoria: string | null;
+  ativo: boolean;
+  categoria_omie: string | null;
+  conta_corrente_omie: string | null;
+}
+
+/** Cria (sem id) ou atualiza um código TRX. */
+export function useSaveTrxCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...row }: TrxCodeInput) => {
+      const { error } = id
+        ? await supabase.from("trx_code_mapping").update(row).eq("id", id)
+        : await supabase.from("trx_code_mapping").insert(row);
+      if (error) {
+        if (error.code === "23505") throw new Error(`O código ${row.trx_code} já está cadastrado.`);
+        throw error;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trx-code-mapping"] }),
   });
