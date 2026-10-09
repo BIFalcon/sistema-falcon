@@ -1,3 +1,4 @@
+import { validateDreFileName } from "@/lib/dreFileName";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -94,6 +95,13 @@ export default function DrePage() {
     if (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) {
       toast.error("Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv");
       return;
+    }
+    if (hotel?.name && closing) {
+      const nameError = validateDreFileName(file.name, hotel.name, closing.month, closing.year);
+      if (nameError) {
+        toast.error(nameError, { duration: 10000 });
+        return;
+      }
     }
     try {
       const r = await upload.mutateAsync({
