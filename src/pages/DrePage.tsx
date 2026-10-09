@@ -1,3 +1,4 @@
+import { validateDreFileName } from "@/lib/dreFileName";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
