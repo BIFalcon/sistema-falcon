@@ -95,6 +95,13 @@ export default function DrePage() {
       toast.error("Envie um arquivo Excel (.xlsx, .xlsm, .xls) ou .csv");
       return;
     }
+    if (hotel?.name && closing) {
+      const nameError = validateDreFileName(file.name, hotel.name, closing.month, closing.year);
+      if (nameError) {
+        toast.error(nameError, { duration: 10000 });
+        return;
+      }
+    }
     try {
       const r = await upload.mutateAsync({
         closingId: resolvedId,
