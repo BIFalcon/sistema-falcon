@@ -197,6 +197,13 @@
       "when": 1791468963936,
       "tag": "0027_conc_card_exclude_pix",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791547164063,
+      "tag": "0028_conc_sum_by_receipt",
+      "breakpoints": true
     }
   ]
 }
