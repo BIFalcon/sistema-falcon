@@ -35,6 +35,8 @@ export interface OperaEntry {
   room: string | null;
   guest_full_name: string | null;
   receipt_no: string | null;
+  trx_no?: string | null;
+  omie_sent_at?: string | null;
   direct_bank: boolean;
   direct_bank_at: string | null;
   matched_at: string | null;
