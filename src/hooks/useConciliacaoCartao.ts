@@ -1098,3 +1098,24 @@ export function useSetBillingPix() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-bank"] }),
   });
 }
+
+/** Marca / desmarca vendas da adquirente como já enviadas ao OMIE. */
+export function useSetOmieSent() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error } = await supabase
+          .from("conc_acquirer_entries")
+          .update({ omie_sent_at: value ? new Date().toISOString() : null, omie_sent_by: value ? user!.id : null })
+          .in("id", ids.slice(i, i + 200));
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conc-entries-by-ids"] });
+      qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
+    },
+  });
+}
