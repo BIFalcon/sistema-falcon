@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload, Users,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Send, Trash2, Undo2, Upload, Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
