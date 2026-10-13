@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Send, Trash2, Undo2, Upload, Users,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload, Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,7 +24,6 @@ import { ConciliadosPairs } from "@/components/conciliacao/ConciliadosPairs";
 import { JustificationsPanel } from "@/components/conciliacao/JustificationsPanel";
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
-import { OmieIntegrationTab } from "@/components/conciliacao/OmieIntegrationTab";
 import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
@@ -131,8 +130,7 @@ function ClassifiedList({ title, subtitle, rows, actionLabel, onAction, busy, ex
 /* ------------------------------------------------------------------ */
 
 export default function ConciliacaoCartaoPage() {
-  const { allowedHotels, isMaster, hasRole } = useAuth();
-  const canSeeOmie = isMaster || hasRole("controladoria") || hasRole("patronos");
+  const { allowedHotels } = useAuth();
   // Filtros globais de Contas a Receber (hotel + período) — o período também
   // pode ser ajustado aqui dentro, pelo seletor abaixo.
   const {
@@ -522,7 +520,6 @@ export default function ConciliacaoCartaoPage() {
           <TabsTrigger value="pix" className="text-xs"><Landmark className="h-3.5 w-3.5 mr-1" /> PIX</TabsTrigger>
           <TabsTrigger value="dinheiro" className="text-xs"><Banknote className="h-3.5 w-3.5 mr-1" /> Dinheiro</TabsTrigger>
           <TabsTrigger value="trx-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Total diário por TRX</TabsTrigger>
-          {canSeeOmie && <TabsTrigger value="omie" className="text-xs"><Send className="h-3.5 w-3.5 mr-1" /> Integração OMIE</TabsTrigger>}
           <TabsTrigger value="importacoes" className="text-xs"><Upload className="h-3.5 w-3.5 mr-1" /> Importações</TabsTrigger>
           <TabsTrigger value="codigos" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Códigos TRX</TabsTrigger>
         </TabsList>
@@ -802,11 +799,6 @@ export default function ConciliacaoCartaoPage() {
         </TabsContent>
 
         {/* ---------------- Importações ---------------- */}
-        <TabsContent value="omie" className="mt-4">
-          {!canSeeOmie ? null : needsHotel ? NoHotel : (
-            <OmieIntegrationTab hotelId={hotelId!} dateFrom={dateFrom} dateTo={dateTo} specificDates={specificDates} />
-          )}
-        </TabsContent>
 
         <TabsContent value="importacoes" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
