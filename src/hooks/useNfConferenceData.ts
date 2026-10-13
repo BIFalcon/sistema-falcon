@@ -361,7 +361,7 @@ export function useUploadNfFiles() {
         }));
         const { error } = await supabase
           .from("nf_opera_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: false });
         if (error) throw error;
       }
 
@@ -386,7 +386,7 @@ export function useUploadNfFiles() {
         }));
         const { error } = await supabase
           .from("nf_nota_entries")
-          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: true });
+          .upsert(batch, { onConflict: "entry_key", ignoreDuplicates: false });
         if (error) throw error;
       }
 
