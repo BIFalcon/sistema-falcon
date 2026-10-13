@@ -92,7 +92,7 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
       const code = codeMap.get(op.trx_code.trim());
       for (const a of acqs) {
         const isB2B = a!.source === "b2b";
-        const isPix = m.kind === "pix_extrato" || String(a!.categoria ?? "").toUpperCase().includes("PIX");
+        const isPix = String(a!.categoria ?? "").toUpperCase().includes("PIX");
         out.push({
           id: a!.id,
           tipo: isB2B ? "B2B" : isPix ? "PIX" : "Cartão",
