@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useConciliacaoCartao";
 import templateAsset from "@/assets/omie-contas-receber.xlsx.asset.json";
 
-type Tipo = "Cartão" | "B2B";
+type Tipo = "Cartão" | "B2B" | "PIX";
 
 interface OmieRow {
   id: string; // id da venda da adquirente
@@ -38,7 +38,12 @@ interface Props {
 }
 
 export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }: Props) {
-  const matches = useConcMatches(hotelId, "cartao");
+  const cardMatches = useConcMatches(hotelId, "cartao");
+  const pixMatches = useConcMatches(hotelId, "pix_extrato");
+  const matches = useMemo(
+    () => ({ data: [...(cardMatches.data ?? []), ...(pixMatches.data ?? [])], isLoading: cardMatches.isLoading || pixMatches.isLoading }),
+    [cardMatches.data, pixMatches.data, cardMatches.isLoading, pixMatches.isLoading],
+  );
   const mapping = useTrxCodeMapping();
   const setSent = useSetOmieSent();
   const [showSent, setShowSent] = useState(false);
@@ -71,9 +76,10 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
       const code = codeMap.get(op.trx_code.trim());
       for (const a of acqs) {
         const isB2B = a!.source === "b2b";
+        const isPix = m.kind === "pix_extrato" || String(a!.categoria ?? "").toUpperCase().includes("PIX");
         out.push({
           id: a!.id,
-          tipo: isB2B ? "B2B" : "Cartão",
+          tipo: isB2B ? "B2B" : isPix ? "PIX" : "Cartão",
           categoria: code?.categoria_omie ?? "",
           conta: code?.conta_corrente_omie ?? "",
           valor: a!.valor_liquido ?? null,

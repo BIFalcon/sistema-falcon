@@ -245,6 +245,14 @@ const findCol = (header: string[], ...names: string[]): number => {
   return -1;
 };
 
+/** NSU da Rede; quando vazio ou "-" (PIX), usa os últimos 20 caracteres do ID Transação (limite do OMIE). */
+export function redeNsu(nsu: unknown, idTx: unknown): string | null {
+  const n = String(nsu ?? "").trim();
+  if (n && n !== "-") return n;
+  const id = String(idTx ?? "").trim();
+  return id && id !== "-" ? id.slice(-20) : null;
+}
+
 export const onlyDigits = (v: unknown): string => String(v ?? "").replace(/\D/g, "");
 
 /**
@@ -278,6 +286,7 @@ export async function parseAcquirerExcel(
   const iOrig = findCol(header, "valor da venda original");
   const iNsu = findCol(header, "nsu/cv", "nsu cv", "nsu");
   const iPrazo = findCol(header, "prazo de recebimento", "prazo");
+  const iIdTx = findCol(header, "id transacao");
 
   if (iStatus === -1 || iAmount === -1 || iDate === -1) {
     throw new Error("Cabeçalho da operadora não reconhecido (esperado na 2ª linha).");
@@ -349,7 +358,7 @@ export async function parseAcquirerExcel(
       source: "rede",
       valor_liquido: iLiq !== -1 && r[iLiq] != null && r[iLiq] !== "" ? parseMoney(r[iLiq]) : null,
       valor_original: iOrig !== -1 && r[iOrig] != null && r[iOrig] !== "" ? parseMoney(r[iOrig]) : null,
-      nsu: iNsu !== -1 ? String(r[iNsu] ?? "").trim() || null : null,
+      nsu: redeNsu(iNsu !== -1 ? r[iNsu] : null, iIdTx !== -1 ? r[iIdTx] : null),
       prazo_recebimento: iPrazo !== -1 ? String(r[iPrazo] ?? "").trim() || null : null,
     });
   }
