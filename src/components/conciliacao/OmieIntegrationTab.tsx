@@ -28,6 +28,8 @@ interface OmieRow {
   nsu: string;
   sentAt: string | null;
   trx: string;
+  /** Tabela onde fica a marcação de envio: PIX usa o lançamento do Opera. */
+  table: "conc_acquirer_entries" | "conc_opera_entries";
 }
 
 interface Props {
@@ -70,13 +72,27 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
     for (const m of matches.data ?? []) {
       const ops = m.conc_match_items.filter((i) => i.side === "opera").map((i) => opById.get(i.entry_id)).filter(Boolean);
       const acqs = m.conc_match_items.filter((i) => i.side === "acquirer").map((i) => acqById.get(i.entry_id)).filter(Boolean);
+      if (m.kind === "pix_extrato") {
+        // PIX: 1 linha por lançamento do Opera; NSU/Nota = TRX_NO (único no Opera).
+        for (const o of ops) {
+          if (!o || Number(o.amount) <= 0 || !inPeriod(o.business_date)) continue;
+          const c = codeMap.get(o.trx_code.trim());
+          out.push({
+            id: o.id, tipo: "PIX", table: "conc_opera_entries",
+            categoria: c?.categoria_omie ?? "", conta: c?.conta_corrente_omie ?? "",
+            valor: Number(o.amount), emissao: o.business_date ?? "", vencimento: o.business_date ?? null,
+            nsu: o.trx_no ?? "", sentAt: o.omie_sent_at ?? null, trx: o.trx_code,
+          });
+        }
+        continue;
+      }
       if (!ops.length || !acqs.length) continue;
       const op = [...ops].sort((a, b) => (a!.business_date ?? "").localeCompare(b!.business_date ?? ""))[0]!;
       if (!inPeriod(op.business_date)) continue;
       const code = codeMap.get(op.trx_code.trim());
       for (const a of acqs) {
         const isB2B = a!.source === "b2b";
-        const isPix = m.kind === "pix_extrato" || String(a!.categoria ?? "").toUpperCase().includes("PIX");
+        const isPix = String(a!.categoria ?? "").toUpperCase().includes("PIX");
         out.push({
           id: a!.id,
           tipo: isB2B ? "B2B" : isPix ? "PIX" : "Cartão",
@@ -88,6 +104,7 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
           nsu: (isB2B ? a!.codigo_reserva : a!.nsu) ?? "",
           sentAt: a!.omie_sent_at ?? null,
           trx: op.trx_code,
+          table: "conc_acquirer_entries",
         });
       }
     }
@@ -126,12 +143,16 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
   };
 
   const mark = (value: boolean) => {
-    const list = [...sel].filter((id) => visible.some((r) => r.id === id));
+    const chosen = visible.filter((r) => sel.has(r.id));
+    const list = chosen.map((r) => r.id);
     if (!list.length) return;
-    setSent.mutate({ ids: list, value }, {
-      onSuccess: () => { toast.success(value ? `${list.length} marcada(s) como enviadas ao OMIE` : `${list.length} voltaram para a lista`); setSel(new Set()); },
-      onError: (e: Error) => toast.error(e.message),
-    });
+    const acq = chosen.filter((r) => r.table === "conc_acquirer_entries").map((r) => r.id);
+    const op = chosen.filter((r) => r.table === "conc_opera_entries").map((r) => r.id);
+    Promise.all([
+      acq.length ? setSent.mutateAsync({ ids: acq, value }) : null,
+      op.length ? setSent.mutateAsync({ ids: op, value, table: "conc_opera_entries" }) : null,
+    ]).then(() => { toast.success(value ? `${list.length} marcada(s) como enviadas ao OMIE` : `${list.length} voltaram para a lista`); setSel(new Set()); })
+      .catch((e: Error) => toast.error(e.message));
   };
 
   const loading = matches.isLoading || entries.isLoading;
@@ -141,7 +162,7 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
       <CardContent className="pt-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Conciliações de Cartão e B2B já casadas, no formato de importação do OMIE. Período pela data do Opera.
+            Conciliações de Cartão, B2B e PIX já casadas, no formato de importação do OMIE. Período pela data do Opera.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">

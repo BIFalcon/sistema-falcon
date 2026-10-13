@@ -614,8 +614,14 @@ export default function ConciliacaoCartaoPage() {
                   matches={pixMatches.data ?? []}
                   rowById={matchRowById}
                   periodIds={periodRowIds}
-                  leftSides={["opera", "acquirer"]}
-                  title="PIX conciliados — Opera/Adquirente × Extrato Bancário"
+                  leftSides={["opera"]}
+                  infoSides={["acquirer"]}
+                  columns={[
+                    { label: "Adquirente", sides: ["acquirer"] },
+                    { label: "Opera", sides: ["opera"] },
+                    { label: "Banco", sides: ["bank"] },
+                  ]}
+                  title="PIX conciliados — Adquirente · Opera · Banco"
                   exportName={`pix-conciliados-${hotelId}.xlsx`}
                   onUndoMany={undoMany}
                   undoing={undo.isPending}

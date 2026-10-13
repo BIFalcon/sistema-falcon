@@ -17,8 +17,12 @@ const SIDE_LABEL: Record<string, string> = {
 
 /** Conciliados: mostra os dois lados da equação, com desfazer individual ou em lote. */
 export function ConciliadosPairs({
-  matches, rowById, periodIds, title, leftSides, exportName, onUndoMany, undoing,
+  matches, rowById, periodIds, title, leftSides, exportName, onUndoMany, undoing, columns, infoSides = [],
 }: {
+  /** Quando informado, mostra uma coluna por origem (ex.: Adquirente · Opera · Banco). */
+  columns?: { label: string; sides: string[] }[];
+  /** Origens exibidas mas fora das somas esquerda/direita (evita contar o mesmo PIX duas vezes). */
+  infoSides?: string[];
   matches: ConcMatch[];
   rowById: Map<string, ReconcileRow>;
   /** Ids dentro do filtro atual; a data do Opera define o período. */
@@ -48,8 +52,9 @@ export function ConciliadosPairs({
       }));
       return {
         match: m,
-        left: items.filter((i) => leftSides.includes(i.side)),
-        right: items.filter((i) => !leftSides.includes(i.side)),
+        all: items,
+        left: items.filter((i) => leftSides.includes(i.side) && !infoSides.includes(i.side)),
+        right: items.filter((i) => !leftSides.includes(i.side) && !infoSides.includes(i.side)),
       };
     });
 
@@ -60,7 +65,7 @@ export function ConciliadosPairs({
   const handleExport = () => {
     const data: Record<string, string | number>[] = [];
     groups.forEach((g, idx) => {
-      const all = [...g.left.map((i) => ({ ...i, pos: "Esquerda" })), ...g.right.map((i) => ({ ...i, pos: "Direita" }))];
+      const all = g.all.map((i) => ({ ...i, pos: infoSides.includes(i.side) ? "Informativo" : leftSides.includes(i.side) ? "Esquerda" : "Direita" }));
       for (const i of all) {
         data.push({
           "Conciliação": idx + 1,
@@ -178,6 +183,19 @@ export function ConciliadosPairs({
                       </Button>
                     </span>
                   </div>
+                  {columns ? (
+                    <div className="grid gap-3 md:grid-cols-3 text-[11px]">
+                      {columns.map((c) => {
+                        const all = g.all.filter((i) => c.sides.includes(i.side));
+                        return (
+                          <div key={c.label} className="rounded-md border p-2">
+                            <p className="mb-1 font-semibold">{c.label} · <Money value={all.reduce((s, i) => s + i.amount, 0)} /></p>
+                            <ItemList items={all} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
                   <div className="grid gap-3 md:grid-cols-2 text-[11px]">
                     <div className="rounded-md border p-2">
                       <p className="mb-1 font-semibold">Lado esquerdo · <Money value={l} /></p>
@@ -188,6 +206,7 @@ export function ConciliadosPairs({
                       <ItemList items={g.right} />
                     </div>
                   </div>
+                  )}
                 </li>
               );
             })}

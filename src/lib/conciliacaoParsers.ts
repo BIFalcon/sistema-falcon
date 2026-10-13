@@ -144,6 +144,8 @@ export interface OperaRow {
   room: string;
   guest_full_name: string;
   receipt_no: string;
+  /** Número único da transação no Opera (TRX_NO). */
+  trx_no?: string;
 }
 
 const tagValue = (el: Element, tag: string): string => {
@@ -203,6 +205,7 @@ export async function parseOperaXml(
       room,
       guest_full_name: guest,
       receipt_no: receipt,
+      trx_no: tagValue(el, "TRX_NO").replace(/\.0+$/, "") || undefined,
     });
   }
 

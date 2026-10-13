@@ -211,6 +211,13 @@
       "when": 1791891837881,
       "tag": "0029_conc_omie_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791893417661,
+      "tag": "0030_conc_pix_three_way",
+      "breakpoints": true
     }
   ]
 }

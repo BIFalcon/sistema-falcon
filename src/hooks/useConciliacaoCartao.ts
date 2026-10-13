@@ -35,6 +35,8 @@ export interface OperaEntry {
   room: string | null;
   guest_full_name: string | null;
   receipt_no: string | null;
+  trx_no?: string | null;
+  omie_sent_at?: string | null;
   direct_bank: boolean;
   direct_bank_at: string | null;
   matched_at: string | null;
@@ -383,8 +385,15 @@ export function useImportOpera() {
         room: r.room,
         guest_full_name: r.guest_full_name,
         receipt_no: r.receipt_no,
+        trx_no: r.trx_no ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
+      // Completa o TRX_NO dos lançamentos já importados antes (não sobrescreve).
+      const fill = parsedOpera.rows.filter((r) => r.trx_no && knownOpera.has(r.entry_key)).map((r) => ({ entry_key: r.entry_key, trx_no: r.trx_no }));
+      for (let i = 0; i < fill.length; i += 500) {
+        const { error } = await supabase.rpc("conc_fill_opera_trx_no", { _rows: fill.slice(i, i + 500) as never });
+        if (error) throw error;
+      }
 
       const autoMatched = await runAutoReconcile(hotelId);
       return { inserted: rows.length, skipped, autoMatched, duplicates, skippedCodes: parsedOpera.skippedCodes };
@@ -1068,7 +1077,7 @@ export function useEntriesByIds(ids: string[]) {
         const [a, b, o] = await Promise.all([
           supabase.from("conc_acquirer_entries").select("*").in("id", c),
           supabase.from("conc_bank_entries").select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at").in("id", c),
-          supabase.from("conc_opera_entries").select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at").in("id", c),
+          supabase.from("conc_opera_entries").select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, trx_no, omie_sent_at, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at").in("id", c),
         ]);
         if (a.error) throw a.error;
         if (b.error) throw b.error;
@@ -1104,10 +1113,10 @@ export function useSetOmieSent() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+    mutationFn: async ({ ids, value, table = "conc_acquirer_entries" }: { ids: string[]; value: boolean; table?: "conc_acquirer_entries" | "conc_opera_entries" }) => {
       for (let i = 0; i < ids.length; i += 200) {
         const { error } = await supabase
-          .from("conc_acquirer_entries")
+          .from(table)
           .update({ omie_sent_at: value ? new Date().toISOString() : null, omie_sent_by: value ? user!.id : null })
           .in("id", ids.slice(i, i + 200));
         if (error) throw error;
