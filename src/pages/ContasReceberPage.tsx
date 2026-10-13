@@ -32,6 +32,14 @@ import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePaidBankVerification } from "@/hooks/useConciliacaoCartao";
 import ConciliacaoSection from "@/pages/conciliacao/ConciliacaoCartaoPage";
+import { OmieIntegrationTab } from "@/components/conciliacao/OmieIntegrationTab";
+import { useModuleFilters } from "@/contexts/FilterContext";
+
+function OmieSection() {
+  const { hotelId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
+  if (!hotelId) return <p className="py-8 text-center text-sm text-muted-foreground">Selecione um hotel no topo da página.</p>;
+  return <OmieIntegrationTab hotelId={hotelId} dateFrom={dateFrom} dateTo={dateTo} specificDates={specificDates} />;
+}
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
@@ -278,8 +286,10 @@ export default function ContasReceberPage() {
   // Aba na URL (?aba=) para o cabeçalho saber quando esconder o seletor de período duplicado.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("aba");
-  const tab: "to_invoice" | "open_folio" | "conciliacao" =
-    rawTab === "open_folio" || (rawTab === "conciliacao" && canConciliar) ? rawTab : "to_invoice";
+  // Integração OMIE: só Controladoria, Patronos e Master.
+  const canSeeOmie = isMaster || isPatronos || hasRole("controladoria");
+  const tab: "to_invoice" | "open_folio" | "conciliacao" | "omie" =
+    rawTab === "open_folio" || (rawTab === "conciliacao" && canConciliar) || (rawTab === "omie" && canSeeOmie) ? rawTab : "to_invoice";
   const setTab = (v: typeof tab) => {
     const next = new URLSearchParams(searchParams);
     if (v === "to_invoice") next.delete("aba"); else next.set("aba", v);
@@ -301,6 +311,7 @@ export default function ContasReceberPage() {
           <TabsTrigger value="to_invoice">Faturamento</TabsTrigger>
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
           {canConciliar && <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>}
+          {canSeeOmie && <TabsTrigger value="omie">Integração OMIE</TabsTrigger>}
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
           <ToInvoiceSection
@@ -323,6 +334,11 @@ export default function ContasReceberPage() {
         {canConciliar && (
           <TabsContent value="conciliacao" className="mt-5">
             <ConciliacaoSection />
+          </TabsContent>
+        )}
+        {canSeeOmie && (
+          <TabsContent value="omie" className="mt-5">
+            <OmieSection />
           </TabsContent>
         )}
       </Tabs>
