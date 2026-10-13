@@ -151,9 +151,8 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
     Promise.all([
       acq.length ? setSent.mutateAsync({ ids: acq, value }) : null,
       op.length ? setSent.mutateAsync({ ids: op, value, table: "conc_opera_entries" }) : null,
-    ]).then(() => { toast.success(value ? `${list.length} marcada(s) como enviadas ao OMIE` : `${list.length} voltaram para a lista`); setSel(new Set()); },
-      onError: (e: Error) => toast.error(e.message),
-    });
+    ]).then(() => { toast.success(value ? `${list.length} marcada(s) como enviadas ao OMIE` : `${list.length} voltaram para a lista`); setSel(new Set()); })
+      .catch((e: Error) => toast.error(e.message));
   };
 
   const loading = matches.isLoading || entries.isLoading;
@@ -163,7 +162,7 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
       <CardContent className="pt-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Conciliações de Cartão e B2B já casadas, no formato de importação do OMIE. Período pela data do Opera.
+            Conciliações de Cartão, B2B e PIX já casadas, no formato de importação do OMIE. Período pela data do Opera.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
