@@ -226,6 +226,11 @@ export interface AcquirerRow {
   cnpj: string;
   /** Origem do arquivo: relatório da Rede ou relatório B2B. */
   source: "rede" | "b2b";
+  valor_liquido?: number | null;
+  valor_original?: number | null;
+  nsu?: string | null;
+  prazo_recebimento?: string | null;
+  codigo_reserva?: string | null;
 }
 
 const findCol = (header: string[], ...names: string[]): number => {
@@ -269,6 +274,10 @@ export async function parseAcquirerExcel(
   const iDate = findCol(header, "data da venda", "data");
   const iEstab = findCol(header, "nome do estabelecimento", "estabelecimento");
   const iCnpj = findCol(header, "cnpj do estabelecimento", "cnpj cpf", "cnpj");
+  const iLiq = findCol(header, "valor liquido");
+  const iOrig = findCol(header, "valor da venda original");
+  const iNsu = findCol(header, "nsu/cv", "nsu cv", "nsu");
+  const iPrazo = findCol(header, "prazo de recebimento", "prazo");
 
   if (iStatus === -1 || iAmount === -1 || iDate === -1) {
     throw new Error("Cabeçalho da operadora não reconhecido (esperado na 2ª linha).");
@@ -338,6 +347,10 @@ export async function parseAcquirerExcel(
       status: String(r[iStatus] ?? "").trim(),
       cnpj,
       source: "rede",
+      valor_liquido: iLiq !== -1 && r[iLiq] != null && r[iLiq] !== "" ? parseMoney(r[iLiq]) : null,
+      valor_original: iOrig !== -1 && r[iOrig] != null && r[iOrig] !== "" ? parseMoney(r[iOrig]) : null,
+      nsu: iNsu !== -1 ? String(r[iNsu] ?? "").trim() || null : null,
+      prazo_recebimento: iPrazo !== -1 ? String(r[iPrazo] ?? "").trim() || null : null,
     });
   }
 
@@ -375,6 +388,8 @@ export async function parseB2BExcel(
   const iAmount = findCol(header, "valor da transacao", "valor");
   const iBandeira = findCol(header, "bandeira");
   const iKey = findCol(header, "chave da transacao");
+  const iLiq = findCol(header, "valor liquido");
+  const iReserva = findCol(header, "codigo da reserva", "reserva");
 
   if (iDate === -1 || iStatus === -1 || iAmount === -1) {
     throw new Error("Cabeçalho do relatório B2B não reconhecido (esperado 'Data da transação', 'Status' e 'Valor da transação').");
@@ -411,6 +426,8 @@ export async function parseB2BExcel(
       status,
       cnpj: "",
       source: "b2b",
+      valor_liquido: iLiq !== -1 && r[iLiq] != null && r[iLiq] !== "" ? parseMoney(r[iLiq]) : null,
+      codigo_reserva: iReserva !== -1 ? String(r[iReserva] ?? "").trim() || null : null,
     });
   }
 

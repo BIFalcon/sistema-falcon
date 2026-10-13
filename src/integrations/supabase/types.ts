@@ -1164,6 +1164,7 @@ export type Database = {
           b2b_by: string | null
           bandeira: string | null
           categoria: string | null
+          codigo_reserva: string | null
           created_at: string
           entry_key: string
           establishment_raw: string | null
@@ -1171,11 +1172,17 @@ export type Database = {
           id: string
           matched_at: string | null
           modalidade: string | null
+          nsu: string | null
+          omie_sent_at: string | null
+          omie_sent_by: string | null
+          prazo_recebimento: string | null
           raw: Json
           sale_date: string | null
           source: string
           status: string | null
           upload_id: string | null
+          valor_liquido: number | null
+          valor_original: number | null
         }
         Insert: {
           amount?: number
@@ -1184,6 +1191,7 @@ export type Database = {
           b2b_by?: string | null
           bandeira?: string | null
           categoria?: string | null
+          codigo_reserva?: string | null
           created_at?: string
           entry_key: string
           establishment_raw?: string | null
@@ -1191,11 +1199,17 @@ export type Database = {
           id?: string
           matched_at?: string | null
           modalidade?: string | null
+          nsu?: string | null
+          omie_sent_at?: string | null
+          omie_sent_by?: string | null
+          prazo_recebimento?: string | null
           raw?: Json
           sale_date?: string | null
           source?: string
           status?: string | null
           upload_id?: string | null
+          valor_liquido?: number | null
+          valor_original?: number | null
         }
         Update: {
           amount?: number
@@ -1204,6 +1218,7 @@ export type Database = {
           b2b_by?: string | null
           bandeira?: string | null
           categoria?: string | null
+          codigo_reserva?: string | null
           created_at?: string
           entry_key?: string
           establishment_raw?: string | null
@@ -1211,11 +1226,17 @@ export type Database = {
           id?: string
           matched_at?: string | null
           modalidade?: string | null
+          nsu?: string | null
+          omie_sent_at?: string | null
+          omie_sent_by?: string | null
+          prazo_recebimento?: string | null
           raw?: Json
           sale_date?: string | null
           source?: string
           status?: string | null
           upload_id?: string | null
+          valor_liquido?: number | null
+          valor_original?: number | null
         }
         Relationships: [
           {
@@ -3613,6 +3634,7 @@ export type Database = {
         Args: { _hotel_id?: string }
         Returns: number
       }
+      conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
         Returns: {
