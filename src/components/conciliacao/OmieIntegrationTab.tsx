@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useConciliacaoCartao";
 import templateAsset from "@/assets/omie-contas-receber.xlsx.asset.json";
 
-type Tipo = "Cartão" | "B2B";
+type Tipo = "Cartão" | "B2B" | "PIX";
 
 interface OmieRow {
   id: string; // id da venda da adquirente
