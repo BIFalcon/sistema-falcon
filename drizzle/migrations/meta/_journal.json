@@ -204,6 +204,13 @@
       "when": 1791547164063,
       "tag": "0028_conc_sum_by_receipt",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791891837881,
+      "tag": "0029_conc_omie_integration",
+      "breakpoints": true
     }
   ]
 }
