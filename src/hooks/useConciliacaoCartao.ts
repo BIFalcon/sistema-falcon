@@ -269,10 +269,21 @@ const CHUNK = 500;
 
 /** Conciliação automática: casa pares exatos 1:1 (data + categoria + valor).
  *  Não substitui a conciliação manual — só resolve os casos óbvios. */
-async function runAutoReconcile(hotelId?: string | null) {
+async function runAutoReconcileStrict(hotelId?: string | null) {
   const { data, error } = await supabase.rpc("conc_auto_reconcile", hotelId ? { _hotel_id: hotelId } : {});
   if (error) throw error;
   return (data ?? 0) as number;
+}
+
+/** Usado após importações: o arquivo já foi gravado, então uma falha/lentidão
+ *  na conciliação automática nunca deve fazer o upload parecer que falhou. */
+async function runAutoReconcile(hotelId?: string | null) {
+  try {
+    return await runAutoReconcileStrict(hotelId);
+  } catch (err) {
+    console.warn("Conciliação automática pós-importação falhou:", err);
+    return 0;
+  }
 }
 
 export function useAutoReconcile() {
