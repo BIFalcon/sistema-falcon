@@ -17,8 +17,10 @@ const SIDE_LABEL: Record<string, string> = {
 
 /** Conciliados: mostra os dois lados da equação, com desfazer individual ou em lote. */
 export function ConciliadosPairs({
-  matches, rowById, periodIds, title, leftSides, exportName, onUndoMany, undoing,
+  matches, rowById, periodIds, title, leftSides, exportName, onUndoMany, undoing, columns,
 }: {
+  /** Quando informado, mostra uma coluna por origem (ex.: Adquirente · Opera · Banco). */
+  columns?: { label: string; sides: string[] }[];
   matches: ConcMatch[];
   rowById: Map<string, ReconcileRow>;
   /** Ids dentro do filtro atual; a data do Opera define o período. */
@@ -178,6 +180,19 @@ export function ConciliadosPairs({
                       </Button>
                     </span>
                   </div>
+                  {columns ? (
+                    <div className="grid gap-3 md:grid-cols-3 text-[11px]">
+                      {columns.map((c) => {
+                        const all = [...g.left, ...g.right].filter((i) => c.sides.includes(i.side));
+                        return (
+                          <div key={c.label} className="rounded-md border p-2">
+                            <p className="mb-1 font-semibold">{c.label} · <Money value={all.reduce((s, i) => s + i.amount, 0)} /></p>
+                            <ItemList items={all} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
                   <div className="grid gap-3 md:grid-cols-2 text-[11px]">
                     <div className="rounded-md border p-2">
                       <p className="mb-1 font-semibold">Lado esquerdo · <Money value={l} /></p>
@@ -188,6 +203,7 @@ export function ConciliadosPairs({
                       <ItemList items={g.right} />
                     </div>
                   </div>
+                  )}
                 </li>
               );
             })}
