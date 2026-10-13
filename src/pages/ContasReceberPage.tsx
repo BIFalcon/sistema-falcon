@@ -40,7 +40,6 @@ function OmieSection() {
   if (!hotelId) return <p className="py-8 text-center text-sm text-muted-foreground">Selecione um hotel no topo da página.</p>;
   return <OmieIntegrationTab hotelId={hotelId} dateFrom={dateFrom} dateTo={dateTo} specificDates={specificDates} />;
 }
-import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAllHotels } from "@/hooks/useHotelAssets";
 import {
   useToInvoiceTotals,
