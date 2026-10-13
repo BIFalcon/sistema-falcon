@@ -803,8 +803,8 @@ export default function ConciliacaoCartaoPage() {
 
         {/* ---------------- Importações ---------------- */}
         <TabsContent value="omie" className="mt-4">
-          {needsHotel ? NoHotel : (
-            {canSeeOmie && <OmieIntegrationTab hotelId={hotelId!} dateFrom={dateFrom} dateTo={dateTo} specificDates={specificDates} />}
+          {!canSeeOmie ? null : needsHotel ? NoHotel : (
+            <OmieIntegrationTab hotelId={hotelId!} dateFrom={dateFrom} dateTo={dateTo} specificDates={specificDates} />
           )}
         </TabsContent>
 
