@@ -59,6 +59,12 @@ export interface AcquirerEntry {
   b2b: boolean;
   b2b_at: string | null;
   source: "rede" | "b2b" | string | null;
+  valor_liquido?: number | null;
+  valor_original?: number | null;
+  nsu?: string | null;
+  prazo_recebimento?: string | null;
+  codigo_reserva?: string | null;
+  omie_sent_at?: string | null;
 }
 
 
@@ -397,6 +403,20 @@ export function useImportOpera() {
  *  estáveis (entry_key) já existentes para o hotel. Buscamos as chaves do hotel
  *  página por página em vez de filtrar por milhares de chaves na URL — o filtro
  *  gigante fazia o servidor recusar a requisição ("Bad Request"). */
+/** Reimportação: completa os campos novos (líquido, NSU, prazo, reserva)
+ *  em vendas que já estavam no sistema, sem mexer no resto. */
+async function fillAcquirerExtra(rows: import("@/lib/conciliacaoParsers").AcquirerRow[]) {
+  const withData = rows.filter((r) => r.valor_liquido != null || r.valor_original != null || r.nsu || r.prazo_recebimento || r.codigo_reserva);
+  for (let i = 0; i < withData.length; i += 500) {
+    const chunk = withData.slice(i, i + 500).map((r) => ({
+      entry_key: r.entry_key, valor_liquido: r.valor_liquido ?? null, valor_original: r.valor_original ?? null,
+      nsu: r.nsu ?? null, prazo_recebimento: r.prazo_recebimento ?? null, codigo_reserva: r.codigo_reserva ?? null,
+    }));
+    const { error } = await supabase.rpc("conc_fill_acquirer_extra", { _rows: chunk as never });
+    if (error) throw error;
+  }
+}
+
 async function existingKeys(
   table: "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries",
   hotelId: string,
@@ -460,8 +480,14 @@ export function useImportAcquirer() {
         categoria: r.categoria,
         status: r.status,
         source: r.source,
+        valor_liquido: r.valor_liquido ?? null,
+        valor_original: r.valor_original ?? null,
+        nsu: r.nsu ?? null,
+        prazo_recebimento: r.prazo_recebimento ?? null,
+        codigo_reserva: r.codigo_reserva ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
+      await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
       return { inserted: rows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
@@ -520,8 +546,14 @@ export function useImportB2B() {
         categoria: r.categoria,
         status: r.status,
         source: r.source,
+        valor_liquido: r.valor_liquido ?? null,
+        valor_original: r.valor_original ?? null,
+        nsu: r.nsu ?? null,
+        prazo_recebimento: r.prazo_recebimento ?? null,
+        codigo_reserva: r.codigo_reserva ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
+      await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
       return { inserted: rows.length, skipped, autoMatched, duplicates };
