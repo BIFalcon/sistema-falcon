@@ -65,7 +65,7 @@ export function ConciliadosPairs({
   const handleExport = () => {
     const data: Record<string, string | number>[] = [];
     groups.forEach((g, idx) => {
-      const all = [...g.left.map((i) => ({ ...i, pos: "Esquerda" })), ...g.right.map((i) => ({ ...i, pos: "Direita" }))];
+      const all = g.all.map((i) => ({ ...i, pos: infoSides.includes(i.side) ? "Informativo" : leftSides.includes(i.side) ? "Esquerda" : "Direita" }));
       for (const i of all) {
         data.push({
           "Conciliação": idx + 1,
