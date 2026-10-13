@@ -41,8 +41,8 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
   const cardMatches = useConcMatches(hotelId, "cartao");
   const pixMatches = useConcMatches(hotelId, "pix_extrato");
   const matches = useMemo(
-    () => ({ data: [...(cardMatches.data ?? []), ...(pixMatches.data ?? [])] }),
-    [cardMatches.data, pixMatches.data],
+    () => ({ data: [...(cardMatches.data ?? []), ...(pixMatches.data ?? [])], isLoading: cardMatches.isLoading || pixMatches.isLoading }),
+    [cardMatches.data, pixMatches.data, cardMatches.isLoading, pixMatches.isLoading],
   );
   const mapping = useTrxCodeMapping();
   const setSent = useSetOmieSent();
