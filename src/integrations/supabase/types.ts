@@ -1462,11 +1462,14 @@ export type Database = {
           hotel_id: string
           id: string
           matched_at: string | null
+          omie_sent_at: string | null
+          omie_sent_by: string | null
           raw: Json
           receipt_no: string | null
           room: string | null
           trx_code: string
           trx_desc: string | null
+          trx_no: string | null
           upload_id: string | null
         }
         Insert: {
@@ -1489,11 +1492,14 @@ export type Database = {
           hotel_id: string
           id?: string
           matched_at?: string | null
+          omie_sent_at?: string | null
+          omie_sent_by?: string | null
           raw?: Json
           receipt_no?: string | null
           room?: string | null
           trx_code: string
           trx_desc?: string | null
+          trx_no?: string | null
           upload_id?: string | null
         }
         Update: {
@@ -1516,11 +1522,14 @@ export type Database = {
           hotel_id?: string
           id?: string
           matched_at?: string | null
+          omie_sent_at?: string | null
+          omie_sent_by?: string | null
           raw?: Json
           receipt_no?: string | null
           room?: string | null
           trx_code?: string
           trx_desc?: string | null
+          trx_no?: string | null
           upload_id?: string | null
         }
         Relationships: [
@@ -3635,6 +3644,7 @@ export type Database = {
         Returns: number
       }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
+      conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
         Returns: {
