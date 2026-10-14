@@ -232,6 +232,20 @@
       "when": 1791918103856,
       "tag": "0032_conc_unmatched_partial_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791980530290,
+      "tag": "0033_investor_notification_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791980710202,
+      "tag": "0034_investors_module",
+      "breakpoints": true
     }
   ]
 }

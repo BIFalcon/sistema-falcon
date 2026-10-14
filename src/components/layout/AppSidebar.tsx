@@ -28,6 +28,7 @@ import {
   Inbox,
   Megaphone,
   Palette,
+  Landmark,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,7 @@ import falconLogo from "@/assets/falcon-logo-white.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 import { useAvatarUrl } from "@/hooks/useProfileAvatar";
+import { useInvestorAccess } from "@/hooks/useInvestors";
 
 type LeafItem = {
   title: string;
@@ -63,6 +65,7 @@ type LeafItem = {
   end?: boolean;
   requireMaster?: boolean;
   allowedRoles?: AppRole[];
+  requireInvestorAccess?: boolean;
 };
 
 type GroupItem = LeafItem & {
@@ -174,6 +177,12 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
     ],
   },
   {
+    label: "Investidores",
+    items: [
+      { title: "Investidores", url: "/investidores", icon: Landmark, requireInvestorAccess: true },
+    ],
+  },
+  {
     label: "Configurações",
     items: [
       { title: "Usuários", url: "/configuracoes/usuarios", icon: UserCog, requireMaster: true },
@@ -196,12 +205,14 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { profile, roles, isMaster, hasRole, canViewPerformanceSla } = useAuth();
+  const { data: invAccess } = useInvestorAccess();
 
   // Marketing-only users see ONLY the Marketing area.
   const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
-  const visibleGroups = isMarketingOnly
+  const visibleGroups = (isMarketingOnly
     ? navGroups.filter((g) => g.label === "Marketing")
-    : navGroups;
+    : navGroups
+  ).filter((g) => g.label !== "Investidores" || !!invAccess?.can_access);
 
   // Mostra TODOS os roles do usuário, com prefixo "Master" quando aplicável.
   const roleNames = roles.map((r) => ROLE_LABELS[r] ?? r);
