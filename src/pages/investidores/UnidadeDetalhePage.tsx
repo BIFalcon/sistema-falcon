@@ -15,7 +15,7 @@ export default function UnidadeDetalhePage() {
   const { unitId } = useParams();
   const { data: access, isLoading: al } = useInvestorAccess();
   const [full, setFull] = useState(false);
-  const { data, isLoading, error } = useUnitDetail(access?.can_access ? unitId : undefined, full);
+  const { data, isLoading, error } = useUnitDetail(access?.can_access ? unitId : undefined, full || !!access?.can_view_full);
   const [change, setChange] = useState<null | "investor" | "payee">(null);
   const [editPayee, setEditPayee] = useState(false);
   const { setModalidade } = useInvestorMutations();

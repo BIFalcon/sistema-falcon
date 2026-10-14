@@ -14,7 +14,7 @@ export default function InvestidorDetalhePage() {
   const { investorId } = useParams();
   const { data: access, isLoading: al } = useInvestorAccess();
   const [full, setFull] = useState(false);
-  const { data, isLoading, error } = useInvestorDetail(access?.can_access ? investorId : undefined, full);
+  const { data, isLoading, error } = useInvestorDetail(access?.can_access ? investorId : undefined, full || !!access?.can_view_full);
   const [payeeDlg, setPayeeDlg] = useState<{ open: boolean; payee: PayeeJson | null }>({ open: false, payee: null });
   const { setActive } = useInvestorMutations();
 
