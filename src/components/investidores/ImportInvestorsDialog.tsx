@@ -63,12 +63,12 @@ export function ImportInvestorsDialog({ open, onOpenChange, defaultHotelId }: { 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Importar planilha de investidores</DialogTitle>
           <DialogDescription>Linha 1 com o nome do hotel, linha 2 com o cabeçalho e uma linha por UH. Endereços, nascimento, estado civil e colunas sem título são ignorados.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label>Hotel</Label>
             <Select value={hotelId} onValueChange={(v) => { setHotelId(v); reset(); }}>
@@ -96,7 +96,7 @@ export function ImportInvestorsDialog({ open, onOpenChange, defaultHotelId }: { 
             {parsed.hotelTitle && hotelName && !parsed.hotelTitle.toLowerCase().includes(hotelName.toLowerCase().split(" ").slice(-1)[0]) && (
               <p className="text-sm text-warning-foreground bg-warning/15 rounded p-2">Atenção: a planilha diz "{parsed.hotelTitle}", mas o hotel escolhido é {hotelName}.</p>
             )}
-            <div className="grid grid-cols-5 gap-2 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
               {[["UHs", rows.length], ["UHs novas", novas], ["Investidores", investidores], ["Favorecidos", favorecidos], ["Pendentes / parciais", `${pend} / ${parc}`]].map(([l, v]) => (
                 <div key={String(l)} className="rounded border p-2"><div className="text-lg font-semibold">{v}</div><div className="text-xs text-muted-foreground">{l}</div></div>
               ))}
