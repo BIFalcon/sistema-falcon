@@ -3971,6 +3971,7 @@ export type Database = {
         | "ar_to_invoice_upload_to_hotel"
         | "dre_sla_reminder"
         | "hotel_contexto_request"
+        | "investor_change"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -4175,6 +4176,7 @@ export const Constants = {
         "ar_to_invoice_upload_to_hotel",
         "dre_sla_reminder",
         "hotel_contexto_request",
+        "investor_change",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
