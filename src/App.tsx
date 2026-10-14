@@ -36,6 +36,9 @@ import TreinamentosPage from "./pages/rh/TreinamentosPage";
 import PoliticasPage from "./pages/rh/PoliticasPage";
 import MarketingCalendarioPage from "./pages/marketing/CalendarioPage";
 import PadroesMarcaPage from "./pages/marketing/PadroesMarcaPage";
+import InvestidoresPage from "./pages/investidores/InvestidoresPage";
+import UnidadeDetalhePage from "./pages/investidores/UnidadeDetalhePage";
+import InvestidorDetalhePage from "./pages/investidores/InvestidorDetalhePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
@@ -187,6 +190,9 @@ const App = () => (
               <Route path="/configuracoes/notificacoes" element={<RoleGuard masterOnly><NotificacoesEmailsPage /></RoleGuard>} />
               <Route path="/configuracoes/emails" element={<Navigate to="/configuracoes/notificacoes?aba=emails" replace />} />
               <Route path="/hoteis" element={<Navigate to="/configuracoes/hoteis" replace />} />
+              <Route path="/investidores" element={<InvestidoresPage />} />
+              <Route path="/investidores/uh/:unitId" element={<UnidadeDetalhePage />} />
+              <Route path="/investidores/investidor/:investorId" element={<InvestidorDetalhePage />} />
               <Route path="/perfil" element={<PerfilPage />} />
             </Route>
 
