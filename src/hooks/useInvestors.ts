@@ -123,7 +123,8 @@ function useInvalidate() {
 
 export function useInvestorMutations() {
   const inv = useInvalidate();
-  const wrap = <A,>(fn: (a: A) => Promise<unknown>) => useMutation({ mutationFn: fn, onSuccess: inv });
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const wrap = <A, R>(fn: (a: A) => Promise<R>) => useMutation<R, Error, A>({ mutationFn: fn, onSuccess: inv });
   return {
     importRows: wrap((a: { hotelId: string; modalidade: string; rows: unknown[]; fileName: string }) =>
       rpc<Record<string, number>>("inv_import", { _hotel_id: a.hotelId, _modalidade: a.modalidade, _rows: a.rows, _file_name: a.fileName })),
