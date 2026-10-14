@@ -958,6 +958,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_access_logs: {
+        Row: {
+          acao: string
+          created_at: string
+          detalhe: Json
+          hotel_id: string | null
+          id: string
+          modulo: string
+          registro_id: string | null
+          role: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          detalhe?: Json
+          hotel_id?: string | null
+          id?: string
+          modulo: string
+          registro_id?: string | null
+          role?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          detalhe?: Json
+          hotel_id?: string | null
+          id?: string
+          modulo?: string
+          registro_id?: string | null
+          role?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       be_eight_jti_replay: {
         Row: {
           created_at: string
@@ -2316,6 +2352,104 @@ export type Database = {
           },
         ]
       }
+      investor_payees: {
+        Row: {
+          agencia: string | null
+          banco_codigo: string | null
+          banco_nome: string | null
+          chave_pix: string | null
+          conta: string | null
+          created_at: string
+          documento_favorecido: string | null
+          id: string
+          investor_id: string
+          nome_favorecido: string
+          observacao: string | null
+          status_dados: string
+          tipo_chave_pix: string | null
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          banco_codigo?: string | null
+          banco_nome?: string | null
+          chave_pix?: string | null
+          conta?: string | null
+          created_at?: string
+          documento_favorecido?: string | null
+          id?: string
+          investor_id: string
+          nome_favorecido: string
+          observacao?: string | null
+          status_dados?: string
+          tipo_chave_pix?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          banco_codigo?: string | null
+          banco_nome?: string | null
+          chave_pix?: string | null
+          conta?: string | null
+          created_at?: string
+          documento_favorecido?: string | null
+          id?: string
+          investor_id?: string
+          nome_favorecido?: string
+          observacao?: string | null
+          status_dados?: string
+          tipo_chave_pix?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_payees_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investors: {
+        Row: {
+          ativo: boolean
+          codigo_externo: string | null
+          created_at: string
+          created_by: string | null
+          documento: string | null
+          email: string | null
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_externo?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_externo?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       letter_highlights: {
         Row: {
           closing_id: string
@@ -3457,6 +3591,106 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_investor_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string
+          id: string
+          investor_id: string
+          motivo_troca: string | null
+          payee_id: string | null
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          id?: string
+          investor_id: string
+          motivo_troca?: string | null
+          payee_id?: string | null
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          id?: string
+          investor_id?: string
+          motivo_troca?: string | null
+          payee_id?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_investor_links_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_investor_links_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "investor_payees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_investor_links_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_investor_links_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_pool_units_current"
+            referencedColumns: ["unit_id"]
+          },
+        ]
+      }
+      units: {
+        Row: {
+          codigo_uh: string
+          created_at: string
+          hotel_id: string
+          id: string
+          modalidade: string
+          updated_at: string
+        }
+        Insert: {
+          codigo_uh: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          modalidade?: string
+          updated_at?: string
+        }
+        Update: {
+          codigo_uh?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          modalidade?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "units_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_hotels: {
         Row: {
           created_at: string
@@ -3536,7 +3770,40 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_pool_units_current: {
+        Row: {
+          codigo_uh: string | null
+          data_inicio: string | null
+          hotel_id: string | null
+          investor_id: string | null
+          link_id: string | null
+          payee_id: string | null
+          unit_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_investor_links_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_investor_links_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "investor_payees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       ar_to_invoice_daily_totals: {
@@ -3827,6 +4094,150 @@ export type Database = {
         Returns: boolean
       }
       hotel_slug: { Args: { _name: string }; Returns: string }
+      inv_can_access: { Args: { _uid: string }; Returns: boolean }
+      inv_can_edit: { Args: { _uid: string }; Returns: boolean }
+      inv_can_view_full: { Args: { _uid: string }; Returns: boolean }
+      inv_change_link: {
+        Args: {
+          _data_inicio?: string
+          _investor_id: string
+          _motivo: string
+          _payee_id: string
+          _unit_id: string
+        }
+        Returns: string
+      }
+      inv_import: {
+        Args: {
+          _file_name?: string
+          _hotel_id: string
+          _modalidade: string
+          _rows: Json
+        }
+        Returns: Json
+      }
+      inv_investor_detail: {
+        Args: { _full?: boolean; _investor_id: string }
+        Returns: Json
+      }
+      inv_is_finance: { Args: { _uid: string }; Returns: boolean }
+      inv_list_payees: {
+        Args: { _investor_id: string }
+        Returns: {
+          documento: string
+          id: string
+          nome_favorecido: string
+          status_dados: string
+        }[]
+      }
+      inv_list_units: {
+        Args: {
+          _hotel_id?: string
+          _limit?: number
+          _modalidade?: string
+          _offset?: number
+          _search?: string
+          _status?: string
+        }
+        Returns: {
+          codigo_uh: string
+          hotel_id: string
+          hotel_name: string
+          investor_documento: string
+          investor_id: string
+          investor_nome: string
+          modalidade: string
+          payee_id: string
+          payee_nome: string
+          status_dados: string
+          total_count: number
+          unit_id: string
+          vigente_desde: string
+        }[]
+      }
+      inv_log: {
+        Args: {
+          _acao: string
+          _detalhe: Json
+          _hotel_id: string
+          _registro_id: string
+        }
+        Returns: undefined
+      }
+      inv_mask_agencia: { Args: { _a: string }; Returns: string }
+      inv_mask_conta: { Args: { _c: string }; Returns: string }
+      inv_mask_doc: { Args: { _d: string }; Returns: string }
+      inv_mask_pix: { Args: { _k: string }; Returns: string }
+      inv_my_access: { Args: never; Returns: Json }
+      inv_payee_json: {
+        Args: {
+          _full: boolean
+          p: Database["public"]["Tables"]["investor_payees"]["Row"]
+        }
+        Returns: Json
+      }
+      inv_payee_status: {
+        Args: { _agencia: string; _banco: string; _conta: string; _pix: string }
+        Returns: string
+      }
+      inv_pending_export: {
+        Args: { _hotel_id?: string }
+        Returns: {
+          codigo_uh: string
+          falta: string
+          favorecido: string
+          hotel_name: string
+          investidor: string
+          observacao: string
+          status_dados: string
+        }[]
+      }
+      inv_require_edit: { Args: never; Returns: undefined }
+      inv_save_investor: {
+        Args: {
+          _codigo_externo: string
+          _documento: string
+          _email: string
+          _id: string
+          _nome: string
+          _telefone: string
+        }
+        Returns: string
+      }
+      inv_save_payee: {
+        Args: { _data: Json; _id: string; _investor_id: string }
+        Returns: string
+      }
+      inv_search_investors: {
+        Args: { _q: string }
+        Returns: {
+          ativo: boolean
+          codigo_externo: string
+          documento: string
+          id: string
+          nome: string
+        }[]
+      }
+      inv_set_investor_active: {
+        Args: { _ativo: boolean; _id: string }
+        Returns: undefined
+      }
+      inv_set_modalidade: {
+        Args: { _modalidade: string; _unit_ids: string[] }
+        Returns: number
+      }
+      inv_set_observacao: {
+        Args: { _observacao: string; _payee_ids: string[] }
+        Returns: number
+      }
+      inv_stats: {
+        Args: { _hotel_id?: string; _modalidade?: string }
+        Returns: Json
+      }
+      inv_unit_detail: {
+        Args: { _full?: boolean; _unit_id: string }
+        Returns: Json
+      }
       is_ap_manager: { Args: { _user_id: string }; Returns: boolean }
       is_ar_manager: { Args: { _user_id: string }; Returns: boolean }
       is_dre_uploader: { Args: { _user_id: string }; Returns: boolean }
