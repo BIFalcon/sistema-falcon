@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, Upload, Search } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useModuleFilters } from "@/contexts/FilterContext";
 import { fetchPendingExport, useInvestorAccess, useInvestorMutations, useInvestorStats, useInvestorUnits } from "@/hooks/useInvestors";
 import { StatusSelo, fmtDate } from "@/components/investidores/StatusSelo";
 import { ImportInvestorsDialog } from "@/components/investidores/ImportInvestorsDialog";
@@ -19,10 +19,13 @@ const ALL = "__all";
 const PAGE = 50;
 
 export default function InvestidoresPage() {
-  const { allowedHotels } = useAuth();
   const { data: access, isLoading: accessLoading } = useInvestorAccess();
   const [params, setParams] = useSearchParams();
-  const hotelId = params.get("hotel");
+  const { hotelId, setHotelId } = useModuleFilters("global");
+  useEffect(() => {
+    const h = params.get("hotel");
+    if (h) { setHotelId(h); const p = new URLSearchParams(params); p.delete("hotel"); setParams(p, { replace: true }); }
+  }, [params, setHotelId, setParams]);
   const [modalidade, setModalidade] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
@@ -77,10 +80,6 @@ export default function InvestidoresPage() {
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
-        <Select value={hotelId ?? ALL} onValueChange={(v) => { const p = new URLSearchParams(params); if (v === ALL) p.delete("hotel"); else p.set("hotel", v); setParams(p, { replace: true }); }}>
-          <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value={ALL}>Todos os hotéis</SelectItem>{allowedHotels.map((h) => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}</SelectContent>
-        </Select>
         <Select value={modalidade ?? ALL} onValueChange={(v) => setModalidade(v === ALL ? null : v)}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value={ALL}>Pool e Condo</SelectItem><SelectItem value="pool">Pool</SelectItem><SelectItem value="condo">Condo</SelectItem></SelectContent>
