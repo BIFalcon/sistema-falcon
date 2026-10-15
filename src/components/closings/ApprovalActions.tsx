@@ -116,14 +116,20 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     }
   }
 
-  if (currentStatus === "aprovado" || currentStatus === "nao_iniciado" || currentStatus === "nao_aplicavel") {
-    return null;
+  // DRE aprovada: só Fernando ou Master podem devolver (reabre o envio de nova versão).
+  const canUnapprove = !isCarta && currentStatus === "aprovado" && (isMaster || roles.includes("fernando" as AppRole));
+  if ((currentStatus === "aprovado" && !canUnapprove) || currentStatus === "nao_iniciado" || currentStatus === "nao_aplicavel") {
+    return currentStatus === "aprovado" && !isCarta ? (
+      <p className="text-xs text-muted-foreground">DRE aprovada. Somente Fernando ou Master podem devolvê-la.</p>
+    ) : null;
   }
+  const showApprove = !!nextStatus && currentStatus !== "aprovado";
+  const canReturn = canApprove || canUnapprove;
 
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {nextStatus && (
+        {showApprove && (
           <Button
             onClick={handleApprove}
             disabled={!canApprove || updateStatus.isPending || recordApproval.isPending}
@@ -137,7 +143,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
           <Button
             variant="outline"
             onClick={() => setReturnOpen(true)}
-            disabled={!canApprove}
+            disabled={!canReturn}
             className="gap-2"
           >
             <Undo2 className="h-4 w-4" />
@@ -146,7 +152,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
         )}
       </div>
 
-      {!canApprove && requiredRole && (
+      {!canApprove && !canUnapprove && requiredRole && (
         <p className="text-xs text-muted-foreground mt-2">
           Apenas usuários com papel <strong>{STATUS_LABELS[currentStatus]}</strong> podem aprovar este estágio.
         </p>

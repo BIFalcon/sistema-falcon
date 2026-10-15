@@ -3,12 +3,13 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Eye, Plus } from "lucide-react";
+import { ArrowLeft, Eye, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useInvestorAccess, useInvestorDetail, useInvestorMutations, type PayeeJson } from "@/hooks/useInvestors";
 import { StatusSelo, fmtDate } from "@/components/investidores/StatusSelo";
 import { PayeeCard } from "@/components/investidores/PayeeCard";
 import { PayeeFormDialog } from "@/components/investidores/PayeeFormDialog";
+import { InvestorFormDialog } from "@/components/investidores/InvestorFormDialog";
 
 export default function InvestidorDetalhePage() {
   const { investorId } = useParams();
@@ -17,6 +18,7 @@ export default function InvestidorDetalhePage() {
   const { data, isLoading, error } = useInvestorDetail(access?.can_access ? investorId : undefined, full || !!access?.can_view_full);
   const [payeeDlg, setPayeeDlg] = useState<{ open: boolean; payee: PayeeJson | null }>({ open: false, payee: null });
   const { setActive } = useInvestorMutations();
+  const [editOpen, setEditOpen] = useState(false);
 
   if (al) return <div className="p-6 text-muted-foreground">Carregando…</div>;
   if (!access?.can_access) return <Navigate to="/" replace />;
@@ -33,6 +35,7 @@ export default function InvestidorDetalhePage() {
         </div>
         <div className="flex gap-2">
           {access.can_edit && access.can_view_full && !access.is_finance && !data.full && <Button variant="outline" onClick={() => setFull(true)}><Eye className="h-4 w-4 mr-1" />Mostrar dados completos</Button>}
+          {access.can_edit && data.full && <Button variant="outline" onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-1" />Editar dados</Button>}
           {access.can_edit && <Button variant="outline" onClick={() => setActive.mutateAsync({ id: investor.id, ativo: !investor.ativo }).then(() => toast.success(investor.ativo ? "Investidor inativado" : "Investidor reativado")).catch((e) => toast.error(e.message))}>{investor.ativo ? "Inativar" : "Reativar"}</Button>}
         </div>
       </div>
@@ -72,6 +75,7 @@ export default function InvestidorDetalhePage() {
         </CardContent>
       </Card>
 
+      <InvestorFormDialog open={editOpen} onOpenChange={setEditOpen} investor={investor} />
       <PayeeFormDialog open={payeeDlg.open} onOpenChange={(o) => setPayeeDlg((s) => ({ ...s, open: o }))} investorId={investor.id} payee={payeeDlg.payee} />
     </div>
   );

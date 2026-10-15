@@ -780,6 +780,36 @@ export function useUnscheduleEntries() {
 }
 
 /**
+ * Desmarca "Pago": volta para "Em Aprovação", limpa data/valor/juros pagos e
+ * devolve à lista principal os que tinham ido para o histórico de pagos.
+ */
+export function useUnmarkPaidEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { entryIds: string[] }) => {
+      if (input.entryIds.length === 0) return 0;
+      const { data, error } = await supabase
+        .from("ap_entries")
+        .update({ payment_status: "em_aprovacao", payment_paid_at: null, paid_amount: null, paid_interest: null, scheduled_date: null, is_pending: false } as never)
+        .in("id", input.entryIds)
+        .in("payment_status", ["pago", "pago_parcialmente"])
+        .select("id");
+      if (error) throw error;
+      const { error: e2 } = await supabase
+        .from("ap_entries")
+        .update({ archived_at: null, archived_reason: null, archived_upload_id: null } as never)
+        .in("id", input.entryIds)
+        .eq("archived_reason", "paid_history");
+      if (e2) throw e2;
+      return data?.length ?? 0;
+    },
+    onSuccess: () => {
+      ["ap-entries", "ap-entries-all", "ap-paid", "ap-paid-all"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    },
+  });
+}
+
+/**
  * Marca/desmarca em lote o flag "Pendente" (paralelo ao status).
  */
 export function useSetEntryPending() {

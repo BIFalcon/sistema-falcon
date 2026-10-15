@@ -68,7 +68,8 @@ export default function DrePage() {
   const { data: downloadLog = [] } = useDreDownloadLog(canSeeDownloaders ? resolvedId : null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const canUpload = isMaster || hasRole("controladoria") || hasRole("gop");
+  const dreLocked = closing?.status_dre === "aprovado" && !(closing as { is_historical?: boolean } | undefined)?.is_historical;
+  const canUpload = (isMaster || hasRole("controladoria") || hasRole("gop")) && !dreLocked;
   // ADM tem acesso apenas de leitura: baixar/visualizar DRE e comentar.
   // Nunca pode aprovar/devolver — escondemos totalmente o card de ações.
   const canSeeApprovalActions = !hasRole("adm") || isMaster
@@ -212,6 +213,7 @@ export default function DrePage() {
                   </Button>
                 </>
               )}
+              {dreLocked && <span className="text-xs text-muted-foreground">Aprovada pelo Fernando — envio bloqueado até devolução.</span>}
             </div>
 
             {versions.length === 0 ? (

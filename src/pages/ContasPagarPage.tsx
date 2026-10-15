@@ -16,7 +16,12 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Undo2, Upload, Wallet, CalendarIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -75,6 +80,7 @@ import {
   useLatestApUpload,
   useSetEntryPaymentStatus,
   useUnscheduleEntries,
+  useUnmarkPaidEntries,
   useSetEntryPending,
   useTodayBankBalance,
   useUpsertBankBalance,
@@ -176,6 +182,7 @@ export default function ContasPagarPage() {
   const upsertBalance = useUpsertBankBalance();
   const setPaymentStatus = useSetEntryPaymentStatus();
   const unscheduleEntries = useUnscheduleEntries();
+  const unmarkPaid = useUnmarkPaidEntries();
   const setPending = useSetEntryPending();
   const upsertCard = useUpsertCardReceivable();
   const updateCard = useUpdateCardReceivable();
@@ -1866,6 +1873,26 @@ export default function ContasPagarPage() {
                         <CheckCircle2 className="h-3.5 w-3.5" /> Quitar
                       </Button>
                     )}
+                    {showPaid && canMarkPaid && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-8"
+                        disabled={selectedIds.size === 0 || unmarkPaid.isPending}
+                        title="Desfaz o pagamento: volta para Em Aprovação e limpa data e valor pagos"
+                        onClick={async () => {
+                          const ids = Array.from(selectedIds);
+                          if (!confirm(`Desmarcar ${ids.length} lançamento(s) como pago? Eles voltam para "Em Aprovação" e a data/valor pagos são apagados.`)) return;
+                          try {
+                            const n = await unmarkPaid.mutateAsync({ entryIds: ids });
+                            toast.success(`${n} lançamento(s) voltaram para Em Aprovação`);
+                            setSelectedIds(new Set());
+                          } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao desmarcar pago"); }
+                        }}
+                      >
+                        <Undo2 className="h-3.5 w-3.5" /> Desmarcar Pago
+                      </Button>
+                    )}
                     {showPaid && canManage && selectedIds.size > 0 && (
                       <Button
                         size="sm"
@@ -2329,9 +2356,24 @@ export default function ContasPagarPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
                 Data de agendamento
               </label>
-              <BrDateInput value={scheduledDate}
- onChange={setScheduledDate}
- />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !scheduledDate && "text-muted-foreground")}>
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {scheduledDate ? format(parseISO(scheduledDate), "dd/MM/yyyy") : "Escolha a data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={ptBR}
+                    selected={scheduledDate ? parseISO(scheduledDate) : undefined}
+                    onSelect={(d) => d && setScheduledDate(format(d, "yyyy-MM-dd"))}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
