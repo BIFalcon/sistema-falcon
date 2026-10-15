@@ -16,7 +16,12 @@
  *  - todos os useMemo de derivação    → hooks/useApPageDerived.ts
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, Building2, CalendarClock, CalendarX, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, FileDown, FileSpreadsheet, Filter, Loader2, Mail, Pencil, Plus, Search, ShieldCheck, Trash2, Undo2, Upload, Wallet, CalendarIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
