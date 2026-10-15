@@ -331,6 +331,9 @@ export function parsePrefeituraNotas(
         for (const row of rows.slice(headerRowIndex + 1)) {
           const numero = iNumero >= 0 ? String(row[iNumero] ?? "").trim() : "";
           if (!numero) continue;
+          // Linhas de rodapé/vazias (só o número preenchido, ou "Total") não são notas.
+          const filled = row.filter((c: unknown) => String(c ?? "").trim() !== "").length;
+          if (filled <= 1 || !/\d/.test(numero)) continue;
 
           const situacao = iSituacao >= 0 ? String(row[iSituacao] ?? "").trim() : "";
           // Só descarta o que está explicitamente cancelado/substituído.

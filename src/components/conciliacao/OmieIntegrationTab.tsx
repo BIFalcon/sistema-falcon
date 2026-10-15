@@ -98,7 +98,8 @@ export function OmieIntegrationTab({ hotelId, dateFrom, dateTo, specificDates }:
           tipo: isB2B ? "B2B" : isPix ? "PIX" : "Cartão",
           categoria: code?.categoria_omie ?? "",
           conta: code?.conta_corrente_omie ?? "",
-          valor: a!.valor_liquido ?? null,
+          // Cartão/PIX da Rede: valor bruto da venda. B2B mantém o líquido.
+          valor: isB2B ? a!.valor_liquido ?? null : (a!.amount != null ? Number(a!.amount) : null),
           emissao: op.business_date ?? "",
           vencimento: isB2B ? vencimentoB2B(a!.sale_date) : vencimentoPorPrazo(a!.sale_date, a!.prazo_recebimento),
           nsu: (isB2B ? a!.codigo_reserva : a!.nsu) ?? "",
