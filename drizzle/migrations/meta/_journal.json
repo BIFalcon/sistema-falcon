@@ -253,6 +253,13 @@
       "when": 1791981407167,
       "tag": "0035_investors_full_view_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792064037797,
+      "tag": "0036_dre_lock_after_fernando_and_petropolis_no_carta",
+      "breakpoints": true
     }
   ]
 }
