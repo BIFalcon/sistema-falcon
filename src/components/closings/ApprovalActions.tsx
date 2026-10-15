@@ -116,9 +116,15 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     }
   }
 
-  if (currentStatus === "aprovado" || currentStatus === "nao_iniciado" || currentStatus === "nao_aplicavel") {
-    return null;
+  // DRE aprovada: só Fernando ou Master podem devolver (reabre o envio de nova versão).
+  const canUnapprove = !isCarta && currentStatus === "aprovado" && (isMaster || roles.includes("fernando" as AppRole));
+  if ((currentStatus === "aprovado" && !canUnapprove) || currentStatus === "nao_iniciado" || currentStatus === "nao_aplicavel") {
+    return currentStatus === "aprovado" && !isCarta ? (
+      <p className="text-xs text-muted-foreground">DRE aprovada. Somente Fernando ou Master podem devolvê-la.</p>
+    ) : null;
   }
+  const showApprove = !!nextStatus && currentStatus !== "aprovado";
+  const canReturn = canApprove || canUnapprove;
 
   return (
     <>
