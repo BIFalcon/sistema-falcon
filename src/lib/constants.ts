@@ -105,7 +105,7 @@ export const STATUS_TONE: Record<ClosingStatus, StatusTone> = {
 };
 
 // Hotéis que pulam a Carta ao Investidor (exceção documentada).
-export const HOTELS_WITHOUT_CARTA = ["ibis-budget-recife"] as const;
+export const HOTELS_WITHOUT_CARTA = ["ibis-budget-recife", "ibis-budget-petropolis"] as const;
 
 export function hotelSkipsCarta(hotelId: string | null | undefined): boolean {
   if (!hotelId) return false;
