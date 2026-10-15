@@ -129,7 +129,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {nextStatus && (
+        {showApprove && (
           <Button
             onClick={handleApprove}
             disabled={!canApprove || updateStatus.isPending || recordApproval.isPending}
@@ -143,7 +143,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
           <Button
             variant="outline"
             onClick={() => setReturnOpen(true)}
-            disabled={!canApprove}
+            disabled={!canReturn}
             className="gap-2"
           >
             <Undo2 className="h-4 w-4" />
@@ -152,7 +152,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
         )}
       </div>
 
-      {!canApprove && requiredRole && (
+      {!canApprove && !canUnapprove && requiredRole && (
         <p className="text-xs text-muted-foreground mt-2">
           Apenas usuários com papel <strong>{STATUS_LABELS[currentStatus]}</strong> podem aprovar este estágio.
         </p>
