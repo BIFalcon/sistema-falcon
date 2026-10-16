@@ -213,7 +213,7 @@ export default function ConferenciaNotasFiscaisPage() {
       setOperaFile(null);
       setPrefeituraFile(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
+      toast.error(err instanceof Error ? err.message : (err as { message?: string })?.message || "Erro ao processar arquivos");
     }
   };
 

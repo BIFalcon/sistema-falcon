@@ -58,16 +58,24 @@ function toIsoDate(raw: unknown): string {
   if (!s) return "";
   // Já vem em ISO (ex.: "2026-08-29" ou "2026-08-29 00:00:00")
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) return validYmd(iso[1], iso[2], iso[3]);
   const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
   if (m) {
     const dd = m[1].padStart(2, "0");
     const mm = m[2].padStart(2, "0");
     let yyyy = m[3];
     if (yyyy.length === 2) yyyy = (parseInt(yyyy, 10) > 50 ? "19" : "20") + yyyy;
-    return `${yyyy}-${mm}-${dd}`;
+    return validYmd(yyyy, mm, dd);
   }
-  return s;
+  // Data incompleta/ilegível (ex.: "2026-08"): fica vazia e a nota concilia pelos demais dados.
+  return "";
+}
+
+function validYmd(y: string, m: string, d: string): string {
+  const yy = +y, mm = +m, dd = +d;
+  const dt = new Date(Date.UTC(yy, mm - 1, dd));
+  if (dt.getUTCFullYear() !== yy || dt.getUTCMonth() !== mm - 1 || dt.getUTCDate() !== dd) return "";
+  return `${y}-${m}-${d}`;
 }
 
 function parseMoney(raw: unknown): number {
