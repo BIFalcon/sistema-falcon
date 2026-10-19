@@ -1,3 +1,4 @@
+- [ ] Corrigir visualização/download da carta sem fallback silencioso e sem alterar versões; testar o fluxo.
 - [x] Unificar fonte e leitura da planilha mensal de RH por competência e hotel.
 - [x] Substituir o mês inteiro em uma operação segura, mantendo histórico de outros meses.
 - [x] Alimentar Turnover e Custo e Folha pela fonte única; remover envio do Turnover.
