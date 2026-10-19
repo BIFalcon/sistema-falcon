@@ -7,5 +7,6 @@
 - [x] Atualizar gráficos de Turnover, fórmula única, histórico mensal e rolagem do ranking; testar regras.
 - [ ] Conferir gráficos e ranking com sessão real — bloqueado: preview sem login e sem conta correspondente ao solicitante.
 - [x] Mover comparação de turnover por hotel para o Ranking, substituindo a lista pelo gráfico.
-- [ ] Aplicar classificação aprovada de cargos aos departamentos nos custos atuais e futuras importações; reservas/comercial em Hospedagem e Serviços Gerais em Governança.
-- [ ] Mostrar percentuais após as barras do Ranking e permitir baixar o gráfico completo como imagem.
+- [x] Aplicar classificação aprovada de cargos aos departamentos nos custos atuais e futuras importações; reservas/comercial em Hospedagem e Serviços Gerais em Governança.
+- [x] Mostrar percentuais após as barras do Ranking e permitir baixar o gráfico completo como imagem.
+- [ ] Conferir download de imagem no Ranking com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
