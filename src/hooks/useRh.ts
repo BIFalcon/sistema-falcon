@@ -128,12 +128,12 @@ export function useRhEmployees(
       // Dedup por hotel+matrícula mantendo a referência mais recente (que já
       // carrega a rescisão, quando houver).
       const byKey = new Map<string, RhEmployee>();
-      const events = new Map<string, Array<{ movement: unknown; month: number | null; year: number | null; termination_date: string | null }>>();
+      const events = new Map<string, Array<{ movement: unknown; month: number | null; year: number | null; termination_date: string | null; employee: RhEmployee }>>();
       for (const e of results.flat()) {
         const key = `${e.hotel_id}|${e.employee_key || e.id}`;
         if (e.source_format === "CONSOLIDADO") {
           const history = events.get(key) ?? [];
-          history.push({ movement: e.raw.movement, month: e.reference_month, year: e.reference_year, termination_date: e.termination_date });
+          history.push({ movement: e.raw.movement, month: e.reference_month, year: e.reference_year, termination_date: e.termination_date, employee: e });
           events.set(key, history);
         }
         const prev = byKey.get(key);
@@ -142,7 +142,7 @@ export function useRhEmployees(
           continue;
         }
         const rank = (x: RhEmployee) => (x.reference_year ?? 0) * 12 + (x.reference_month ?? 0);
-        if (rank(e) > rank(prev) || (!prev.termination_date && e.termination_date)) byKey.set(key, e);
+        if (rank(e) > rank(prev)) byKey.set(key, e);
       }
       return Array.from(byKey, ([key, employee]) => ({ ...employee, raw: { ...employee.raw, monthly_events: events.get(key) } }));
     },
