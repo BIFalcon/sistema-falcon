@@ -1,14 +1,15 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, Loader2, Download, AlertTriangle } from "lucide-react";
+import { Upload, Loader2, Download, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { canUploadRh } from "@/lib/rhAccess";
+import { sortPayrollEntries, type PayrollSort, type PayrollSortKey } from "@/lib/payrollSort";
 import type { RhMonthlyResult } from "@/lib/rhMonthlyParser";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
@@ -18,6 +19,14 @@ import {
 } from "@/hooks/useRhPayroll";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const EMPLOYEE_COLUMNS: { key: PayrollSortKey; label: string; numeric?: boolean }[] = [
+  { key: "employee_name", label: "Funcionário" },
+  { key: "position", label: "Função" },
+  { key: "department", label: "Departamento" },
+  { key: "admission_date", label: "Admissão" },
+  { key: "base_salary", label: "Sal. Base", numeric: true },
+  { key: "total_cost", label: "Total", numeric: true },
+];
 
 function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
   return (
@@ -42,10 +51,15 @@ export default function CustoFolhaPage() {
   const [warnings, setWarnings] = useState<RhMonthlyResult["unknownHotels"]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [employeeSort, setEmployeeSort] = useState<PayrollSort | null>(null);
 
   const { data: s, isLoading } = usePayrollSummary(hotelId, month, year);
   const { data: history = [] } = usePayrollHistory(hotelId, year);
   const { data: entries = [] } = usePayrollEntries(isRhManager, hotelId, month, year);
+  const sortedEntries = useMemo(() => sortPayrollEntries(entries, employeeSort), [entries, employeeSort]);
+  const toggleEmployeeSort = (key: PayrollSortKey) => {
+    setEmployeeSort(current => ({ key, direction: current?.key === key && current.direction === "asc" ? "desc" : "asc" }));
+  };
   const { data: roomnights } = usePayrollRoomnights(hotelId, month, year);
   const upload = useUploadPayroll();
   const hotelName = allowedHotels.find((h) => h.id === hotelId)?.name ?? hotelId ?? "";
@@ -196,13 +210,23 @@ export default function CustoFolhaPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      <th className="py-2 pr-3">Funcionário</th><th className="py-2 pr-3">Função</th>
-                      <th className="py-2 pr-3">Departamento</th><th className="py-2 pr-3">Admissão</th>
-                      <th className="py-2 pr-3 text-right">Sal. Base</th><th className="py-2 text-right">Total</th>
+                      {EMPLOYEE_COLUMNS.map(column => {
+                        const active = employeeSort?.key === column.key;
+                        const Icon = active ? (employeeSort.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                        return (
+                          <th key={column.key} scope="col" aria-sort={active ? (employeeSort.direction === "asc" ? "ascending" : "descending") : "none"}
+                            className={`py-2 ${column.key === "total_cost" ? "" : "pr-3"} ${column.numeric ? "text-right" : ""}`}>
+                            <Button variant="ghost" onClick={() => toggleEmployeeSort(column.key)}
+                              className={`h-auto min-h-8 w-full px-0 py-1 text-[10px] font-semibold uppercase ${column.numeric ? "justify-end" : "justify-start"} ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                              {column.label}<Icon className="ml-1 h-3 w-3 shrink-0" aria-hidden="true" />
+                            </Button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {entries.map((e) => (
+                    {sortedEntries.map((e) => (
                       <tr key={e.id}>
                         <td className="py-2 pr-3">{e.employee_name}</td>
                         <td className="py-2 pr-3">{e.position ?? "—"}</td>
