@@ -7,4 +7,4 @@
 - [x] Atualizar gráficos de Turnover, fórmula única, histórico mensal e rolagem do ranking; testar regras.
 - [ ] Conferir gráficos e ranking com sessão real — bloqueado: preview sem login e sem conta correspondente ao solicitante.
 - [x] Mover comparação de turnover por hotel para o Ranking, substituindo a lista pelo gráfico.
-- [ ] Corrigir agrupamento de custos por departamento — bloqueado: arquivo mensal não contém Departamento; requer escolha entre adicionar a coluna ou fornecer classificação de cargos.
+- [ ] Corrigir agrupamento de custos por departamento usando classificação de cargos — bloqueado: aguarda relação Cargo → Departamento fornecida ou validada pelo usuário.
