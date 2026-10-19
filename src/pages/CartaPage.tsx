@@ -16,7 +16,6 @@ import {
   useGenerateLetterAi,
   useLetterHighlights,
   useLetterVersions,
-  downloadLetterPdfBlob,
 } from "@/hooks/useLetter";
 import { useDreIndicators } from "@/hooks/useDre";
 import { useHotel, useFalconLogo } from "@/hooks/useHotelAssets";
@@ -32,6 +31,7 @@ import { getSignedPrivateUrl } from "@/lib/privateStorage";
 import { ArrowLeft, FileDown, Save, Loader2, AlertTriangle, RefreshCw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { generateLetterPdf } from "@/lib/letterPdf";
+import { requireLetterPdfBlob } from "@/lib/letterPdfFlow";
 import { supabase } from "@/integrations/supabase/client";
 import type { IndicatorKey } from "@/lib/dreParser";
 
@@ -417,35 +417,32 @@ export default function CartaPage() {
     }
   }
 
-  /** Gera o PDF na hora (layout atual) e, se falhar, cai para o arquivo salvo. */
-  async function buildFreshPdfBlob(): Promise<Blob | null> {
-    if (!letter || !closing || !assetsReady) return null;
-    try {
-      const [hotelCoverUrl, brandLogoUrl] = await Promise.all([
-        getSignedPrivateUrl(hotelRow?.cover_url ?? null, "hotel-assets"),
-        getSignedPrivateUrl(hotelRow?.brand_logo_url ?? null, "hotel-assets"),
-      ]);
-      return await generateLetterPdf({
-        letter,
-        closing,
-        hotel,
-        hotelCoverUrl,
-        brandLogoUrl,
-        falconLogoUrl: falconLogoUrl ?? null,
-        highlights,
-        indicators: indicatorMap,
-        previousIndicators: prevIndicatorMap,
-      });
-    } catch {
-      return null;
-    }
+  /** Gera o PDF atual sem substituir falhas pelo arquivo salvo. */
+  async function buildFreshPdfBlob(): Promise<Blob> {
+    if (!letter || !closing) throw new Error("Os dados da carta ainda não estão disponíveis. Tente novamente.");
+    if (!assetsReady) throw new Error(`Não foi possível gerar a carta: imagens indisponíveis (${missingAssets.join(", ")}).`);
+    const [hotelCoverUrl, brandLogoUrl] = await Promise.all([
+      getSignedPrivateUrl(hotelRow?.cover_url ?? null, "hotel-assets"),
+      getSignedPrivateUrl(hotelRow?.brand_logo_url ?? null, "hotel-assets"),
+    ]);
+    return await generateLetterPdf({
+      letter,
+      closing,
+      hotel,
+      hotelCoverUrl,
+      brandLogoUrl,
+      falconLogoUrl: falconLogoUrl ?? null,
+      highlights,
+      indicators: indicatorMap,
+      previousIndicators: prevIndicatorMap,
+    });
   }
 
   async function handleDownloadPdf() {
     if (!letter?.pdf_url) return;
     const filename = letter.pdf_url.split("/").pop() ?? "carta-investidor.pdf";
     try {
-      const blob = (await buildFreshPdfBlob()) ?? (await downloadLetterPdfBlob(letter.pdf_url));
+      const blob = await requireLetterPdfBlob(buildFreshPdfBlob);
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
