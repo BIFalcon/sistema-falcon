@@ -128,12 +128,12 @@ export function useRhEmployees(
       // Dedup por hotel+matrícula mantendo a referência mais recente (que já
       // carrega a rescisão, quando houver).
       const byKey = new Map<string, RhEmployee>();
-      const events = new Map<string, Array<{ movement: unknown; month: number | null; year: number | null; termination_date: string | null }>>();
+      const events = new Map<string, Array<{ movement: unknown; month: number | null; year: number | null; termination_date: string | null; employee: RhEmployee }>>();
       for (const e of results.flat()) {
         const key = `${e.hotel_id}|${e.employee_key || e.id}`;
         if (e.source_format === "CONSOLIDADO") {
           const history = events.get(key) ?? [];
-          history.push({ movement: e.raw.movement, month: e.reference_month, year: e.reference_year, termination_date: e.termination_date });
+          history.push({ movement: e.raw.movement, month: e.reference_month, year: e.reference_year, termination_date: e.termination_date, employee: e });
           events.set(key, history);
         }
         const prev = byKey.get(key);
@@ -142,9 +142,36 @@ export function useRhEmployees(
           continue;
         }
         const rank = (x: RhEmployee) => (x.reference_year ?? 0) * 12 + (x.reference_month ?? 0);
-        if (rank(e) > rank(prev) || (!prev.termination_date && e.termination_date)) byKey.set(key, e);
+        if (rank(e) > rank(prev)) byKey.set(key, e);
       }
       return Array.from(byKey, ([key, employee]) => ({ ...employee, raw: { ...employee.raw, monthly_events: events.get(key) } }));
+    },
+  });
+}
+
+/** Independent monthly snapshots: never reuse a deduplicated multi-month denominator. */
+export function useRhTurnoverHistory(month: number, year: number) {
+  return useQuery({
+    queryKey: ["rh", "turnover-history", month, year],
+    queryFn: async () => Promise.all(periodWindowMonths(month, year, 12).map(async (period) => {
+      const { data, error } = await supabase.rpc("get_rh_employees_for_user", {
+        _hotel_id: null, _reference_month: period.month, _reference_year: period.year,
+      });
+      if (error) throw error;
+      return { ...period, employees: (data ?? []) as unknown as RhEmployee[] };
+    })),
+  });
+}
+
+export function useRhDepartureReasons(hotelId: string | null, month: number, year: number, periodMonths: number) {
+  return useQuery({
+    queryKey: ["rh", "departure-reasons", hotelId, month, year, periodMonths],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_rh_departure_reasons", {
+        _hotel_id: hotelId, _month: month, _year: year, _period_months: periodMonths,
+      });
+      if (error) throw error;
+      return (data ?? []).map((row) => ({ name: row.reason, total: Number(row.total) }));
     },
   });
 }
@@ -348,8 +375,7 @@ export interface RhMetrics {
   admitidos: number;            // admissões dentro da janela do período
   experiencia: number;          // nº de ativos com admissão < 90 dias
   pctExperiencia: number;       // % com admissão < 90 dias
-  pctTurnover: number;          // (adm + desl) / 2 / total * 100
-  pctRotatividade: number;      // desligamentos / total * 100
+  pctRotatividade: number;      // ((admissões + desligamentos) / 2) / ativos * 100
   porSexo: { M: number; F: number; N: number };
   porFaixaEtaria: Record<string, number>;
   tempoCasaMedio: number;       // em anos, considerando ativos
@@ -433,7 +459,11 @@ export function calcMetrics(
   // ocorridos dentro da janela (não apenas o último mês).
   const monthlyEventRows = (employee: RhEmployee, movement: string): RhEmployee[] => {
     const events = Array.isArray(employee.raw.monthly_events) ? employee.raw.monthly_events : [{ movement: employee.raw.movement, month: employee.reference_month, year: employee.reference_year, termination_date: employee.termination_date }];
-    return events.filter((event) => normalizeRh(event.movement) === movement).map((event) => ({ ...employee, id: `${employee.id}-${event.year}-${event.month}-${movement}`, termination_date: event.termination_date, reference_month: event.month, reference_year: event.year }));
+    return events.filter((event) => {
+      const period = Number(event.year) * 12 + Number(event.month);
+      const end = targetYear * 12 + targetMonth;
+      return normalizeRh(event.movement) === movement && period >= end - Math.max(1, periodMonths) + 1 && period <= end;
+    }).map((event) => ({ ...employee, ...(event.employee ?? {}), id: `${employee.id}-${event.year}-${event.month}-${movement}`, termination_date: event.termination_date, reference_month: event.month, reference_year: event.year }));
   };
   const listaDesligamentos = knownAtRef.flatMap((e) => e.source_format === "CONSOLIDADO" ? monthlyEventRows(e, "desligamento") : !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)) ? [e] : []);
   const ativos = listaAtivos.length;
@@ -502,11 +532,7 @@ export function calcMetrics(
     listaAdmitidos,
     listaExperiencia,
     pctExperiencia: round2((novos / safeTotal) * 100),
-    // Definição validada com RH:
-    //   • Turnover     = desligamentos / ativos × 100
-    //   • Rotatividade = ((admissões + desligamentos) / 2) / ativos × 100
-    pctTurnover: round2((desligamentos / safeTotal) * 100),
-    pctRotatividade: round2(((admissoes + desligamentos) / 2 / safeTotal) * 100),
+    pctRotatividade: total ? round2(((admissoes + desligamentos) / 2 / total) * 100) : 0,
     porSexo,
     porFaixaEtaria,
     tempoCasaMedio: tempoCasaCount ? tempoCasaSum / tempoCasaCount : 0,

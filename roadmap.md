@@ -4,3 +4,5 @@
 - [x] Conferir acessos RH/Master, Fernando/Viewer, GOP/GG e bloqueio de ADM nas funções e telas mensais.
 - [x] Testar regras e leitura da planilha real (389 linhas; dois nomes de hotel não reconhecidos).
 - [ ] Validar envio e leitura com sessão real RH/Master — bloqueado: usuário solicitante não tem conta correspondente para sessão automática; requer login no preview.
+- [x] Atualizar gráficos de Turnover, fórmula única, histórico mensal e rolagem do ranking; testar regras.
+- [ ] Conferir gráficos e ranking com sessão real — bloqueado: preview sem login e sem conta correspondente ao solicitante.
