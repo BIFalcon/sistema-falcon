@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trophy } from "lucide-react";
+import { Download, Loader2, Trophy } from "lucide-react";
+import { toast } from "sonner";
+import { logSensitiveExport } from "@/hooks/useRhPayroll";
 import {
-  BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
@@ -98,6 +100,8 @@ export default function TurnoverPage() {
     { value: 12, label: "Anual" },
   ];
   const [rankOpen, setRankOpen] = useState(false);
+  const rankingRef = useRef<HTMLDivElement>(null);
+  const [exportingRanking, setExportingRanking] = useState(false);
   const [detail, setDetail] = useState<{ title: string; rows: RhEmployee[] } | null>(null);
 
   const { data: allEmployees = [], isLoading, isError } = useRhEmployees(undefined, month, year, periodMonths);
@@ -133,6 +137,29 @@ export default function TurnoverPage() {
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
   }, [rhHotels, allEmployees, month, year, periodMonths]);
   const hotelData = ranking.map((row) => ({ name: row.hotel.name, turnover: row.hasData ? row.pctRotatividade : null }));
+  const exportRanking = async () => {
+    const element = rankingRef.current;
+    if (!element) return;
+    setExportingRanking(true);
+    try {
+      await logSensitiveExport({ module: "rh-turnover-ranking", format: "png", month, year, details: { period_months: periodMonths, hotels: ranking.map((row) => row.hotel.id) } });
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(element, { backgroundColor: getComputedStyle(element).backgroundColor, scale: 2, logging: false });
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("Não foi possível gerar a imagem.")), "image/png"));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ranking-turnover-${String(month).padStart(2, "0")}-${year}-${periodMonths}m.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (error) {
+      toast.error("Não foi possível baixar o ranking: " + (error instanceof Error ? error.message : "erro ao gerar imagem"));
+    } finally {
+      setExportingRanking(false);
+    }
+  };
 
   return (
     <div className="space-y-6" translate="no">
@@ -237,16 +264,27 @@ export default function TurnoverPage() {
           <DialogHeader>
             <DialogTitle>Ranking por % turnover</DialogTitle>
           </DialogHeader>
-          <div className="min-h-0 max-h-[60dvh] overflow-y-auto pr-2">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={exportRanking} disabled={exportingRanking || isLoading || isError || !ranking.some((row) => row.hasData)}>
+              {exportingRanking ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />} Baixar imagem
+            </Button>
+          </div>
+          <div className="min-h-0 max-h-[60dvh] overflow-auto pr-2">
             {isLoading ? <ChartMessage text="Carregando hotéis…" /> : isError ? <ChartMessage text="Não foi possível carregar os hotéis." /> : !ranking.some((row) => row.hasData) ? <ChartMessage text="Sem dados no período" /> : (
+              <div ref={rankingRef} className="min-w-[540px] bg-background p-3">
+              <h3 className="font-semibold text-sm">Ranking por % turnover</h3>
+              <p className="text-xs text-muted-foreground mb-3">{String(month).padStart(2, "0")}/{year} · {PERIOD_OPTIONS.find((period) => period.value === periodMonths)?.label}</p>
               <ResponsiveContainer width="100%" height={Math.max(240, hotelData.length * 44)}>
-                <BarChart data={hotelData} layout="vertical" margin={{ top: 8, right: 25, left: 0, bottom: 8 }}>
+                <BarChart data={hotelData} layout="vertical" margin={{ top: 8, right: 70, left: 0, bottom: 8 }}>
                   <XAxis type="number" fontSize={12} tickFormatter={(value) => `${value}%`} />
                   <YAxis type="category" dataKey="name" width={150} interval={0} tick={<HotelAxisTick />} />
                   <Tooltip formatter={(value: number) => formatPct(value)} />
-                  <Bar name="Turnover" dataKey="turnover" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false} />
+                  <Bar name="Turnover" dataKey="turnover" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false}>
+                    <LabelList dataKey="turnover" position="right" offset={8} fontSize={11} fill="hsl(var(--foreground))" formatter={(value) => typeof value === "number" ? formatPct(value) : "—"} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             )}
           </div>
         </DialogContent>
