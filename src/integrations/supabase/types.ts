@@ -3031,16 +3031,29 @@ export type Database = {
       }
       rh_employees: {
         Row: {
+          accounting: string | null
           admission_date: string | null
           birth_date: string | null
+          cnpj: string | null
+          company: string | null
           cpf: string | null
           created_at: string
+          deductions: number | null
           department: string | null
+          detail: string | null
           employee_key: string
+          fgts: number | null
+          fgts_base: number | null
           gender: string | null
+          gross_earnings: number | null
           hotel_id: string
           id: string
+          inss_base: number | null
+          inss_deducted: number | null
+          movement: string | null
           name: string
+          net_earnings: number | null
+          overtime_earnings: number | null
           position: string | null
           raw: Json
           reference_month: number | null
@@ -3054,16 +3067,29 @@ export type Database = {
           upload_id: string | null
         }
         Insert: {
+          accounting?: string | null
           admission_date?: string | null
           birth_date?: string | null
+          cnpj?: string | null
+          company?: string | null
           cpf?: string | null
           created_at?: string
+          deductions?: number | null
           department?: string | null
+          detail?: string | null
           employee_key: string
+          fgts?: number | null
+          fgts_base?: number | null
           gender?: string | null
+          gross_earnings?: number | null
           hotel_id: string
           id?: string
+          inss_base?: number | null
+          inss_deducted?: number | null
+          movement?: string | null
           name: string
+          net_earnings?: number | null
+          overtime_earnings?: number | null
           position?: string | null
           raw?: Json
           reference_month?: number | null
@@ -3077,16 +3103,29 @@ export type Database = {
           upload_id?: string | null
         }
         Update: {
+          accounting?: string | null
           admission_date?: string | null
           birth_date?: string | null
+          cnpj?: string | null
+          company?: string | null
           cpf?: string | null
           created_at?: string
+          deductions?: number | null
           department?: string | null
+          detail?: string | null
           employee_key?: string
+          fgts?: number | null
+          fgts_base?: number | null
           gender?: string | null
+          gross_earnings?: number | null
           hotel_id?: string
           id?: string
+          inss_base?: number | null
+          inss_deducted?: number | null
+          movement?: string | null
           name?: string
+          net_earnings?: number | null
+          overtime_earnings?: number | null
           position?: string | null
           raw?: Json
           reference_month?: number | null
@@ -3905,6 +3944,10 @@ export type Database = {
         Returns: boolean
       }
       can_view_rh_directory: { Args: { _user_id: string }; Returns: boolean }
+      can_view_rh_monthly_hotel: {
+        Args: { _hotel_id: string; _user_id: string }
+        Returns: boolean
+      }
       conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
@@ -4055,6 +4098,22 @@ export type Database = {
           upload_id: string
         }[]
       }
+      get_rh_monthly_payroll_entries: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: {
+          admission_date: string
+          base_salary: number
+          bond: string
+          department: string
+          employee_name: string
+          fgts: number
+          id: string
+          inss_patronal: number
+          position: string
+          termination_date: string
+          total_cost: number
+        }[]
+      }
       get_rh_payroll_history: {
         Args: { _hotel_id: string; _year: number }
         Returns: {
@@ -4094,6 +4153,16 @@ export type Database = {
         Returns: boolean
       }
       hotel_slug: { Args: { _name: string }; Returns: string }
+      import_rh_monthly: {
+        Args: {
+          _file_name: string
+          _month: number
+          _rows: Json
+          _unknown_hotels?: Json
+          _year: number
+        }
+        Returns: Json
+      }
       inv_can_access: { Args: { _uid: string }; Returns: boolean }
       inv_can_edit: { Args: { _uid: string }; Returns: boolean }
       inv_can_view_full: { Args: { _uid: string }; Returns: boolean }

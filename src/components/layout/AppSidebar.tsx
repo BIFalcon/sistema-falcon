@@ -152,7 +152,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         icon: Users,
         allowedRoles: ["processos","fernando","controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"] as AppRole[],
         children: [
-          { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown },
+          { title: "Turnover & Rotatividade", url: "/rh/turnover", icon: TrendingDown, allowedRoles: ["processos","fernando","rh","viewer","gg","gop"] as AppRole[] },
           { title: "Custo e Folha", url: "/rh/custo-folha", icon: Wallet, allowedRoles: ["processos","fernando","rh","viewer","gg","gop"] as AppRole[] },
           { title: "Organograma", url: "/rh/organograma", icon: Network },
           { title: "Treinamentos", url: "/rh/treinamentos", icon: GraduationCap },

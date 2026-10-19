@@ -1,5 +1,6 @@
-- [ ] Unificar fonte e leitura da planilha mensal de RH por competência e hotel.
-- [ ] Substituir o mês inteiro em uma operação segura, mantendo histórico de outros meses.
-- [ ] Alimentar Turnover e Custo e Folha pela fonte única; remover envio do Turnover.
-- [ ] Conferir acessos RH/Master, Fernando/Viewer, GOP/GG e bloqueio de ADM.
-- [ ] Testar regras, planilha real e fluxo de envio/leitura.
+- [x] Unificar fonte e leitura da planilha mensal de RH por competência e hotel.
+- [x] Substituir o mês inteiro em uma operação segura, mantendo histórico de outros meses.
+- [x] Alimentar Turnover e Custo e Folha pela fonte única; remover envio do Turnover.
+- [x] Conferir acessos RH/Master, Fernando/Viewer, GOP/GG e bloqueio de ADM nas funções e telas mensais.
+- [x] Testar regras e leitura da planilha real (389 linhas; dois nomes de hotel não reconhecidos).
+- [ ] Validar envio e leitura com sessão real RH/Master — bloqueado: usuário solicitante não tem conta correspondente para sessão automática; requer login no preview.

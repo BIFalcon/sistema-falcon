@@ -65,7 +65,7 @@ export function AppHeader() {
     pathname.startsWith("/financeiro/contas-receber") && new URLSearchParams(search).get("aba") === "conciliacao";
   const hidePeriod = isUsuarios || isConciliacaoAr;
   const isRhTurnover = pathname.startsWith("/rh/turnover");
-  const showMatrizOption = isRhTurnover && canSeeMatriz && !!matrizHotel;
+  const showMatrizOption = (isRhTurnover || pathname.startsWith("/rh/custo-folha")) && canSeeMatriz && !!matrizHotel;
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
