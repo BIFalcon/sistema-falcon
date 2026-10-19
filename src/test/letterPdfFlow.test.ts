@@ -20,3 +20,14 @@ describe("geração obrigatória da carta", () => {
     await expect(requireLetterPdfBlob(async () => { throw error; })).rejects.toBe(error);
   });
 });
+import { hasVisibleInk } from "@/lib/letterPdfFlow";
+describe("validação dos gráficos", () => {
+  it("rejeita gráfico totalmente branco", () => {
+    expect(hasVisibleInk(new Uint8ClampedArray(400).fill(255))).toBe(false);
+  });
+  it("aceita gráfico com traços desenhados", () => {
+    const px = new Uint8ClampedArray(400).fill(255);
+    px[0] = 30; px[1] = 60; px[2] = 120;
+    expect(hasVisibleInk(px)).toBe(true);
+  });
+});
