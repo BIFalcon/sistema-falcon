@@ -4068,6 +4068,18 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_rh_departure_reasons: {
+        Args: {
+          _hotel_id: string
+          _month: number
+          _period_months?: number
+          _year: number
+        }
+        Returns: {
+          reason: string
+          total: number
+        }[]
+      }
       get_rh_employees_for_user: {
         Args: {
           _hotel_id?: string
@@ -4358,6 +4370,10 @@ export type Database = {
       recalc_consolidado_cache: {
         Args: { _closing_id: string }
         Returns: undefined
+      }
+      rh_departure_reason_category: {
+        Args: { _detail: string }
+        Returns: string
       }
       users_with_role_for_hotel: {
         Args: {

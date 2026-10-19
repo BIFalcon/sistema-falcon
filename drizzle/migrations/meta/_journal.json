@@ -267,6 +267,13 @@
       "when": 1792410516617,
       "tag": "0037_unify_rh_monthly_source",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792411578826,
+      "tag": "0038_rh_turnover_reason_aggregates",
+      "breakpoints": true
     }
   ]
 }
