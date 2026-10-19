@@ -54,6 +54,12 @@ describe("Fonte mensal de RH", () => {
   it("preserva a data e o motivo de desligamento do detalhe", () => {
     expect(parse(row({ 9: "Desligado", 10: "Desligamento", 11: "em 02/09/2026 — Demitido SEM justa causa" })).rows[0]).toMatchObject({ termination_date: "2026-09-02", detail: "em 02/09/2026 — Demitido SEM justa causa" });
   });
+  it("preserva eventos dos meses anteriores sem mudar a situação da foto mais recente", () => {
+    const record = employees(parse(row({ 8: "01/07/2026" })).rows)[0];
+    record.raw.monthly_events = [{ movement: "Admissão", month: 7, year: 2026, termination_date: null }, { movement: "Transferência (entrada)", month: 9, year: 2026, termination_date: null }];
+    const metrics = calcMetrics([record], 9, 2026, 3);
+    expect(metrics.admitidos).toBe(1); expect(metrics.ativos).toBe(1); expect(metrics.inativos).toBe(0);
+  });
   it("não infere CPF, nascimento nem gênero na fonte nova", () => {
     expect(parse(row()).rows[0]).not.toHaveProperty("gender");
     expect(parse(row()).rows[0]).not.toHaveProperty("cpf");

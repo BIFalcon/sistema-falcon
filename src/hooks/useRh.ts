@@ -128,8 +128,14 @@ export function useRhEmployees(
       // Dedup por hotel+matrícula mantendo a referência mais recente (que já
       // carrega a rescisão, quando houver).
       const byKey = new Map<string, RhEmployee>();
+      const events = new Map<string, Array<{ movement: unknown; month: number | null; year: number | null; termination_date: string | null }>>();
       for (const e of results.flat()) {
         const key = `${e.hotel_id}|${e.employee_key || e.id}`;
+        if (e.source_format === "CONSOLIDADO") {
+          const history = events.get(key) ?? [];
+          history.push({ movement: e.raw.movement, month: e.reference_month, year: e.reference_year, termination_date: e.termination_date });
+          events.set(key, history);
+        }
         const prev = byKey.get(key);
         if (!prev) {
           byKey.set(key, e);
@@ -138,7 +144,7 @@ export function useRhEmployees(
         const rank = (x: RhEmployee) => (x.reference_year ?? 0) * 12 + (x.reference_month ?? 0);
         if (rank(e) > rank(prev) || (!prev.termination_date && e.termination_date)) byKey.set(key, e);
       }
-      return Array.from(byKey.values());
+      return Array.from(byKey, ([key, employee]) => ({ ...employee, raw: { ...employee.raw, monthly_events: events.get(key) } }));
     },
   });
 }
@@ -425,9 +431,11 @@ export function calcMetrics(
   const listaAtivos = knownAtRef.filter((e) => e.source_format === "CONSOLIDADO" ? e.status === "ativo" : !e.termination_date);
   // Numa janela de mais de um mês, os desligamentos somam todos os eventos
   // ocorridos dentro da janela (não apenas o último mês).
-  const listaDesligamentos = knownAtRef.filter(
-    (e) => e.source_format === "CONSOLIDADO" ? normalizeRh(e.raw.movement) === "desligamento" : !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)),
-  );
+  const monthlyEventRows = (employee: RhEmployee, movement: string): RhEmployee[] => {
+    const events = Array.isArray(employee.raw.monthly_events) ? employee.raw.monthly_events : [{ movement: employee.raw.movement, month: employee.reference_month, year: employee.reference_year, termination_date: employee.termination_date }];
+    return events.filter((event) => normalizeRh(event.movement) === movement).map((event) => ({ ...employee, id: `${employee.id}-${event.year}-${event.month}-${movement}`, termination_date: event.termination_date, reference_month: event.month, reference_year: event.year }));
+  };
+  const listaDesligamentos = knownAtRef.flatMap((e) => e.source_format === "CONSOLIDADO" ? monthlyEventRows(e, "desligamento") : !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)) ? [e] : []);
   const ativos = listaAtivos.length;
   const desligamentosTotais = listaDesligamentos.length;
   const total = ativos;          // denominador = quadro ativo
@@ -435,7 +443,7 @@ export function calcMetrics(
 
   const ninetyMs = 90 * 86400000;
 
-  const listaAdmitidos = knownAtRef.filter((e) => e.source_format === "CONSOLIDADO" ? normalizeRh(e.raw.movement) === "admissao" : inWindow(e.admission_date));
+  const listaAdmitidos = knownAtRef.flatMap((e) => e.source_format === "CONSOLIDADO" ? monthlyEventRows(e, "admissao") : inWindow(e.admission_date) ? [e] : []);
   const listaExperiencia: RhEmployee[] = [];
   let novos = 0;
   const admissoes = listaAdmitidos.length;
