@@ -4371,6 +4371,10 @@ export type Database = {
         Args: { _closing_id: string }
         Returns: undefined
       }
+      rh_department_for_position: {
+        Args: { _position: string }
+        Returns: string
+      }
       rh_departure_reason_category: {
         Args: { _detail: string }
         Returns: string
