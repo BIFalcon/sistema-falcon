@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy } from "lucide-react";
 import {
@@ -217,20 +216,6 @@ export default function TurnoverPage() {
       </section>
 
       <section className="space-y-3 min-w-0">
-        <h2 className="text-sm font-semibold">Turnover por hotel</h2>
-        {isLoading ? <ChartMessage text="Carregando hotéis…" /> : isError ? <ChartMessage text="Não foi possível carregar os hotéis." /> : !ranking.some((row) => row.hasData) ? <ChartMessage text="Sem dados no período" /> : (
-          <ResponsiveContainer width="100%" height={Math.max(240, hotelData.length * 44)}>
-            <BarChart data={hotelData} layout="vertical" margin={{ top: 8, right: 25, left: 0, bottom: 8 }}>
-              <XAxis type="number" fontSize={12} tickFormatter={(value) => `${value}%`} />
-              <YAxis type="category" dataKey="name" width={150} interval={0} tick={<HotelAxisTick />} />
-              <Tooltip formatter={(value: number) => formatPct(value)} />
-              <Bar name="Turnover" dataKey="turnover" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </section>
-
-      <section className="space-y-3 min-w-0">
         <h2 className="text-sm font-semibold">Admissões x Desligamentos por mês</h2>
         {historyLoading ? <ChartMessage text="Carregando histórico…" /> : historyError ? <ChartMessage text="Não foi possível carregar o histórico." /> : !hasHistory ? <ChartMessage text="Sem dados no período" /> : (
           <ResponsiveContainer width="100%" height={280}>
@@ -248,24 +233,21 @@ export default function TurnoverPage() {
 
       {/* Ranking modal */}
       <Dialog open={rankOpen} onOpenChange={setRankOpen}>
-        <DialogContent className="max-w-lg max-h-[85dvh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[85dvh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Ranking por % turnover</DialogTitle>
           </DialogHeader>
-          <div className="divide-y divide-border min-h-0 max-h-[60dvh] overflow-y-auto pr-2">
-            {ranking.length === 0 && <p className="text-sm text-muted-foreground py-4">Sem dados suficientes.</p>}
-            {ranking.map((r, i) => (
-              <div key={r.hotel.id} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <Badge variant="outline" className="w-7 justify-center">{i + 1}</Badge>
-                  <div>
-                    <p className="text-sm font-medium">{r.hotel.name}</p>
-                    <p className="text-xs text-muted-foreground">{r.total} colaborador(es)</p>
-                  </div>
-                </div>
-                <p className="text-sm font-semibold">{r.hasData ? formatPct(r.pctRotatividade) : "—"}</p>
-              </div>
-            ))}
+          <div className="min-h-0 max-h-[60dvh] overflow-y-auto pr-2">
+            {isLoading ? <ChartMessage text="Carregando hotéis…" /> : isError ? <ChartMessage text="Não foi possível carregar os hotéis." /> : !ranking.some((row) => row.hasData) ? <ChartMessage text="Sem dados no período" /> : (
+              <ResponsiveContainer width="100%" height={Math.max(240, hotelData.length * 44)}>
+                <BarChart data={hotelData} layout="vertical" margin={{ top: 8, right: 25, left: 0, bottom: 8 }}>
+                  <XAxis type="number" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                  <YAxis type="category" dataKey="name" width={150} interval={0} tick={<HotelAxisTick />} />
+                  <Tooltip formatter={(value: number) => formatPct(value)} />
+                  <Bar name="Turnover" dataKey="turnover" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </DialogContent>
       </Dialog>
