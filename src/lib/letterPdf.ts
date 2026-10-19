@@ -1,3 +1,4 @@
+import { CHART_RENDER_ERROR, hasVisibleInk } from "@/lib/letterPdfFlow";
 /**
  * Gera a Carta ao Investidor em PDF — formato quadrado 210x210mm, 7 páginas,
  * fielmente baseada no modelo Falcon Hotéis:
@@ -393,12 +394,27 @@ const HEADER_CONTENT_Y = 34;
 
 interface ChartSize { w: number; h: number; }
 
+/** Garante que o gráfico foi realmente desenhado (navegadores/extensões podem bloquear o Canvas). */
+function exportChart(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): string {
+  let pixels: Uint8ClampedArray;
+  try {
+    pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  } catch {
+    throw new Error(CHART_RENDER_ERROR);
+  }
+  if (!hasVisibleInk(pixels)) throw new Error(CHART_RENDER_ERROR);
+  const data = canvas.toDataURL("image/png");
+  if (!data.startsWith("data:image/png") || data.length < 2000) throw new Error(CHART_RENDER_ERROR);
+  return data;
+}
+
 function makeCanvas(widthMm: number, heightMm: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; px: number } {
   const px = 4; // px por mm
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(widthMm * px);
   canvas.height = Math.round(heightMm * px);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = (canvas.getContext("2d", { alpha: false }) ?? canvas.getContext("2d")) as CanvasRenderingContext2D | null;
+  if (!ctx) throw new Error(CHART_RENDER_ERROR);
   ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   return { canvas, ctx, px };
@@ -490,7 +506,7 @@ function drawBarChart(
   ctx.fillStyle = TEXT;
   ctx.fillText("Ano anterior", canvas.width / 2 + 6 * px, ly);
 
-  return canvas.toDataURL("image/png");
+  return exportChart(canvas, ctx);
 }
 
 function drawLineChart(
@@ -710,7 +726,7 @@ function drawLineChart(
   ctx.fillStyle = TEXT;
   ctx.fillText("Ano anterior", canvas.width / 2 + 8 * px, ly);
 
-  return canvas.toDataURL("image/png");
+  return exportChart(canvas, ctx);
 }
 
 /* ───────────────── Gerador principal ───────────────── */
