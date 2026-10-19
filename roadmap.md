@@ -6,3 +6,5 @@
 - [ ] Validar envio e leitura com sessão real RH/Master — bloqueado: usuário solicitante não tem conta correspondente para sessão automática; requer login no preview.
 - [x] Atualizar gráficos de Turnover, fórmula única, histórico mensal e rolagem do ranking; testar regras.
 - [ ] Conferir gráficos e ranking com sessão real — bloqueado: preview sem login e sem conta correspondente ao solicitante.
+- [ ] Mover comparação de turnover por hotel para o Ranking, substituindo a lista pelo gráfico.
+- [ ] Investigar e corrigir custos agrupados como Sem departamento em todos os hotéis.
