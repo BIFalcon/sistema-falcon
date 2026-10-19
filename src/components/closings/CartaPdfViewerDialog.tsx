@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FileDown, Loader2 } from "lucide-react";
 import { getLetterPdfSignedUrl } from "@/hooks/useLetter";
+import { requireLetterPdfBlob } from "@/lib/letterPdfFlow";
 
 interface Props {
   open: boolean;
@@ -27,25 +28,24 @@ export function CartaPdfViewerDialog({ open, onOpenChange, pdfPath, versionLabel
     setError(null);
     setUrl(null);
     (async () => {
-      // 1) tenta gerar o PDF na hora, garantindo o layout mais recente para todos
-      if (buildBlob) {
-        try {
-          const blob = await buildBlob();
+      try {
+        if (buildBlob) {
+          const blob = await requireLetterPdfBlob(buildBlob);
           if (cancelled) return;
-          if (blob) {
-            objectUrl = URL.createObjectURL(blob);
-            setUrl(objectUrl);
-            setLoading(false);
-            return;
-          }
-        } catch { /* cai para o arquivo salvo */ }
+          objectUrl = URL.createObjectURL(blob);
+          setUrl(objectUrl);
+        } else {
+          // Arquivo salvo somente quando não há geração atual configurada.
+          const u = await getLetterPdfSignedUrl(pdfPath);
+          if (cancelled) return;
+          if (!u) throw new Error("Não foi possível gerar o link de visualização.");
+          setUrl(u);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Não foi possível gerar a carta. Tente novamente.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      // 2) fallback: arquivo salvo no storage
-      const u = await getLetterPdfSignedUrl(pdfPath).catch(() => null);
-      if (cancelled) return;
-      if (!u) setError("Não foi possível gerar o link de visualização.");
-      else setUrl(u);
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -68,7 +68,7 @@ export function CartaPdfViewerDialog({ open, onOpenChange, pdfPath, versionLabel
             </div>
           )}
           {error && (
-            <div className="h-full flex items-center justify-center text-destructive text-sm px-6 text-center">
+            <div role="alert" className="h-full flex items-center justify-center text-destructive text-sm px-6 text-center">
               {error}
             </div>
           )}
