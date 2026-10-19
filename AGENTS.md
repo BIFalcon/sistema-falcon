@@ -3,6 +3,7 @@
 - Legacy payroll tables remain read-only historical fallbacks for periods without a consolidated upload; never combine both sources in the same period.
 - RH payroll individual values are RH/Master-only through RLS and manager-checked RPCs; other authorized roles receive aggregates, never per-person costs.
 - Use rhMonthlyParser for all new RH file reads and rhAccess for client permissions; server RPCs independently enforce permissions.
+- Turnover history uses independent authorized monthly snapshots, preserving event-time fields for period charts; departure reason categories are server-side aggregates so masked individual reasons remain private.
 - Payroll table sorting uses a pure client-side payrollSort helper on copied rows; ordering never mutates cached data or changes export/access behavior.
 - Sensitive exports log to sensitive_export_log before the file is generated — reuse it for every sensitive export module.
 
