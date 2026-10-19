@@ -1,16 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { Upload, Trophy, Loader2 } from "lucide-react";
+import { Trophy } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useRhEmployees, useUploadRhFile, calcMetrics, type RhEmployee } from "@/hooks/useRh";
+import { useRhEmployees, calcMetrics, type RhEmployee } from "@/hooks/useRh";
 import { fmtDate } from "@/lib/formatters";
 
 const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
@@ -48,7 +47,6 @@ function KpiCard({
 
 export default function TurnoverPage() {
   const { allowedHotels, isMaster, hasRole } = useAuth();
-  const canUpload = isMaster || hasRole("rh");
   const isRhManager = isMaster || hasRole("rh") || hasRole("processos");
   const { hotelId, month, year } = useModuleFilters("rh");
   const [periodMonths, setPeriodMonths] = useState(1);
@@ -60,14 +58,11 @@ export default function TurnoverPage() {
     { value: 6, label: "Semestral" },
     { value: 12, label: "Anual" },
   ];
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
   const [detail, setDetail] = useState<{ title: string; rows: RhEmployee[] } | null>(null);
 
   const rhHotelId = isRhManager ? undefined : hotelId;
   const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year, periodMonths);
-  const upload = useUploadRhFile();
 
   const hotelNames = useMemo(
     () => Object.fromEntries(allowedHotels.map((h) => [h.id, h.name])),
@@ -102,21 +97,6 @@ export default function TurnoverPage() {
       })
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
   }, [allowedHotels, allEmployees, month, year, periodMonths]);
-
-  const handleFile = async (file: File) => {
-    if (!hotelId) {
-      toast.error("Selecione um hotel antes de enviar a planilha.");
-      return;
-    }
-    try {
-      const res = await upload.mutateAsync({ file, hotelId, referenceMonth: month, referenceYear: year });
-      toast.success(
-        `Importação concluída — ${String(month).padStart(2, "0")}/${year}, formato ${res.parsed.format}, ${res.parsed.employees.length} colaborador(es).`,
-      );
-    } catch (e: any) {
-      toast.error("Erro ao processar planilha: " + (e?.message ?? "desconhecido"));
-    }
-  };
 
   return (
     <div className="space-y-6" translate="no">
@@ -160,7 +140,7 @@ export default function TurnoverPage() {
         <KpiCard
           label="Desligamentos"
           value={String(metrics.inativos)}
-          sub="planilha de rescisões"
+          sub="movimentos de desligamento"
           onClick={() => setDetail({ title: "Desligamentos", rows: metrics.listaDesligamentos })}
         />
         <KpiCard
@@ -218,49 +198,6 @@ export default function TurnoverPage() {
           </ResponsiveContainer>
         </Card>
       </div>
-
-      {/* Upload */}
-      {canUpload && (
-      <Card
-        className={`p-8 border-2 border-dashed shadow-soft transition-colors ${
-          dragOver ? "border-accent bg-accent/5" : "border-border"
-        }`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const f = e.dataTransfer.files?.[0];
-          if (f) handleFile(f);
-        }}
-      >
-        <div className="flex flex-col items-center text-center gap-3">
-          <Upload className="h-8 w-8 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-semibold">Arraste a planilha de RH aqui</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Formatos aceitos: POUSADA, ASSENSUS e RCASTRO (.xlsx).
-              {!hotelId && <span className="text-amber-600 dark:text-amber-400"> Selecione um hotel acima.</span>}
-            </p>
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFile(f);
-              e.target.value = "";
-            }}
-          />
-          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
-            {upload.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-            Selecionar arquivo
-          </Button>
-        </div>
-      </Card>
-      )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando colaboradores…</p>}
 

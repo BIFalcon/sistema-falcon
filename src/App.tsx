@@ -43,6 +43,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedLayout } from "./components/layout/ProtectedLayout";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
+import { RH_VIEW_ROLES } from "./lib/rhAccess";
 import type { AppRole } from "./lib/constants";
 
 const queryClient = new QueryClient({
@@ -168,8 +169,8 @@ const App = () => (
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/conciliacao" element={<Navigate to="/financeiro/contas-receber" replace />} />
               <Route path="/rh" element={<Navigate to="/rh/turnover" replace />} />
-              <Route path="/rh/turnover" element={<RoleGuard roles={["controladoria","patronos","rh","gop","gg","ri","operacoes","viewer"]}><TurnoverPage /></RoleGuard>} />
-              <Route path="/rh/custo-folha" element={<RoleGuard roles={["rh","gop","gg","viewer"]}><CustoFolhaPage /></RoleGuard>} />
+              <Route path="/rh/turnover" element={<RoleGuard roles={RH_VIEW_ROLES}><TurnoverPage /></RoleGuard>} />
+              <Route path="/rh/custo-folha" element={<RoleGuard roles={RH_VIEW_ROLES}><CustoFolhaPage /></RoleGuard>} />
               <Route path="/perfil-hotel/contexto" element={<RoleGuard roles={["gg","gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelPage /></RoleGuard>} />
               <Route path="/perfil-hotel/contexto/consolidado" element={<RoleGuard roles={["gop","controladoria","patronos","ri","fernando","processos","viewer"]}><ContextoHotelExportPage /></RoleGuard>} />
               <Route path="/rh/calendario" element={<Navigate to="/marketing/calendario" replace />} />

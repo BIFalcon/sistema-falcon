@@ -8,10 +8,13 @@ import { Upload, Loader2, Download, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
+import { canUploadRh } from "@/lib/rhAccess";
+import type { RhMonthlyResult } from "@/lib/rhMonthlyParser";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import {
   usePayrollSummary, usePayrollHistory, usePayrollEntries, usePayrollRoomnights,
-  useUploadPayroll, logSensitiveExport,
+  useUploadPayroll, logSensitiveExport, previewMonthlyPayroll,
 } from "@/hooks/useRhPayroll";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -31,9 +34,12 @@ function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: 
 }
 
 export default function CustoFolhaPage() {
-  const { isMaster, hasRole, allowedHotels } = useAuth();
-  const isRhManager = isMaster || hasRole("rh");
-  const { hotelId, month, year } = useModuleFilters("rh");
+  const { roles, allowedHotels } = useAuth();
+  const isRhManager = canUploadRh(roles);
+  const { hotelId, month, year, setMonth, setYear } = useModuleFilters("rh");
+  const [pending, setPending] = useState<{ file: File; parsed: RhMonthlyResult } | null>(null);
+  const [reading, setReading] = useState(false);
+  const [warnings, setWarnings] = useState<RhMonthlyResult["unknownHotels"]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -45,14 +51,26 @@ export default function CustoFolhaPage() {
   const hotelName = allowedHotels.find((h) => h.id === hotelId)?.name ?? hotelId ?? "";
 
   const handleFile = async (file: File) => {
+    setReading(true);
     try {
-      const r = await upload.mutateAsync({ file, month, year });
-      toast.success(
-        `Folha ${String(month).padStart(2, "0")}/${year} importada: ${r.sheets.length} hotel(is), ${r.sheets.reduce((a, x) => a + x.rows.length, 0)} colaborador(es).` +
-          (r.ignoredSheets.length ? ` Abas ignoradas: ${r.ignoredSheets.join(", ")}.` : ""),
-      );
-    } catch (e: any) {
-      toast.error("Erro ao importar folha: " + (e?.message ?? "desconhecido"));
+      const parsed = await previewMonthlyPayroll(file);
+      setWarnings(parsed.unknownHotels);
+      if (!parsed.rows.length) throw new Error("Nenhum hotel reconhecido; nada foi substituído.");
+      setPending({ file, parsed });
+    } catch (e: unknown) {
+      toast.error("Erro ao ler folha: " + (e instanceof Error ? e.message : "erro desconhecido"));
+    } finally { setReading(false); }
+  };
+
+  const confirmUpload = async () => {
+    if (!pending) return;
+    try {
+      const result = await upload.mutateAsync(pending);
+      setMonth(result.month); setYear(result.year); setPending(null);
+      toast.success(`Folha ${String(result.month).padStart(2, "0")}/${result.year} importada: ${new Set(result.rows.map((row) => row.hotel_id)).size} hotéis, ${result.rows.length} colaboradores.`);
+      if (result.unknownHotels.length) toast.warning("Hotéis não importados: " + result.unknownHotels.map((hotel) => `${hotel.name}: ${hotel.count} linhas`).join("; "), { duration: 15000 });
+    } catch (e: unknown) {
+      toast.error("Erro ao importar folha: " + (e instanceof Error ? e.message : "erro desconhecido"));
     }
   };
 
@@ -83,7 +101,7 @@ export default function CustoFolhaPage() {
   };
 
   const hasData = !!s && s.headcount > 0;
-  const costPerRn = hasData && roomnights ? s!.total_cost / roomnights : null;
+  const costPerRn = hasData && roomnights ? s.total_cost / roomnights : null;
   const histData = MONTHS.map((m, i) => {
     const h = history.find((x) => x.reference_month === i + 1);
     return { mes: m, total: h ? Number(h.total_cost) : 0 };
@@ -202,21 +220,37 @@ export default function CustoFolhaPage() {
         </>
       )}
 
+      {warnings.length > 0 && <div className="text-sm text-destructive" role="alert">
+        <p className="font-semibold">Hotéis não reconhecidos</p>
+        {warnings.map((hotel) => <p key={hotel.name}>{hotel.name}: {hotel.count} linhas não importadas.</p>)}
+      </div>}
+      <AlertDialog open={!!pending} onOpenChange={(open) => { if (!open && !upload.isPending) setPending(null); }}>
+        <AlertDialogContent><AlertDialogHeader>
+          <AlertDialogTitle>Importar folha mensal?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {pending && `${String(pending.parsed.month).padStart(2, "0")}/${pending.parsed.year} — ${pending.parsed.rows.length} colaboradores, ${new Set(pending.parsed.rows.map((row) => row.hotel_id)).size} hotéis. Todos os dados desta competência serão substituídos, inclusive hotéis ausentes do arquivo. Outros meses serão preservados.`}
+            {pending?.parsed.unknownHotels.length ? " Há hotéis não reconhecidos; suas linhas não serão importadas. Confira os nomes abaixo antes de continuar." : ""}
+          </AlertDialogDescription>
+          {pending?.parsed.unknownHotels.map((hotel) => <p className="text-sm text-destructive" key={hotel.name}>{hotel.name}: {hotel.count} linhas</p>)}
+        </AlertDialogHeader><AlertDialogFooter>
+          <AlertDialogCancel disabled={upload.isPending}>Cancelar</AlertDialogCancel>
+          <Button onClick={confirmUpload} disabled={upload.isPending}>{upload.isPending ? "Importando…" : "Confirmar importação"}</Button>
+        </AlertDialogFooter></AlertDialogContent>
+      </AlertDialog>
       {isRhManager && (
         <Card className="p-8 border-2 border-dashed shadow-soft">
           <div className="flex flex-col items-center text-center gap-3">
             <Upload className="h-8 w-8 text-muted-foreground" />
             <div>
-              <p className="text-sm font-semibold">Planilha de custo e folha — {MONTHS[month - 1]}/{year}</p>
+              <p className="text-sm font-semibold">Planilha mensal de RH</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Uma aba por hotel (nome da aba = nome do hotel). Abas que não são hotel são ignoradas.
-                Reenviar o mesmo mês substitui só aquele mês.
+                Quadro de pessoal — todos os hotéis.
               </p>
             </div>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
-              {upload.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={upload.isPending || reading}>
+              {upload.isPending || reading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               Selecionar arquivo
             </Button>
           </div>

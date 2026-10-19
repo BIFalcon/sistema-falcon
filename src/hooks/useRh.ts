@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { parseRhFile, type ParsedRhEmployee } from "@/lib/rhParser";
-import { detectGenderWithRole } from "@/lib/rhGenderDetector";
+import { normalizeRh } from "@/lib/rhMonthlyParser";
 
 // ---------- types ----------
 
@@ -201,69 +200,6 @@ export function useRhPolicies() {
 }
 
 // ---------- mutations ----------
-
-export function useUploadRhFile() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ file, hotelId, referenceMonth, referenceYear }: { file: File; hotelId: string; referenceMonth: number; referenceYear: number }) => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) throw new Error("Não autenticado");
-
-      const parsed = await parseRhFile(file);
-
-      const { data: uploadRow, error: upErr } = await supabase
-        .from("rh_uploads")
-        .insert({
-          hotel_id: hotelId,
-          file_name: file.name,
-          file_path: `${hotelId}/${Date.now()}_${file.name}`,
-          file_size: file.size,
-          uploaded_by: userId,
-          detected_format: parsed.format,
-          parsed_count: parsed.employees.length,
-          parse_error: parsed.warnings.length ? parsed.warnings.join(" | ") : null,
-          reference_month: referenceMonth,
-          reference_year: referenceYear,
-          metadata: { warnings: parsed.warnings, reference_month: referenceMonth, reference_year: referenceYear } as never,
-        })
-        .select()
-        .single();
-      if (upErr) throw upErr;
-
-      if (parsed.employees.length > 0) {
-        const rows = parsed.employees.map((e: ParsedRhEmployee) => ({
-          hotel_id: hotelId,
-          upload_id: uploadRow.id,
-          employee_key: e.employee_key,
-          name: e.full_name,
-          cpf: e.cpf,
-          position: e.role,
-          department: e.department,
-          admission_date: e.admission_date,
-          termination_date: e.dismissal_date,
-          birth_date: e.birth_date,
-          gender: e.gender_raw || detectGenderWithRole(e.full_name, e.role),
-          salary: e.salary,
-          status: e.status,
-          source_format: parsed.format,
-          reference_month: referenceMonth,
-          reference_year: referenceYear,
-          raw: e.raw as never,
-        }));
-        const { error: empErr } = await supabase
-          .from("rh_employees")
-          .upsert(rows, { onConflict: "hotel_id,employee_key,reference_year,reference_month" });
-        if (empErr) throw empErr;
-      }
-
-      return { upload: uploadRow, parsed };
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["rh", "employees"] });
-    },
-  });
-}
 
 export function useAddCalendarPost() {
   const qc = useQueryClient();
@@ -468,6 +404,7 @@ export function calcMetrics(
 
   const isActiveAtRef = (e: RhEmployee): boolean => {
     const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
+    if (e.source_format === "CONSOLIDADO") return e.status === "ativo";
     if (Number.isNaN(adm) || adm > refTs) return false;
     if (!e.termination_date) return true;
     const term = new Date(e.termination_date).getTime();
@@ -478,18 +415,18 @@ export function calcMetrics(
   // Considera somente colaboradores que existiam até a data de referência.
   const knownAtRef = employees.filter((e) => {
     const adm = e.admission_date ? new Date(e.admission_date).getTime() : NaN;
-    return !Number.isNaN(adm) && adm <= refTs;
+    return e.source_format === "CONSOLIDADO" || (!Number.isNaN(adm) && adm <= refTs);
   });
   // Definição (ASSENSUS): a planilha mensal traz duas abas — ATIVOS (linhas
   // sem data de rescisão) e RESCISÕES (linhas com data de rescisão). Os KPIs
   // refletem exatamente isso:
   //   • Ativos = Total      → linhas sem termination_date (ativos no mês)
   //   • Desligamentos       → linhas com termination_date no upload do mês
-  const listaAtivos = knownAtRef.filter((e) => !e.termination_date);
+  const listaAtivos = knownAtRef.filter((e) => e.source_format === "CONSOLIDADO" ? e.status === "ativo" : !e.termination_date);
   // Numa janela de mais de um mês, os desligamentos somam todos os eventos
   // ocorridos dentro da janela (não apenas o último mês).
   const listaDesligamentos = knownAtRef.filter(
-    (e) => !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)),
+    (e) => e.source_format === "CONSOLIDADO" ? normalizeRh(e.raw.movement) === "desligamento" : !!e.termination_date && (periodMonths <= 1 || inWindow(e.termination_date)),
   );
   const ativos = listaAtivos.length;
   const desligamentosTotais = listaDesligamentos.length;
@@ -498,7 +435,7 @@ export function calcMetrics(
 
   const ninetyMs = 90 * 86400000;
 
-  const listaAdmitidos = knownAtRef.filter((e) => inWindow(e.admission_date));
+  const listaAdmitidos = knownAtRef.filter((e) => e.source_format === "CONSOLIDADO" ? normalizeRh(e.raw.movement) === "admissao" : inWindow(e.admission_date));
   const listaExperiencia: RhEmployee[] = [];
   let novos = 0;
   const admissoes = listaAdmitidos.length;
