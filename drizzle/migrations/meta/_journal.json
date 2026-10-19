@@ -281,6 +281,13 @@
       "when": 1792412997207,
       "tag": "0039_rh_position_departments",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792413131268,
+      "tag": "0040_rh_department_andar",
+      "breakpoints": true
     }
   ]
 }
