@@ -5,14 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy } from "lucide-react";
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useRhEmployees, calcMetrics, type RhEmployee } from "@/hooks/useRh";
+import { useRhEmployees, useRhTurnoverHistory, useRhDepartureReasons, calcMetrics, type RhEmployee } from "@/hooks/useRh";
 import { fmtDate } from "@/lib/formatters";
 
-const SEX_COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
+import { departuresBySector, turnoverMonthlySeries } from "@/lib/rhTurnoverAnalytics";
+
+const SECONDARY_COLOR = "hsl(var(--accent))";
 const BAR_COLOR = "hsl(var(--primary))";
 
 function formatPct(n: number) {
@@ -45,9 +47,47 @@ function KpiCard({
   );
 }
 
+
+function ChartMessage({ text }: { text: string }) {
+  return <p className="text-sm text-muted-foreground py-12 text-center">{text}</p>;
+}
+
+function HotelAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
+  const words = String(payload?.value ?? "").split(" ");
+  const lines: string[] = [];
+  for (const word of words) {
+    const last = lines.length - 1;
+    if (last >= 0 && `${lines[last]} ${word}`.length <= 23) lines[last] += ` ${word}`;
+    else lines.push(word);
+  }
+  return <text x={x - 6} y={y} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize={10}>
+    {lines.map((line, index) => <tspan key={index} x={x - 6} dy={index === 0 ? -(lines.length - 1) * 6 + 3 : 12}>{line}</tspan>)}
+  </text>;
+}
+
+function CountChart({ title, data, loading, error }: { title: string; data: { name: string; total: number }[]; loading: boolean; error: boolean }) {
+  return <section className="space-y-3 min-w-0">
+    <h2 className="text-sm font-semibold">{title}</h2>
+    {loading ? <ChartMessage text="Carregando desligamentos…" /> : error ? <ChartMessage text="Não foi possível carregar os desligamentos." /> : !data.length ? <ChartMessage text="Sem desligamentos no período" /> : (
+      <div className="space-y-3">
+        {data.map((row) => <div key={row.name}>
+          <div className="flex justify-between gap-3 text-xs mb-1"><span className="break-words min-w-0">{row.name}</span><span className="font-semibold tabular-nums">{row.total}</span></div>
+          <ResponsiveContainer width="100%" height={18}>
+            <BarChart layout="vertical" data={[row]} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <XAxis type="number" hide domain={[0, Math.max(...data.map((item) => item.total))]} />
+              <YAxis type="category" dataKey="name" hide />
+              <Tooltip /><Bar name="Desligamentos" dataKey="total" fill={BAR_COLOR} radius={[0, 4, 4, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>)}
+      </div>
+    )}
+  </section>;
+}
+
 export default function TurnoverPage() {
-  const { allowedHotels, isMaster, hasRole } = useAuth();
-  const isRhManager = isMaster || hasRole("rh") || hasRole("processos");
+  const { allowedHotels, isMaster, matrizHotel, canSeeMatriz } = useAuth();
+  const rhHotels = useMemo(() => canSeeMatriz && matrizHotel ? [...allowedHotels, matrizHotel] : allowedHotels, [allowedHotels, matrizHotel, canSeeMatriz]);
   const { hotelId, month, year } = useModuleFilters("rh");
   const [periodMonths, setPeriodMonths] = useState(1);
 
@@ -61,12 +101,13 @@ export default function TurnoverPage() {
   const [rankOpen, setRankOpen] = useState(false);
   const [detail, setDetail] = useState<{ title: string; rows: RhEmployee[] } | null>(null);
 
-  const rhHotelId = isRhManager ? undefined : hotelId;
-  const { data: allEmployees = [], isLoading } = useRhEmployees(rhHotelId, month, year, periodMonths);
+  const { data: allEmployees = [], isLoading, isError } = useRhEmployees(undefined, month, year, periodMonths);
+  const { data: history = [], isLoading: historyLoading, isError: historyError } = useRhTurnoverHistory(month, year);
+  const { data: reasonData = [], isLoading: reasonsLoading, isError: reasonsError } = useRhDepartureReasons(hotelId, month, year, periodMonths);
 
   const hotelNames = useMemo(
-    () => Object.fromEntries(allowedHotels.map((h) => [h.id, h.name])),
-    [allowedHotels],
+    () => Object.fromEntries(rhHotels.map((h) => [h.id, h.name])),
+    [rhHotels],
   );
 
   const scopedEmployees = useMemo(
@@ -79,24 +120,20 @@ export default function TurnoverPage() {
     [scopedEmployees, month, year, periodMonths],
   );
 
-  const sexData = [
-    { name: "Masculino", value: metrics.porSexo.M },
-    { name: "Feminino", value: metrics.porSexo.F },
-    { name: "Não identificado", value: metrics.porSexo.N },
-  ].filter((d) => d.value > 0);
-
-  const ageData = Object.entries(metrics.porFaixaEtaria).map(([faixa, total]) => ({ faixa, total }));
+  const sectorData = useMemo(() => departuresBySector(metrics.listaDesligamentos), [metrics]);
+  const monthlyData = useMemo(() => turnoverMonthlySeries(history, hotelId), [history, hotelId]);
+  const hasHistory = monthlyData.some((row) => row.turnover !== null);
 
   const ranking = useMemo(() => {
-    if (allowedHotels.length <= 1) return [];
-    return allowedHotels
+    return rhHotels
       .map((h) => {
         const emps = allEmployees.filter((e) => e.hotel_id === h.id);
         const m = calcMetrics(emps, month, year, periodMonths);
-        return { hotel: h, pctRotatividade: m.pctRotatividade, total: m.total };
+        return { hotel: h, pctRotatividade: m.pctRotatividade, total: m.total, hasData: emps.length > 0 };
       })
       .sort((a, b) => b.pctRotatividade - a.pctRotatividade);
-  }, [allowedHotels, allEmployees, month, year, periodMonths]);
+  }, [rhHotels, allEmployees, month, year, periodMonths]);
+  const hotelData = ranking.map((row) => ({ name: row.hotel.name, turnover: row.hasData ? row.pctRotatividade : null }));
 
   return (
     <div className="space-y-6" translate="no">
@@ -155,70 +192,78 @@ export default function TurnoverPage() {
           sub="< 90 dias"
           onClick={() => setDetail({ title: "Período de Experiência", rows: metrics.listaExperiencia })}
         />
-        <KpiCard label="% Turnover" value={formatPct(metrics.pctTurnover)} />
+        <KpiCard label="% Turnover" value={formatPct(metrics.pctRotatividade)} />
         <KpiCard label="Tempo de casa" value={`${metrics.tempoCasaMedio.toFixed(1)} a`} sub="médio (ativos)" />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-4 shadow-soft">
-          <p className="text-sm font-semibold mb-3">Distribuição por sexo</p>
-          {sexData.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Sem dados.</p>
-          ) : (
-            <ResponsiveContainer key={`sex-${hotelId}-${month}-${year}-${periodMonths}`} width="100%" height={240}>
-              <PieChart margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
-                <Pie
-                  data={sexData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={65}
-                  label={({ value, percent }) => `${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                  labelLine
-                >
-                  {sexData.map((_, i) => <Cell key={i} fill={SEX_COLORS[i % SEX_COLORS.length]} />)}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-        <Card className="p-4 shadow-soft">
-          <p className="text-sm font-semibold mb-3">Distribuição por faixa etária</p>
-          <ResponsiveContainer key={`age-${hotelId}-${month}-${year}-${periodMonths}`} width="100%" height={240}>
-            <BarChart data={ageData}>
-              <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="total" fill={BAR_COLOR} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+        <CountChart title={periodMonths === 1 ? "Motivos de desligamento (no mês)" : "Motivos de desligamento (no período)"} data={reasonData} loading={reasonsLoading} error={reasonsError} />
+        <CountChart title="Desligamento por setor" data={sectorData} loading={isLoading} error={isError} />
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Carregando colaboradores…</p>}
+      <section className="space-y-3 min-w-0">
+        <h2 className="text-sm font-semibold">Evolução do turnover</h2>
+        {historyLoading ? <ChartMessage text="Carregando histórico…" /> : historyError ? <ChartMessage text="Não foi possível carregar o histórico." /> : !hasHistory ? <ChartMessage text="Sem dados no período" /> : (
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={monthlyData} margin={{ top: 12, right: 20, left: 0, bottom: 12 }}>
+              <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+              <XAxis dataKey="name" fontSize={11} minTickGap={25} />
+              <YAxis fontSize={12} tickFormatter={(value) => `${value}%`} />
+              <Tooltip formatter={(value: number) => formatPct(value)} />
+              <Line name="Turnover" type="linear" dataKey="turnover" stroke={BAR_COLOR} strokeWidth={2} dot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </section>
+
+      <section className="space-y-3 min-w-0">
+        <h2 className="text-sm font-semibold">Turnover por hotel</h2>
+        {isLoading ? <ChartMessage text="Carregando hotéis…" /> : isError ? <ChartMessage text="Não foi possível carregar os hotéis." /> : !ranking.some((row) => row.hasData) ? <ChartMessage text="Sem dados no período" /> : (
+          <ResponsiveContainer width="100%" height={Math.max(240, hotelData.length * 44)}>
+            <BarChart data={hotelData} layout="vertical" margin={{ top: 8, right: 25, left: 0, bottom: 8 }}>
+              <XAxis type="number" fontSize={12} tickFormatter={(value) => `${value}%`} />
+              <YAxis type="category" dataKey="name" width={150} interval={0} tick={<HotelAxisTick />} />
+              <Tooltip formatter={(value: number) => formatPct(value)} />
+              <Bar name="Turnover" dataKey="turnover" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </section>
+
+      <section className="space-y-3 min-w-0">
+        <h2 className="text-sm font-semibold">Admissões x Desligamentos por mês</h2>
+        {historyLoading ? <ChartMessage text="Carregando histórico…" /> : historyError ? <ChartMessage text="Não foi possível carregar o histórico." /> : !hasHistory ? <ChartMessage text="Sem dados no período" /> : (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={monthlyData} margin={{ top: 12, right: 20, left: 0, bottom: 12 }}>
+              <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+              <XAxis dataKey="name" fontSize={11} minTickGap={25} />
+              <YAxis fontSize={12} allowDecimals={false} />
+              <Tooltip /><Legend />
+              <Bar name="Admissões" dataKey="admitted" fill={BAR_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar name="Desligamentos" dataKey="terminated" fill={SECONDARY_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </section>
 
       {/* Ranking modal */}
       <Dialog open={rankOpen} onOpenChange={setRankOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Ranking por % rotatividade</DialogTitle>
+            <DialogTitle>Ranking por % turnover</DialogTitle>
           </DialogHeader>
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border min-h-0 max-h-[60dvh] overflow-y-auto pr-2">
             {ranking.length === 0 && <p className="text-sm text-muted-foreground py-4">Sem dados suficientes.</p>}
             {ranking.map((r, i) => (
-              <div key={r.hotel.id} className="flex items-center justify-between py-2.5">
-                <div className="flex items-center gap-3">
+              <div key={r.hotel.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="flex items-center gap-3 min-w-0">
                   <Badge variant="outline" className="w-7 justify-center">{i + 1}</Badge>
                   <div>
                     <p className="text-sm font-medium">{r.hotel.name}</p>
                     <p className="text-xs text-muted-foreground">{r.total} colaborador(es)</p>
                   </div>
                 </div>
-                <p className="text-sm font-semibold">{formatPct(r.pctRotatividade)}</p>
+                <p className="text-sm font-semibold">{r.hasData ? formatPct(r.pctRotatividade) : "—"}</p>
               </div>
             ))}
           </div>
@@ -254,7 +299,7 @@ export default function TurnoverPage() {
                       <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
                       <td className="py-2 pr-3">{fmtDate(e.termination_date)}</td>
                       <td className="py-2 pr-3">{hotelNames[e.hotel_id] ?? e.hotel_id}</td>
-                      <td className="py-2">{e.department ?? "—"}</td>
+                      <td className="py-2">{e.department || e.position || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
