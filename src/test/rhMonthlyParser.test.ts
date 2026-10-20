@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
-import { RH_MONTHLY_HEADERS, parseRhMonthlyRows, parseRhMonthlyFile, matchHotel } from "@/lib/rhMonthlyParser";
+import { RH_MONTHLY_HEADERS, RH_DETAILED_HEADERS, parseRhMonthlyRows, parseRhMonthlyFile, matchHotel } from "@/lib/rhMonthlyParser";
 import { canUploadRh, canViewRh } from "@/lib/rhAccess";
 import { calcMetrics, type RhEmployee } from "@/hooks/useRh";
 
@@ -18,6 +18,16 @@ const employees = (rows: ReturnType<typeof parse>["rows"]): RhEmployee[] => rows
 }));
 
 describe("Fonte mensal de RH", () => {
+  it("lê HE, noturno, reflexos, feriado e total separados sem deslocar o líquido", async () => {
+    const values = [...row().slice(0, 14), 584, 428.55, 206.72, 0, 1219.27, ...row().slice(15)];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([RH_DETAILED_HEADERS, values]), "Quadro");
+    const result = await parseRhMonthlyFile(XLSX.write(wb, { type: "array", bookType: "xlsx" }), hotels);
+    expect(result.rows[0]).toMatchObject({ overtime_hours_earnings: 584, night_earnings: 428.55, reflex_earnings: 206.72, holiday_earnings: 0, overtime_earnings: 1219.27, net_earnings: 2150 });
+  });
+  it("preserva detalhamento ausente na planilha antiga como sem dado", () => {
+    expect(parse(row()).rows[0]).toMatchObject({ overtime_hours_earnings: null, night_earnings: null, reflex_earnings: null, holiday_earnings: null, overtime_earnings: 150 });
+  });
   it("lê 09/2026 do arquivo e guarda todos os valores sem calcular encargos", () => {
     const result = parse(row());
     expect([result.month, result.year]).toEqual([9, 2026]);
