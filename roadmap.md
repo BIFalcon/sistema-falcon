@@ -1,3 +1,4 @@
+- [ ] Renomear Administrativo & Financeiro nos departamentos e compactar a tabela de colaboradores com cabeçalhos quebrados.
 - [x] Detalhar extras da nova folha por departamento e colaborador, renomear Recepção & Atendimento e preservar compatibilidade com a folha antiga; 48 testes passaram, arquivo real validado (473 linhas, 19 hotéis, nenhum desconhecido). Arquivo não importado: reenviar pela tela após login.
 - [x] Corrigir leitura de Roomnights usando quartos ocupados da DRE; setembro auditado nos hotéis com DRE, Confins 4.538 e Serra Talhada 1.786.
 - [ ] Conferir tabelas detalhadas e Roomnights com sessão RH/Master — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview.
