@@ -234,7 +234,7 @@ export default function CustoFolhaPage() {
                 <Badge variant="outline">visível só para RH e Master</Badge>
               </div>
               <div className="max-h-[60vh] overflow-y-auto">
-                <table className="w-full table-fixed text-xs [&_td]:px-1 [&_td]:py-2 [&_td]:align-top [&_td]:whitespace-normal [&_td]:[overflow-wrap:anywhere] [&_th]:px-1">
+                <table className="w-full table-fixed text-[11px] xl:text-xs [&_td]:px-1 [&_td]:py-2 [&_td]:align-top [&_td]:whitespace-normal [&_td]:break-words [&_th]:px-1">
                   <colgroup>
                     <col className="w-[13%]" />
                     <col className="w-[12%]" />
@@ -251,7 +251,7 @@ export default function CustoFolhaPage() {
                           <th key={column.key} scope="col" aria-sort={active ? (employeeSort.direction === "asc" ? "ascending" : "descending") : "none"}
                             className={`py-2 align-bottom ${column.numeric ? "text-right" : ""}`}>
                             <Button variant="ghost" onClick={() => toggleEmployeeSort(column.key)}
-                              className={`h-auto min-h-14 w-full gap-1 whitespace-normal px-0 py-1 text-[10px] leading-tight font-semibold uppercase tracking-normal ${column.numeric ? "justify-end text-right" : "justify-start text-left"} ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                              className={`h-auto min-h-14 w-full flex-col gap-1 whitespace-normal px-0 py-1 text-[10px] leading-tight font-semibold uppercase tracking-normal ${column.numeric ? "items-end text-right" : "items-start text-left"} ${active ? "text-foreground" : "text-muted-foreground"}`}>
                               <span className="min-w-0 break-words">{column.key === "overtime_earnings" ? <>Total HE /<br />noturno /<br />reflexos</> : column.label}</span>
                               <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
                             </Button>
@@ -268,7 +268,7 @@ export default function CustoFolhaPage() {
                         <td>{e.department ?? "—"}</td>
                         <td>{fmtDate(e.admission_date)}</td>
                         {[e.base_salary, e.overtime_hours_earnings, e.night_earnings, e.reflex_earnings, e.holiday_earnings, e.overtime_earnings, e.total_cost].map((value, index) => (
-                          <td key={index} className="text-right tabular-nums">{payrollMoney(value).replace(/\u00a0/g, " ")}</td>
+                          <td key={index} className="text-right tabular-nums">{value == null ? "Sem dado" : <>R$ <span className="whitespace-nowrap">{value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></>}</td>
                         ))}
                       </tr>
                     ))}
