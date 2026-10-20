@@ -1,3 +1,4 @@
+- [ ] Alterar Custo e Folha para líquido, cards de salário/bruto/extras e série mensal de extras, preservando ausência de dados legados; testar cálculos e RPCs.
 - [x] Liberar Indicadores DRE para ADM: somente Resumo e um hotel vinculado por vez; cinco testes de permissão passaram e geração conferida sem erros.
 - [ ] Conferir Indicadores DRE com sessão real ADM — bloqueado: sem sessão autorizada disponível; requer login no preview.
 - [x] Corrigir visualização/download da carta sem fallback silencioso e sem alterar versões; sete testes passaram.
