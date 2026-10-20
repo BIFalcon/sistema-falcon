@@ -316,8 +316,7 @@ export function AppSidebar() {
                         {!collapsed && (
                           <CollapsibleContent>
                             <SidebarMenuSub>
-                              {item.children?.
-                                .filter((child) => {
+                              {item.children?.filter((child) => {
                                   if (child.requireMaster) return isMaster || roles.includes("processos");
                                   if (child.url === "/fechamento/performance") return canViewPerformanceSla;
                                   if (child.allowedRoles) return isMaster || child.allowedRoles.some((r) => hasRole(r));

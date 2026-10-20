@@ -76,6 +76,7 @@ type AppRole =
   | "rh"
   | "marketing"
   | "operacoes"
+  | "novos_negocios"
   | "viewer";
 
 type Action =
