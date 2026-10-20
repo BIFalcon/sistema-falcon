@@ -316,6 +316,13 @@
       "when": 1792497512313,
       "tag": "0044_novos_negocios_readonly_policy_commands",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792503210501,
+      "tag": "0045_conc_opera_unique_trx_no",
+      "breakpoints": true
     }
   ]
 }
