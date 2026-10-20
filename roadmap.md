@@ -1,3 +1,5 @@
+- [ ] Detalhar extras da nova folha por departamento e colaborador, renomear Recepção & Atendimento e preservar compatibilidade com a folha antiga.
+- [ ] Corrigir Roomnights de setembro de Confins e conferir os demais hotéis.
 - [x] Ajustar seleção de hotéis da Carta para RI: ignorar carteira GOP antiga, selecionar hotel válido e liberar vínculo fixo ao trocar filtros; 24 testes passaram, aplicação sem erros.
 - [ ] Conferir seleção da Carta com sessão real RI — bloqueado: preview sem login e solicitante sem conta correspondente; requer login no preview.
 - [x] Criar perfil Novos Negócios: consulta à DRE do Fechamento e três Indicadores DRE de todos os hotéis; cadastro disponível, políticas aplicadas e oito testes de acesso passaram.
