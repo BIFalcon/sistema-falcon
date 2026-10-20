@@ -1,3 +1,4 @@
+- [ ] Liberar Indicadores DRE para ADM: somente Resumo e hotéis vinculados; testar permissões.
 - [x] Corrigir visualização/download da carta sem fallback silencioso e sem alterar versões; sete testes passaram.
 - [ ] Conferir download da carta com sessão real — bloqueado: não há conta correspondente ao solicitante; requer login no preview.
 - [x] Unificar fonte e leitura da planilha mensal de RH por competência e hotel.
