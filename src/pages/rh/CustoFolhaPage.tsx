@@ -33,7 +33,7 @@ const payrollMoney = (value: number | null | undefined) => value == null ? "Sem 
 function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
   return (
     <Card className="p-4 shadow-soft">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground break-words">{label}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
       {sub && (
         <p className={`text-xs mt-0.5 flex items-center gap-1 ${warn ? "text-destructive" : "text-muted-foreground"}`}>
@@ -184,14 +184,14 @@ export default function CustoFolhaPage() {
             </Card>
             <Card className="p-4 shadow-soft">
               <p className="text-sm font-semibold mb-3">Evolução mensal — Líquido {year}</p>
-              <ResponsiveContainer width="100%" height={260}>
+              {!histData.some(point => point.total != null) ? <p className="text-sm text-muted-foreground">Sem dado</p> : <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={histData}>
                   <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </Card>
           </div>
 
