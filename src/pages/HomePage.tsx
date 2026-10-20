@@ -19,6 +19,7 @@ import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useRhCalendarDates } from "@/hooks/useRh";
 import { CalendarDays } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { DRE_INDICATOR_ROLES } from "@/lib/dreAccess";
 
 interface TodoItem {
   dot: "red" | "amber" | "blue" | "green";
@@ -306,7 +307,7 @@ export default function HomePage() {
       });
     }
 
-    if (isMaster || hasRole("gop") || hasRole("gg") || hasRole("controladoria") || hasRole("operacoes") || hasRole("viewer")) {
+    if (isMaster || DRE_INDICATOR_ROLES.some(hasRole)) {
       cards.push({
         icon: <TrendingUp className="h-4 w-4" />,
         title: "Indicadores DRE",

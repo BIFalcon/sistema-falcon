@@ -1,4 +1,5 @@
 
+- Indicadores DRE route, navigation and summary restrictions share dreAccess helpers; ADM-only access uses one linked hotel at a time and server DRE RPCs independently check hotel authorization.
 - Letter preview and download use requireLetterPdfBlob when live generation is configured; generation failures must surface instead of silently substituting a stored PDF.
 - RH monthly imports use rh_employees as the single source and import_rh_monthly as an atomic, serialized whole-period replacement; this prevents partial imports and keeps both RH panels consistent.
 - Legacy payroll tables remain read-only historical fallbacks for periods without a consolidated upload; never combine both sources in the same period.

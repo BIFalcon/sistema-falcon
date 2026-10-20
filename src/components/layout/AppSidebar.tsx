@@ -56,6 +56,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 import { useAvatarUrl } from "@/hooks/useProfileAvatar";
 import { useInvestorAccess } from "@/hooks/useInvestors";
+import { DRE_INDICATOR_ROLES } from "@/lib/dreAccess";
 
 type LeafItem = {
   title: string;
@@ -97,7 +98,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
   {
     label: "Análise",
     items: [
-      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer"] as AppRole[] },
+      { title: "Indicadores DRE", url: "/indicadores", icon: TrendingUp, allowedRoles: DRE_INDICATOR_ROLES },
       { title: "Metas GG", url: "/metas", icon: Target, soon: true, allowedRoles: ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer"] as AppRole[] },
     ],
   },

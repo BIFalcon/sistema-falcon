@@ -25,6 +25,7 @@ import { useEffect } from "react";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
 import { DateFilterPicker } from "@/components/financeiro/DateFilterPicker";
+import { isDreSummaryOnly } from "@/lib/dreAccess";
 
 function getModuleFromPath(pathname: string): FilterModule {
   if (pathname.startsWith("/fechamento/consolidado")) return "consolidado";
@@ -47,10 +48,16 @@ export function AppHeader() {
   const { pathname, search } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
-  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz } = useAuth();
+  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz, roles } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
+  const summaryOnly = isIndicadores && isDreSummaryOnly(roles, isMaster);
+  useEffect(() => {
+    if (!summaryOnly) return;
+    if (hotelIds.length > 0) setHotelIds([]);
+    if (!allowedHotels.some((h) => h.id === hotelId)) setHotelId(allowedHotels[0]?.id ?? null);
+  }, [summaryOnly, hotelIds, hotelId, allowedHotels, setHotelIds, setHotelId]);
   const isHomePage = pathname === "/" || pathname === "/home";
   const isMarketing = pathname.startsWith("/marketing");
   // Telas sem filtro global (têm filtros próprios ou não são filtradas).
@@ -124,12 +131,12 @@ export function AppHeader() {
           Filtros
         </span>
 
-        {isGg && allowedHotels.length <= 1 ? (
+        {(isGg || summaryOnly) && allowedHotels.length <= 1 ? (
           <div className="h-9 px-3 flex items-center gap-2 rounded-md border border-input bg-muted/50 text-sm font-medium min-w-[180px]">
             <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
           </div>
-        ) : isGg && allowedHotels.length > 1 ? (
+        ) : (isGg || summaryOnly) && allowedHotels.length > 1 ? (
           <Select
             value={hotelId ?? undefined}
             onValueChange={(v) => setHotelId(v)}

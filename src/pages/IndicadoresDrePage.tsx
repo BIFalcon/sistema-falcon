@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeriodBar, describeMonths } from "@/components/indicadores/PeriodBar";
 import { ComparativoTab } from "@/components/indicadores/ComparativoTab";
 import { HistoricoTab } from "@/components/indicadores/HistoricoTab";
+import { isDreSummaryOnly, resolveDreTab, scopeDreHotelIds } from "@/lib/dreAccess";
 
 const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const DRE_FILE_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
@@ -498,10 +499,18 @@ function TreeLine({ node, selectedIds, select }: { node: DreLineNode; selectedId
 }
 
 export default function IndicadoresDrePage() {
-  const { allowedHotels, isMaster, user } = useAuth();
+  const { allowedHotels, isMaster, user, roles } = useAuth();
+  const summaryOnly = isDreSummaryOnly(roles, isMaster);
   const { hotelId, hotelIds: selectedHotelIds, month: filterMonth, year: filterYear } = useModuleFilters("indicadores");
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = ["resumo", "comparativo", "historico"].includes(searchParams.get("aba") ?? "") ? searchParams.get("aba")! : "resumo";
+  const tab = resolveDreTab(searchParams.get("aba"), summaryOnly);
+  useEffect(() => {
+    if (summaryOnly && searchParams.get("aba") !== "resumo") {
+      const next = new URLSearchParams(searchParams);
+      next.set("aba", "resumo");
+      setSearchParams(next, { replace: true });
+    }
+  }, [summaryOnly, searchParams, setSearchParams]);
   const setTab = (v: string) => { const n = new URLSearchParams(searchParams); n.set("aba", v); setSearchParams(n, { replace: true }); };
   const [year, setYear] = useState<number>(filterYear);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([filterMonth >= 1 && filterMonth <= 12 ? filterMonth : new Date().getMonth() + 1]);
@@ -524,10 +533,8 @@ export default function IndicadoresDrePage() {
   const showAsPct = divider === "revenue" || divider === "lodging" || divider === "netprofit";
   const hasDivider = divider !== "none";
   const hotelIds = useMemo(() => {
-    if (selectedHotelIds && selectedHotelIds.length > 0) return selectedHotelIds;
-    if (hotelId) return [hotelId];
-    return [];
-  }, [hotelOptions, hotelId, selectedHotelIds]);
+    return scopeDreHotelIds(summaryOnly ? [] : selectedHotelIds, hotelId, hotelOptions.map((h) => h.id), summaryOnly);
+  }, [hotelOptions, hotelId, selectedHotelIds, summaryOnly]);
   const noHotelSelected = hotelIds.length === 0;
   const { data: dataset, isLoading } = useDreAnalytics({
     hotelIds,
@@ -847,8 +854,8 @@ export default function IndicadoresDrePage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
-          <TabsTrigger value="comparativo">Comparativo</TabsTrigger>
-          <TabsTrigger value="historico">Histórico por hotel</TabsTrigger>
+          {!summaryOnly && <TabsTrigger value="comparativo">Comparativo</TabsTrigger>}
+          {!summaryOnly && <TabsTrigger value="historico">Histórico por hotel</TabsTrigger>}
         </TabsList>
       </Tabs>
       <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} hideYear={tab === "historico"} />
