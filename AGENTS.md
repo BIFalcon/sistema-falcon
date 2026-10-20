@@ -8,6 +8,7 @@
 - Payroll RPCs retain the total_cost alias for compatibility, while consolidated values come from net_earnings; separate summary fields and an authorized overtime-history RPC preserve legacy/missing monetary data as NULL. payrollMetrics shares null-safe monthly series and ratio calculations with tests.
 - RH payroll individual values are RH/Master-only through RLS and manager-checked RPCs; other authorized roles receive aggregates, never per-person costs.
 - Use rhMonthlyParser for all new RH file reads and rhAccess for client permissions; server RPCs independently enforce permissions.
+- Detailed payroll extras use nullable source columns and the versioned manager-only entries RPC; older layouts retain totals without fabricated detail. RH Roomnights uses an RH-authorized RPC reading the latest monthly DRE occupied-room indicator, not occupancy multiplied by cached availability.
 - Turnover history uses independent authorized monthly snapshots, preserving event-time fields for period charts; departure reason categories are server-side aggregates so masked individual reasons remain private.
 - Payroll table sorting uses a pure client-side payrollSort helper on copied rows; ordering never mutates cached data or changes export/access behavior.
 - Sensitive exports log to sensitive_export_log before the file is generated — reuse it for every sensitive export module.

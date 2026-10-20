@@ -1,3 +1,6 @@
+- [x] Detalhar extras da nova folha por departamento e colaborador, renomear Recepção & Atendimento e preservar compatibilidade com a folha antiga; 48 testes passaram, arquivo real validado (473 linhas, 19 hotéis, nenhum desconhecido). Arquivo não importado: reenviar pela tela após login.
+- [x] Corrigir leitura de Roomnights usando quartos ocupados da DRE; setembro auditado nos hotéis com DRE, Confins 4.538 e Serra Talhada 1.786.
+- [ ] Conferir tabelas detalhadas e Roomnights com sessão RH/Master — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview.
 - [x] Ajustar seleção de hotéis da Carta para RI: ignorar carteira GOP antiga, selecionar hotel válido e liberar vínculo fixo ao trocar filtros; 24 testes passaram, aplicação sem erros.
 - [ ] Conferir seleção da Carta com sessão real RI — bloqueado: preview sem login e solicitante sem conta correspondente; requer login no preview.
 - [x] Criar perfil Novos Negócios: consulta à DRE do Fechamento e três Indicadores DRE de todos os hotéis; cadastro disponível, políticas aplicadas e oito testes de acesso passaram.

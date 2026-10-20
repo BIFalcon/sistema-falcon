@@ -323,6 +323,13 @@
       "when": 1792503210501,
       "tag": "0045_conc_opera_unique_trx_no",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1792527030697,
+      "tag": "0046_rh_detailed_extras_and_roomnights",
+      "breakpoints": true
     }
   ]
 }

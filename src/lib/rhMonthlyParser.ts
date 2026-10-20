@@ -1,6 +1,8 @@
 import * as XLSX from "xlsx";
 
 export const RH_MONTHLY_HEADERS = ["Competência", "Hotel", "Contabilidade", "CNPJ", "Empresa", "Código", "Nome", "Cargo", "Admissão", "Situação", "Movimento", "Detalhe", "Salário contratual", "Proventos (bruto)", "Hora extra, noturno e reflexos", "Descontos", "Líquido", "Base INSS", "INSS descontado", "Base FGTS", "FGTS"];
+export const RH_EXTRA_HEADERS = ["Hora extra", "Adicional noturno", "DSR / reflexos", "Feriado trabalhado"];
+export const RH_DETAILED_HEADERS = [...RH_MONTHLY_HEADERS.slice(0, 14), ...RH_EXTRA_HEADERS, "Total HE, noturno e reflexos", ...RH_MONTHLY_HEADERS.slice(15)];
 export const normalizeRh = (value: unknown) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const text = (value: unknown) => String(value ?? "").trim();
 const optional = (value: unknown) => text(value) || null;
@@ -56,6 +58,7 @@ export interface RhMonthlyRow {
   admission_date: string | null; status: "ativo" | "inativo"; movement: string | null; detail: string | null;
   termination_date: string | null; salary: number | null; gross_earnings: number | null;
   overtime_earnings: number | null; deductions: number | null; net_earnings: number | null;
+  overtime_hours_earnings: number | null; night_earnings: number | null; reflex_earnings: number | null; holiday_earnings: number | null;
   inss_base: number | null; inss_deducted: number | null; fgts_base: number | null; fgts: number | null;
   cnpj: string | null; accounting: string | null; company: string | null;
 }
@@ -67,7 +70,10 @@ export interface RhMonthlyResult {
 
 export function parseRhMonthlyRows(data: unknown[][], hotels: { id: string; name: string }[]): RhMonthlyResult {
   const header = (data[0] ?? []).map(normalizeRh);
-  const indices = RH_MONTHLY_HEADERS.map((column) => header.indexOf(normalizeRh(column)));
+  const indices = RH_MONTHLY_HEADERS.map((column, index) => index === 14 && header.includes(normalizeRh("Total HE, noturno e reflexos"))
+    ? header.indexOf(normalizeRh("Total HE, noturno e reflexos")) : header.indexOf(normalizeRh(column)));
+  const extraIndices = RH_EXTRA_HEADERS.map(column => header.indexOf(normalizeRh(column)));
+  if (extraIndices.some(index => index >= 0) && extraIndices.some(index => index < 0)) throw new Error("Colunas de detalhamento ausentes: " + RH_EXTRA_HEADERS.filter((_, index) => extraIndices[index] < 0).join(", ") + ".");
   const missing = RH_MONTHLY_HEADERS.filter((_, i) => indices[i] < 0);
   if (missing.length) throw new Error(`Colunas ausentes: ${missing.join(", ")}.`);
   const rows: RhMonthlyRow[] = [];
@@ -102,6 +108,10 @@ export function parseRhMonthlyRows(data: unknown[][], hotels: { id: string; name
       status: situation === "ativo" ? "ativo" : "inativo", movement, detail, termination_date: termination,
       salary: money(v(12), i + 1, RH_MONTHLY_HEADERS[12]), gross_earnings: money(v(13), i + 1, RH_MONTHLY_HEADERS[13]),
       overtime_earnings: money(v(14), i + 1, RH_MONTHLY_HEADERS[14]), deductions: money(v(15), i + 1, RH_MONTHLY_HEADERS[15]),
+      overtime_hours_earnings: money(source[extraIndices[0]], i + 1, RH_EXTRA_HEADERS[0]),
+      night_earnings: money(source[extraIndices[1]], i + 1, RH_EXTRA_HEADERS[1]),
+      reflex_earnings: money(source[extraIndices[2]], i + 1, RH_EXTRA_HEADERS[2]),
+      holiday_earnings: money(source[extraIndices[3]], i + 1, RH_EXTRA_HEADERS[3]),
       net_earnings: money(v(16), i + 1, RH_MONTHLY_HEADERS[16]), inss_base: money(v(17), i + 1, RH_MONTHLY_HEADERS[17]),
       inss_deducted: money(v(18), i + 1, RH_MONTHLY_HEADERS[18]), fgts_base: money(v(19), i + 1, RH_MONTHLY_HEADERS[19]),
       fgts: money(v(20), i + 1, RH_MONTHLY_HEADERS[20]), cnpj: optional(v(3)), accounting: optional(v(2)), company: optional(v(4)),
@@ -116,8 +126,9 @@ export async function parseRhMonthlyFile(file: File | ArrayBuffer, hotels: { id:
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheets = workbook.SheetNames.filter((name) => {
     const header = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, range: 0, defval: null })[0] ?? [];
-    return RH_MONTHLY_HEADERS.every((column) => header.map(normalizeRh).includes(normalizeRh(column)));
+    const normalized = header.map(normalizeRh);
+    return RH_MONTHLY_HEADERS.every((column, index) => normalized.includes(normalizeRh(column)) || (index === 14 && normalized.includes(normalizeRh("Total HE, noturno e reflexos"))));
   });
-  if (sheets.length !== 1) throw new Error("O arquivo deve ter uma única aba de dados com as 21 colunas do Quadro e cabeçalho na primeira linha.");
+  if (sheets.length !== 1) throw new Error("O arquivo deve ter uma única aba de dados do Quadro com as colunas da folha e cabeçalho na primeira linha.");
   return parseRhMonthlyRows(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheets[0]], { header: 1, defval: null, raw: true }), hotels);
 }

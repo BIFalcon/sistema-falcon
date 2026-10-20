@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Upload, Loader2, Download, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { canUploadRh } from "@/lib/rhAccess";
@@ -15,7 +15,7 @@ import type { RhMonthlyResult } from "@/lib/rhMonthlyParser";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import {
-  usePayrollSummary, usePayrollHistory, usePayrollOvertimeHistory, usePayrollEntries, usePayrollRoomnights,
+  usePayrollSummary, usePayrollHistory, usePayrollEntries, usePayrollRoomnights,
   useUploadPayroll, logSensitiveExport, previewMonthlyPayroll,
 } from "@/hooks/useRhPayroll";
 
@@ -26,6 +26,11 @@ const EMPLOYEE_COLUMNS: { key: PayrollSortKey; label: string; numeric?: boolean 
   { key: "department", label: "Departamento" },
   { key: "admission_date", label: "Admissão" },
   { key: "base_salary", label: "Sal. Base", numeric: true },
+  { key: "overtime_hours_earnings", label: "Hora extra", numeric: true },
+  { key: "night_earnings", label: "Adicional noturno", numeric: true },
+  { key: "reflex_earnings", label: "DSR / reflexos", numeric: true },
+  { key: "holiday_earnings", label: "Feriado trabalhado", numeric: true },
+  { key: "overtime_earnings", label: "Total HE/noturno/reflexos", numeric: true },
   { key: "total_cost", label: "Líquido", numeric: true },
 ];
 const payrollMoney = (value: number | null | undefined) => value == null ? "Sem dado" : fmtBRL(value);
@@ -57,7 +62,6 @@ export default function CustoFolhaPage() {
 
   const { data: s, isLoading } = usePayrollSummary(hotelId, month, year);
   const { data: history = [] } = usePayrollHistory(hotelId, year);
-  const { data: overtimeHistory = [] } = usePayrollOvertimeHistory(hotelId, year);
   const { data: entries = [] } = usePayrollEntries(isRhManager, hotelId, month, year);
   const sortedEntries = useMemo(() => sortPayrollEntries(entries, employeeSort), [entries, employeeSort]);
   const toggleEmployeeSort = (key: PayrollSortKey) => {
@@ -102,11 +106,13 @@ export default function CustoFolhaPage() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s.departments.map((d) => ({
         Departamento: d.department, Colaboradores: d.headcount, "Líquido": d.total_cost ?? "Sem dado",
+        "Hora extra": d.overtime_hours_earnings ?? "Sem dado", "Adicional noturno": d.night_earnings ?? "Sem dado", "DSR / reflexos": d.reflex_earnings ?? "Sem dado", "Feriado trabalhado": d.holiday_earnings ?? "Sem dado", "Total HE/noturno/reflexos": d.overtime_earnings ?? "Sem dado",
       }))), "Por departamento");
       if (isRhManager) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(entries.map((e) => ({
           Funcionário: e.employee_name, Função: e.position, Departamento: e.department, Vínculo: e.bond,
           Admissão: e.admission_date, "Sal. Base": e.base_salary, FGTS: e.fgts, "INSS Patronal": e.inss_patronal, Líquido: e.total_cost ?? "Sem dado",
+          "Hora extra": e.overtime_hours_earnings ?? "Sem dado", "Adicional noturno": e.night_earnings ?? "Sem dado", "DSR / reflexos": e.reflex_earnings ?? "Sem dado", "Feriado trabalhado": e.holiday_earnings ?? "Sem dado", "Total HE/noturno/reflexos": e.overtime_earnings ?? "Sem dado",
         }))), "Colaboradores");
       }
       XLSX.writeFile(wb, `custo-folha-${hotelId}-${year}-${String(month).padStart(2, "0")}.xlsx`);
@@ -119,7 +125,7 @@ export default function CustoFolhaPage() {
 
   const hasData = !!s && s.headcount > 0;
   const costPerRn = payrollCostPerRoomnight(s?.total_cost, roomnights);
-  const histData = payrollMonthlySeries(history, overtimeHistory).map(point => ({ ...point, mes: MONTHS[point.reference_month - 1] }));
+  const histData = payrollMonthlySeries(history, []).map(point => ({ ...point, mes: MONTHS[point.reference_month - 1] }));
 
   return (
     <div className="space-y-6" translate="no">
@@ -156,7 +162,7 @@ export default function CustoFolhaPage() {
             <Kpi
               label="Roomnights"
               value={roomnights != null ? roomnights.toLocaleString("pt-BR") : "—"}
-              sub={costPerRn != null ? `${fmtBRL(costPerRn)} de folha por RN` : roomnights ? "Sem dado de líquido" : "sem DRE do mês"}
+              sub={costPerRn != null ? `${fmtBRL(costPerRn)} de folha por RN` : roomnights != null ? "Sem custo por RN" : "Sem dado de Roomnights na DRE"}
             />
           </div>
 
@@ -196,17 +202,29 @@ export default function CustoFolhaPage() {
           </div>
 
           <Card className="p-4 shadow-soft">
-            <p className="text-sm font-semibold mb-3">Evolução mensal — Hora extra, noturno e reflexos</p>
-            {!histData.some(point => point.overtime != null) ? <p className="text-sm text-muted-foreground">Sem dado</p> : (
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={histData}>
-                  <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
-                  <Line dataKey="overtime" name="Hora extra, noturno e reflexos" stroke="hsl(var(--accent))" strokeWidth={2} connectNulls={false} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+            <p className="text-sm font-semibold mb-3">Hora extra, noturno e reflexos — Por departamento</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-sm">
+                <thead><tr className="text-left text-xs text-muted-foreground">
+                  <th className="py-2 pr-3">Departamento</th>
+                  <th className="py-2 px-2 text-right">Hora extra</th>
+                  <th className="py-2 px-2 text-right">Adicional noturno</th>
+                  <th className="py-2 px-2 text-right">DSR / reflexos</th>
+                  <th className="py-2 px-2 text-right">Feriado trabalhado</th>
+                  <th className="py-2 pl-2 text-right">Total</th>
+                </tr></thead>
+                <tbody className="divide-y divide-border">{s.departments.map(d => (
+                  <tr key={d.department}>
+                    <td className="py-2 pr-3">{d.department}</td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">{payrollMoney(d.overtime_hours_earnings)}</td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">{payrollMoney(d.night_earnings)}</td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">{payrollMoney(d.reflex_earnings)}</td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">{payrollMoney(d.holiday_earnings)}</td>
+                    <td className="py-2 pl-2 text-right whitespace-nowrap font-semibold">{payrollMoney(d.overtime_earnings)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
           </Card>
 
           {isRhManager && (
@@ -216,7 +234,7 @@ export default function CustoFolhaPage() {
                 <Badge variant="outline">visível só para RH e Master</Badge>
               </div>
               <div className="max-h-[60vh] overflow-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[1300px] text-sm">
                   <thead>
                     <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {EMPLOYEE_COLUMNS.map(column => {
@@ -242,6 +260,11 @@ export default function CustoFolhaPage() {
                         <td className="py-2 pr-3">{e.department ?? "—"}</td>
                         <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
                         <td className="py-2 pr-3 text-right">{fmtBRL(e.base_salary)}</td>
+                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.overtime_hours_earnings)}</td>
+                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.night_earnings)}</td>
+                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.reflex_earnings)}</td>
+                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.holiday_earnings)}</td>
+                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.overtime_earnings)}</td>
                         <td className="py-2 text-right">{payrollMoney(e.total_cost)}</td>
                       </tr>
                     ))}

@@ -7,6 +7,10 @@ const rows = [
 ];
 
 describe("payroll column sorting", () => {
+  it.each<PayrollSortKey>(["overtime_earnings", "overtime_hours_earnings", "night_earnings", "reflex_earnings", "holiday_earnings"])("sorts detailed %s numerically", key => {
+    const source = [{ ...rows[0], [key]: 100 }, { ...rows[1], [key]: 20 }];
+    expect(sortPayrollEntries(source, { key, direction: "asc" }).map(row => row.id)).toEqual(["a", "b"]);
+  });
   it.each<PayrollSortKey>(["employee_name", "position", "department", "admission_date", "base_salary", "total_cost"])("sorts %s in both directions without changing source rows", (key) => {
     expect(sortPayrollEntries(rows, { key, direction: "asc" }).map(row => row.id)).toEqual(["a", "b"]);
     expect(sortPayrollEntries(rows, { key, direction: "desc" }).map(row => row.id)).toEqual(["b", "a"]);
