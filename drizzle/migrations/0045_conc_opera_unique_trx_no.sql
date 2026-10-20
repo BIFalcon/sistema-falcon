@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS conc_opera_hotel_trx_no_uidx ON public.conc_opera_entries (hotel_id, trx_no) WHERE trx_no IS NOT NULL AND trx_no <> '';

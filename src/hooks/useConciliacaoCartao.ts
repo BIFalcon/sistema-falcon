@@ -365,7 +365,28 @@ export function useImportOpera() {
       const { skipped, total } = parsedOpera;
       // Relatório acumulado (MTD): descarta o que já existe.
       const knownOpera = await existingKeys("conc_opera_entries", hotelId);
-      const rows = parsedOpera.rows.filter((r) => !knownOpera.has(r.entry_key));
+      // TRX_NO é o identificador único do Opera: evita duplicar quando o
+      // relatório muda a grafia do hóspede entre exportações.
+      const knownTrx = new Set(
+        (await fetchAllPaged<{ id: string; trx_no: string | null }>(() =>
+          supabase
+            .from("conc_opera_entries")
+            .select("id, trx_no")
+            .eq("hotel_id", hotelId)
+            .not("trx_no", "is", null)
+            .order("id", { ascending: true }),
+        )).map((r) => String(r.trx_no).trim()),
+      );
+      const seenTrx = new Set<string>();
+      const rows = parsedOpera.rows.filter((r) => {
+        if (knownOpera.has(r.entry_key)) return false;
+        const t = r.trx_no ? String(r.trx_no).trim() : "";
+        if (t) {
+          if (knownTrx.has(t) || seenTrx.has(t)) return false;
+          seenTrx.add(t);
+        }
+        return true;
+      });
       const duplicates = parsedOpera.rows.length - rows.length;
 
       const { data: up, error: upErr } = await supabase
