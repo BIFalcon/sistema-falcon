@@ -4134,6 +4134,13 @@ export type Database = {
           total_cost: number
         }[]
       }
+      get_rh_payroll_overtime_history: {
+        Args: { _hotel_id: string; _year: number }
+        Returns: {
+          reference_month: number
+          total_overtime_earnings: number
+        }[]
+      }
       get_rh_payroll_summary: {
         Args: { _hotel_id: string; _month: number; _year: number }
         Returns: Json
