@@ -1256,12 +1256,15 @@ function drawDreTable(
   };
 
 
-  const fmtVal = (v: number | null) =>
-    v == null
-      ? "—"
-      : v < 0
-        ? `(${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })})`
-        : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  const fmtVal = (v: number | null, cents = false) => {
+    if (v == null) return "—";
+    const opts = cents
+      ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      : { maximumFractionDigits: 0 };
+    return v < 0
+      ? `(${Math.abs(v).toLocaleString("pt-BR", opts)})`
+      : v.toLocaleString("pt-BR", opts);
+  };
 
   const x0 = 12, x1 = SIZE - 12;
   let y = HEADER_CONTENT_Y;
@@ -1317,7 +1320,8 @@ function drawDreTable(
       doc.line(x0, y + rowH, x1, y + rowH);
     }
     doc.text(r.label, x0 + (r.kind === "item" ? 6 : 3), y + rowH - 1.6);
-    doc.text(fmtVal(v), x1 - 3, y + rowH - 1.6, { align: "right" });
+    const isUh = r.kind === "highlight" && /por\s+uh/i.test(r.label);
+    doc.text(fmtVal(v, isUh), x1 - 3, y + rowH - 1.6, { align: "right" });
     if (r.kind === "highlight" && /por\s+uh/i.test(r.label)) uhValue = v;
     y += rowH;
     if (y > SIZE - 12) break; // proteção contra overflow
