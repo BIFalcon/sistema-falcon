@@ -1,3 +1,4 @@
+- [ ] Corrigir composição da receita na Carta do Manhattan com as seis linhas da DRE, sem alterar os demais hotéis; validar planilha e geração.
 - [x] Renomear Administrativo & Financeiro nos departamentos (74 registros existentes) e compactar a tabela de colaboradores com cabeçalhos quebrados; 30 testes passaram e larguras verificadas sem rolagem horizontal em amostra visual (1048, 1280 e 1775px). Conferência autenticada continua bloqueada pelo login abaixo.
 - [x] Detalhar extras da nova folha por departamento e colaborador, renomear Recepção & Atendimento e preservar compatibilidade com a folha antiga; 48 testes passaram, arquivo real validado (473 linhas, 19 hotéis, nenhum desconhecido). Arquivo não importado: reenviar pela tela após login.
 - [x] Corrigir leitura de Roomnights usando quartos ocupados da DRE; setembro auditado nos hotéis com DRE, Confins 4.538 e Serra Talhada 1.786.
