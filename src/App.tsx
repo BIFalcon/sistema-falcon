@@ -45,6 +45,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { RH_VIEW_ROLES } from "./lib/rhAccess";
 import type { AppRole } from "./lib/constants";
+import { DRE_INDICATOR_ROLES } from "./lib/dreAccess";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -159,7 +160,7 @@ const App = () => (
               <Route path="/carta" element={<Navigate to="/fechamento/carta" replace />} />
 
               {/* Análise */}
-              <Route path="/indicadores" element={<RoleGuard roles={["gop","gg","controladoria","patronos","operacoes","viewer","rh"]}><IndicadoresDrePage /></RoleGuard>} />
+              <Route path="/indicadores" element={<RoleGuard roles={DRE_INDICATOR_ROLES}><IndicadoresDrePage /></RoleGuard>} />
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
