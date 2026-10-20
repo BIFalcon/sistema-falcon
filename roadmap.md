@@ -1,3 +1,4 @@
+- [ ] Ajustar seleção de hotéis da Carta para RI e testar filtro vazio, seleção persistida e troca de fechamento.
 - [x] Criar perfil Novos Negócios: consulta à DRE do Fechamento e três Indicadores DRE de todos os hotéis; cadastro disponível, políticas aplicadas e oito testes de acesso passaram.
 - [ ] Conferir acesso com sessão real Novos Negócios — bloqueado: perfil novo ainda não atribuído a uma conta; sem sessão correspondente do solicitante.
 - [x] Alterar Custo e Folha para líquido, cards de salário/bruto/extras e série mensal de extras; migração aplicada, campos/permissões conferidos e 40 testes passaram.
