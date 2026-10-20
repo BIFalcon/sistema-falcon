@@ -3046,6 +3046,7 @@ export type Database = {
           fgts_base: number | null
           gender: string | null
           gross_earnings: number | null
+          holiday_earnings: number | null
           hotel_id: string
           id: string
           inss_base: number | null
@@ -3053,11 +3054,14 @@ export type Database = {
           movement: string | null
           name: string
           net_earnings: number | null
+          night_earnings: number | null
           overtime_earnings: number | null
+          overtime_hours_earnings: number | null
           position: string | null
           raw: Json
           reference_month: number | null
           reference_year: number | null
+          reflex_earnings: number | null
           salary: number | null
           source_format: string | null
           status: string
@@ -3082,6 +3086,7 @@ export type Database = {
           fgts_base?: number | null
           gender?: string | null
           gross_earnings?: number | null
+          holiday_earnings?: number | null
           hotel_id: string
           id?: string
           inss_base?: number | null
@@ -3089,11 +3094,14 @@ export type Database = {
           movement?: string | null
           name: string
           net_earnings?: number | null
+          night_earnings?: number | null
           overtime_earnings?: number | null
+          overtime_hours_earnings?: number | null
           position?: string | null
           raw?: Json
           reference_month?: number | null
           reference_year?: number | null
+          reflex_earnings?: number | null
           salary?: number | null
           source_format?: string | null
           status?: string
@@ -3118,6 +3126,7 @@ export type Database = {
           fgts_base?: number | null
           gender?: string | null
           gross_earnings?: number | null
+          holiday_earnings?: number | null
           hotel_id?: string
           id?: string
           inss_base?: number | null
@@ -3125,11 +3134,14 @@ export type Database = {
           movement?: string | null
           name?: string
           net_earnings?: number | null
+          night_earnings?: number | null
           overtime_earnings?: number | null
+          overtime_hours_earnings?: number | null
           position?: string | null
           raw?: Json
           reference_month?: number | null
           reference_year?: number | null
+          reflex_earnings?: number | null
           salary?: number | null
           source_format?: string | null
           status?: string
@@ -4126,6 +4138,27 @@ export type Database = {
           total_cost: number
         }[]
       }
+      get_rh_monthly_payroll_entries_v2: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: {
+          admission_date: string
+          base_salary: number
+          bond: string
+          department: string
+          employee_name: string
+          fgts: number
+          holiday_earnings: number
+          id: string
+          inss_patronal: number
+          night_earnings: number
+          overtime_earnings: number
+          overtime_hours_earnings: number
+          position: string
+          reflex_earnings: number
+          termination_date: string
+          total_cost: number
+        }[]
+      }
       get_rh_payroll_history: {
         Args: { _hotel_id: string; _year: number }
         Returns: {
@@ -4140,6 +4173,10 @@ export type Database = {
           reference_month: number
           total_overtime_earnings: number
         }[]
+      }
+      get_rh_payroll_roomnights: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: number
       }
       get_rh_payroll_summary: {
         Args: { _hotel_id: string; _month: number; _year: number }
