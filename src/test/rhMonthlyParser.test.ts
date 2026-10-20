@@ -28,6 +28,11 @@ describe("Fonte mensal de RH", () => {
     expect(matchHotel("Hotel Divinópolis", hotels)).toBe("a");
     expect(matchHotel("Divinópolis", [...hotels, { id: "c", name: "Ibis Styles Divinópolis" }])).toBeNull();
   });
+  it("reconhece Jaboatão e Cuiabá Shopping pelos nomes cadastrados", () => {
+    const list = [{ id: "j", name: "Ibis budget Recife Jaboatão" }, { id: "c", name: "Ibis Cuiabá" }, { id: "x", name: "Condomínio Cuiabá" }];
+    expect(matchHotel("Ibis Budget Jaboatão", list)).toBe("j");
+    expect(matchHotel("Ibis Cuiabá Shopping", list)).toBe("c");
+  });
   it("avisa cada hotel desconhecido com a quantidade exata de linhas", () => {
     const result = parse(row(), row({ 1: "Hotel desconhecido", 5: "2" }), row({ 1: "Hotel desconhecido", 5: "3" }));
     expect(result.unknownHotels).toEqual([{ name: "Hotel desconhecido", count: 2 }]);
