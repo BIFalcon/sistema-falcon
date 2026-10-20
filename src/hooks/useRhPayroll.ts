@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { parseRhMonthlyFile, type RhMonthlyResult } from "@/lib/rhMonthlyParser";
 
 interface PayrollEntry {
+ overtime_earnings: number | null; overtime_hours_earnings: number | null; night_earnings: number | null; reflex_earnings: number | null; holiday_earnings: number | null;
  id: string; employee_name: string; position: string | null; department: string | null; bond: string | null; admission_date: string | null; termination_date: string | null; base_salary: number | null; fgts: number | null; inss_patronal: number | null; total_cost: number | null;
 }
 
@@ -16,7 +17,7 @@ export interface PayrollSummary {
   experience: number;
   terminated: number;
   has_termination_data: boolean;
-  departments: { department: string; total_cost: number | null; headcount: number }[];
+  departments: { department: string; total_cost: number | null; headcount: number; overtime_earnings: number | null; overtime_hours_earnings: number | null; night_earnings: number | null; reflex_earnings: number | null; holiday_earnings: number | null }[];
 }
 
 export function usePayrollSummary(hotelId?: string, month?: number, year?: number) {
@@ -70,7 +71,7 @@ export function usePayrollEntries(enabled: boolean, hotelId?: string, month?: nu
     queryFn: async () => {
       if (!hotelId) throw new Error("Selecione um hotel.");
       if (!month || !year) throw new Error("Selecione um período.");
-      const { data, error } = await supabase.rpc("get_rh_monthly_payroll_entries", {
+      const { data, error } = await supabase.rpc("get_rh_monthly_payroll_entries_v2", {
         _hotel_id: hotelId, _month: month, _year: year,
       });
       if (error) throw error;
@@ -79,21 +80,17 @@ export function usePayrollEntries(enabled: boolean, hotelId?: string, month?: nu
   });
 }
 
-/** Roomnights = Ocupação × UHs disponíveis do consolidado da DRE. */
+/** Roomnights = quartos ocupados da versão mais recente da DRE do mês. */
 export function usePayrollRoomnights(hotelId?: string, month?: number, year?: number) {
   return useQuery({
     enabled: !!hotelId && !!month && !!year,
     queryKey: ["rh-payroll", "roomnights", hotelId, year, month],
     queryFn: async () => {
       if (!hotelId) throw new Error("Selecione um hotel.");
-      const { data, error } = await supabase
-        .from("consolidado_resultados_cache")
-        .select("ocupacao, uhs_disponiveis")
-        .eq("hotel_id", hotelId).eq("month", month ?? 0).eq("year", year ?? 0)
-        .maybeSingle();
+      if (!month || !year) throw new Error("Selecione um período.");
+      const { data, error } = await supabase.rpc("get_rh_payroll_roomnights", { _hotel_id: hotelId, _month: month, _year: year });
       if (error) throw error;
-      if (!data?.ocupacao || !data?.uhs_disponiveis) return null;
-      return Math.round(Number(data.ocupacao) * Number(data.uhs_disponiveis));
+      return data == null ? null : Math.round(Number(data));
     },
   });
 }
