@@ -1,3 +1,5 @@
+- [x] Ajustar seleção de hotéis da Carta para RI: ignorar carteira GOP antiga, selecionar hotel válido e liberar vínculo fixo ao trocar filtros; 24 testes passaram, aplicação sem erros.
+- [ ] Conferir seleção da Carta com sessão real RI — bloqueado: preview sem login e solicitante sem conta correspondente; requer login no preview.
 - [x] Criar perfil Novos Negócios: consulta à DRE do Fechamento e três Indicadores DRE de todos os hotéis; cadastro disponível, políticas aplicadas e oito testes de acesso passaram.
 - [ ] Conferir acesso com sessão real Novos Negócios — bloqueado: perfil novo ainda não atribuído a uma conta; sem sessão correspondente do solicitante.
 - [x] Alterar Custo e Folha para líquido, cards de salário/bruto/extras e série mensal de extras; migração aplicada, campos/permissões conferidos e 40 testes passaram.

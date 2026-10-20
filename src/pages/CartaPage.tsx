@@ -141,7 +141,7 @@ export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { hotelId, month, year } = useModuleFilters("fechamento");
+  const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster, isPatronos } = useAuth();
 
   const ensure = useEnsureClosing();
@@ -151,6 +151,10 @@ export default function CartaPage() {
 
   const closingIdParam = params.get("closing");
   const [resolvedId, setResolvedId] = useState<string | null>(closingIdParam);
+
+  useEffect(() => {
+    setResolvedId(closingIdParam);
+  }, [closingIdParam]);
 
   // Reset imediato ao trocar hotel/mês/ano — sem isso a página fica presa
   // no fechamento anterior até o lookup/ensure terminar (ou até dar F5).
@@ -189,6 +193,12 @@ export default function CartaPage() {
   }, [resolvedId, hotelId, month, year, existingClosing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
+  useEffect(() => {
+    if (!closingIdParam || closing?.id !== closingIdParam) return;
+    setHotelId(closing.hotel_id);
+    setMonth(closing.month);
+    setYear(closing.year);
+  }, [closingIdParam, closing, setHotelId, setMonth, setYear]);
   const { data: letter } = useLetter(resolvedId);
   const { data: highlights = [] } = useLetterHighlights(letter?.id);
   const { data: versions = [] } = useLetterVersions(letter?.id);

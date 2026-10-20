@@ -26,6 +26,7 @@ import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
 import { DateFilterPicker } from "@/components/financeiro/DateFilterPicker";
 import { isDreSummaryOnly } from "@/lib/dreAccess";
+import { resolveCartaHotelId } from "@/lib/cartaHotelSelection";
 
 function getModuleFromPath(pathname: string): FilterModule {
   if (pathname.startsWith("/fechamento/consolidado")) return "consolidado";
@@ -52,6 +53,8 @@ export function AppHeader() {
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
+  const isCarta = pathname === "/fechamento/carta" || pathname === "/carta";
+  const closingIdParam = new URLSearchParams(search).get("closing");
   const summaryOnly = isIndicadores && isDreSummaryOnly(roles, isMaster);
   useEffect(() => {
     if (!summaryOnly) return;
@@ -76,10 +79,25 @@ export function AppHeader() {
   const { data: pendingCount = 0 } = usePendingNotificationCount();
   const { data: gopManagers = [] } = useGopManagers();
   const selectedGop = gopManagers.find((g) => g.user_id === gopId);
-  const gopHotelIds = selectedGop ? new Set(selectedGop.hotel_ids) : null;
+  const gopHotelIds = !isCarta && selectedGop ? new Set(selectedGop.hotel_ids) : null;
   const visibleHotels = gopHotelIds
     ? allowedHotels.filter((h) => gopHotelIds.has(h.id))
     : allowedHotels;
+
+  useEffect(() => {
+    // A direct closing link is synchronized by CartaPage after it loads.
+    if (!isCarta || closingIdParam) return;
+    const nextHotelId = resolveCartaHotelId(hotelId, allowedHotels.map((h) => h.id));
+    if (nextHotelId !== hotelId) setHotelId(nextHotelId);
+  }, [isCarta, closingIdParam, hotelId, allowedHotels, setHotelId]);
+
+  function changeCartaFilter(update: () => void) {
+    update();
+    if (!isCarta || !closingIdParam) return;
+    const nextParams = new URLSearchParams(search);
+    nextParams.delete("closing");
+    navigate({ pathname, search: nextParams.toString() }, { replace: true });
+  }
 
   // Filtro de GOP removido de Indicadores: limpa seleção antiga persistida
   useEffect(() => {
@@ -139,7 +157,7 @@ export function AppHeader() {
         ) : (isGg || summaryOnly) && allowedHotels.length > 1 ? (
           <Select
             value={hotelId ?? undefined}
-            onValueChange={(v) => setHotelId(v)}
+            onValueChange={(v) => changeCartaFilter(() => setHotelId(v))}
           >
             <SelectTrigger className="w-[220px] h-9">
               <SelectValue placeholder="Selecionar hotel" />
@@ -213,13 +231,13 @@ export function AppHeader() {
         ) : (
           <Select
             value={hotelId ?? "__all__"}
-            onValueChange={(v) => setHotelId(v === "__all__" ? null : v)}
+            onValueChange={(v) => changeCartaFilter(() => setHotelId(v === "__all__" ? null : v))}
           >
             <SelectTrigger className="w-[220px] h-9">
               <SelectValue placeholder="Hotel" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              {(isMaster || hasRole("financeiro") || hasRole("viewer") || hasRole("controladoria") || hasRole("patronos") || hasRole("ri") || hasRole("operacoes") || hasRole("rh") || hasRole("gop")) && (
+              {!isCarta && (isMaster || hasRole("financeiro") || hasRole("viewer") || hasRole("controladoria") || hasRole("patronos") || hasRole("ri") || hasRole("operacoes") || hasRole("rh") || hasRole("gop")) && (
                 <SelectItem value="__all__">
                   {selectedGop ? `Todos da carteira (${visibleHotels.length})` : "Todos os hotéis"}
                 </SelectItem>
@@ -265,7 +283,7 @@ export function AppHeader() {
           />
         ) : (
           <>
-            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+            <Select value={String(month)} onValueChange={(v) => changeCartaFilter(() => setMonth(Number(v)))}>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Mês" />
               </SelectTrigger>
@@ -278,7 +296,7 @@ export function AppHeader() {
               </SelectContent>
             </Select>
 
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <Select value={String(year)} onValueChange={(v) => changeCartaFilter(() => setYear(Number(v)))}>
               <SelectTrigger className="w-[100px] h-9">
                 <SelectValue placeholder="Ano" />
               </SelectTrigger>
