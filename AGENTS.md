@@ -2,6 +2,7 @@
 - Indicadores DRE route, navigation and summary restrictions share dreAccess helpers; ADM-only access uses one linked hotel at a time and server DRE RPCs independently check hotel authorization.
 - Novos Negocios uses DRE-specific read policies and can_read_dre_hotel, never general/global data-access helpers; its layout allows only DRE, indicators and account profile, and DRE resolution reads existing closings without creating them.
 - Letter preview and download use requireLetterPdfBlob when live generation is configured; generation failures must surface instead of silently substituting a stored PDF.
+- Letter DRE revenue composition uses letterRevenue keyed by the closing hotel ID; scoped templates prevent one hotel's line mapping from changing other hotels, and PDF rows must fit through distribution.
 - Carta uses the authorized hotel list without persisted GOP scoping, defaults to a valid single hotel, and synchronizes direct closing links with shared filters; changing a filter releases the URL closing pin so the displayed letter follows the selection.
 - RH monthly imports use rh_employees as the single source and import_rh_monthly as an atomic, serialized whole-period replacement; this prevents partial imports and keeps both RH panels consistent.
 - Legacy payroll tables remain read-only historical fallbacks for periods without a consolidated upload; never combine both sources in the same period.

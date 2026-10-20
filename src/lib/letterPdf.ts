@@ -1,4 +1,5 @@
 import { CHART_RENDER_ERROR, hasVisibleInk } from "@/lib/letterPdfFlow";
+import { findLetterDreValue, getLetterRevenueRows } from "@/lib/letterRevenue";
 /**
  * Gera a Carta ao Investidor em PDF — formato quadrado 210x210mm, 7 páginas,
  * fielmente baseada no modelo Falcon Hotéis:
@@ -1150,7 +1151,7 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
   addPage(doc);
   drawBirdWatermark(doc, birdWatermark, { x: 0, y: 0, w: SIZE, h: SIZE });
   drawPageHeader(doc, "Demonstrativo de Resultados", falconData, brandData);
-  drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`);
+  drawDreTable(doc, dreLines, `${MONTHS_PT[closing.month - 1]} ${closing.year}`, closing.hotel_id);
 
   /* ───── 7. ENCERRAMENTO ───── */
   addPage(doc);
@@ -1193,10 +1194,11 @@ export async function generateLetterPdf(input: LetterPdfInput): Promise<Blob> {
  * Os matchers buscam dentro das linhas extraídas da DRE pelo parser; se o
  * rótulo equivalente não existir naquele template, a linha é omitida.
  */
-function drawDreTable(
+export function drawDreTable(
   doc: jsPDF,
   lines: { label: string; value: number | null }[],
   monthLabel: string,
+  hotelId = "",
 ) {
   type Row =
     | { kind: "section"; label: string }
@@ -1206,10 +1208,7 @@ function drawDreTable(
 
   const rows: Row[] = [
     { kind: "section", label: "RECEITAS" },
-    { kind: "item", label: "Receita Bruta de Serviços", rx: [/receita\s+bruta\s+(de\s+)?servi[çc]os/i, /^receita\s+(de\s+)?hospedagem/i] },
-    { kind: "item", label: "Receita Bruta A&B", rx: [/^receita\s+bruta\s+a&b/i, /^receita\s+(de\s+)?a&b/i, /alimentos?\s+e\s+bebidas?/i] },
-    { kind: "item", label: "Receita Financeira Líquida", rx: [/receita\s+financeira/i] },
-    { kind: "item", label: "Outras Receitas", rx: [/^outras\s+receitas/i] },
+    ...getLetterRevenueRows(hotelId),
     { kind: "total", label: "RECEITA BRUTA TOTAL", rx: [/^receita\s+bruta\s+total/i, /^total\s+das?\s+receitas?\s+brutas?/i, /^receita\s+total\s+bruta/i, /^\(\+\)\s*receitas?\s+brutas?/i] },
     { kind: "item", label: "(–) Impostos s/ vendas e serviços", rx: [/impostos?\s+s\/?\s*vendas/i, /impostos?\s+sobre\s+(vendas|servi)/i, /^total\s+das?\s+dedu[çc][õo]es(\s+e\s+cancelamentos)?/i, /^\(-\)\s*dedu[çc][õo]es\s+impostos/i] },
     { kind: "total", label: "DEDUÇÕES DA RECEITA TOTAL", rx: [/^\(?-?\)?\s*dedu[çc][õo]es\s+(da\s+)?receita/i, /^total\s+de\s+dedu/i, /^total\s+das?\s+dedu[çc][õo]es(\s+e\s+cancelamentos)?/i, /^dedu[çc][õo]es/i] },
@@ -1243,17 +1242,7 @@ function drawDreTable(
   // regex da lista é o rótulo preferencial (ex.: "Receita Bruta de Serviços"),
   // e só caímos nos alternativos (ex.: "Receita de Hospedagem") quando o
   // preferencial não existe naquele template.
-  const findValue = (rxs: RegExp[]): number | null => {
-    const cleaned = lines.map((l) => ({
-      lbl: l.label.replace(/^\[\w+\]\s*/, "").trim(),
-      value: l.value,
-    }));
-    for (const rx of rxs) {
-      const hit = cleaned.find((l) => rx.test(l.lbl));
-      if (hit) return hit.value;
-    }
-    return null;
-  };
+  const findValue = (rxs: RegExp[]): number | null => findLetterDreValue(lines, rxs);
 
 
   const fmtVal = (v: number | null, cents = false) => {
@@ -1267,6 +1256,8 @@ function drawDreTable(
   };
 
   const x0 = 12, x1 = SIZE - 12;
+  // Fit all rows, including distribution, when Manhattan adds two revenue lines.
+  const compact = hotelId === "manhattan-poa";
   let y = HEADER_CONTENT_Y;
   let uhValue: number | null = null;
   // header navy
@@ -1281,7 +1272,7 @@ function drawDreTable(
 
   for (const r of rows) {
     if (r.kind === "section") {
-      const rowH = 5.6;
+      const rowH = compact ? 5.2 : 5.6;
       doc.setFillColor("#E5E7EB");
       doc.rect(x0, y, x1 - x0, rowH, "F");
       doc.setFont("helvetica", "bold");
@@ -1298,7 +1289,7 @@ function drawDreTable(
       const variaveis = findValue([/^despesas?\s+vari[áa]veis?\s+(totais?|total)/i, /^total\s+de?\s*despesas?\s+vari[áa]veis?/i]);
       if (fixas != null || variaveis != null) v = (fixas ?? 0) + (variaveis ?? 0);
     }
-    const rowH = r.kind === "highlight" ? 6.4 : 5.4;
+    const rowH = r.kind === "highlight" ? 6.4 : compact ? 5 : 5.4;
     if (r.kind === "highlight") {
       doc.setFillColor("#FEF3C7"); // amarelo destaque
       doc.rect(x0, y, x1 - x0, rowH, "F");
