@@ -1154,11 +1154,11 @@ export function useDeleteManualEntry() {
         .from("ap_entries")
         .delete()
         .eq("id", input.entryId)
-        .eq("is_manual", true)
+        .or("is_manual.eq.true,is_transfer.eq.true")
         .select("id");
       if (error) throw error;
       if (!data || data.length === 0) {
-        throw new Error("Lançamento não excluído (apenas lançamentos manuais podem ser excluídos).");
+        throw new Error("Lançamento não excluído (apenas lançamentos manuais ou transferências podem ser excluídos).");
       }
     },
     onSuccess: (_n, v) => {

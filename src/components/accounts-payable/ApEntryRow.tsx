@@ -2,7 +2,7 @@
  * Linha da tabela de lançamentos de Contas a Pagar.
  */
 import { useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, Pencil, ShieldCheck, Unlink, UserPlus, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Banknote, CalendarClock, CheckCircle2, CircleDashed, Clock, MessageSquare, Pencil, ShieldCheck, Trash2, Unlink, UserPlus, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,7 +82,12 @@ export function ApEntryRow({
       ? "bg-violet-500/10 dark:bg-violet-500/10"
       : "";
 
-  const canEditPaidValues = !archived && (Number(entry.amount) === 0.01 || !!entry.is_manual);
+  // Juros/desconto já gravados sempre podem ser corrigidos ou removidos,
+  // inclusive em lançamentos importados ou já pagos.
+  const hasPaidValues =
+    (entry.paid_interest != null && Number(entry.paid_interest) !== 0) || entry.paid_amount != null;
+  const canEditPaidValues =
+    hasPaidValues || (!archived && (Number(entry.amount) === 0.01 || !!entry.is_manual));
 
   return (
     <TableRow
@@ -124,13 +129,16 @@ export function ApEntryRow({
             </>
           )}
           {entry.is_transfer && (
-            <Badge
-              variant="outline"
-              className="text-[10px] gap-1 border-slate-500/40 text-slate-700 dark:text-slate-300"
-              title={`Transferência ${entry.transfer_from_bank ?? ""} → ${entry.transfer_to_bank ?? ""}`}
-            >
-              <ArrowRightLeft className="h-3 w-3" /> Transferência
-            </Badge>
+            <>
+              <Badge
+                variant="outline"
+                className="text-[10px] gap-1 border-slate-500/40 text-slate-700 dark:text-slate-300"
+                title={`Transferência ${entry.transfer_from_bank ?? ""} → ${entry.transfer_to_bank ?? ""}`}
+              >
+                <ArrowRightLeft className="h-3 w-3" /> Transferência
+              </Badge>
+              {canManage && !entry.is_manual && <DeleteTransferButton entry={entry} />}
+            </>
           )}
           {entry.is_group && canManage && <UngroupButton entry={entry} />}
           {issues?.has("cnpj_divergente") && (
@@ -307,6 +315,48 @@ export function ApEntryRow({
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+function DeleteTransferButton({ entry }: { entry: ApEntry }) {
+  const del = useDeleteManualEntry();
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 text-muted-foreground hover:text-destructive"
+          title="Excluir transferência"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir transferência?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {entry.supplier} — {fmtBRL(Number(entry.amount))}. Esta ação não pode ser desfeita.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={del.isPending}
+            onClick={async () => {
+              try {
+                await del.mutateAsync({ entryId: entry.id, hotelId: entry.hotel_id });
+                toast.success("Transferência excluída");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+              }
+            }}
+          >
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
