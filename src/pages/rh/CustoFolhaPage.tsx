@@ -5,16 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Upload, Loader2, Download, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { canUploadRh } from "@/lib/rhAccess";
 import { sortPayrollEntries, type PayrollSort, type PayrollSortKey } from "@/lib/payrollSort";
+import { payrollCostPerRoomnight, payrollDepartmentPercentage, payrollMonthlySeries } from "@/lib/payrollMetrics";
 import type { RhMonthlyResult } from "@/lib/rhMonthlyParser";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { fmtBRL, fmtDate } from "@/lib/formatters";
 import {
-  usePayrollSummary, usePayrollHistory, usePayrollEntries, usePayrollRoomnights,
+  usePayrollSummary, usePayrollHistory, usePayrollOvertimeHistory, usePayrollEntries, usePayrollRoomnights,
   useUploadPayroll, logSensitiveExport, previewMonthlyPayroll,
 } from "@/hooks/useRhPayroll";
 
@@ -25,13 +26,14 @@ const EMPLOYEE_COLUMNS: { key: PayrollSortKey; label: string; numeric?: boolean 
   { key: "department", label: "Departamento" },
   { key: "admission_date", label: "Admissão" },
   { key: "base_salary", label: "Sal. Base", numeric: true },
-  { key: "total_cost", label: "Total", numeric: true },
+  { key: "total_cost", label: "Líquido", numeric: true },
 ];
+const payrollMoney = (value: number | null | undefined) => value == null ? "Sem dado" : fmtBRL(value);
 
 function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
   return (
     <Card className="p-4 shadow-soft">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground break-words">{label}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
       {sub && (
         <p className={`text-xs mt-0.5 flex items-center gap-1 ${warn ? "text-destructive" : "text-muted-foreground"}`}>
@@ -55,6 +57,7 @@ export default function CustoFolhaPage() {
 
   const { data: s, isLoading } = usePayrollSummary(hotelId, month, year);
   const { data: history = [] } = usePayrollHistory(hotelId, year);
+  const { data: overtimeHistory = [] } = usePayrollOvertimeHistory(hotelId, year);
   const { data: entries = [] } = usePayrollEntries(isRhManager, hotelId, month, year);
   const sortedEntries = useMemo(() => sortPayrollEntries(entries, employeeSort), [entries, employeeSort]);
   const toggleEmployeeSort = (key: PayrollSortKey) => {
@@ -98,12 +101,12 @@ export default function CustoFolhaPage() {
       });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s.departments.map((d) => ({
-        Departamento: d.department, Colaboradores: d.headcount, "Custo total": d.total_cost,
+        Departamento: d.department, Colaboradores: d.headcount, "Líquido": d.total_cost ?? "Sem dado",
       }))), "Por departamento");
       if (isRhManager) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(entries.map((e) => ({
           Funcionário: e.employee_name, Função: e.position, Departamento: e.department, Vínculo: e.bond,
-          Admissão: e.admission_date, "Sal. Base": e.base_salary, FGTS: e.fgts, "INSS Patronal": e.inss_patronal, Total: e.total_cost,
+          Admissão: e.admission_date, "Sal. Base": e.base_salary, FGTS: e.fgts, "INSS Patronal": e.inss_patronal, Líquido: e.total_cost ?? "Sem dado",
         }))), "Colaboradores");
       }
       XLSX.writeFile(wb, `custo-folha-${hotelId}-${year}-${String(month).padStart(2, "0")}.xlsx`);
@@ -115,11 +118,8 @@ export default function CustoFolhaPage() {
   };
 
   const hasData = !!s && s.headcount > 0;
-  const costPerRn = hasData && roomnights ? s.total_cost / roomnights : null;
-  const histData = MONTHS.map((m, i) => {
-    const h = history.find((x) => x.reference_month === i + 1);
-    return { mes: m, total: h ? Number(h.total_cost) : 0 };
-  });
+  const costPerRn = payrollCostPerRoomnight(s?.total_cost, roomnights);
+  const histData = payrollMonthlySeries(history, overtimeHistory).map(point => ({ ...point, mes: MONTHS[point.reference_month - 1] }));
 
   return (
     <div className="space-y-6" translate="no">
@@ -148,20 +148,15 @@ export default function CustoFolhaPage() {
       {hasData && s && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Kpi label="Total pago em folha" value={fmtBRL(s.total_cost)} />
+            <Kpi label="Salário Base total" value={payrollMoney(s.total_salary)} />
+            <Kpi label="Proventos (Bruto) total" value={payrollMoney(s.total_gross_earnings)} />
+            <Kpi label="Líquido total" value={payrollMoney(s.total_cost)} />
+            <Kpi label="Hora extra/noturno/reflexos total" value={payrollMoney(s.total_overtime_earnings)} />
             <Kpi label="Colaboradores" value={String(s.headcount)} />
-            <Kpi label="Admitidos no mês" value={String(s.admitted)} />
-            <Kpi label="Período de experiência" value={String(s.experience)} sub="< 90 dias" />
-            <Kpi
-              label="Desligados no mês"
-              value={s.has_termination_data ? String(s.terminated) : "—"}
-              sub={s.has_termination_data ? undefined : "Aguardando dado na planilha"}
-              warn={!s.has_termination_data}
-            />
             <Kpi
               label="Roomnights"
               value={roomnights != null ? roomnights.toLocaleString("pt-BR") : "—"}
-              sub={costPerRn != null ? `${fmtBRL(costPerRn)} de folha por RN` : "sem DRE do mês"}
+              sub={costPerRn != null ? `${fmtBRL(costPerRn)} de folha por RN` : roomnights ? "Sem dado de líquido" : "sem DRE do mês"}
             />
           </div>
 
@@ -172,7 +167,7 @@ export default function CustoFolhaPage() {
                 <thead>
                   <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <th className="py-2">Departamento</th><th className="py-2 text-right">Colab.</th>
-                    <th className="py-2 text-right">Custo</th><th className="py-2 text-right">%</th>
+                    <th className="py-2 text-right">Líquido</th><th className="py-2 text-right">%</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -180,25 +175,39 @@ export default function CustoFolhaPage() {
                     <tr key={d.department}>
                       <td className="py-2">{d.department}</td>
                       <td className="py-2 text-right">{d.headcount}</td>
-                      <td className="py-2 text-right">{fmtBRL(d.total_cost)}</td>
-                      <td className="py-2 text-right">{((d.total_cost / (s.total_cost || 1)) * 100).toFixed(1).replace(".", ",")}%</td>
+                      <td className="py-2 text-right">{payrollMoney(d.total_cost)}</td>
+                      <td className="py-2 text-right">{payrollDepartmentPercentage(d.total_cost, s.total_cost)?.toFixed(1).replace(".", ",").concat("%") ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </Card>
             <Card className="p-4 shadow-soft">
-              <p className="text-sm font-semibold mb-3">Evolução mensal {year}</p>
-              <ResponsiveContainer width="100%" height={260}>
+              <p className="text-sm font-semibold mb-3">Evolução mensal — Líquido {year}</p>
+              {!histData.some(point => point.total != null) ? <p className="text-sm text-muted-foreground">Sem dado</p> : <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={histData}>
                   <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </Card>
           </div>
+
+          <Card className="p-4 shadow-soft">
+            <p className="text-sm font-semibold mb-3">Evolução mensal — Hora extra, noturno e reflexos</p>
+            {!histData.some(point => point.overtime != null) ? <p className="text-sm text-muted-foreground">Sem dado</p> : (
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={histData}>
+                  <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                  <Line dataKey="overtime" name="Hora extra, noturno e reflexos" stroke="hsl(var(--accent))" strokeWidth={2} connectNulls={false} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </Card>
 
           {isRhManager && (
             <Card className="p-4 shadow-soft">
@@ -233,7 +242,7 @@ export default function CustoFolhaPage() {
                         <td className="py-2 pr-3">{e.department ?? "—"}</td>
                         <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
                         <td className="py-2 pr-3 text-right">{fmtBRL(e.base_salary)}</td>
-                        <td className="py-2 text-right">{fmtBRL(e.total_cost)}</td>
+                        <td className="py-2 text-right">{payrollMoney(e.total_cost)}</td>
                       </tr>
                     ))}
                   </tbody>
