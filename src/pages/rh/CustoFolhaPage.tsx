@@ -233,8 +233,15 @@ export default function CustoFolhaPage() {
                 <p className="text-sm font-semibold">Colaboradores</p>
                 <Badge variant="outline">visível só para RH e Master</Badge>
               </div>
-              <div className="max-h-[60vh] overflow-auto">
-                <table className="w-full min-w-[1300px] text-sm">
+              <div className="max-h-[60vh] overflow-y-auto">
+                <table className="w-full table-fixed text-[11px] xl:text-xs [&_td]:px-1 [&_td]:py-2 [&_td]:align-top [&_td]:whitespace-normal [&_td]:break-words [&_th]:px-1">
+                  <colgroup>
+                    <col className="w-[13%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[9%]" />
+                    {EMPLOYEE_COLUMNS.filter(column => column.numeric).map(column => <col key={column.key} />)}
+                  </colgroup>
                   <thead>
                     <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {EMPLOYEE_COLUMNS.map(column => {
@@ -242,10 +249,11 @@ export default function CustoFolhaPage() {
                         const Icon = active ? (employeeSort.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
                         return (
                           <th key={column.key} scope="col" aria-sort={active ? (employeeSort.direction === "asc" ? "ascending" : "descending") : "none"}
-                            className={`py-2 ${column.key === "total_cost" ? "" : "pr-3"} ${column.numeric ? "text-right" : ""}`}>
+                            className={`py-2 align-bottom ${column.numeric ? "text-right" : ""}`}>
                             <Button variant="ghost" onClick={() => toggleEmployeeSort(column.key)}
-                              className={`h-auto min-h-8 w-full px-0 py-1 text-[10px] font-semibold uppercase ${column.numeric ? "justify-end" : "justify-start"} ${active ? "text-foreground" : "text-muted-foreground"}`}>
-                              {column.label}<Icon className="ml-1 h-3 w-3 shrink-0" aria-hidden="true" />
+                              className={`h-auto min-h-14 w-full flex-col gap-1 whitespace-normal px-0 py-1 text-[10px] leading-tight font-semibold uppercase tracking-normal ${column.numeric ? "items-end text-right" : "items-start text-left"} ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                              <span className="min-w-0 break-words">{column.key === "overtime_earnings" ? <>Total HE /<br />noturno /<br />reflexos</> : column.label}</span>
+                              <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
                             </Button>
                           </th>
                         );
@@ -255,17 +263,13 @@ export default function CustoFolhaPage() {
                   <tbody className="divide-y divide-border">
                     {sortedEntries.map((e) => (
                       <tr key={e.id}>
-                        <td className="py-2 pr-3">{e.employee_name}</td>
-                        <td className="py-2 pr-3">{e.position ?? "—"}</td>
-                        <td className="py-2 pr-3">{e.department ?? "—"}</td>
-                        <td className="py-2 pr-3">{fmtDate(e.admission_date)}</td>
-                        <td className="py-2 pr-3 text-right">{fmtBRL(e.base_salary)}</td>
-                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.overtime_hours_earnings)}</td>
-                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.night_earnings)}</td>
-                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.reflex_earnings)}</td>
-                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.holiday_earnings)}</td>
-                        <td className="py-2 pr-3 text-right whitespace-nowrap">{payrollMoney(e.overtime_earnings)}</td>
-                        <td className="py-2 text-right">{payrollMoney(e.total_cost)}</td>
+                        <td>{e.employee_name}</td>
+                        <td>{e.position ?? "—"}</td>
+                        <td>{e.department ?? "—"}</td>
+                        <td>{fmtDate(e.admission_date)}</td>
+                        {[e.base_salary, e.overtime_hours_earnings, e.night_earnings, e.reflex_earnings, e.holiday_earnings, e.overtime_earnings, e.total_cost].map((value, index) => (
+                          <td key={index} className="text-right tabular-nums">{value == null ? "Sem dado" : <>R$ <span className="whitespace-nowrap">{value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></>}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

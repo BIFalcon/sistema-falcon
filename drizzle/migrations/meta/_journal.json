@@ -330,6 +330,13 @@
       "when": 1792527030697,
       "tag": "0046_rh_detailed_extras_and_roomnights",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792527577927,
+      "tag": "0047_rh_administrativo_financeiro_label",
+      "breakpoints": true
     }
   ]
 }
