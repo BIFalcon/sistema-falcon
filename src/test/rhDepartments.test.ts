@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // Exercise the ordered rules in the deployed SQL, not a second client-side mapping.
-const sql = readFileSync("drizzle/migrations/0046_rh_detailed_extras_and_roomnights.sql", "utf8");
+const sql = readFileSync("drizzle/migrations/0047_rh_administrativo_financeiro_label.sql", "utf8");
 const rules = Array.from(sql.matchAll(/WHEN p ~ '([^']+)' THEN '([^']+)'/g), ([, pattern, department]) => ({ pattern: new RegExp(pattern), department }));
 const classify = (position: string) => {
   const normalized = position.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").toLowerCase();
@@ -28,8 +28,11 @@ describe("Classificação aprovada dos departamentos de RH", () => {
     ["Anfitrião A & B", "Alimentos & Bebidas"],
     ["ATENDENTE DE A E B - NIVEL II", "Alimentos & Bebidas"],
     ["Oficial de Manutenção Predial", "Manutenção"],
-    ["Almoxarife", "Administrativo, Financeiro & Controladoria"],
-    ["Aprendiz de Programador de sistemas de informação", "Administrativo, Financeiro & Controladoria"],
+    ["Almoxarife", "Administrativo & Financeiro"],
+    ["Aprendiz de Programador de sistemas de informação", "Administrativo & Financeiro"],
+    ["Coordenador Administrativo", "Administrativo & Financeiro"],
+    ["Analista Financeiro JR", "Administrativo & Financeiro"],
+    ["Analista de Controladoria", "Administrativo & Financeiro"],
     ["Subgerente de Operações Regi", "Gestão & Operações"],
     ["Assistente de Pessoa e Cultura", "Recursos Humanos"],
   ])("classifica %s no grupo aprovado", (position, department) => {
