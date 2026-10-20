@@ -7,13 +7,16 @@ interface PayrollEntry {
 }
 
 export interface PayrollSummary {
-  total_cost: number;
+  total_cost: number | null;
+  total_salary: number | null;
+  total_gross_earnings: number | null;
+  total_overtime_earnings: number | null;
   headcount: number;
   admitted: number;
   experience: number;
   terminated: number;
   has_termination_data: boolean;
-  departments: { department: string; total_cost: number; headcount: number }[];
+  departments: { department: string; total_cost: number | null; headcount: number }[];
 }
 
 export function usePayrollSummary(hotelId?: string, month?: number, year?: number) {
@@ -41,7 +44,20 @@ export function usePayrollHistory(hotelId?: string, year?: number) {
       if (!year) throw new Error("Selecione um ano.");
       const { data, error } = await supabase.rpc("get_rh_payroll_history", { _hotel_id: hotelId, _year: year });
       if (error) throw error;
-      return (data ?? []) as { reference_month: number; total_cost: number; headcount: number }[];
+      return (data ?? []) as { reference_month: number; total_cost: number | null; headcount: number }[];
+    },
+  });
+}
+
+export function usePayrollOvertimeHistory(hotelId?: string, year?: number) {
+  return useQuery({
+    enabled: !!hotelId && !!year,
+    queryKey: ["rh-payroll", "overtime-history", hotelId, year],
+    queryFn: async () => {
+      if (!hotelId || !year) throw new Error("Selecione um hotel e um ano.");
+      const { data, error } = await supabase.rpc("get_rh_payroll_overtime_history", { _hotel_id: hotelId, _year: year });
+      if (error) throw error;
+      return (data ?? []) as { reference_month: number; total_overtime_earnings: number | null }[];
     },
   });
 }
