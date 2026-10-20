@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AppRole } from "@/lib/constants";
 import { GlobalLoadingBar } from "@/components/ui/GlobalLoadingBar";
 import { HotelContextoBanner } from "@/components/HotelContextoBanner";
+import { canAccessNovosNegociosPath, isNovosNegociosOnly } from "@/lib/dreAccess";
 
 function FullScreenLoader() {
   return (
@@ -97,6 +98,10 @@ export function ProtectedLayout({ requireRoles, children }: Props) {
 
   if (!hasAnyRole()) {
     return <Navigate to="/sem-permissao" replace />;
+  }
+
+  if (isNovosNegociosOnly(roles) && !canAccessNovosNegociosPath(location.pathname)) {
+    return <Navigate to="/fechamento/dre" replace />;
   }
 
   if (requireRoles && requireRoles.length > 0 && !isMaster) {
