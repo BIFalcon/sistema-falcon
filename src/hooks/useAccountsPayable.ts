@@ -1103,6 +1103,9 @@ export function useUpdateEntryPaidValues() {
     onSuccess: (_n, v) => {
       qc.invalidateQueries({ queryKey: ["ap-entries", v.hotelId] });
       qc.invalidateQueries({ queryKey: ["ap-entries-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-paid", v.hotelId] });
+      qc.invalidateQueries({ queryKey: ["ap-paid-all"] });
+      qc.invalidateQueries({ queryKey: ["ap-paid-all-juros"] });
     },
   });
 }
