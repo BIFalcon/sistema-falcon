@@ -56,7 +56,7 @@ export default function DrePage() {
     const resolve = readOnlyBusiness
       ? supabase.from("closings").select("id").eq("hotel_id", hotelId).eq("month", month).eq("year", year).maybeSingle().then(({ data, error }) => { if (error) throw error; return data; })
       : ensure.mutateAsync({ hotelId, month, year });
-    resolve
+    Promise.resolve(resolve)
       .then((c) => {
         if (!cancelled) { setResolvedId(c?.id ?? null); setClosingResolved(true); }
       })
