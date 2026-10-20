@@ -14,7 +14,17 @@ export function matchHotel(name: string, hotels: { id: string; name: string }[])
   const stripped = strip(target);
   if (!stripped) return null;
   const candidates = hotels.filter((hotel) => strip(normalizeRh(hotel.name)) === stripped || strip(normalizeRh(hotel.id)) === stripped);
-  return candidates.length === 1 ? candidates[0].id : null;
+  if (candidates.length === 1) return candidates[0].id;
+  if (candidates.length > 1) return null;
+  // Fallback: one name's words fully contained in the other (e.g. "Jaboatão" ⊂ "Recife Jaboatão", "Cuiabá" ⊂ "Cuiabá Shopping").
+  const words = new Set(stripped.split(" "));
+  const subset = hotels.filter((hotel) => {
+    const h = strip(normalizeRh(hotel.name)).split(" ").filter(Boolean);
+    if (!h.length) return false;
+    const hs = new Set(h);
+    return h.every((w) => words.has(w)) || [...words].every((w) => hs.has(w));
+  });
+  return subset.length === 1 ? subset[0].id : null;
 }
 
 function money(value: unknown, row: number, column: string): number | null {
