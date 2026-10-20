@@ -19,12 +19,15 @@ import { DreExcelViewerDialog } from "@/components/closings/DreExcelViewerDialog
 import { MONTHS_PT, STATUS_LABELS } from "@/lib/constants";
 import { ArrowLeft, Download, Eye, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function DrePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
+  const readOnlyBusiness = hasRole("novos_negocios") && !isMaster;
+  const [closingResolved, setClosingResolved] = useState(false);
   const ensure = useEnsureClosing();
   const upload = useUploadDre();
 
@@ -37,6 +40,7 @@ export default function DrePage() {
   useEffect(() => {
     if (closingIdParam) return;
     setResolvedId(null);
+    setClosingResolved(false);
   }, [hotelId, month, year, closingIdParam]);
 
   // Quando o filtro de hotel/mês/ano muda (e não viemos via ?closing= explícito),
@@ -49,16 +53,18 @@ export default function DrePage() {
       return;
     }
     let cancelled = false;
-    ensure
-      .mutateAsync({ hotelId, month, year })
+    const resolve = readOnlyBusiness
+      ? supabase.from("closings").select("id").eq("hotel_id", hotelId).eq("month", month).eq("year", year).maybeSingle().then(({ data, error }) => { if (error) throw error; return data; })
+      : ensure.mutateAsync({ hotelId, month, year });
+    Promise.resolve(resolve)
       .then((c) => {
-        if (!cancelled) setResolvedId(c.id);
+        if (!cancelled) { setResolvedId(c?.id ?? null); setClosingResolved(true); }
       })
       .catch((err) => toast.error(err.message));
     return () => {
       cancelled = true;
     };
-  }, [closingIdParam, hotelId, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [closingIdParam, hotelId, month, year, readOnlyBusiness]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: closing } = useClosing(resolvedId);
   const { data: versions = [] } = useDreVersions(resolvedId);
@@ -69,12 +75,12 @@ export default function DrePage() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const dreLocked = closing?.status_dre === "aprovado" && !(closing as { is_historical?: boolean } | undefined)?.is_historical;
-  const canUpload = (isMaster || hasRole("controladoria") || hasRole("gop")) && !dreLocked;
+  const canUpload = !readOnlyBusiness && (isMaster || hasRole("controladoria") || hasRole("gop")) && !dreLocked;
   // ADM tem acesso apenas de leitura: baixar/visualizar DRE e comentar.
   // Nunca pode aprovar/devolver — escondemos totalmente o card de ações.
-  const canSeeApprovalActions = !hasRole("adm") || isMaster
+  const canSeeApprovalActions = !readOnlyBusiness && (!hasRole("adm") || isMaster
     || hasRole("controladoria") || hasRole("patronos") || hasRole("gop")
-    || hasRole("gg") || hasRole("fernando");
+    || hasRole("gg") || hasRole("fernando"));
 
   const latestVersionId = useMemo(() => {
     if (!versions.length) return null;
@@ -161,7 +167,7 @@ export default function DrePage() {
 
   if (!closing) {
     return (
-      <div className="text-sm text-muted-foreground">Carregando fechamento…</div>
+      <div className="text-sm text-muted-foreground">{closingResolved && !resolvedId ? "Nenhuma DRE disponível para este hotel e período." : "Carregando fechamento…"}</div>
     );
   }
 
@@ -324,9 +330,9 @@ export default function DrePage() {
         </div>
 
         {/* COL 3: Comentários */}
-        <div>
+        {!readOnlyBusiness && <div>
           <CommentsThread closingId={closing.id} stage="dre" />
-        </div>
+        </div>}
       </div>
       <DreExcelViewerDialog
         open={viewerOpen}

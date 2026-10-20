@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isMaster = roles.some((r) => (MASTER_ROLES as readonly string[]).includes(r));
-  const GLOBAL_ACCESS_ROLES = ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer"];
+  const GLOBAL_ACCESS_ROLES = ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer", "novos_negocios"];
   const hasGlobalAccess = isMaster || roles.some((r) => GLOBAL_ACCESS_ROLES.includes(r as string));
   // Hotéis "rh_only" (ex.: Matriz) nunca entram nos filtros globais.
   const isRhOnly = (h: Hotel) => (h as { rh_only?: boolean }).rh_only === true;

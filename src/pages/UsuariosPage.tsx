@@ -72,6 +72,7 @@ import { useAllHotels } from "@/hooks/useHotelAssets";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 const SELECTABLE_ROLES: { value: AppRole; label: string; scope: string }[] = [
+  { value: "novos_negocios", label: "Novos Negócios", scope: "Consulta de DRE e Indicadores DRE em todos os hotéis" },
   { value: "fernando", label: "Fernando (CEO)", scope: "Aprovação final de DRE e Carta — visualização total" },
   { value: "controladoria", label: "Controladoria", scope: "Acesso a todos os hotéis" },
   { value: "patronos", label: "Patronos (Coordenadoria Financeiro)", scope: "Acesso total + autoriza pagamento" },
@@ -311,7 +312,7 @@ function UserRow({
           </div>
         </TableCell>
         <TableCell>
-          {user.is_master || ["controladoria", "patronos", "ri", "marketing"].includes(user.roles[0] ?? "") ? (
+          {user.is_master || ["controladoria", "patronos", "ri", "marketing", "novos_negocios"].includes(user.roles[0] ?? "") ? (
             <span className="text-xs text-muted-foreground italic">Todos</span>
           ) : hotelNames.length === 0 ? (
             <span className="text-xs text-muted-foreground">—</span>
@@ -494,7 +495,7 @@ function UserWizard({ open, onOpenChange, editing, hotels, canCreateMaster }: Wi
   const needsHotelSelection =
     !isMasterFlag && (primaryRole === "gop" || primaryRole === "gg" || primaryRole === "adm");
   const hasGlobalAccess =
-    isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer"].includes(primaryRole);
+    isMasterFlag || ["fernando", "controladoria", "patronos", "ri", "rh", "marketing", "operacoes", "viewer", "novos_negocios"].includes(primaryRole);
 
   // Validações por etapa
   const canAdvanceStep1 =

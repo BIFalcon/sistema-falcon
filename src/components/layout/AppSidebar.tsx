@@ -56,7 +56,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 import { useAvatarUrl } from "@/hooks/useProfileAvatar";
 import { useInvestorAccess } from "@/hooks/useInvestors";
-import { DRE_INDICATOR_ROLES } from "@/lib/dreAccess";
+import { DRE_INDICATOR_ROLES, isNovosNegociosOnly } from "@/lib/dreAccess";
 
 type LeafItem = {
   title: string;
@@ -82,10 +82,10 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         title: "Fechamento",
         url: "/fechamento",
         icon: ClipboardList,
-        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","operacoes","viewer"] as AppRole[],
+        allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","operacoes","viewer","novos_negocios"] as AppRole[],
         children: [
           { title: "Visão Geral", url: "/fechamento", icon: LayoutGrid, end: true, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"] as AppRole[] },
-          { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer"] as AppRole[] },
+          { title: "DRE", url: "/fechamento/dre", icon: FileSpreadsheet, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer","novos_negocios"] as AppRole[] },
           { title: "Carta ao Investidor", url: "/fechamento/carta", icon: Mail, allowedRoles: ["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"] as AppRole[] },
           { title: "Financeiro", url: "/fechamento/financeiro", icon: Wallet, allowedRoles: ["financeiro","viewer"] as AppRole[] },
           { title: "Envio", url: "/fechamento/envio", icon: Send, allowedRoles: ["ri"] as AppRole[] },
@@ -210,7 +210,10 @@ export function AppSidebar() {
 
   // Marketing-only users see ONLY the Marketing area.
   const isMarketingOnly = !isMaster && roles.length > 0 && roles.every((r) => r === "marketing");
-  const visibleGroups = (isMarketingOnly
+  const isBusinessOnly = isNovosNegociosOnly(roles);
+  const visibleGroups = (isBusinessOnly
+    ? navGroups.filter(g => g.label === "Operação" || g.label === "Análise").map(g => ({ ...g, items: g.items.filter(item => item.url !== "/") }))
+    : isMarketingOnly
     ? navGroups.filter((g) => g.label === "Marketing")
     : navGroups
   ).filter((g) => g.label !== "Investidores" || !!invAccess?.can_access);
@@ -313,8 +316,7 @@ export function AppSidebar() {
                         {!collapsed && (
                           <CollapsibleContent>
                             <SidebarMenuSub>
-                              {item.children!
-                                .filter((child) => {
+                              {item.children?.filter((child) => {
                                   if (child.requireMaster) return isMaster || roles.includes("processos");
                                   if (child.url === "/fechamento/performance") return canViewPerformanceSla;
                                   if (child.allowedRoles) return isMaster || child.allowedRoles.some((r) => hasRole(r));

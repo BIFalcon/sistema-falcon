@@ -1,6 +1,14 @@
 import type { AppRole } from "@/lib/constants";
 
-export const DRE_INDICATOR_ROLES: AppRole[] = ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer", "rh", "adm"];
+export const DRE_INDICATOR_ROLES: AppRole[] = ["gop", "gg", "controladoria", "patronos", "operacoes", "viewer", "rh", "adm", "novos_negocios"];
+
+export function isNovosNegociosOnly(roles: AppRole[]): boolean {
+  return roles.length > 0 && roles.every(role => role === "novos_negocios");
+}
+
+export function canAccessNovosNegociosPath(path: string): boolean {
+  return ["/fechamento/dre", "/indicadores", "/perfil"].includes(path);
+}
 
 export function isDreSummaryOnly(roles: AppRole[], isMaster: boolean): boolean {
   return !isMaster && roles.includes("adm") && !roles.some((role) => DRE_INDICATOR_ROLES.includes(role) && role !== "adm");

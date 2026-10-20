@@ -295,6 +295,27 @@
       "when": 1792497103084,
       "tag": "0041_rh_payroll_net_totals_and_overtime",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792497451304,
+      "tag": "0042_add_novos_negocios_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792497490388,
+      "tag": "0043_novos_negocios_dre_read_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792497512313,
+      "tag": "0044_novos_negocios_readonly_policy_commands",
+      "breakpoints": true
     }
   ]
 }

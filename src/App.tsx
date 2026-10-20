@@ -141,7 +141,7 @@ const App = () => (
 
               {/* Fechamento */}
               <Route path="/fechamento" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"]}><FechamentoPage /></RoleGuard>} />
-              <Route path="/fechamento/dre" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer"]}><DrePage /></RoleGuard>} />
+              <Route path="/fechamento/dre" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","adm","rh","viewer","novos_negocios"]}><DrePage /></RoleGuard>} />
               <Route path="/fechamento/carta" element={<RoleGuard roles={["processos","fernando","controladoria","gop","ri","financeiro","gg","rh","viewer"]}><CartaPage /></RoleGuard>} />
               <Route path="/fechamento/financeiro" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><FinanceiroPage /></RoleGuard>} />
               <Route path="/fechamento/envio" element={<RoleGuard roles={["ri"]}><EnvioPage /></RoleGuard>} />

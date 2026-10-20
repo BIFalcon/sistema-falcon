@@ -13,6 +13,7 @@ export const ROLE_LABELS: Record<string, string> = {
   comercial: "Comercial",
   operacoes: "Operações",
   viewer: "Visualizador",
+  novos_negocios: "Novos Negócios",
 };
 
 export const MASTER_ROLES = ["processos", "fernando"] as const;
@@ -36,6 +37,7 @@ export type AppRole =
   | "marketing"
   | "comercial"
   | "operacoes"
+  | "novos_negocios"
   | "viewer";
 
 export interface Hotel {

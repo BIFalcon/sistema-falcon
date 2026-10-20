@@ -1,3 +1,5 @@
+- [x] Criar perfil Novos Negócios: consulta à DRE do Fechamento e três Indicadores DRE de todos os hotéis; cadastro disponível, políticas aplicadas e oito testes de acesso passaram.
+- [ ] Conferir acesso com sessão real Novos Negócios — bloqueado: perfil novo ainda não atribuído a uma conta; sem sessão correspondente do solicitante.
 - [x] Alterar Custo e Folha para líquido, cards de salário/bruto/extras e série mensal de extras; migração aplicada, campos/permissões conferidos e 40 testes passaram.
 - [ ] Conferir novos valores e exportação de Custo e Folha com sessão real RH/Master — bloqueado: não existe conta correspondente ao solicitante para sessão automática; requer login no preview.
 - [x] Liberar Indicadores DRE para ADM: somente Resumo e um hotel vinculado por vez; cinco testes de permissão passaram e geração conferida sem erros.
