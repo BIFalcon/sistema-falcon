@@ -234,7 +234,19 @@ export interface AcquirerRow {
   nsu?: string | null;
   prazo_recebimento?: string | null;
   codigo_reserva?: string | null;
+  cancelada_pelo_estabelecimento?: boolean | null;
+  data_cancelamento?: string | null;
+  valor_cancelado?: number | null;
+  em_disputa_chargeback?: boolean | null;
 }
+
+const parseSimNao = (v: unknown): boolean | null => {
+  const t = normText(v);
+  if (!t || t === "-") return null;
+  if (t.startsWith("SIM") || t === "S" || t === "TRUE" || t === "1") return true;
+  if (t.startsWith("NAO") || t === "N" || t === "FALSE" || t === "0") return false;
+  return null;
+};
 
 const findCol = (header: string[], ...names: string[]): number => {
   for (const n of names) {
@@ -290,6 +302,10 @@ export async function parseAcquirerExcel(
   const iNsu = findCol(header, "nsu/cv", "nsu cv", "nsu");
   const iPrazo = findCol(header, "prazo de recebimento", "prazo");
   const iIdTx = findCol(header, "id transacao");
+  const iCancelada = findCol(header, "cancelada pelo estabelecimento");
+  const iDataCanc = findCol(header, "data do cancelamento");
+  const iValorCanc = findCol(header, "valor cancelado");
+  const iChargeback = findCol(header, "em disputa de chargeback");
 
   if (iStatus === -1 || iAmount === -1 || iDate === -1) {
     throw new Error("Cabeçalho da operadora não reconhecido (esperado na 2ª linha).");
@@ -325,7 +341,9 @@ export async function parseAcquirerExcel(
       hotelId = matchHotelByText(estab, hotels);
     }
 
-    if (!(status.includes("APROVADA") || status.includes("PAGO"))) {
+    const cancelada = iCancelada !== -1 ? parseSimNao(r[iCancelada]) : null;
+    // Vendas canceladas pelo estabelecimento entram para gerar o ajuste do NSU na reimportação.
+    if (!(status.includes("APROVADA") || status.includes("PAGO") || cancelada)) {
       skipped++;
       continue;
     }
@@ -363,6 +381,10 @@ export async function parseAcquirerExcel(
       valor_original: iOrig !== -1 && r[iOrig] != null && r[iOrig] !== "" ? parseMoney(r[iOrig]) : null,
       nsu: redeNsu(iNsu !== -1 ? r[iNsu] : null, iIdTx !== -1 ? r[iIdTx] : null),
       prazo_recebimento: iPrazo !== -1 ? String(r[iPrazo] ?? "").trim() || null : null,
+      cancelada_pelo_estabelecimento: cancelada,
+      data_cancelamento: iDataCanc !== -1 && r[iDataCanc] != null && String(r[iDataCanc]).trim() && String(r[iDataCanc]).trim() !== "-" ? toIso(r[iDataCanc]) || null : null,
+      valor_cancelado: iValorCanc !== -1 && r[iValorCanc] != null && r[iValorCanc] !== "" && r[iValorCanc] !== "-" ? parseMoney(r[iValorCanc]) : null,
+      em_disputa_chargeback: iChargeback !== -1 ? parseSimNao(r[iChargeback]) : null,
     });
   }
 
