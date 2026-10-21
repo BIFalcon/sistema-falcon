@@ -337,6 +337,13 @@
       "when": 1792527577927,
       "tag": "0047_rh_administrativo_financeiro_label",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792583106405,
+      "tag": "0048_conc_card_match_d_plus_minus_1",
+      "breakpoints": true
     }
   ]
 }
