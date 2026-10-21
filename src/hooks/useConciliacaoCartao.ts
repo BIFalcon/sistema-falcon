@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
 import {
   parseAcquirerExcel,
   parseB2BExcel,
@@ -487,9 +488,19 @@ export function useImportAcquirer() {
       const { skipped, unmatched, otherHotels } = parsed;
 
       // Planilha MTD (acumulada): descarta o que já foi importado antes.
-      const known = await existingKeys("conc_acquirer_entries", hotelId);
-      const rows = parsed.rows.filter((r) => !known.has(r.entry_key));
-      const duplicates = parsed.rows.length - rows.length;
+      const existing = await fetchAllPaged<ExistingAcquirerEntry>(() =>
+        supabase
+          .from("conc_acquirer_entries")
+          .select("id, entry_key, nsu, bandeira, amount, created_at")
+          .eq("hotel_id", hotelId)
+          .order("entry_key", { ascending: true }),
+      );
+      const known = new Set(existing.map((e) => e.entry_key));
+      // Ajustes só para linhas da Rede (B2B tem dedupe próprio).
+      const split = splitRedeReimport(parsed.rows, existing.filter((e) => !!e.nsu));
+      const deltaRows = split.deltaRows.filter((r) => !known.has(r.entry_key));
+      const rows = [...split.newRows, ...deltaRows];
+      const duplicates = parsed.rows.length - split.newRows.length - split.deltaRows.length;
 
       const matchedHotelIds = [hotelId];
 
@@ -526,12 +537,17 @@ export function useImportAcquirer() {
         nsu: r.nsu ?? null,
         prazo_recebimento: r.prazo_recebimento ?? null,
         codigo_reserva: r.codigo_reserva ?? null,
+        cancelada_pelo_estabelecimento: r.cancelada_pelo_estabelecimento ?? null,
+        data_cancelamento: r.data_cancelamento || null,
+        valor_cancelado: r.valor_cancelado ?? null,
+        em_disputa_chargeback: r.em_disputa_chargeback ?? null,
+        adjusts_entry_id: (r as Partial<DeltaRow>).adjusts_entry_id ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
-      await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
+      await fillAcquirerExtra(split.unchanged.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
+      return { inserted: rows.length, adjustments: deltaRows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });

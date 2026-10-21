@@ -1194,14 +1194,18 @@ export type Database = {
       }
       conc_acquirer_entries: {
         Row: {
+          adjusts_entry_id: string | null
           amount: number
           b2b: boolean
           b2b_at: string | null
           b2b_by: string | null
           bandeira: string | null
+          cancelada_pelo_estabelecimento: boolean | null
           categoria: string | null
           codigo_reserva: string | null
           created_at: string
+          data_cancelamento: string | null
+          em_disputa_chargeback: boolean | null
           entry_key: string
           establishment_raw: string | null
           hotel_id: string
@@ -1217,18 +1221,23 @@ export type Database = {
           source: string
           status: string | null
           upload_id: string | null
+          valor_cancelado: number | null
           valor_liquido: number | null
           valor_original: number | null
         }
         Insert: {
+          adjusts_entry_id?: string | null
           amount?: number
           b2b?: boolean
           b2b_at?: string | null
           b2b_by?: string | null
           bandeira?: string | null
+          cancelada_pelo_estabelecimento?: boolean | null
           categoria?: string | null
           codigo_reserva?: string | null
           created_at?: string
+          data_cancelamento?: string | null
+          em_disputa_chargeback?: boolean | null
           entry_key: string
           establishment_raw?: string | null
           hotel_id: string
@@ -1244,18 +1253,23 @@ export type Database = {
           source?: string
           status?: string | null
           upload_id?: string | null
+          valor_cancelado?: number | null
           valor_liquido?: number | null
           valor_original?: number | null
         }
         Update: {
+          adjusts_entry_id?: string | null
           amount?: number
           b2b?: boolean
           b2b_at?: string | null
           b2b_by?: string | null
           bandeira?: string | null
+          cancelada_pelo_estabelecimento?: boolean | null
           categoria?: string | null
           codigo_reserva?: string | null
           created_at?: string
+          data_cancelamento?: string | null
+          em_disputa_chargeback?: boolean | null
           entry_key?: string
           establishment_raw?: string | null
           hotel_id?: string
@@ -1271,6 +1285,7 @@ export type Database = {
           source?: string
           status?: string | null
           upload_id?: string | null
+          valor_cancelado?: number | null
           valor_liquido?: number | null
           valor_original?: number | null
         }
