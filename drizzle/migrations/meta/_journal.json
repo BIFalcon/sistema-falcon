@@ -351,6 +351,13 @@
       "when": 1792583456625,
       "tag": "0049_trx_code_mapping_categoria_check",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792583525231,
+      "tag": "0050_conc_acquirer_cancel_fields",
+      "breakpoints": true
     }
   ]
 }
