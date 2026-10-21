@@ -24,6 +24,7 @@ import { ConciliadosPairs } from "@/components/conciliacao/ConciliadosPairs";
 import { JustificationsPanel } from "@/components/conciliacao/JustificationsPanel";
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
+import { B2BBaixaTab } from "@/components/conciliacao/B2BBaixaTab";
 import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
@@ -501,7 +502,11 @@ export default function ConciliacaoCartaoPage() {
                 <TabsTrigger value="justificativa" className="text-[11px]">Justificativa</TabsTrigger>
                 <TabsTrigger value="conciliados" className="text-[11px]">Cartões Conciliados</TabsTrigger>
                 <TabsTrigger value="b2b" className="text-[11px]">B2B</TabsTrigger>
+                <TabsTrigger value="baixa-b2b" className="text-[11px]">Baixa (B2B)</TabsTrigger>
               </TabsList>
+              <TabsContent value="baixa-b2b" className="mt-4">
+                <B2BBaixaTab hotelId={hotelId!} />
+              </TabsContent>
               <TabsContent value="pendentes" className="mt-4">
                 <ReconcilePanel
                   boxes={cardBoxes}

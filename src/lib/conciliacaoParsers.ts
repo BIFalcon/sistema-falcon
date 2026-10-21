@@ -648,3 +648,89 @@ export async function parseTotvsExcel(
   if (total === 0) skipped = grid.length;
   return { rows, skipped, total, unclassified: [...unclassified] };
 }
+
+/* ------------------------------------------------------------------ *
+ * 2c. Recebimentos B2B ("Transferência B2B Checkout", aba "transfer")
+ * ------------------------------------------------------------------ */
+
+export interface B2BReceiptRow {
+  entry_key: string;
+  hotel_id: string;
+  data_operacao: string | null;
+  tipo_lancamento: "charge" | "deposit" | string;
+  descricao: string | null;
+  valor_total_transacao: number | null;
+  valor_comissao: number | null;
+  valor_incentivo: number | null;
+  valor_taxa_servico: number | null;
+  valor_recebivel_bruto: number | null;
+  valor_taxa_adquirencia: number | null;
+  valor_recebivel_liquido: number | null;
+  chave_transacao: string | null;
+  nsu_autorizacao: string | null;
+  data_transacao: string | null;
+  identificador_pedido: string | null;
+  forma_pagamento: string | null;
+  bandeira: string | null;
+  numero_cartao: string | null;
+  localizador_reserva: string | null;
+}
+
+/** Lê a planilha de recebimentos B2B a partir de uma grade (primeira linha útil = cabeçalho). */
+export function parseB2BReceivablesGrid(grid: unknown[][], hotelId: string): { rows: B2BReceiptRow[]; skipped: number } {
+  let headerIdx = grid.findIndex((r) => (r ?? []).some((c) => normText(c).includes("TIPO DO LANCAMENTO")));
+  if (headerIdx === -1) throw new Error("Cabeçalho de recebimentos B2B não reconhecido (esperado 'Tipo do lançamento').");
+  const header = (grid[headerIdx] ?? []).map((c) => normText(c));
+  const col = (...names: string[]) => {
+    for (const n of names) {
+      const i = header.indexOf(normText(n));
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const idx = {
+    dataOp: col("Data da operação"), tipo: col("Tipo do lançamento"), desc: col("Descrição"),
+    total: col("Valor total da transação"), comissao: col("Valor pago em comissão"),
+    incentivo: col("Valor pago em incentivo"), taxaServ: col("Valor taxa de serviço B2B"),
+    bruto: col("Valor do recebível bruto"), taxaAdq: col("Valor taxa de adquirência"),
+    liquido: col("Valor do recebível líquido"), chave: col("Chave da transação"),
+    nsu: col("NSU Autorização"), dataTx: col("Data da transação"), pedido: col("Identificador do pedido"),
+    forma: col("Forma de pagamento"), bandeira: col("Bandeira do cartão"), cartao: col("Número do cartão"),
+    loc: col("Localizador da reserva"),
+  };
+  if (idx.tipo === -1 || idx.dataOp === -1) throw new Error("Colunas 'Data da operação' e 'Tipo do lançamento' são obrigatórias.");
+
+  const txt = (r: unknown[], i: number) => (i === -1 ? null : String(r[i] ?? "").trim() || null);
+  const num = (r: unknown[], i: number) => (i === -1 || r[i] == null || r[i] === "" ? null : parseMoney(r[i]));
+  const date = (r: unknown[], i: number) => (i === -1 ? null : toIso(r[i]) || null);
+  const occ = makeOccCounter();
+  const rows: B2BReceiptRow[] = [];
+  let skipped = 0;
+  for (const r of grid.slice(headerIdx + 1)) {
+    const tipo = normText(r[idx.tipo]).toLowerCase();
+    if (!tipo) continue;
+    if (tipo !== "charge" && tipo !== "deposit") { skipped++; continue; }
+    const row: Omit<B2BReceiptRow, "entry_key"> = {
+      hotel_id: hotelId,
+      data_operacao: date(r, idx.dataOp), tipo_lancamento: tipo, descricao: txt(r, idx.desc),
+      valor_total_transacao: num(r, idx.total), valor_comissao: num(r, idx.comissao),
+      valor_incentivo: num(r, idx.incentivo), valor_taxa_servico: num(r, idx.taxaServ),
+      valor_recebivel_bruto: num(r, idx.bruto), valor_taxa_adquirencia: num(r, idx.taxaAdq),
+      valor_recebivel_liquido: num(r, idx.liquido), chave_transacao: txt(r, idx.chave),
+      nsu_autorizacao: txt(r, idx.nsu), data_transacao: date(r, idx.dataTx),
+      identificador_pedido: txt(r, idx.pedido), forma_pagamento: txt(r, idx.forma),
+      bandeira: txt(r, idx.bandeira), numero_cartao: txt(r, idx.cartao), localizador_reserva: txt(r, idx.loc),
+    };
+    const base = [hotelId, "b2brec", tipo, row.data_operacao ?? "", row.chave_transacao ?? "",
+      row.localizador_reserva ?? "", (row.valor_recebivel_liquido ?? 0).toFixed(2)].join("|");
+    rows.push({ ...row, entry_key: hashKey([base, occ(base)]) });
+  }
+  return { rows, skipped };
+}
+
+export async function parseB2BReceivablesExcel(file: File, hotelId: string) {
+  const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
+  const name = wb.SheetNames.find((n) => normText(n) === "TRANSFER") ?? wb.SheetNames[0];
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: false, defval: null, raw: true });
+  return parseB2BReceivablesGrid(grid, hotelId);
+}
