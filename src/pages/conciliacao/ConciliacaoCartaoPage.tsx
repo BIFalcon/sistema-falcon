@@ -28,7 +28,7 @@ import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
   useDeleteConcUpload, useImportBankStatement, useImportOpera, useOperaEntries, useReconcile,
-  useAutoReconcile, useEntriesByIds, useSetBillingPix, useConcJustifications, useSaveJustification, useSetB2B, useSetDirectBankBulk,
+  useAutoReconcile, useEntriesByIds, useSetBillingPix, useConcJustifications, useSaveJustification, useSetB2B,
   useMarkCashPaid, useCashProofUrl, useMatchedCountsByUpload, useAFaturarDaily,
   useTrxCodeMapping, useUndoReconcile, useUpdateTrxCode,
   type ConcKind, type ConcMatch, type ConcSide,
@@ -157,7 +157,6 @@ export default function ConciliacaoCartaoPage() {
 
   const reconcile = useReconcile();
   const undo = useUndoReconcile();
-  const setDirectBulk = useSetDirectBankBulk();
   const setB2B = useSetB2B();
   const setBillingPix = useSetBillingPix();
   const markCash = useMarkCashPaid();
@@ -370,16 +369,6 @@ export default function ConciliacaoCartaoPage() {
     );
   };
 
-  const markDirectBank = (rows: ReconcileRow[], value: boolean) => {
-    setDirectBulk.mutate(
-      { ids: rows.map((r) => r.id), value },
-      {
-        onSuccess: () => toast.success(value ? `${rows.length} lançamento(s) marcado(s) como direto no banco` : "Marcação removida"),
-        onError: (e: Error) => toast.error(e.message),
-      },
-    );
-  };
-
   const saveNote = (kind: ConcKind) => (row: ReconcileRow, note: string) => {
     if (!hotelId) return;
     saveJustification.mutate(
@@ -442,22 +431,10 @@ export default function ConciliacaoCartaoPage() {
     {
       key: "acq-card", title: "Adquirente", subtitle: "Vendas de cartão — Rede e B2B",
       position: "left", rows: acquirerCartao,
-      actions: [{
-        label: "Classificar como B2B",
-        icon: <Users className="h-3 w-3 mr-1" />,
-        disabled: setB2B.isPending,
-        onRun: (rows) => classifyB2B(rows, "acquirer", true),
-      }],
     },
     {
       key: "opera-card", title: "Front Caixa", subtitle: "Opera — transações de cartão",
       position: "right", rows: operaCartao,
-      actions: [{
-        label: "Classificar como B2B",
-        icon: <Users className="h-3 w-3 mr-1" />,
-        disabled: setB2B.isPending,
-        onRun: (rows) => classifyB2B(rows, "opera", true),
-      }],
     },
   ];
 
@@ -466,12 +443,6 @@ export default function ConciliacaoCartaoPage() {
     {
       key: "opera-pix", title: "Front Caixa (PIX)", subtitle: "Opera — transações PIX",
       position: "left", rows: operaPix,
-      actions: [{
-        label: "Direto no banco",
-        icon: <Landmark className="h-3 w-3 mr-1" />,
-        disabled: setDirectBulk.isPending,
-        onRun: (rows) => markDirectBank(rows, true),
-      }],
     },
     {
       key: "bank-pix", title: "Extrato Bancário", subtitle: 'Lançamentos com "PIX" na descrição', position: "right", rows: bankPix,
@@ -586,7 +557,6 @@ export default function ConciliacaoCartaoPage() {
                 <TabsTrigger value="pendentes" className="text-[11px]">Não Conciliados</TabsTrigger>
                 <TabsTrigger value="justificativa" className="text-[11px]">Justificativa</TabsTrigger>
                 <TabsTrigger value="conciliados" className="text-[11px]">PIX Conciliados</TabsTrigger>
-                <TabsTrigger value="direto" className="text-[11px]">Direto no banco</TabsTrigger>
                 <TabsTrigger value="faturamento" className="text-[11px]">Faturamento (PIX)</TabsTrigger>
               </TabsList>
               <TabsContent value="pendentes" className="mt-4">
@@ -623,17 +593,6 @@ export default function ConciliacaoCartaoPage() {
                   exportName={`pix-conciliados-${hotelId}.xlsx`}
                   onUndoMany={undoMany}
                   undoing={undo.isPending}
-                />
-              </TabsContent>
-              <TabsContent value="direto" className="mt-4">
-                <ClassifiedList
-                  title="Recebidos direto no banco"
-                  subtitle="Lançamentos do Opera retirados das pendências"
-                  rows={directBankRows}
-                  actionLabel="Reverter"
-                  busy={setDirectBulk.isPending}
-                  onAction={(r) => markDirectBank([r], false)}
-                  exportName={`direto-no-banco-${hotelId}.xlsx`}
                 />
               </TabsContent>
               <TabsContent value="faturamento" className="mt-4">
