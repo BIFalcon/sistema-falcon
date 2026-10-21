@@ -358,6 +358,13 @@
       "when": 1792583525231,
       "tag": "0050_conc_acquirer_cancel_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792583767049,
+      "tag": "0051_conc_b2b_receipts",
+      "breakpoints": true
     }
   ]
 }

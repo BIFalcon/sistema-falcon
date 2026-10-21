@@ -1306,6 +1306,132 @@ export type Database = {
           },
         ]
       }
+      conc_b2b_receipts: {
+        Row: {
+          bandeira: string | null
+          chave_transacao: string | null
+          created_at: string
+          data_operacao: string | null
+          data_transacao: string | null
+          deposit_id: string | null
+          descricao: string | null
+          entry_key: string
+          forma_pagamento: string | null
+          hotel_id: string
+          id: string
+          identificador_pedido: string | null
+          localizador_reserva: string | null
+          matched_acquirer_id: string | null
+          matched_at: string | null
+          matched_bank_id: string | null
+          nsu_autorizacao: string | null
+          numero_cartao: string | null
+          tipo_lancamento: string | null
+          upload_id: string | null
+          valor_comissao: number | null
+          valor_incentivo: number | null
+          valor_recebivel_bruto: number | null
+          valor_recebivel_liquido: number | null
+          valor_taxa_adquirencia: number | null
+          valor_taxa_servico: number | null
+          valor_total_transacao: number | null
+        }
+        Insert: {
+          bandeira?: string | null
+          chave_transacao?: string | null
+          created_at?: string
+          data_operacao?: string | null
+          data_transacao?: string | null
+          deposit_id?: string | null
+          descricao?: string | null
+          entry_key: string
+          forma_pagamento?: string | null
+          hotel_id: string
+          id?: string
+          identificador_pedido?: string | null
+          localizador_reserva?: string | null
+          matched_acquirer_id?: string | null
+          matched_at?: string | null
+          matched_bank_id?: string | null
+          nsu_autorizacao?: string | null
+          numero_cartao?: string | null
+          tipo_lancamento?: string | null
+          upload_id?: string | null
+          valor_comissao?: number | null
+          valor_incentivo?: number | null
+          valor_recebivel_bruto?: number | null
+          valor_recebivel_liquido?: number | null
+          valor_taxa_adquirencia?: number | null
+          valor_taxa_servico?: number | null
+          valor_total_transacao?: number | null
+        }
+        Update: {
+          bandeira?: string | null
+          chave_transacao?: string | null
+          created_at?: string
+          data_operacao?: string | null
+          data_transacao?: string | null
+          deposit_id?: string | null
+          descricao?: string | null
+          entry_key?: string
+          forma_pagamento?: string | null
+          hotel_id?: string
+          id?: string
+          identificador_pedido?: string | null
+          localizador_reserva?: string | null
+          matched_acquirer_id?: string | null
+          matched_at?: string | null
+          matched_bank_id?: string | null
+          nsu_autorizacao?: string | null
+          numero_cartao?: string | null
+          tipo_lancamento?: string | null
+          upload_id?: string | null
+          valor_comissao?: number | null
+          valor_incentivo?: number | null
+          valor_recebivel_bruto?: number | null
+          valor_recebivel_liquido?: number | null
+          valor_taxa_adquirencia?: number | null
+          valor_taxa_servico?: number | null
+          valor_total_transacao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_b2b_receipts_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "conc_b2b_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_b2b_receipts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_b2b_receipts_matched_acquirer_id_fkey"
+            columns: ["matched_acquirer_id"]
+            isOneToOne: false
+            referencedRelation: "conc_acquirer_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_b2b_receipts_matched_bank_id_fkey"
+            columns: ["matched_bank_id"]
+            isOneToOne: false
+            referencedRelation: "conc_bank_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_b2b_receipts_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_bank_entries: {
         Row: {
           account_name_raw: string | null
@@ -3979,6 +4105,14 @@ export type Database = {
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
         Returns: number
+      }
+      conc_b2b_auto_match: {
+        Args: { p_bank_prefix?: string; p_hotel: string }
+        Returns: Json
+      }
+      conc_b2b_unmatch_deposit: {
+        Args: { p_deposit: string }
+        Returns: undefined
       }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
