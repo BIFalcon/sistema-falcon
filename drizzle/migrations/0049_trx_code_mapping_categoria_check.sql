@@ -1,0 +1,1 @@
+ALTER TABLE public.trx_code_mapping ADD CONSTRAINT trx_code_mapping_categoria_check CHECK (categoria IS NULL OR categoria IN ('CARTAO','PIX','DINHEIRO','FATURADO'));
