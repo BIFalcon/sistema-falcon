@@ -16,3 +16,4 @@
 - Consolidated RH departments are classified server-side by rh_department_for_position and a monthly-row trigger; this keeps individual and aggregate views consistent for current rows and future imports without changing legacy payroll data.
 
 - Investidores module: all reads/writes go through SECURITY DEFINER `inv_*` RPCs (tables have RLS with no direct policies) so masking, audit (audit_access_logs) and finance notifications stay server-side; access comes from user_roles (edit + full view for editor roles) and user_permissions keys (finance, extra full view), never hardcoded e-mails.
+- B2B settlement (Baixa) lives in conc_b2b_receipts; matching runs in the conc_b2b_auto_match RPC (sale×receipt by reservation locator, deposit×bank by net value+nearest date) and the bank description prefix is centralized in src/lib/b2bBaixa.ts so it can be adjusted once validated.
