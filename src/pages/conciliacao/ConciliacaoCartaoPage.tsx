@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload, Users,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -306,9 +306,6 @@ export default function ConciliacaoCartaoPage() {
     ...operaRows.filter((r) => operaById.get(r.id)?.b2b).map((r) => ({ ...r, info: "Opera · B2B" })),
     ...acquirerRows.filter((r) => acquirerById.get(r.id)?.b2b).map((r) => ({ ...r, info: "Adquirente · B2B" })),
   ];
-  const directBankRows = operaRows
-    .filter((r) => operaById.get(r.id)?.direct_bank)
-    .map((r) => ({ ...r, info: "Recebido direto no banco" }));
   const billingPixRows = bankRows
     .filter((r) => bankById.get(r.id)?.billing_pix)
     .map((r) => ({ ...r, info: "Pagamento de Faturamento (PIX)" }));

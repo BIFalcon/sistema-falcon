@@ -783,26 +783,6 @@ export function useUndoReconcile() {
   });
 }
 
-/** Marca / desmarca um item do Opera como "recebido direto no banco". */
-export function useSetDirectBank() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
-      const { error } = await supabase
-        .from("conc_opera_entries")
-        .update({
-          direct_bank: value,
-          direct_bank_by: value ? user!.id : null,
-          direct_bank_at: value ? new Date().toISOString() : null,
-        })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-opera"] }),
-  });
-}
-
 export function useUpdateTrxCode() {
   const qc = useQueryClient();
   return useMutation({
@@ -920,27 +900,6 @@ export function useSetB2B() {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
     },
-  });
-}
-
-/** Marca / desmarca vários itens do Opera como "recebido direto no banco". */
-export function useSetDirectBankBulk() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
-      if (!ids.length) return;
-      const { error } = await supabase
-        .from("conc_opera_entries")
-        .update({
-          direct_bank: value,
-          direct_bank_by: value ? user!.id : null,
-          direct_bank_at: value ? new Date().toISOString() : null,
-        })
-        .in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["conc-opera"] }),
   });
 }
 
