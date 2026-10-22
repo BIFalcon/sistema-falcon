@@ -386,6 +386,13 @@
       "when": 1792670200254,
       "tag": "0054_ar_francesinha_notification_events",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1792670260555,
+      "tag": "0055_conc_francesinha",
+      "breakpoints": true
     }
   ]
 }
