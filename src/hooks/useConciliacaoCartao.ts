@@ -196,7 +196,7 @@ export function useBankEntries(hotelId: string | null, dateFrom?: string, dateTo
       const build = () => {
         let q = supabase
           .from("conc_bank_entries")
-          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at")
+          .select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at, cpf_cnpj")
           .eq("hotel_id", hotelId!)
           .order("line_date", { ascending: true })
           .order("id", { ascending: true });
