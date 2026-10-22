@@ -400,6 +400,13 @@
       "when": 1792670288984,
       "tag": "0056_ar_missing_due_date_per_hotel",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1792671227592,
+      "tag": "0057_conc_opera_base_and_omie_category",
+      "breakpoints": true
     }
   ]
 }
