@@ -26,6 +26,7 @@ import { ReconcilePanel, Money, fmtDay, type BoxConfig, type ReconcileRow } from
 import { ConciliadosPairs } from "@/components/conciliacao/ConciliadosPairs";
 import { JustificationsPanel } from "@/components/conciliacao/JustificationsPanel";
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
+import { BillingDueDialog, FrancesinhaTab } from "@/components/conciliacao/FrancesinhaTab";
 import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
 import { B2BBaixaTab } from "@/components/conciliacao/B2BBaixaTab";
 import { RedeAntecipacaoTab, RedeBaixaTab, RedeChargebacksTab, TarifasTab } from "@/components/conciliacao/RedeRecebimentosTabs";
@@ -171,6 +172,7 @@ export default function ConciliacaoCartaoPage() {
   const importAcquirer = useImportAcquirer();
   const importB2B = useImportB2B();
   const importBank = useImportBankStatement();
+  const [billingDueDate, setBillingDueDate] = useState<string | null>(null);
   const hotelCnpj = useQuery({
     queryKey: ["hotel-cnpj", hotelId ?? "none"], enabled: !!hotelId,
     queryFn: async () => {
@@ -330,7 +332,10 @@ export default function ConciliacaoCartaoPage() {
     setBillingPix.mutate(
       { ids: rows.map((r) => r.id), value },
       {
-        onSuccess: () => toast.success(value ? `${rows.length} lançamento(s) marcado(s) como Faturamento` : "Marcação removida"),
+        onSuccess: () => {
+          toast.success(value ? `${rows.length} lançamento(s) marcado(s) como Faturamento` : "Marcação removida");
+          if (value) setBillingDueDate(rows.map((r) => r.date).filter(Boolean).sort()[0] ?? null);
+        },
         onError: (e: Error) => toast.error(e.message),
       },
     );
@@ -506,6 +511,7 @@ export default function ConciliacaoCartaoPage() {
           <TabsTrigger value="dinheiro" className="text-xs"><Banknote className="h-3.5 w-3.5 mr-1" /> Dinheiro</TabsTrigger>
           <TabsTrigger value="trx-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Total diário por TRX</TabsTrigger>
           <TabsTrigger value="importacoes" className="text-xs"><Upload className="h-3.5 w-3.5 mr-1" /> Importações</TabsTrigger>
+          <TabsTrigger value="francesinha" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Francesinha</TabsTrigger>
           <TabsTrigger value="codigos" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Códigos TRX</TabsTrigger>
         </TabsList>
 
@@ -959,6 +965,9 @@ export default function ConciliacaoCartaoPage() {
         </TabsContent>
 
         {/* ---------------- Códigos TRX ---------------- */}
+        <TabsContent value="francesinha" className="mt-4">
+          {needsHotel ? NoHotel : <FrancesinhaTab hotelId={hotelId!} />}
+        </TabsContent>
         <TabsContent value="codigos" className="mt-4">
           <Card>
             <CardHeader className="pb-3 flex-row items-center justify-between gap-3">
@@ -1035,6 +1044,7 @@ export default function ConciliacaoCartaoPage() {
       )}
 
       {/* Dinheiro — marcar como pago */}
+      {hotelId && <BillingDueDialog hotelId={hotelId} date={billingDueDate} onClose={() => setBillingDueDate(null)} />}
       <CashPaidDialog
         open={!!cashDialog}
         onOpenChange={(v) => !v && setCashDialog(null)}
