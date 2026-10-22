@@ -211,7 +211,7 @@ export default function ConciliacaoCartaoPage() {
       title: e.trx_desc || e.trx_code,
       subtitle: [e.room && `UH ${e.room}`, e.guest_full_name, e.receipt_no && `Rec. ${e.receipt_no}`]
         .filter(Boolean).join(" · "),
-      tag: e.categoria ?? undefined,
+      tag: e.categoria_omie || "Sem Categoria OMIE",
     })),
     [opera.data],
   );
@@ -239,7 +239,6 @@ export default function ConciliacaoCartaoPage() {
   );
 
   const isPix = (categoria?: string | null) => (categoria ?? "").trim().toUpperCase().includes("PIX");
-  const isCash = (categoria?: string | null) => (categoria ?? "").trim().toUpperCase().includes("DINHEIRO");
 
   const rowById = useMemo(() => {
     const m = new Map<string, ReconcileRow>();
@@ -280,6 +279,7 @@ export default function ConciliacaoCartaoPage() {
       id: e.id, side: "opera", date: e.business_date, amount: Number(e.amount),
       title: e.trx_desc || e.trx_code,
       subtitle: [e.room && `UH ${e.room}`, e.guest_full_name, e.receipt_no && `Rec. ${e.receipt_no}`].filter(Boolean).join(" · "),
+      tag: e.categoria_omie || "Sem Categoria OMIE",
     });
     return m;
   }, [rowById, partners.data]);
@@ -297,15 +297,12 @@ export default function ConciliacaoCartaoPage() {
   });
   const bankPendentes = bankRows.filter((r) => { const e = bankById.get(r.id); return e && !e.matched_at && !e.billing_pix; });
 
-  // Cartão: sem PIX e sem dinheiro (cada um tem sua tela).
-  const operaCartao = operaPendentesAll.filter((r) => {
-    const c = operaById.get(r.id)?.categoria;
-    return !isPix(c) && !isCash(c);
-  });
+  // A Base direciona o fluxo; Categoria OMIE é somente etiqueta/chave de cruzamento.
+  const operaCartao = operaPendentesAll.filter((r) => operaById.get(r.id)?.base_conciliacao === "CARTAO");
   const acquirerCartao = acquirerPendentesAll.filter((r) => !isPix(acquirerById.get(r.id)?.categoria));
 
   // PIX: adquirente PIX + opera PIX × extrato com "PIX" na descrição.
-  const operaPix = operaPendentesAll.filter((r) => isPix(operaById.get(r.id)?.categoria));
+  const operaPix = operaPendentesAll.filter((r) => operaById.get(r.id)?.base_conciliacao === "PIX");
   const acquirerPix = acquirerPendentesAll.filter((r) => isPix(acquirerById.get(r.id)?.categoria));
   const bankPix = bankPendentes.filter((r) => {
     const e = bankById.get(r.id);
@@ -313,7 +310,7 @@ export default function ConciliacaoCartaoPage() {
   });
 
   // Dinheiro
-  const operaCash = operaPendentesAll.filter((r) => isCash(operaById.get(r.id)?.categoria));
+  const operaCash = operaPendentesAll.filter((r) => operaById.get(r.id)?.base_conciliacao === "DINHEIRO");
   // Extrato na aba Dinheiro: só depósitos em dinheiro e boletos com o CNPJ do próprio hotel.
   const bankCash = bankPendentes.filter((r) => {
     const e = bankById.get(r.id);

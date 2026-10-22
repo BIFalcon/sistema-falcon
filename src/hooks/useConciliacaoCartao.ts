@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
+import { operaClassification, type ConciliationBase } from "@/lib/conciliationCategory";
 import {
   parseAcquirerExcel,
   parseB2BExcel,
   parseBankStatement,
   parseOperaXml,
   parseTotvsExcel,
-  normText,
   type HotelRef,
 } from "@/lib/conciliacaoParsers";
 
@@ -31,6 +31,8 @@ export interface OperaEntry {
   trx_code: string;
   trx_desc: string | null;
   categoria: string | null;
+  base_conciliacao: ConciliationBase | null;
+  categoria_omie: string | null;
   amount: number;
   business_date: string | null;
   room: string | null;
@@ -147,7 +149,7 @@ export function useOperaEntries(hotelId: string | null, dateFrom?: string, dateT
       const build = () => {
         let q = supabase
           .from("conc_opera_entries")
-          .select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
+          .select("id, hotel_id, trx_code, trx_desc, categoria, base_conciliacao, categoria_omie, amount, business_date, room, guest_full_name, receipt_no, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at")
           .eq("hotel_id", hotelId!)
           .order("business_date", { ascending: true })
           .order("id", { ascending: true });
@@ -354,13 +356,14 @@ export function useImportOpera() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
-      if (/\.xlsx?$/i.test(file.name)) return await importTotvs(file, hotelId, user!.id);
+      if (!user) throw new Error("Entre no sistema para importar.");
+      if (/\.xlsx?$/i.test(file.name)) return await importTotvs(file, hotelId, user.id);
       const { data: map, error: mapErr } = await supabase
         .from("trx_code_mapping")
-        .select("trx_code, categoria, ativo")
+        .select("trx_code, categoria, categoria_omie, ativo")
         .eq("ativo", true);
       if (mapErr) throw mapErr;
-      const byCode = new Map((map ?? []).map((m) => [m.trx_code.trim(), m.categoria]));
+      const byCode = new Map((map ?? []).map((m) => [m.trx_code.trim(), m]));
       const active = new Set(byCode.keys());
 
       const parsedOpera = await parseOperaXml(file, hotelId, active);
@@ -400,7 +403,7 @@ export function useImportOpera() {
           file_size: file.size,
           parsed_count: rows.length,
           skipped_count: skipped + duplicates,
-          uploaded_by: user!.id,
+          uploaded_by: user.id,
           metadata: { total_rows: total, duplicates },
         })
         .select("id")
@@ -413,7 +416,7 @@ export function useImportOpera() {
         entry_key: r.entry_key,
         trx_code: r.trx_code,
         trx_desc: r.trx_desc,
-        categoria: normText(byCode.get(r.trx_code) ?? ""),
+        ...operaClassification(byCode.get(r.trx_code.trim()) ?? { categoria: null, categoria_omie: null }),
         amount: r.amount,
         business_date: r.business_date || null,
         room: r.room,
@@ -818,7 +821,11 @@ export function useUpdateTrxCode() {
       const { error } = await supabase.from("trx_code_mapping").update(patch).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["trx-code-mapping"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trx-code-mapping"] });
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-entries-by-ids"] });
+    },
   });
 }
 
@@ -845,7 +852,11 @@ export function useSaveTrxCode() {
         throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["trx-code-mapping"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trx-code-mapping"] });
+      qc.invalidateQueries({ queryKey: ["conc-opera"] });
+      qc.invalidateQueries({ queryKey: ["conc-entries-by-ids"] });
+    },
   });
 }
 
@@ -1093,7 +1104,7 @@ export function useEntriesByIds(ids: string[]) {
         const [a, b, o] = await Promise.all([
           supabase.from("conc_acquirer_entries").select("*").in("id", c),
           supabase.from("conc_bank_entries").select("id, hotel_id, account_name_raw, line_date, description, amount, matched_at, billing_pix, billing_pix_at").in("id", c),
-          supabase.from("conc_opera_entries").select("id, hotel_id, trx_code, trx_desc, categoria, amount, business_date, room, guest_full_name, receipt_no, trx_no, omie_sent_at, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at").in("id", c),
+          supabase.from("conc_opera_entries").select("id, hotel_id, trx_code, trx_desc, categoria, base_conciliacao, categoria_omie, amount, business_date, room, guest_full_name, receipt_no, trx_no, omie_sent_at, direct_bank, direct_bank_at, matched_at, b2b, b2b_at, cash_paid_date, cash_proof_path, cash_paid_at").in("id", c),
         ]);
         if (a.error) throw a.error;
         if (b.error) throw b.error;
