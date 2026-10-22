@@ -37,7 +37,7 @@ describe("francesinha (Arcoverde, set/2026)", () => {
 describe("extrato Arcoverde set/2026 — filtro da aba Dinheiro", () => {
   it("só depósitos e boleto com CNPJ do hotel; PIX continua completo", async () => {
     const buf = readFileSync("src/test/fixtures/extrato_arcoverde_set2026.xlsx");
-    const file = { name: "extrato.xlsx", arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) } as unknown as File;
+    const file = { name: "extrato.xlsx", arrayBuffer: async () => new Uint8Array(buf) } as unknown as File;
     const full = await parseBankStatement(file, [], "ibis-arcoverde");
     const cash = await parseBankStatement(file, [], "ibis-arcoverde", { kind: "dinheiro", hotelCnpj: "60.498.259/0001-36" });
     expect(full.rows.length).toBeGreaterThan(400);
