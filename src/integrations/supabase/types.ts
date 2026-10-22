@@ -1438,6 +1438,7 @@ export type Database = {
           amount: number
           billing_pix: boolean
           billing_pix_at: string | null
+          cpf_cnpj: string | null
           created_at: string
           description: string | null
           entry_key: string
@@ -1453,6 +1454,7 @@ export type Database = {
           amount?: number
           billing_pix?: boolean
           billing_pix_at?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           description?: string | null
           entry_key: string
@@ -1468,6 +1470,7 @@ export type Database = {
           amount?: number
           billing_pix?: boolean
           billing_pix_at?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           description?: string | null
           entry_key?: string
