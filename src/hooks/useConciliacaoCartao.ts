@@ -81,6 +81,7 @@ export interface BankEntry {
   matched_at: string | null;
   billing_pix?: boolean;
   billing_pix_at?: string | null;
+  cpf_cnpj?: string | null;
 }
 
 export interface ConcMatch {

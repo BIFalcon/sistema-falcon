@@ -2,6 +2,9 @@ import { Fragment, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { isCashBankLine } from "@/lib/conciliacaoParsers";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
   FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload,
@@ -168,6 +171,14 @@ export default function ConciliacaoCartaoPage() {
   const importAcquirer = useImportAcquirer();
   const importB2B = useImportB2B();
   const importBank = useImportBankStatement();
+  const hotelCnpj = useQuery({
+    queryKey: ["hotel-cnpj", hotelId ?? "none"], enabled: !!hotelId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelId! });
+      if (error) throw error;
+      return (data as unknown as { cnpj: string | null }[])?.[0]?.cnpj ?? null;
+    },
+  });
   const autoReconcile = useAutoReconcile();
   const uploads = useConcUploads(hotelId);
   const matchedByUpload = useMatchedCountsByUpload(
@@ -301,7 +312,11 @@ export default function ConciliacaoCartaoPage() {
 
   // Dinheiro
   const operaCash = operaPendentesAll.filter((r) => isCash(operaById.get(r.id)?.categoria));
-  const bankCash = bankPendentes.filter((r) => Number(bankById.get(r.id)?.amount ?? 0) > 0);
+  // Extrato na aba Dinheiro: só depósitos em dinheiro e boletos com o CNPJ do próprio hotel.
+  const bankCash = bankPendentes.filter((r) => {
+    const e = bankById.get(r.id);
+    return e && Number(e.amount) > 0 && isCashBankLine(e.description, e.cpf_cnpj, hotelCnpj.data);
+  });
 
   // Classificados
   const b2bRows = [
@@ -638,6 +653,18 @@ export default function ConciliacaoCartaoPage() {
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-dinheiro-${hotelId}.xlsx`}
                 />
+                <div className="mt-4 max-w-md">
+                  <DropZone
+                    label="Enviar extrato (somente Dinheiro)"
+                    hint="Sobe só depósitos (DEP/DN/dinheiro) e boletos com o CNPJ do hotel"
+                    accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
+                    busy={importBank.isPending}
+                    onFile={(f) => importBank.mutate({ file: f, hotelIdOverride: hotelId, kind: "dinheiro" }, {
+                      onSuccess: (r) => toast.success(`${r.inserted} lançamento(s) de dinheiro importado(s) · ${r.filtered} linha(s) do extrato fora do filtro · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s)`),
+                      onError: (e: Error) => toast.error(e.message),
+                    })}
+                  />
+                </div>
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
                 <JustificationsPanel
