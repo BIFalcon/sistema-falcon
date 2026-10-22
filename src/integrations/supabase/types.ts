@@ -1726,6 +1726,274 @@ export type Database = {
           },
         ]
       }
+      conc_rede_ajustes: {
+        Row: {
+          bandeira: string | null
+          created_at: string
+          data_ajuste: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          motivo: string | null
+          upload_id: string | null
+          valor_cobrado: number | null
+        }
+        Insert: {
+          bandeira?: string | null
+          created_at?: string
+          data_ajuste?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          motivo?: string | null
+          upload_id?: string | null
+          valor_cobrado?: number | null
+        }
+        Update: {
+          bandeira?: string | null
+          created_at?: string
+          data_ajuste?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          motivo?: string | null
+          upload_id?: string | null
+          valor_cobrado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_rede_ajustes_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_ajustes_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_rede_chargebacks: {
+        Row: {
+          bandeira: string | null
+          created_at: string
+          data_debito: string | null
+          data_original_venda: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          modalidade: string | null
+          motivo_cancelamento: string | null
+          nsu_cv: string | null
+          tipo: string | null
+          upload_id: string | null
+          valor_descontado: number | null
+          valor_original_venda: number | null
+        }
+        Insert: {
+          bandeira?: string | null
+          created_at?: string
+          data_debito?: string | null
+          data_original_venda?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          modalidade?: string | null
+          motivo_cancelamento?: string | null
+          nsu_cv?: string | null
+          tipo?: string | null
+          upload_id?: string | null
+          valor_descontado?: number | null
+          valor_original_venda?: number | null
+        }
+        Update: {
+          bandeira?: string | null
+          created_at?: string
+          data_debito?: string | null
+          data_original_venda?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          modalidade?: string | null
+          motivo_cancelamento?: string | null
+          nsu_cv?: string | null
+          tipo?: string | null
+          upload_id?: string | null
+          valor_descontado?: number | null
+          valor_original_venda?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_rede_chargebacks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_chargebacks_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_rede_pagamentos: {
+        Row: {
+          agencia: string | null
+          banco: string | null
+          bandeira: string | null
+          conta_corrente: string | null
+          created_at: string
+          data_original_vencimento: string | null
+          data_original_venda: string | null
+          data_recebimento: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          modalidade: string | null
+          nsu_cv: string | null
+          status: string | null
+          taxa_mdr: number | null
+          upload_id: string | null
+          valor_bruto_parcela_atualizada: number | null
+          valor_bruto_parcela_original: number | null
+          valor_liquido_parcela: number | null
+          valor_mdr: number | null
+        }
+        Insert: {
+          agencia?: string | null
+          banco?: string | null
+          bandeira?: string | null
+          conta_corrente?: string | null
+          created_at?: string
+          data_original_vencimento?: string | null
+          data_original_venda?: string | null
+          data_recebimento?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          modalidade?: string | null
+          nsu_cv?: string | null
+          status?: string | null
+          taxa_mdr?: number | null
+          upload_id?: string | null
+          valor_bruto_parcela_atualizada?: number | null
+          valor_bruto_parcela_original?: number | null
+          valor_liquido_parcela?: number | null
+          valor_mdr?: number | null
+        }
+        Update: {
+          agencia?: string | null
+          banco?: string | null
+          bandeira?: string | null
+          conta_corrente?: string | null
+          created_at?: string
+          data_original_vencimento?: string | null
+          data_original_venda?: string | null
+          data_recebimento?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          modalidade?: string | null
+          nsu_cv?: string | null
+          status?: string | null
+          taxa_mdr?: number | null
+          upload_id?: string | null
+          valor_bruto_parcela_atualizada?: number | null
+          valor_bruto_parcela_original?: number | null
+          valor_liquido_parcela?: number | null
+          valor_mdr?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_rede_pagamentos_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_pagamentos_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_rede_recebidos: {
+        Row: {
+          bandeira: string | null
+          created_at: string
+          data: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          matched_at: string | null
+          matched_bank_id: string | null
+          modalidade: string | null
+          status: string | null
+          upload_id: string | null
+          valor_depositado: number | null
+        }
+        Insert: {
+          bandeira?: string | null
+          created_at?: string
+          data?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          matched_at?: string | null
+          matched_bank_id?: string | null
+          modalidade?: string | null
+          status?: string | null
+          upload_id?: string | null
+          valor_depositado?: number | null
+        }
+        Update: {
+          bandeira?: string | null
+          created_at?: string
+          data?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          matched_at?: string | null
+          matched_bank_id?: string | null
+          modalidade?: string | null
+          status?: string | null
+          upload_id?: string | null
+          valor_depositado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_rede_recebidos_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_recebidos_matched_bank_id_fkey"
+            columns: ["matched_bank_id"]
+            isOneToOne: false
+            referencedRelation: "conc_bank_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_recebidos_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_uploads: {
         Row: {
           file_name: string
@@ -4127,6 +4395,16 @@ export type Database = {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
         Returns: string
       }
+      conc_rede_auto_match: {
+        Args: {
+          p_bank_prefix: string
+          p_brand_map: Json
+          p_hotel: string
+          p_mod_map: Json
+        }
+        Returns: Json
+      }
+      conc_rede_unmatch: { Args: { p_id: string }; Returns: undefined }
       consolidado_has_line: {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: boolean
@@ -4572,6 +4850,7 @@ export type Database = {
         Args: { _detail: string }
         Returns: string
       }
+      unaccent_safe: { Args: { t: string }; Returns: string }
       users_with_role_for_hotel: {
         Args: {
           _hotel_id: string
