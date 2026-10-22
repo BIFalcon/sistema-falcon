@@ -109,6 +109,20 @@ export function parseMoney(raw: unknown): number {
 
 /** Contador de ocorrências: distingue linhas idênticas dentro do arquivo
  * sem depender da posição absoluta (reimportar o mesmo dado não duplica). */
+/** Alguns bancos gravam a dimensão da aba errada (ex.: A1:F13 com 470 linhas); recalcula pelo conteúdo real. */
+export function fixSheetRef(ws: XLSX.WorkSheet): XLSX.WorkSheet {
+  let maxR = 0, maxC = 0, any = false;
+  for (const k of Object.keys(ws)) {
+    if (k[0] === "!") continue;
+    const c = XLSX.utils.decode_cell(k);
+    if (c.r > maxR) maxR = c.r;
+    if (c.c > maxC) maxC = c.c;
+    any = true;
+  }
+  if (any) ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  return ws;
+}
+
 export function makeOccCounter() {
   const seen = new Map<string, number>();
   return (base: string) => {
@@ -281,8 +295,8 @@ export async function parseAcquirerExcel(
   target?: { id: string; cnpj?: string | null } | null,
 ): Promise<{ rows: AcquirerRow[]; skipped: number; unmatched: string[]; otherHotels: number }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const ws = fixSheetRef(wb.Sheets[wb.SheetNames[0]]);
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -406,7 +420,7 @@ export async function parseB2BExcel(
 ): Promise<{ rows: AcquirerRow[]; skipped: number }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -511,8 +525,8 @@ export async function parseBankStatement(
     wb.SheetNames.find((n) => normText(n).startsWith("LANCAMENTOS")) ?? "";
   if (!sheetName) throw new Error('Aba "Lançamentos" não encontrada no extrato.');
 
-  const ws = wb.Sheets[sheetName];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const ws = fixSheetRef(wb.Sheets[sheetName]);
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -634,7 +648,7 @@ export async function parseTotvsExcel(
 ): Promise<{ rows: TotvsRow[]; skipped: number; total: number; unclassified: string[] }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -755,6 +769,6 @@ export function parseB2BReceivablesGrid(grid: unknown[][], hotelId: string): { r
 export async function parseB2BReceivablesExcel(file: File, hotelId: string) {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const name = wb.SheetNames.find((n) => normText(n) === "TRANSFER") ?? wb.SheetNames[0];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: false, defval: null, raw: true });
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(wb.Sheets[name]), { header: 1, blankrows: false, defval: null, raw: true });
   return parseB2BReceivablesGrid(grid, hotelId);
 }

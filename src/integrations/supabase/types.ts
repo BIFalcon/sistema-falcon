@@ -775,6 +775,8 @@ export type Database = {
           documents_problem_note: string | null
           entry_key: string
           estimated_due_date: string | null
+          francesinha_at: string | null
+          francesinha_status: string | null
           gg_confirmed_at: string | null
           gg_confirmed_by: string | null
           gg_note: string | null
@@ -788,6 +790,7 @@ export type Database = {
           is_defaulting: boolean
           is_not_billable: boolean
           is_paid: boolean
+          missing_docs_alerted_on: string | null
           not_billable_note: string | null
           not_billable_reason: string | null
           nota_number: string | null
@@ -823,6 +826,8 @@ export type Database = {
           documents_problem_note?: string | null
           entry_key: string
           estimated_due_date?: string | null
+          francesinha_at?: string | null
+          francesinha_status?: string | null
           gg_confirmed_at?: string | null
           gg_confirmed_by?: string | null
           gg_note?: string | null
@@ -836,6 +841,7 @@ export type Database = {
           is_defaulting?: boolean
           is_not_billable?: boolean
           is_paid?: boolean
+          missing_docs_alerted_on?: string | null
           not_billable_note?: string | null
           not_billable_reason?: string | null
           nota_number?: string | null
@@ -871,6 +877,8 @@ export type Database = {
           documents_problem_note?: string | null
           entry_key?: string
           estimated_due_date?: string | null
+          francesinha_at?: string | null
+          francesinha_status?: string | null
           gg_confirmed_at?: string | null
           gg_confirmed_by?: string | null
           gg_note?: string | null
@@ -884,6 +892,7 @@ export type Database = {
           is_defaulting?: boolean
           is_not_billable?: boolean
           is_paid?: boolean
+          missing_docs_alerted_on?: string | null
           not_billable_note?: string | null
           not_billable_reason?: string | null
           nota_number?: string | null
@@ -1491,6 +1500,100 @@ export type Database = {
           },
           {
             foreignKeyName: "conc_bank_entries_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_francesinha_entries: {
+        Row: {
+          acao: string | null
+          agencia_receb: string | null
+          carteira: string | null
+          created_at: string
+          data_movimento: string | null
+          descricao_operacao: string | null
+          entry_key: string
+          hotel_id: string
+          id: string
+          matched_ar_id: string | null
+          nosso_numero: string | null
+          operacoes_valor: string | null
+          pagador: string | null
+          processed_at: string | null
+          result: string | null
+          seu_numero: string | null
+          tipo: string | null
+          upload_id: string | null
+          valor_final: number | null
+          valor_inicial: number | null
+          vencimento: string | null
+        }
+        Insert: {
+          acao?: string | null
+          agencia_receb?: string | null
+          carteira?: string | null
+          created_at?: string
+          data_movimento?: string | null
+          descricao_operacao?: string | null
+          entry_key: string
+          hotel_id: string
+          id?: string
+          matched_ar_id?: string | null
+          nosso_numero?: string | null
+          operacoes_valor?: string | null
+          pagador?: string | null
+          processed_at?: string | null
+          result?: string | null
+          seu_numero?: string | null
+          tipo?: string | null
+          upload_id?: string | null
+          valor_final?: number | null
+          valor_inicial?: number | null
+          vencimento?: string | null
+        }
+        Update: {
+          acao?: string | null
+          agencia_receb?: string | null
+          carteira?: string | null
+          created_at?: string
+          data_movimento?: string | null
+          descricao_operacao?: string | null
+          entry_key?: string
+          hotel_id?: string
+          id?: string
+          matched_ar_id?: string | null
+          nosso_numero?: string | null
+          operacoes_valor?: string | null
+          pagador?: string | null
+          processed_at?: string | null
+          result?: string | null
+          seu_numero?: string | null
+          tipo?: string | null
+          upload_id?: string | null
+          valor_final?: number | null
+          valor_inicial?: number | null
+          vencimento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_francesinha_entries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_francesinha_entries_matched_ar_id_fkey"
+            columns: ["matched_ar_id"]
+            isOneToOne: false
+            referencedRelation: "ar_to_invoice_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_francesinha_entries_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "conc_uploads"
@@ -4269,6 +4372,7 @@ export type Database = {
       }
     }
     Functions: {
+      ar_doc_number: { Args: { t: string }; Returns: string }
       ar_to_invoice_daily_totals: {
         Args: {
           p_dates?: string[]
@@ -4387,6 +4491,7 @@ export type Database = {
       }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
+      conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
         Returns: {
@@ -4429,6 +4534,8 @@ export type Database = {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: number
       }
+      enqueue_ar_missing_docs_alerts: { Args: never; Returns: number }
+      enqueue_ar_missing_due_date_weekly: { Args: never; Returns: number }
       enqueue_ar_notification: {
         Args: {
           _body_md: string
@@ -4948,6 +5055,9 @@ export type Database = {
         | "dre_sla_reminder"
         | "hotel_contexto_request"
         | "investor_change"
+        | "ar_boleto_baixado"
+        | "ar_to_invoice_missing_docs"
+        | "ar_boleto_missing_due_date"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -5154,6 +5264,9 @@ export const Constants = {
         "dre_sla_reminder",
         "hotel_contexto_request",
         "investor_change",
+        "ar_boleto_baixado",
+        "ar_to_invoice_missing_docs",
+        "ar_boleto_missing_due_date",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
