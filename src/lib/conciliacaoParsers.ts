@@ -296,7 +296,7 @@ export async function parseAcquirerExcel(
 ): Promise<{ rows: AcquirerRow[]; skipped: number; unmatched: string[]; otherHotels: number }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = fixSheetRef(wb.Sheets[wb.SheetNames[0]]);
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -420,7 +420,7 @@ export async function parseB2BExcel(
 ): Promise<{ rows: AcquirerRow[]; skipped: number }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -526,7 +526,7 @@ export async function parseBankStatement(
   if (!sheetName) throw new Error('Aba "Lançamentos" não encontrada no extrato.');
 
   const ws = fixSheetRef(wb.Sheets[sheetName]);
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
@@ -648,7 +648,7 @@ export async function parseTotvsExcel(
 ): Promise<{ rows: TotvsRow[]; skipped: number; total: number; unclassified: string[] }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(fixSheetRef(ws), {
     header: 1, blankrows: false, defval: null, raw: true,
   });
 
