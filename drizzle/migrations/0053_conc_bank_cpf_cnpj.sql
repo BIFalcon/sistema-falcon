@@ -1,0 +1,1 @@
+ALTER TABLE public.conc_bank_entries ADD COLUMN IF NOT EXISTS cpf_cnpj text;
