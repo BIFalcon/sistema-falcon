@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { hashKey, makeOccCounter, normText, parseMoney, toIso } from "./conciliacaoParsers";
+import { fixSheetRef, hashKey, makeOccCounter, normText, parseMoney, toIso } from "./conciliacaoParsers";
 
 /**
  * Filtro do extrato na Baixa Rede. Formato visto no extrato real:
@@ -123,7 +123,7 @@ export async function parseRedeRecebimentosExcel(file: File, hotelId: string) {
   const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const sheets: Record<string, unknown[][]> = {};
   for (const n of wb.SheetNames) {
-    sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, blankrows: false, defval: null, raw: true });
+    sheets[n] = XLSX.utils.sheet_to_json(fixSheetRef(wb.Sheets[n]), { header: 1, blankrows: false, defval: null, raw: true });
   }
   return parseRedeRecebimentosSheets(sheets, hotelId);
 }

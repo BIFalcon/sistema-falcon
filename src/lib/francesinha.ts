@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { hashKey, makeOccCounter, normText, parseMoney, toIso } from "./conciliacaoParsers";
+import { fixSheetRef, hashKey, makeOccCounter, normText, parseMoney, toIso } from "./conciliacaoParsers";
 
 export type FrancesinhaAcao = "liquidacao" | "baixa" | "entrada" | "ajuste" | "outro";
 
@@ -76,6 +76,6 @@ export function parseFrancesinhaSheets(sheets: Record<string, unknown[][]>, hote
 export async function parseFrancesinhaExcel(file: File, hotelId: string) {
   const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const sheets: Record<string, unknown[][]> = {};
-  for (const n of wb.SheetNames) sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, blankrows: false, defval: null, raw: true });
+  for (const n of wb.SheetNames) sheets[n] = XLSX.utils.sheet_to_json(fixSheetRef(wb.Sheets[n]), { header: 1, blankrows: false, defval: null, raw: true });
   return parseFrancesinhaSheets(sheets, hotelId);
 }

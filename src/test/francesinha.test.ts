@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
 import { classifyFrancesinha, parseFrancesinhaSheets } from "@/lib/francesinha";
-import { isCashBankLine } from "@/lib/conciliacaoParsers";
+import { parseBankStatement } from "@/lib/conciliacaoParsers";
 
 const sheets = (p: string) => {
   const wb = XLSX.read(readFileSync(p), { type: "buffer", cellDates: true });
@@ -35,15 +35,15 @@ describe("francesinha (Arcoverde, set/2026)", () => {
 });
 
 describe("extrato Arcoverde set/2026 — filtro da aba Dinheiro", () => {
-  it("só depósitos e boleto com CNPJ do hotel", () => {
-    const g = Object.values(sheets("src/test/fixtures/extrato_arcoverde_set2026.xlsx"))[0];
-    const hi = g.findIndex((r) => r?.[1] === "Lançamento");
-    const kept = g.slice(hi + 1).filter((r) => r?.[1] && isCashBankLine(String(r[1]), r[3] as string, "60.498.259/0001-36"));
-    const total = g.slice(hi + 1).filter((r) => r?.[1]).length;
-    expect(kept.length).toBeGreaterThan(0);
-    expect(kept.length).toBeLessThan(total);
-    expect(kept.some((r) => String(r[1]).startsWith("BOLETO PAGO") && r[3] === "60.498.259/0001-36")).toBe(true);
-    expect(kept.some((r) => /PIX/.test(String(r[1])))).toBe(false);
-    console.log("DINHEIRO", total, kept.map((r) => `${r[0]} ${r[1]} ${r[4]}`).join(" | "));
+  it("só depósitos e boleto com CNPJ do hotel; PIX continua completo", async () => {
+    const buf = readFileSync("src/test/fixtures/extrato_arcoverde_set2026.xlsx");
+    const file = new File([buf], "extrato.xlsx");
+    const full = await parseBankStatement(file, [], "ibis-arcoverde");
+    const cash = await parseBankStatement(file, [], "ibis-arcoverde", { kind: "dinheiro", hotelCnpj: "60.498.259/0001-36" });
+    expect(full.rows.length).toBeGreaterThan(400);
+    expect(cash.rows.length + cash.filtered).toBe(full.rows.length);
+    expect(cash.rows.every((r) => !/PIX/.test(r.description))).toBe(true);
+    expect(cash.rows.some((r) => r.description === "BOLETO PAGO" && r.amount === -1.5)).toBe(true);
+    console.log("DINHEIRO", full.rows.length, cash.rows.map((r) => `${r.line_date} ${r.description} ${r.amount}`).join(" | "));
   });
 });
