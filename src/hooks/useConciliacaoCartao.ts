@@ -629,11 +629,18 @@ export function useImportBankStatement() {
   const qc = useQueryClient();
   const { user, allowedHotels } = useAuth();
   return useMutation({
-    mutationFn: async ({ file, hotelIdOverride }: { file: File; hotelIdOverride?: string | null }) => {
+    mutationFn: async ({ file, hotelIdOverride, kind }: { file: File; hotelIdOverride?: string | null; kind?: "dinheiro" }) => {
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
+      let hotelCnpj: string | null = null;
+      if (kind === "dinheiro") {
+        if (!hotelIdOverride) throw new Error("Selecione o hotel antes de importar o extrato na aba Dinheiro.");
+        const { data: fin, error: finErr } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelIdOverride });
+        if (finErr) throw finErr;
+        hotelCnpj = (fin as unknown as { cnpj: string | null }[])?.[0]?.cnpj ?? null;
+      }
       // O hotel selecionado no filtro global manda; o nome da conta do arquivo
       // só é usado quando nenhum hotel está selecionado.
-      const parsed = await parseBankStatement(file, hotels, hotelIdOverride ?? null);
+      const parsed = await parseBankStatement(file, hotels, hotelIdOverride ?? null, kind ? { kind, hotelCnpj } : undefined);
       const hotelId = parsed.hotelId;
       if (!hotelId) {
         throw new Error(
@@ -675,11 +682,12 @@ export function useImportBankStatement() {
         line_date: r.line_date || null,
         description: r.description,
         amount: r.amount,
+        cpf_cnpj: r.cpf_cnpj ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: bankRows.length, hotelId, accountName: parsed.accountName, autoMatched, duplicates };
+      return { inserted: bankRows.length, hotelId, accountName: parsed.accountName, autoMatched, duplicates, filtered: parsed.filtered };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
