@@ -379,6 +379,13 @@
       "when": 1792669906936,
       "tag": "0053_conc_bank_cpf_cnpj",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1792670200254,
+      "tag": "0054_ar_francesinha_notification_events",
+      "breakpoints": true
     }
   ]
 }

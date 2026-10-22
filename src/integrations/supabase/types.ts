@@ -4948,6 +4948,9 @@ export type Database = {
         | "dre_sla_reminder"
         | "hotel_contexto_request"
         | "investor_change"
+        | "ar_boleto_baixado"
+        | "ar_to_invoice_missing_docs"
+        | "ar_boleto_missing_due_date"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -5154,6 +5157,9 @@ export const Constants = {
         "dre_sla_reminder",
         "hotel_contexto_request",
         "investor_change",
+        "ar_boleto_baixado",
+        "ar_to_invoice_missing_docs",
+        "ar_boleto_missing_due_date",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
