@@ -75,6 +75,7 @@ export function ConciliadosPairs({
           Data: fmtDay(i.row?.date ?? null),
           Descrição: i.row?.title ?? "(lançamento fora do período/filtro)",
           Detalhe: i.row?.subtitle ?? "",
+          "Categoria OMIE": i.row?.tag ?? "",
           Valor: i.amount,
         });
       }
@@ -100,6 +101,7 @@ export function ConciliadosPairs({
               <span className="font-medium truncate">{i.row?.title ?? "(fora do filtro atual)"}</span>
             </div>
             {i.row?.subtitle && <p className="text-muted-foreground truncate">{i.row.subtitle}</p>}
+            {i.row?.tag && <p className="text-muted-foreground">{i.row.tag}</p>}
             <Badge variant="outline" className="mt-0.5 text-[9px] px-1 py-0 h-4">{SIDE_LABEL[i.side] ?? i.side}</Badge>
           </div>
           <Money value={i.amount} />

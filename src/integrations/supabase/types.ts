@@ -1730,12 +1730,14 @@ export type Database = {
           b2b: boolean
           b2b_at: string | null
           b2b_by: string | null
+          base_conciliacao: string | null
           business_date: string | null
           cash_paid_at: string | null
           cash_paid_by: string | null
           cash_paid_date: string | null
           cash_proof_path: string | null
           categoria: string | null
+          categoria_omie: string | null
           created_at: string
           direct_bank: boolean
           direct_bank_at: string | null
@@ -1760,12 +1762,14 @@ export type Database = {
           b2b?: boolean
           b2b_at?: string | null
           b2b_by?: string | null
+          base_conciliacao?: string | null
           business_date?: string | null
           cash_paid_at?: string | null
           cash_paid_by?: string | null
           cash_paid_date?: string | null
           cash_proof_path?: string | null
           categoria?: string | null
+          categoria_omie?: string | null
           created_at?: string
           direct_bank?: boolean
           direct_bank_at?: string | null
@@ -1790,12 +1794,14 @@ export type Database = {
           b2b?: boolean
           b2b_at?: string | null
           b2b_by?: string | null
+          base_conciliacao?: string | null
           business_date?: string | null
           cash_paid_at?: string | null
           cash_paid_by?: string | null
           cash_paid_date?: string | null
           cash_proof_path?: string | null
           categoria?: string | null
+          categoria_omie?: string | null
           created_at?: string
           direct_bank?: boolean
           direct_bank_at?: string | null
@@ -4489,6 +4495,7 @@ export type Database = {
         Args: { p_deposit: string }
         Returns: undefined
       }
+      conc_category_key: { Args: { _value: string }; Returns: string }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }
