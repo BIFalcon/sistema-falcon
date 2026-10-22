@@ -25,6 +25,7 @@ import { JustificationsPanel } from "@/components/conciliacao/JustificationsPane
 import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
 import { B2BBaixaTab } from "@/components/conciliacao/B2BBaixaTab";
+import { RedeAntecipacaoTab, RedeBaixaTab, RedeChargebacksTab, TarifasTab } from "@/components/conciliacao/RedeRecebimentosTabs";
 import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
   useAcquirerEntries, useBankEntries, useConcMatches, useConcUploads, useImportAcquirer, useImportB2B,
@@ -503,10 +504,18 @@ export default function ConciliacaoCartaoPage() {
                 <TabsTrigger value="conciliados" className="text-[11px]">Cartões Conciliados</TabsTrigger>
                 <TabsTrigger value="b2b" className="text-[11px]">B2B</TabsTrigger>
                 <TabsTrigger value="baixa-b2b" className="text-[11px]">Baixa (B2B)</TabsTrigger>
+                <TabsTrigger value="baixa-rede" className="text-[11px]">Baixa (Rede)</TabsTrigger>
+                <TabsTrigger value="chargebacks" className="text-[11px]">Chargebacks</TabsTrigger>
+                <TabsTrigger value="antecipacao" className="text-[11px]">Antecipação</TabsTrigger>
+                <TabsTrigger value="tarifas" className="text-[11px]">Tarifas</TabsTrigger>
               </TabsList>
               <TabsContent value="baixa-b2b" className="mt-4">
                 <B2BBaixaTab hotelId={hotelId!} />
               </TabsContent>
+              <TabsContent value="baixa-rede" className="mt-4"><RedeBaixaTab hotelId={hotelId!} /></TabsContent>
+              <TabsContent value="chargebacks" className="mt-4"><RedeChargebacksTab hotelId={hotelId!} /></TabsContent>
+              <TabsContent value="antecipacao" className="mt-4"><RedeAntecipacaoTab hotelId={hotelId!} /></TabsContent>
+              <TabsContent value="tarifas" className="mt-4"><TarifasTab hotelId={hotelId!} /></TabsContent>
               <TabsContent value="pendentes" className="mt-4">
                 <ReconcilePanel
                   boxes={cardBoxes}

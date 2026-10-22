@@ -109,7 +109,7 @@ export function parseMoney(raw: unknown): number {
 
 /** Contador de ocorrências: distingue linhas idênticas dentro do arquivo
  * sem depender da posição absoluta (reimportar o mesmo dado não duplica). */
-function makeOccCounter() {
+export function makeOccCounter() {
   const seen = new Map<string, number>();
   return (base: string) => {
     const n = (seen.get(base) ?? 0) + 1;
@@ -118,7 +118,7 @@ function makeOccCounter() {
   };
 }
 
-function hashKey(parts: (string | number)[]): string {
+export function hashKey(parts: (string | number)[]): string {
   const s = parts.map((p) => String(p ?? "")).join("|");
   let h = 0;
   for (let i = 0; i < s.length; i++) {
