@@ -414,6 +414,13 @@
       "when": 1792671319164,
       "tag": "0058_conc_annulment_respect_routing_base",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1792753626386,
+      "tag": "0059_daily_bank_closing_pending",
+      "breakpoints": true
     }
   ]
 }

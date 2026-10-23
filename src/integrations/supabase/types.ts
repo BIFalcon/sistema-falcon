@@ -1507,6 +1507,50 @@ export type Database = {
           },
         ]
       }
+      conc_daily_balances: {
+        Row: {
+          account_name: string
+          balance_date: string
+          hotel_id: string
+          id: string
+          informed_by: string | null
+          initial_balance: number | null
+          real_balance: number | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string
+          balance_date: string
+          hotel_id: string
+          id?: string
+          informed_by?: string | null
+          initial_balance?: number | null
+          real_balance?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string
+          balance_date?: string
+          hotel_id?: string
+          id?: string
+          informed_by?: string | null
+          initial_balance?: number | null
+          real_balance?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_daily_balances_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_francesinha_entries: {
         Row: {
           acao: string | null
@@ -1834,6 +1878,61 @@ export type Database = {
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_pendencias: {
+        Row: {
+          aberta_em: string
+          entry_id: string
+          hotel_id: string
+          id: string
+          match_id: string | null
+          revertida_em: string | null
+          status: string
+          valor: number
+        }
+        Insert: {
+          aberta_em?: string
+          entry_id: string
+          hotel_id: string
+          id?: string
+          match_id?: string | null
+          revertida_em?: string | null
+          status?: string
+          valor: number
+        }
+        Update: {
+          aberta_em?: string
+          entry_id?: string
+          hotel_id?: string
+          id?: string
+          match_id?: string | null
+          revertida_em?: string | null
+          status?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_pendencias_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "conc_bank_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_pendencias_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_pendencias_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "conc_matches"
             referencedColumns: ["id"]
           },
         ]
@@ -4496,6 +4595,15 @@ export type Database = {
         Returns: undefined
       }
       conc_category_key: { Args: { _value: string }; Returns: string }
+      conc_daily_closing: {
+        Args: {
+          p_dates?: string[]
+          p_from?: string
+          p_hotel: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }

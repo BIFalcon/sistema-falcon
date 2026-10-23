@@ -634,6 +634,7 @@ export function useImportBankStatement() {
   const { user, allowedHotels } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelIdOverride, kind }: { file: File; hotelIdOverride?: string | null; kind?: "dinheiro" }) => {
+      if (!user) throw new Error("Entre novamente no sistema");
       const hotels = (allowedHotels ?? []) as unknown as HotelRef[];
       let hotelCnpj: string | null = null;
       if (kind === "dinheiro") {
@@ -666,7 +667,7 @@ export function useImportBankStatement() {
           file_size: file.size,
           parsed_count: bankRows.length,
           skipped_count: parsed.skipped + duplicates,
-          uploaded_by: user!.id,
+          uploaded_by: user.id,
           metadata: {
             account_name: parsed.accountName,
             duplicates,
@@ -691,6 +692,13 @@ export function useImportBankStatement() {
       })));
 
       const autoMatched = await runAutoReconcile(hotelId);
+      if (!kind && parsed.balances.length) {
+        const { error } = await supabase.from("conc_daily_balances").upsert(parsed.balances.map(b => ({
+          ...b, hotel_id: hotelId, account_name: parsed.accountName, source: "extrato", informed_by: user.id,
+          updated_at: new Date().toISOString(),
+        })), { onConflict: "hotel_id,account_name,balance_date" });
+        if (error) throw error;
+      }
       return { inserted: bankRows.length, hotelId, accountName: parsed.accountName, autoMatched, duplicates, filtered: parsed.filtered };
     },
     onSuccess: () => {
