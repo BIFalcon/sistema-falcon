@@ -1,3 +1,4 @@
+- [ ] Enviar divergências de Cartão/PIX/Dinheiro e inadimplência ao GG/ADM do hotel; incluir link de justificativa e pendências na Home; testar fila e acessos.
 - [x] Criar conta transitória e fechamento diário por hotel/dia, com saldos do extrato/preenchimento manual; 16 testes passaram, ciclo bancário de criação/reversão/reabertura validado com registro temporário removido e 2.279 pendências reais sem inconsistências.
 - [ ] Conferir fechamento diário e conciliação manual pela tela com sessão real — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview. Transição bancária testada diretamente, sem execução do botão manual.
 - [x] Separar Base (direcionamento) de Categoria OMIE (etiqueta e cruzamento), atualizar lançamentos existentes sem desfazer conciliações; 18 testes passaram, classificação conferida sem divergências e aplicação sem erros.

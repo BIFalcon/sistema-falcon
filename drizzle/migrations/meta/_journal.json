@@ -421,6 +421,20 @@
       "when": 1792753626386,
       "tag": "0059_daily_bank_closing_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1792754035762,
+      "tag": "0060_conciliation_divergence_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792754081466,
+      "tag": "0061_conciliation_divergences_notifications",
+      "breakpoints": true
     }
   ]
 }

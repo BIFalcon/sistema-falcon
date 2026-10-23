@@ -4604,6 +4604,30 @@ export type Database = {
         }
         Returns: Json
       }
+      conc_divergence_items: {
+        Args: { p_hotel: string }
+        Returns: {
+          amount: number
+          date: string
+          id: string
+          kind: string
+          side: string
+          subtitle: string
+          tag: string
+          title: string
+        }[]
+      }
+      conc_divergence_summary: {
+        Args: { p_hotel?: string }
+        Returns: {
+          cartao: number
+          dinheiro: number
+          hotel_id: string
+          hotel_name: string
+          inadimplente: number
+          pix: number
+        }[]
+      }
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }
@@ -4628,6 +4652,7 @@ export type Database = {
         Returns: Json
       }
       conc_rede_unmatch: { Args: { p_id: string }; Returns: undefined }
+      conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
       consolidado_has_line: {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: boolean
@@ -5173,6 +5198,7 @@ export type Database = {
         | "ar_boleto_baixado"
         | "ar_to_invoice_missing_docs"
         | "ar_boleto_missing_due_date"
+        | "conc_divergences_to_hotel"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -5382,6 +5408,7 @@ export const Constants = {
         "ar_boleto_baixado",
         "ar_to_invoice_missing_docs",
         "ar_boleto_missing_due_date",
+        "conc_divergences_to_hotel",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],

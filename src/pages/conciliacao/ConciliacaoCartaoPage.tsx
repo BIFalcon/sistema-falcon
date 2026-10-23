@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isCashBankLine } from "@/lib/conciliacaoParsers";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
-  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Trash2, Undo2, Upload,
+  FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Send, Trash2, Undo2, Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSendConcDivergences } from "@/hooks/useConcDivergences";
+import { canSendDivergences } from "@/lib/conciliationDivergences";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { fmtBRL, fmtDateTime } from "@/lib/formatters";
 import { DateFilterPicker } from "@/components/financeiro/DateFilterPicker";
@@ -137,7 +139,8 @@ function ClassifiedList({ title, subtitle, rows, actionLabel, onAction, busy, ex
 /* ------------------------------------------------------------------ */
 
 export default function ConciliacaoCartaoPage() {
-  const { allowedHotels } = useAuth();
+  const { allowedHotels, isMaster, roles } = useAuth();
+  const sendDivergences = useSendConcDivergences();
   // Filtros globais de Contas a Receber (hotel + período) — o período também
   // pode ser ajustado aqui dentro, pelo seletor abaixo.
   const {
@@ -502,6 +505,20 @@ export default function ConciliacaoCartaoPage() {
         />
       </div>
 
+      {canSendDivergences(isMaster, roles) && ["cartao", "pix", "dinheiro"].includes(mainTab) && (
+        <div className="flex justify-end">
+          <Button variant="outline" disabled={!hotelId || sendDivergences.isPending} onClick={() => {
+            if (!hotelId) return;
+            sendDivergences.mutate(hotelId, {
+              onSuccess: r => toast.info(r.empty ? "Nenhuma divergência ou inadimplência neste hotel." : r.already_pending ? "Já existe um envio aguardando processamento." : r.queued ? `${r.queued} e-mail(s) de divergências enfileirado(s) para GG/ADM.` : "Nenhum destinatário GG/ADM ativo disponível para envio neste hotel."),
+              onError: (e: Error) => toast.error(e.message),
+            });
+          }}>
+            {sendDivergences.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Enviar divergências agora
+          </Button>
+        </div>
+      )}
       <Tabs value={mainTab} onValueChange={setMainTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="cartao" className="text-xs"><CreditCard className="h-3.5 w-3.5 mr-1" /> Cartão</TabsTrigger>

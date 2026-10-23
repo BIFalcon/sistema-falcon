@@ -1,0 +1,1 @@
+ALTER TYPE public.notification_event ADD VALUE IF NOT EXISTS 'conc_divergences_to_hotel';
