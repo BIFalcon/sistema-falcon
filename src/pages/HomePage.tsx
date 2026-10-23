@@ -16,6 +16,8 @@ import { useClosings } from "@/hooks/useClosings";
 import { useAllApEntries } from "@/hooks/useAccountsPayable";
 import { useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
 import { usePendingNotificationCount } from "@/hooks/useNotifications";
+import { useConcDivergenceSummary } from "@/hooks/useConcDivergences";
+import { divergenceCount, divergenceLink } from "@/lib/conciliationDivergences";
 import { useRhCalendarDates } from "@/hooks/useRh";
 import { CalendarDays } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -150,6 +152,7 @@ export default function HomePage() {
   );
   const { data: ofEntries = [] } = useOpenFolioEntries();
   const { data: pendingNotifs = 0 } = usePendingNotificationCount();
+  const { data: divergences = [] } = useConcDivergenceSummary();
   const { data: calendarDates = [] } = useRhCalendarDates();
 
   const queryClient = useQueryClient();
@@ -258,6 +261,15 @@ export default function HomePage() {
         items.push({ dot: "blue", text: `${ofStats} folios em aberto`, meta: "Open Folio", url: "/financeiro/contas-receber" });
     }
 
+    if (isGg || hasRole("adm")) {
+      for (const s of divergences) {
+        if (divergenceCount(s) > 0) items.push({
+          dot: "red", text: `${s.hotel_name}: ${s.cartao} cartão · ${s.pix} PIX · ${s.dinheiro} dinheiro · ${s.inadimplente} inadimplente(s)`,
+          meta: "Conciliação", url: divergenceLink(s.hotel_id),
+        });
+      }
+    }
+
     if (hasRole("ri")) {
       const readyToSend = closings.filter(
         (c) => c.status_dre === "aprovado" && c.status_carta === "aprovado" && c.status_envio !== "aprovado"
@@ -267,7 +279,7 @@ export default function HomePage() {
     }
 
     return items;
-  }, [closingStats, apStats, ofStats, pendingNotifs, isMaster, isGg, hasRole, closings]);
+  }, [closingStats, apStats, ofStats, pendingNotifs, isMaster, isGg, hasRole, closings, divergences]);
 
   const moduleCards = useMemo((): ModuleCard[] => {
     const cards: ModuleCard[] = [];

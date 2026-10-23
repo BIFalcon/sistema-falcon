@@ -32,6 +32,7 @@ import { BrDateInput } from "@/components/ui/br-date-input";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePaidBankVerification } from "@/hooks/useConciliacaoCartao";
 import ConciliacaoSection from "@/pages/conciliacao/ConciliacaoCartaoPage";
+import { DivergencesPanel } from "@/components/conciliacao/DivergencesPanel";
 import { OmieIntegrationTab } from "@/components/conciliacao/OmieIntegrationTab";
 import { useModuleFilters } from "@/contexts/FilterContext";
 
@@ -282,13 +283,14 @@ export default function ContasReceberPage() {
   const isGgOnly = !seesAllHotels && hasRole("gg");
   const restrictedHotelIds = seesAllHotels ? null : userHotels.map((h) => h.id);
   const canConciliar = isMaster || isPatronos || isFernando || hasRole("controladoria") || hasRole("financeiro");
+  const canJustify = canConciliar || hasRole("gg") || hasRole("adm");
   // Aba na URL (?aba=) para o cabeçalho saber quando esconder o seletor de período duplicado.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("aba");
   // Integração OMIE: só Controladoria, Patronos e Master.
   const canSeeOmie = isMaster || isPatronos || hasRole("controladoria");
   const tab: "to_invoice" | "open_folio" | "conciliacao" | "omie" =
-    rawTab === "open_folio" || (rawTab === "conciliacao" && canConciliar) || (rawTab === "omie" && canSeeOmie) ? rawTab : "to_invoice";
+    rawTab === "open_folio" || (rawTab === "conciliacao" && canJustify) || (rawTab === "omie" && canSeeOmie) ? rawTab : "to_invoice";
   const setTab = (v: typeof tab) => {
     const next = new URLSearchParams(searchParams);
     if (v === "to_invoice") next.delete("aba"); else next.set("aba", v);
@@ -309,7 +311,7 @@ export default function ContasReceberPage() {
         <TabsList>
           <TabsTrigger value="to_invoice">Faturamento</TabsTrigger>
           <TabsTrigger value="open_folio">Open Folio</TabsTrigger>
-          {canConciliar && <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>}
+          {canJustify && <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>}
           {canSeeOmie && <TabsTrigger value="omie">Integração OMIE</TabsTrigger>}
         </TabsList>
         <TabsContent value="to_invoice" className="mt-5">
@@ -330,9 +332,9 @@ export default function ContasReceberPage() {
             isGgOnly={isGgOnly}
           />
         </TabsContent>
-        {canConciliar && (
+        {canJustify && (
           <TabsContent value="conciliacao" className="mt-5">
-            <ConciliacaoSection />
+            {!canConciliar || searchParams.get("divergencias") === "1" ? <DivergencesPanel /> : <ConciliacaoSection />}
           </TabsContent>
         )}
         {canSeeOmie && (

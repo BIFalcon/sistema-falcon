@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useConcDivergenceSummary } from "@/hooks/useConcDivergences";
+import { divergenceCount } from "@/lib/conciliationDivergences";
 
 export type NotificationEvent =
   | "dre_first_preview"
@@ -13,7 +15,8 @@ export type NotificationEvent =
   | "carta_comment"
   | "carta_gop_approved"
   | "carta_fernando_approved"
-  | "carta_returned";
+  | "carta_returned"
+  | "conc_divergences_to_hotel";
 
 export type NotificationStatus = "pending" | "dispatched" | "failed" | "skipped";
 
@@ -49,6 +52,7 @@ export const EVENT_LABELS: Record<NotificationEvent, string> = {
   carta_gop_approved: "Carta — GOP aprovou",
   carta_fernando_approved: "Carta — Fernando aprovou",
   carta_returned: "Carta — devolvida",
+  conc_divergences_to_hotel: "Conciliação — divergências e inadimplência",
 };
 
 export function useNotificationQueue(params?: {
@@ -92,6 +96,8 @@ export function useProcessNotifications() {
 
 /** Conta notificações pendentes para o usuário logado (refetch a cada 30s). */
 export function usePendingNotificationCount() {
+  const { data: divergences = [] } = useConcDivergenceSummary();
+  const divergenceTotal = divergences.reduce((total, s) => total + divergenceCount(s), 0);
   const { data: user } = useQuery({
     queryKey: ["auth-user"],
     queryFn: async () => {
@@ -101,16 +107,17 @@ export function usePendingNotificationCount() {
   });
 
   return useQuery({
-    queryKey: ["notification-count-pending", user?.id],
+    queryKey: ["notification-count-pending", user?.id, divergenceTotal],
     queryFn: async () => {
       if (!user?.id) return 0;
       const { count, error } = await supabase
         .from("notification_queue")
         .select("id", { count: "exact", head: true })
         .eq("recipient_user_id", user.id)
+        .neq("event", "conc_divergences_to_hotel")
         .eq("status", "pending");
       if (error) throw error;
-      return count ?? 0;
+      return (count ?? 0) + divergenceTotal;
     },
     enabled: !!user?.id,
     // Só consulta quando a aba está em foco; evita tráfego de abas esquecidas abertas.
