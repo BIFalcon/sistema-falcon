@@ -1,8 +1,8 @@
-- [ ] Permitir selecionar divergências antes do envio e informar quantidade/valor total no e-mail.
-- [ ] Retornar B2B classificados aos não conciliados, remover aba antiga e corrigir prefixo ZOOP.
-- [ ] Separar Baixas e Cadastros TRX em Contas a Receber.
-- [ ] Centralizar todos os arquivos financeiros exclusivamente em Financeiro → Importações.
-- [ ] Incluir RECEBIDOS/RECEBIMENTOS entre lançamentos bancários de PIX e testar com extrato enviado.
+- [x] Permitir selecionar divergências antes do envio e informar quantidade/valor total no e-mail. Sessão autorizada de José selecionou 2 itens (R$36), enfileirou 5 e-mails; conteúdo e seleção exata conferidos, IDs inválidos rejeitados. Entrega na caixa de entrada não verificada.
+- [x] Retornar B2B classificados aos não conciliados mantendo identificação, remover aba antiga e corrigir prefixo ZOOP no cliente e servidor. Histórico/conciliações preservados; Baixas B2B exibe créditos ZOOP.
+- [x] Separar Baixas e Cadastros TRX em Contas a Receber. Navegação autenticada conferida, sem controles de upload nessas seções.
+- [x] Centralizar relatórios financeiros exclusivamente em Financeiro → Importações; arquivos de comprovação vinculados a lançamentos permanecem em suas ações. Sessão de José importou extrato real com 444 movimentos e leitura confirmada, permissões por tipo preservadas.
+- [x] Incluir RECEBIDOS/RECEBIMENTOS entre lançamentos bancários de PIX, exceto boletos, em cliente, matching e divergências; arquivo real com 8 créditos desse tipo e 9 ZOOP validado, predicados servidor conferidos.
 - [x] Enviar divergências de Cartão/PIX/Dinheiro e inadimplência ao GG/ADM vinculado; link direto e pendências na Home. Clique autenticado em Arcoverde enfileirou 5 e-mails (1 GG/4 ADM); Home do GG e abertura de justificativas de Cartão/PIX/Dinheiro verificadas com sessão real; 13 testes passaram. Entrega na caixa de entrada não verificada.
 - [x] Criar conta transitória e fechamento diário por hotel/dia, com saldos do extrato/preenchimento manual; 16 testes passaram, ciclo bancário de criação/reversão/reabertura validado com registro temporário removido e 2.279 pendências reais sem inconsistências.
 - [ ] Conferir fechamento diário e conciliação manual pela tela com sessão real — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview. Transição bancária testada diretamente, sem execução do botão manual.
