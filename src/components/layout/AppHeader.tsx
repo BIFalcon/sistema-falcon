@@ -72,7 +72,7 @@ export function AppHeader() {
   // Usuários: só hotel. Conciliação (em Contas a Receber): período fica dentro da tela.
   const isUsuarios = pathname.startsWith("/configuracoes/usuarios");
   const isConciliacaoAr =
-    pathname.startsWith("/financeiro/contas-receber") && new URLSearchParams(search).get("aba") === "conciliacao";
+    pathname.startsWith("/financeiro/contas-receber") && ["conciliacao", "baixas", "trx"].includes(new URLSearchParams(search).get("aba") ?? "");
   const hidePeriod = isUsuarios || isConciliacaoAr;
   const isRhTurnover = pathname.startsWith("/rh/turnover");
   const showMatrizOption = (isRhTurnover || pathname.startsWith("/rh/custo-folha")) && canSeeMatriz && !!matrizHotel;
