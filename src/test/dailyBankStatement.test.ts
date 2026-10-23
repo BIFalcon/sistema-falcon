@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseBankStatement } from "@/lib/conciliacaoParsers";
@@ -6,6 +5,7 @@ import { parseBankStatement } from "@/lib/conciliacaoParsers";
 it("extrato real mantém 444 movimentos e captura os saldos separadamente", async () => {
   const bytes = readFileSync("src/test/fixtures/extrato_arcoverde_set2026.xlsx");
   const file = new File([bytes], "extrato.xlsx");
+  Object.defineProperty(file, "arrayBuffer", { value: async () => Uint8Array.from(bytes).buffer });
   const parsed = await parseBankStatement(file, [], "h1");
   expect(parsed.rows).toHaveLength(444);
   expect(parsed.balances.find(b => b.balance_date === "2026-08-31")?.real_balance).toBe(4806.48);
