@@ -272,7 +272,8 @@ function exportToInvoiceToExcel(
 }
 
 export default function ContasReceberPage() {
-  const { hasRole, isMaster, isPatronos, userHotels, isFernando } = useAuth();
+  const { hasRole, isMaster, isPatronos, userHotels, isFernando, allowedHotels } = useAuth();
+  const { setHotelId, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters("financeiro");
   const isManager = !isFernando && (isMaster || hasRole("financeiro"));
   // Quem pode importar relatórios AR: apenas Master ou Patronos.
   const canImportAr = isMaster || isPatronos;
@@ -287,6 +288,15 @@ export default function ContasReceberPage() {
   // Aba na URL (?aba=) para o cabeçalho saber quando esconder o seletor de período duplicado.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("aba");
+  const linkedHotel = searchParams.get("hotel");
+  const linkedStatus = searchParams.get("status");
+  useEffect(() => {
+    if (!linkedHotel || !allowedHotels.some(h => h.id === linkedHotel)) return;
+    setHotelId(linkedHotel);
+    if (linkedStatus === "inadimplente") {
+      setDateFrom(""); setDateTo(""); setSpecificDates([]);
+    }
+  }, [linkedHotel, linkedStatus, allowedHotels, setHotelId, setDateFrom, setDateTo, setSpecificDates]);
   // Integração OMIE: só Controladoria, Patronos e Master.
   const canSeeOmie = isMaster || isPatronos || hasRole("controladoria");
   const tab: "to_invoice" | "open_folio" | "conciliacao" | "omie" =
@@ -372,7 +382,8 @@ function ToInvoiceSection({
   } = useModuleFilters("financeiro");
   const hotelId = globalHotelId ?? "";
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [faturamentoFilter, setFaturamentoFilter] = useState<ToInvoiceStatusFilter>("todos");
+  const [faturamentoParams] = useSearchParams();
+  const [faturamentoFilter, setFaturamentoFilter] = useState<ToInvoiceStatusFilter>(() => faturamentoParams.get("status") === "inadimplente" ? "inadimplente" : "todos");
   // Busca por cliente: consulta no banco com debounce (~400ms).
   const [searchInput, setSearchInput] = useState("");
   const [clientSearch, setClientSearch] = useState("");
