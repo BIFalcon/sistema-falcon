@@ -6,6 +6,7 @@ import { useLatestArUpload } from "@/hooks/useAccountsReceivable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConciliacaoPage from "@/pages/ConciliacaoPage";
 import ConferenciaNotasFiscaisPage from "@/pages/ConferenciaNotasFiscaisPage";
+import { useSearchParams } from "react-router-dom";
 
 export default function ImportacoesPage() {
   const { isMaster, isPatronos, hasRole, isFernando } = useAuth();
@@ -14,9 +15,12 @@ export default function ImportacoesPage() {
   const canAp = !isFernando && (isMaster || hasRole("financeiro"));
   const invoice = useLatestArUpload("to_invoice");
   const folio = useLatestArUpload("open_folio");
+  const [params] = useSearchParams();
+  const preferred = params.get("tipo");
+  const initial = preferred === "totvs" && (isMaster || hasRole("controladoria")) ? "totvs" : preferred === "notas" && canConciliar ? "notas" : canConciliar ? "conciliacao" : canAr ? "receber" : "pagar";
   return <div className="space-y-6">
     <div><p className="text-xs text-accent font-semibold">Gestão · Financeiro</p><h1 className="text-2xl font-semibold">Importações</h1></div>
-    <Tabs defaultValue={canConciliar ? "conciliacao" : canAr ? "receber" : "pagar"}>
+    <Tabs key={initial} defaultValue={initial}>
       <TabsList className="flex flex-wrap h-auto gap-1">
         {canConciliar && <TabsTrigger value="conciliacao">Conciliação e Baixas</TabsTrigger>}
         {canAr && <TabsTrigger value="receber">Contas a Receber</TabsTrigger>}

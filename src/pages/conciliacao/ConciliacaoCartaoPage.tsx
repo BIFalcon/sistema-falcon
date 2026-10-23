@@ -1,5 +1,4 @@
 import { Fragment, useMemo, useState } from "react";
-import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +20,6 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSendConcDivergences } from "@/hooks/useConcDivergences";
 import { canSendDivergences } from "@/lib/conciliationDivergences";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { fmtBRL, fmtDateTime } from "@/lib/formatters";
@@ -144,7 +142,6 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
 
   const reconcile = useReconcile();
   const undo = useUndoReconcile();
-  const setB2B = useSetB2B();
   const setBillingPix = useSetBillingPix();
   const markCash = useMarkCashPaid();
   const proofUrl = useCashProofUrl();
@@ -153,7 +150,8 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
   const hotelCnpj = useQuery({
     queryKey: ["hotel-cnpj", hotelId ?? "none"], enabled: !!hotelId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelId! });
+      if (!hotelId) return null;
+      const { data, error } = await supabase.rpc("get_hotel_financial", { _hotel_id: hotelId });
       if (error) throw error;
       return (data as unknown as { cnpj: string | null }[])?.[0]?.cnpj ?? null;
     },
@@ -298,8 +296,8 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
   const cashPaidRows = operaRows
     .filter((r) => operaById.get(r.id)?.cash_paid_at)
     .map((r) => {
-      const e = operaById.get(r.id)!;
-      return { ...r, info: `Pago em ${fmtDay(e.cash_paid_date)}${e.cash_proof_path ? " · comprovante anexado" : ""}` };
+      const e = operaById.get(r.id);
+      return { ...r, info: `Pago em ${fmtDay(e?.cash_paid_date ?? null)}${e?.cash_proof_path ? " · comprovante anexado" : ""}` };
     });
 
   /* ---------------- Ações ---------------- */
@@ -720,7 +718,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
 
         {/* ---------------- Códigos TRX ---------------- */}
         <TabsContent value="francesinha" className="mt-4">
-          {needsHotel ? NoHotel : <FrancesinhaTab hotelId={hotelId!} />}
+          {hotelId ? <FrancesinhaTab hotelId={hotelId} /> : NoHotel}
         </TabsContent>
         <TabsContent value="codigos" className="mt-4">
           <Card>
