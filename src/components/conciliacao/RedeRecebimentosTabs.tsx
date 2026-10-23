@@ -13,7 +13,7 @@ import { buildTarifas, isAntecipacao, REDE_BANK_PREFIX } from "@/lib/redeRecebim
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-"); return `${m}/${y}`; };
 
-function Importer({ hotelId }: { hotelId: string }) {
+export function RedeReceiptsImporter({ hotelId }: { hotelId: string }) {
   const importer = useImportRedeRecebimentos();
   const { getRootProps, getInputProps } = useDropzone({
     maxFiles: 1, disabled: importer.isPending,
@@ -45,7 +45,6 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
-        <Importer hotelId={hotelId} />
         <Button size="sm" variant="outline" disabled={auto.isPending} onClick={() => auto.mutate(hotelId, {
           onSuccess: (r) => toast.success(`${r.matched} recebimento(s) baixado(s) no banco.`),
           onError: (e) => toast.error((e as Error).message),
@@ -107,7 +106,6 @@ export function RedeChargebacksTab({ hotelId }: { hotelId: string }) {
   const total = rows.reduce((s, r) => s + Number(r.valor_descontado ?? 0), 0);
   return (
     <div className="space-y-3">
-      <Importer hotelId={hotelId} />
       <p className="text-[11px] text-muted-foreground">Fonte: aba "cancelamentos e contestações" do relatório de recebimentos. Não entram na fila normal de baixa.</p>
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Cancelamentos e chargebacks ({rows.length}) · <Money value={-Math.abs(total)} /></CardTitle></CardHeader>
@@ -143,7 +141,6 @@ export function RedeAntecipacaoTab({ hotelId }: { hotelId: string }) {
   const total = rows.reduce((s, r) => s + Math.abs(Number(r.valor_cobrado ?? 0)), 0);
   return (
     <div className="space-y-3">
-      <Importer hotelId={hotelId} />
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Taxas de antecipação ({rows.length}) · <Money value={-total} /></CardTitle></CardHeader>
           <CardContent className="p-0 max-h-[520px] overflow-y-auto">
@@ -177,7 +174,6 @@ export function TarifasTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-3">
-      <Importer hotelId={hotelId} />
       <p className="text-[11px] text-muted-foreground">MDR descontado da Rede (aba pagamentos) + taxa de adquirência B2B + demais ajustes da Rede (exceto taxa de antecipação). Clique no mês para ver os dias.</p>
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
         <Card><CardContent className="p-0 overflow-x-auto">

@@ -21,23 +21,9 @@ const RESULT: Record<string, { label: string; variant: "default" | "secondary" |
 
 export function FrancesinhaTab({ hotelId }: { hotelId: string }) {
   const { data, isLoading } = useFrancesinhaEntries(hotelId);
-  const importer = useImportFrancesinha();
-  const { getRootProps, getInputProps } = useDropzone({
-    maxFiles: 1, disabled: importer.isPending,
-    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
-    onDrop: (f) => f[0] && importer.mutate({ file: f[0], hotelId }, {
-      onSuccess: (r) => toast.success(`${r.inserted} linha(s) nova(s)${r.duplicates ? `, ${r.duplicates} já existiam` : ""}. ${r.paid} baixa(s) de faturamento, ${r.pending} pendência(s) de boleto novo, ${r.adjustments} ajuste(s).`),
-      onError: (e) => toast.error((e as Error).message),
-    }),
-  });
   const rows = data ?? [];
   return (
     <div className="space-y-3">
-      <div {...getRootProps()} className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-accent/50">
-        <input {...getInputProps()} />
-        {importer.isPending ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : <Upload className="h-4 w-4 mx-auto text-muted-foreground" />}
-        <p className="text-xs text-muted-foreground mt-1">Francesinha (extrato de boletos, uma aba por dia)</p>
-      </div>
       <p className="text-[11px] text-muted-foreground">
         Liquidação dá baixa no faturamento (seu número = nº do boleto/nota, mesmo valor). Baixa sem liquidação vira pendência e avisa GG, ADM e Contas a Receber. Entrada só confirma; tarifas e juros ficam como ajuste.
       </p>
@@ -97,4 +83,22 @@ export function BillingDueDialog({ hotelId, date, onClose }: { hotelId: string; 
       </DialogContent>
     </Dialog>
   );
+}
+
+export function FrancesinhaImporter({ hotelId }: { hotelId: string }) {
+  const importer = useImportFrancesinha();
+  const { getRootProps, getInputProps } = useDropzone({
+    maxFiles: 1, disabled: importer.isPending,
+    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
+    onDrop: (f) => f[0] && importer.mutate({ file: f[0], hotelId }, {
+      onSuccess: (r) => toast.success(`${r.inserted} linha(s) nova(s)${r.duplicates ? `, ${r.duplicates} já existiam` : ""}. ${r.paid} baixa(s) de faturamento, ${r.pending} pendência(s) de boleto novo, ${r.adjustments} ajuste(s).`),
+      onError: (e) => toast.error((e as Error).message),
+    }),
+  });
+return (      <div {...getRootProps()} className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-accent/50">
+        <input {...getInputProps()} />
+        {importer.isPending ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : <Upload className="h-4 w-4 mx-auto text-muted-foreground" />}
+        <p className="text-xs text-muted-foreground mt-1">Francesinha (extrato de boletos, uma aba por dia)</p>
+      </div>
+);
 }
