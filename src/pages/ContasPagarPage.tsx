@@ -1,3 +1,4 @@
+import { Link as RouterLink } from "react-router-dom";
 /**
  * ContasPagarPage — versão refatorada.
  *
