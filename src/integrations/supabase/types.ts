@@ -5173,6 +5173,7 @@ export type Database = {
         | "ar_boleto_baixado"
         | "ar_to_invoice_missing_docs"
         | "ar_boleto_missing_due_date"
+        | "conc_divergences_to_hotel"
       notification_status: "pending" | "dispatched" | "failed" | "skipped"
       user_status: "active" | "pending" | "banned"
     }
@@ -5382,6 +5383,7 @@ export const Constants = {
         "ar_boleto_baixado",
         "ar_to_invoice_missing_docs",
         "ar_boleto_missing_due_date",
+        "conc_divergences_to_hotel",
       ],
       notification_status: ["pending", "dispatched", "failed", "skipped"],
       user_status: ["active", "pending", "banned"],
