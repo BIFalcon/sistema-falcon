@@ -29,6 +29,7 @@ import { CashPaidDialog } from "@/components/conciliacao/CashPaidDialog";
 import { BillingDueDialog, FrancesinhaTab } from "@/components/conciliacao/FrancesinhaTab";
 import { TrxCodeDialog } from "@/components/conciliacao/TrxCodeDialog";
 import { B2BBaixaTab } from "@/components/conciliacao/B2BBaixaTab";
+import { DailyBankClosingTab } from "@/components/conciliacao/DailyBankClosingTab";
 import { RedeAntecipacaoTab, RedeBaixaTab, RedeChargebacksTab, TarifasTab } from "@/components/conciliacao/RedeRecebimentosTabs";
 import type { TrxCodeMap } from "@/hooks/useConciliacaoCartao";
 import {
@@ -506,11 +507,16 @@ export default function ConciliacaoCartaoPage() {
           <TabsTrigger value="cartao" className="text-xs"><CreditCard className="h-3.5 w-3.5 mr-1" /> Cartão</TabsTrigger>
           <TabsTrigger value="pix" className="text-xs"><Landmark className="h-3.5 w-3.5 mr-1" /> PIX</TabsTrigger>
           <TabsTrigger value="dinheiro" className="text-xs"><Banknote className="h-3.5 w-3.5 mr-1" /> Dinheiro</TabsTrigger>
+          <TabsTrigger value="fechamento-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Fechamento diário</TabsTrigger>
           <TabsTrigger value="trx-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Total diário por TRX</TabsTrigger>
           <TabsTrigger value="importacoes" className="text-xs"><Upload className="h-3.5 w-3.5 mr-1" /> Importações</TabsTrigger>
           <TabsTrigger value="francesinha" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Francesinha</TabsTrigger>
           <TabsTrigger value="codigos" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Códigos TRX</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="fechamento-diario" className="mt-4">
+          {hotelId ? <DailyBankClosingTab key={hotelId} hotelId={hotelId} dateFrom={dateFrom} dateTo={dateTo} dates={specificDates} /> : NoHotel}
+        </TabsContent>
 
         {/* ---------------- Cartão ---------------- */}
         <TabsContent value="cartao" className="mt-4">

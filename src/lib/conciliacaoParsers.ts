@@ -519,7 +519,7 @@ export async function parseBankStatement(
   targetHotelId?: string | null,
   /** kind "dinheiro": mantém só depósitos e boletos com o CNPJ do hotel. Sem kind (PIX/geral) sobe o extrato completo. */
   opts?: { kind?: "dinheiro"; hotelCnpj?: string | null },
-): Promise<{ rows: BankRow[]; hotelId: string | null; accountName: string; skipped: number; filtered: number; matchedHotelId: string | null }> {
+): Promise<{ rows: BankRow[]; balances: import("@/lib/dailyBankClosing").StatementBalance[]; hotelId: string | null; accountName: string; skipped: number; filtered: number; matchedHotelId: string | null }> {
   const wb = XLSX.read(await readArrayBuffer(file), { type: "array", cellDates: true });
   const sheetName =
     wb.SheetNames.find((n) => normText(n).startsWith("LANCAMENTOS")) ?? "";
@@ -561,12 +561,15 @@ export async function parseBankStatement(
   const iDesc = findCol(header, "lancamento", "historico", "descricao");
   const iValue = findCol(header, "valor r", "valor");
   const iDoc = findCol(header, "cpf/cnpj", "cpf cnpj", "cnpj/cpf", "cnpj cpf");
+  const iBalance = findCol(header, "saldo r", "saldo");
 
   if (iDate === -1 || iDesc === -1 || iValue === -1) {
     throw new Error("Cabeçalho do extrato não reconhecido (esperado na linha 10).");
   }
 
   const rows: BankRow[] = [];
+  const balances: import("@/lib/dailyBankClosing").StatementBalance[] = [];
+  const { statementBalance } = await import("@/lib/dailyBankClosing");
   const occ = makeOccCounter();
   let skipped = 0;
   let filtered = 0;
@@ -576,6 +579,8 @@ export async function parseBankStatement(
     if (!desc) continue;
     const descNorm = normText(desc);
     if (SUMMARY_LINES.some((s) => descNorm.includes(s))) {
+      const snapshot = statementBalance(toIso(r[iDate]), desc, iBalance === -1 ? null : r[iBalance]);
+      if (snapshot) balances.push(snapshot);
       skipped++;
       continue;
     }
@@ -600,7 +605,7 @@ export async function parseBankStatement(
     });
   }
 
-  return { rows, hotelId, accountName, skipped, filtered, matchedHotelId };
+  return { rows, balances, hotelId, accountName, skipped, filtered, matchedHotelId };
 }
 
 /* ------------------------------------------------------------------ *
