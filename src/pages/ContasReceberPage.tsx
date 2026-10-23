@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link as RouterLink } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -309,12 +309,19 @@ export default function ContasReceberPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Gestão · Financeiro</p>
-        <h1 className="text-2xl font-semibold">Contas a Receber</h1>
-        <p className="text-sm text-muted-foreground">
-          Faturamento e folios em aberto consolidados a partir do Opera Cloud.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Gestão · Financeiro</p>
+          <h1 className="text-2xl font-semibold">Contas a Receber</h1>
+          <p className="text-sm text-muted-foreground">
+            Faturamento e folios em aberto consolidados a partir do Opera Cloud.
+          </p>
+        </div>
+        {(isMaster || isPatronos) && (
+          <Button variant="outline" asChild>
+            <RouterLink to="/financeiro/importacoes?tipo=receber"><Upload className="h-4 w-4 mr-2" />Importar relatórios</RouterLink>
+          </Button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>

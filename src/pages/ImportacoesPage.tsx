@@ -17,7 +17,7 @@ export default function ImportacoesPage() {
   const folio = useLatestArUpload("open_folio");
   const [params] = useSearchParams();
   const preferred = params.get("tipo");
-  const initial = preferred === "totvs" && (isMaster || hasRole("controladoria")) ? "totvs" : preferred === "notas" && canConciliar ? "notas" : canConciliar ? "conciliacao" : canAr ? "receber" : "pagar";
+  const initial = preferred === "pagar" && canAp ? "pagar" : preferred === "receber" && canAr ? "receber" : preferred === "totvs" && (isMaster || hasRole("controladoria")) ? "totvs" : preferred === "notas" && canConciliar ? "notas" : canConciliar ? "conciliacao" : canAr ? "receber" : "pagar";
   return <div className="space-y-6">
     <div><p className="text-xs text-accent font-semibold">Gestão · Financeiro</p><h1 className="text-2xl font-semibold">Importações</h1></div>
     <Tabs key={initial} defaultValue={initial}>
