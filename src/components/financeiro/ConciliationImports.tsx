@@ -147,6 +147,7 @@ return <div className="space-y-4">          <div className="grid gap-4 md:grid-c
             </Card>
           </div>
 
+          {hotelId && <div className="grid gap-4 md:grid-cols-3"><section><h3 className="mb-2 font-medium text-sm">Recebimentos Rede</h3><RedeReceiptsImporter hotelId={hotelId} /></section><section><h3 className="mb-2 font-medium text-sm">Transferência B2B Checkout</h3><B2BReceiptsImporter hotelId={hotelId} /></section><section><h3 className="mb-2 font-medium text-sm">Francesinha</h3><FrancesinhaImporter hotelId={hotelId} /></section></div>}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Últimas importações</CardTitle></CardHeader>
             <CardContent className="pb-3 pt-0">
@@ -218,5 +219,5 @@ return <div className="space-y-4">          <div className="grid gap-4 md:grid-c
               </Table>
             </CardContent>
           </Card>
-{hotelId && <div className="grid gap-4 md:grid-cols-3"><section><h3 className="mb-2 font-medium text-sm">Recebimentos Rede</h3><RedeReceiptsImporter hotelId={hotelId} /></section><section><h3 className="mb-2 font-medium text-sm">Transferência B2B Checkout</h3><B2BReceiptsImporter hotelId={hotelId} /></section><section><h3 className="mb-2 font-medium text-sm">Francesinha</h3><FrancesinhaImporter hotelId={hotelId} /></section></div>}</div>;
+</div>;
 }
