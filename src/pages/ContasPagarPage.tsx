@@ -1279,15 +1279,6 @@ export default function ContasPagarPage() {
                     Último: {fmtDateTime(lastUpload.uploaded_at)}
                   </span>
                 )}
-                {/* Inputs de arquivo ocultos */}
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept={acceptedExt}
-                  className="hidden"
-                  onChange={handleFile}
-                  disabled={!canManage || !sourceSystem || uploading}
-                />
                 <Button
                   variant="outline"
                   size="sm"
@@ -1323,20 +1314,6 @@ export default function ContasPagarPage() {
                   }}
                 >
                   <FileDown className="h-4 w-4" /> Exportar Excel
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!canManage || !sourceSystem || uploading}
-                  onClick={() => fileRef.current?.click()}
-                >
-                  {uploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Importar Relatório
                 </Button>
                 {canManage && hotelId && sourceSystem && (
                   <Button

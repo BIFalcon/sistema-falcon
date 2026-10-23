@@ -40,6 +40,7 @@ import {
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fmtBRL } from "@/lib/formatters";
+import { Link } from "react-router-dom";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -154,7 +155,7 @@ function Paged<T>({
   );
 }
 
-export default function ConferenciaNotasFiscaisPage() {
+export default function ConferenciaNotasFiscaisPage({ importMode = false }: { importMode?: boolean }) {
   const { allowedHotels, isMaster, hasRole } = useAuth();
   const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("global");
   const [operaFile, setOperaFile] = useState<File | null>(null);
@@ -407,7 +408,8 @@ export default function ConferenciaNotasFiscaisPage() {
         )}
       </Card>
 
-      {canUpload && (
+      {canUpload && !importMode && <Button variant="outline" asChild><Link to="/financeiro/importacoes?tipo=notas">Importações</Link></Button>}
+      {canUpload && importMode && (
       <Card className="p-6 shadow-soft space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">

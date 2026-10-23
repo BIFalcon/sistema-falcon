@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isPixBankLine } from "@/lib/pixBankFilter";
+import { SendDivergencesDialog } from "@/components/conciliacao/SendDivergencesDialog";
 import { isCashBankLine } from "@/lib/conciliacaoParsers";
 import {
   Banknote, CalendarDays, ChevronDown, ChevronRight, CreditCard, Download,
@@ -44,31 +46,6 @@ import {
 } from "@/hooks/useConciliacaoCartao";
 
 /* ------------------------------------------------------------------ */
-
-function DropZone({ label, hint, accept, onFile, busy }: {
-  label: string; hint: string; accept: Record<string, string[]>;
-  onFile: (f: File) => void; busy: boolean;
-}) {
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept, maxFiles: 1, disabled: busy,
-    onDrop: (files) => files[0] && onFile(files[0]),
-  });
-  return (
-    <div
-      {...getRootProps()}
-      className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
-        isDragActive ? "border-accent bg-accent/5" : "border-border hover:border-accent/50"
-      } ${busy ? "opacity-60 pointer-events-none" : ""}`}
-    >
-      <input {...getInputProps()} />
-      <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
-        {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6 opacity-40" />}
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="text-[11px]">{hint}</p>
-      </div>
-    </div>
-  );
-}
 
 /** Lista simples de lançamentos classificados (B2B / direto no banco / dinheiro pago). */
 function ClassifiedList({ title, subtitle, rows, actionLabel, onAction, busy, exportName }: {
@@ -138,9 +115,9 @@ function ClassifiedList({ title, subtitle, rows, actionLabel, onAction, busy, ex
 
 /* ------------------------------------------------------------------ */
 
-export default function ConciliacaoCartaoPage() {
+export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { section?: "conciliacao" | "baixas" | "trx" }) {
   const { allowedHotels, isMaster, roles } = useAuth();
-  const sendDivergences = useSendConcDivergences();
+  const [sendOpen, setSendOpen] = useState(false);
   // Filtros globais de Contas a Receber (hotel + período) — o período também
   // pode ser ajustado aqui dentro, pelo seletor abaixo.
   const {
@@ -153,7 +130,7 @@ export default function ConciliacaoCartaoPage() {
     setDateTo(to);
   };
 
-  const [mainTab, setMainTab] = useState("cartao");
+  const [mainTab, setMainTab] = useState(section === "trx" ? "codigos" : section === "baixas" ? "baixa-rede" : "cartao");
   const opera = useOperaEntries(hotelId, dateFrom, dateTo, specificDates);
   const acquirer = useAcquirerEntries(hotelId, dateFrom, dateTo, specificDates);
   const bank = useBankEntries(hotelId, dateFrom, dateTo, specificDates);
@@ -172,10 +149,6 @@ export default function ConciliacaoCartaoPage() {
   const markCash = useMarkCashPaid();
   const proofUrl = useCashProofUrl();
 
-  const importOpera = useImportOpera();
-  const importAcquirer = useImportAcquirer();
-  const importB2B = useImportB2B();
-  const importBank = useImportBankStatement();
   const [billingDueDate, setBillingDueDate] = useState<string | null>(null);
   const hotelCnpj = useQuery({
     queryKey: ["hotel-cnpj", hotelId ?? "none"], enabled: !!hotelId,
@@ -186,28 +159,11 @@ export default function ConciliacaoCartaoPage() {
     },
   });
   const autoReconcile = useAutoReconcile();
-  const uploads = useConcUploads(hotelId);
-  const matchedByUpload = useMatchedCountsByUpload(
-    (uploads.data ?? []).map((u) => u.id as string),
-    mainTab === "importacoes",
-  );
-  const deleteUpload = useDeleteConcUpload();
   const trxCodes = useTrxCodeMapping();
   const updateTrx = useUpdateTrxCode();
   const [trxSearch, setTrxSearch] = useState("");
   const [trxEdit, setTrxEdit] = useState<{ code: TrxCodeMap | null; activate?: boolean } | null>(null);
   const [cashDialog, setCashDialog] = useState<ReconcileRow[] | null>(null);
-
-  const uploadHotelLabel = (u: Record<string, unknown>): string => {
-    const direct = allowedHotels.find((h) => h.id === u.hotel_id)?.name;
-    if (direct) return direct;
-    const meta = (u.metadata ?? {}) as { hotel_ids?: string[] };
-    const names = (meta.hotel_ids ?? [])
-      .map((id) => allowedHotels.find((h) => h.id === id)?.name)
-      .filter(Boolean) as string[];
-    if (names.length === 0) return "—";
-    return names.length <= 2 ? names.join(", ") : `${names.length} hotéis`;
-  };
 
   const operaRows: ReconcileRow[] = useMemo(
     () => (opera.data ?? []).map((e) => ({
@@ -216,6 +172,7 @@ export default function ConciliacaoCartaoPage() {
       subtitle: [e.room && `UH ${e.room}`, e.guest_full_name, e.receipt_no && `Rec. ${e.receipt_no}`]
         .filter(Boolean).join(" · "),
       tag: e.categoria_omie || "Sem Categoria OMIE",
+      origin: e.b2b ? "B2B" : undefined,
     })),
     [opera.data],
   );
@@ -229,7 +186,7 @@ export default function ConciliacaoCartaoPage() {
       title: e.categoria || e.bandeira || "—",
       subtitle: [e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
       tag: e.categoria ?? undefined,
-      origin: e.source === "b2b" ? "B2B" : "Rede",
+      origin: e.source === "b2b" || e.b2b ? "B2B" : "Rede",
     })),
     [acquirer.data],
   );
@@ -284,6 +241,7 @@ export default function ConciliacaoCartaoPage() {
       title: e.trx_desc || e.trx_code,
       subtitle: [e.room && `UH ${e.room}`, e.guest_full_name, e.receipt_no && `Rec. ${e.receipt_no}`].filter(Boolean).join(" · "),
       tag: e.categoria_omie || "Sem Categoria OMIE",
+      origin: e.b2b ? "B2B" : undefined,
     });
     return m;
   }, [rowById, partners.data]);
@@ -293,11 +251,11 @@ export default function ConciliacaoCartaoPage() {
 
   const operaPendentesAll = operaRows.filter((r) => {
     const e = operaById.get(r.id);
-    return e && !e.matched_at && !e.direct_bank && !e.b2b && !e.cash_paid_at;
+    return e && !e.matched_at && !e.direct_bank && !e.cash_paid_at;
   });
   const acquirerPendentesAll = acquirerRows.filter((r) => {
     const e = acquirerById.get(r.id);
-    return e && !e.matched_at && !e.b2b;
+    return e && !e.matched_at;
   });
   const bankPendentes = bankRows.filter((r) => { const e = bankById.get(r.id); return e && !e.matched_at && !e.billing_pix; });
 
@@ -310,7 +268,7 @@ export default function ConciliacaoCartaoPage() {
   const acquirerPix = acquirerPendentesAll.filter((r) => isPix(acquirerById.get(r.id)?.categoria));
   const bankPix = bankPendentes.filter((r) => {
     const e = bankById.get(r.id);
-    return e && Number(e.amount) > 0 && (e.description ?? "").toUpperCase().includes("PIX");
+    return e && Number(e.amount) > 0 && isPixBankLine(e.description);
   });
 
   // Dinheiro
@@ -322,10 +280,6 @@ export default function ConciliacaoCartaoPage() {
   });
 
   // Classificados
-  const b2bRows = [
-    ...operaRows.filter((r) => operaById.get(r.id)?.b2b).map((r) => ({ ...r, info: "Opera · B2B" })),
-    ...acquirerRows.filter((r) => acquirerById.get(r.id)?.b2b).map((r) => ({ ...r, info: "Adquirente · B2B" })),
-  ];
   const billingPixRows = bankRows
     .filter((r) => bankById.get(r.id)?.billing_pix)
     .map((r) => ({ ...r, info: "Pagamento de Faturamento (PIX)" }));
@@ -377,16 +331,6 @@ export default function ConciliacaoCartaoPage() {
         onError: (e: Error) => toast.error(e.message),
       });
     }
-  };
-
-  const classifyB2B = (rows: ReconcileRow[], side: "opera" | "acquirer", value: boolean) => {
-    setB2B.mutate(
-      { ids: rows.map((r) => r.id), side, value },
-      {
-        onSuccess: () => toast.success(value ? `${rows.length} lançamento(s) classificado(s) como B2B` : "Classificação B2B removida"),
-        onError: (e: Error) => toast.error(e.message),
-      },
-    );
   };
 
   const saveNote = (kind: ConcKind) => (row: ReconcileRow, note: string) => {
@@ -465,7 +409,7 @@ export default function ConciliacaoCartaoPage() {
       position: "left", rows: operaPix,
     },
     {
-      key: "bank-pix", title: "Extrato Bancário", subtitle: 'Lançamentos com "PIX" na descrição', position: "right", rows: bankPix,
+      key: "bank-pix", title: "Extrato Bancário", subtitle: 'PIX / recebidos / recebimentos', position: "right", rows: bankPix,
       actions: [{
         label: "Marcar como Faturamento",
         icon: <FileSpreadsheet className="h-3 w-3 mr-1" />,
@@ -507,33 +451,21 @@ export default function ConciliacaoCartaoPage() {
 
       {canSendDivergences(isMaster, roles) && ["cartao", "pix", "dinheiro"].includes(mainTab) && (
         <div className="flex justify-end">
-          <Button variant="outline" disabled={!hotelId || sendDivergences.isPending} onClick={() => {
-            if (!hotelId) return;
-            sendDivergences.mutate(hotelId, {
-              onSuccess: r => toast.info(r.empty ? "Nenhuma divergência ou inadimplência neste hotel." : r.already_pending ? "Já existe um envio aguardando processamento." : r.queued ? `${r.queued} e-mail(s) de divergências enfileirado(s) para GG/ADM.` : "Nenhum destinatário GG/ADM ativo disponível para envio neste hotel."),
-              onError: (e: Error) => toast.error(e.message),
-            });
-          }}>
-            {sendDivergences.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Enviar divergências agora
-          </Button>
+          <Button variant="outline" disabled={!hotelId} onClick={() => setSendOpen(true)}><Send className="mr-2 h-4 w-4" />Enviar divergências agora</Button>
         </div>
       )}
       <Tabs value={mainTab} onValueChange={setMainTab}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="cartao" className="text-xs"><CreditCard className="h-3.5 w-3.5 mr-1" /> Cartão</TabsTrigger>
-          <TabsTrigger value="pix" className="text-xs"><Landmark className="h-3.5 w-3.5 mr-1" /> PIX</TabsTrigger>
-          <TabsTrigger value="dinheiro" className="text-xs"><Banknote className="h-3.5 w-3.5 mr-1" /> Dinheiro</TabsTrigger>
-          <TabsTrigger value="fechamento-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Fechamento diário</TabsTrigger>
-          <TabsTrigger value="trx-diario" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" /> Total diário por TRX</TabsTrigger>
-          <TabsTrigger value="importacoes" className="text-xs"><Upload className="h-3.5 w-3.5 mr-1" /> Importações</TabsTrigger>
-          <TabsTrigger value="francesinha" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Francesinha</TabsTrigger>
-          <TabsTrigger value="codigos" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Códigos TRX</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          {section === "conciliacao" && <><TabsTrigger value="cartao">Cartão</TabsTrigger><TabsTrigger value="pix">PIX</TabsTrigger><TabsTrigger value="dinheiro">Dinheiro</TabsTrigger></>}
+          {section === "baixas" && <><TabsTrigger value="baixa-rede">Rede</TabsTrigger><TabsTrigger value="baixa-b2b">B2B</TabsTrigger><TabsTrigger value="francesinha">Francesinha</TabsTrigger><TabsTrigger value="chargebacks">Chargebacks</TabsTrigger><TabsTrigger value="antecipacao">Antecipação</TabsTrigger><TabsTrigger value="tarifas">Tarifas</TabsTrigger><TabsTrigger value="fechamento-diario">Fechamento diário</TabsTrigger></>}
+          {section === "trx" && <><TabsTrigger value="codigos">Códigos TRX</TabsTrigger><TabsTrigger value="trx-diario">Total diário por TRX</TabsTrigger></>}
         </TabsList>
-
-        <TabsContent value="fechamento-diario" className="mt-4">
-          {hotelId ? <DailyBankClosingTab key={hotelId} hotelId={hotelId} dateFrom={dateFrom} dateTo={dateTo} dates={specificDates} /> : NoHotel}
-        </TabsContent>
+        <TabsContent value="fechamento-diario">{hotelId ? <DailyBankClosingTab hotelId={hotelId} dateFrom={dateFrom} dateTo={dateTo} dates={specificDates} /> : NoHotel}</TabsContent>
+        <TabsContent value="baixa-b2b">{hotelId && <B2BBaixaTab hotelId={hotelId} />}</TabsContent>
+        <TabsContent value="baixa-rede">{hotelId && <RedeBaixaTab hotelId={hotelId} />}</TabsContent>
+        <TabsContent value="chargebacks">{hotelId && <RedeChargebacksTab hotelId={hotelId} />}</TabsContent>
+        <TabsContent value="antecipacao">{hotelId && <RedeAntecipacaoTab hotelId={hotelId} />}</TabsContent>
+        <TabsContent value="tarifas">{hotelId && <TarifasTab hotelId={hotelId} />}</TabsContent>
 
         {/* ---------------- Cartão ---------------- */}
         <TabsContent value="cartao" className="mt-4">
@@ -543,20 +475,7 @@ export default function ConciliacaoCartaoPage() {
                 <TabsTrigger value="pendentes" className="text-[11px]">Não Conciliados</TabsTrigger>
                 <TabsTrigger value="justificativa" className="text-[11px]">Justificativa</TabsTrigger>
                 <TabsTrigger value="conciliados" className="text-[11px]">Cartões Conciliados</TabsTrigger>
-                <TabsTrigger value="b2b" className="text-[11px]">B2B</TabsTrigger>
-                <TabsTrigger value="baixa-b2b" className="text-[11px]">Baixa (B2B)</TabsTrigger>
-                <TabsTrigger value="baixa-rede" className="text-[11px]">Baixa (Rede)</TabsTrigger>
-                <TabsTrigger value="chargebacks" className="text-[11px]">Chargebacks</TabsTrigger>
-                <TabsTrigger value="antecipacao" className="text-[11px]">Antecipação</TabsTrigger>
-                <TabsTrigger value="tarifas" className="text-[11px]">Tarifas</TabsTrigger>
               </TabsList>
-              <TabsContent value="baixa-b2b" className="mt-4">
-                <B2BBaixaTab hotelId={hotelId!} />
-              </TabsContent>
-              <TabsContent value="baixa-rede" className="mt-4"><RedeBaixaTab hotelId={hotelId!} /></TabsContent>
-              <TabsContent value="chargebacks" className="mt-4"><RedeChargebacksTab hotelId={hotelId!} /></TabsContent>
-              <TabsContent value="antecipacao" className="mt-4"><RedeAntecipacaoTab hotelId={hotelId!} /></TabsContent>
-              <TabsContent value="tarifas" className="mt-4"><TarifasTab hotelId={hotelId!} /></TabsContent>
               <TabsContent value="pendentes" className="mt-4">
                 <ReconcilePanel
                   boxes={cardBoxes}
@@ -586,17 +505,7 @@ export default function ConciliacaoCartaoPage() {
                   undoing={undo.isPending}
                 />
               </TabsContent>
-              <TabsContent value="b2b" className="mt-4">
-                <ClassifiedList
-                  title="Classificados como B2B"
-                  subtitle="Saem das pendências de conciliação"
-                  rows={b2bRows}
-                  actionLabel="Reverter"
-                  busy={setB2B.isPending}
-                  onAction={(r) => classifyB2B([r], r.side === "acquirer" ? "acquirer" : "opera", false)}
-                  exportName={`b2b-${hotelId}.xlsx`}
-                />
-              </TabsContent>
+
             </Tabs>
           )}
         </TabsContent>
@@ -679,18 +588,6 @@ export default function ConciliacaoCartaoPage() {
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-dinheiro-${hotelId}.xlsx`}
                 />
-                <div className="mt-4 max-w-md">
-                  <DropZone
-                    label="Enviar extrato (somente Dinheiro)"
-                    hint="Sobe só depósitos (DEP/DN/dinheiro) e boletos com o CNPJ do hotel"
-                    accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
-                    busy={importBank.isPending}
-                    onFile={(f) => importBank.mutate({ file: f, hotelIdOverride: hotelId, kind: "dinheiro" }, {
-                      onSuccess: (r) => toast.success(`${r.inserted} lançamento(s) de dinheiro importado(s) · ${r.filtered} linha(s) do extrato fora do filtro · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s)`),
-                      onError: (e: Error) => toast.error(e.message),
-                    })}
-                  />
-                </div>
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
                 <JustificationsPanel
@@ -821,169 +718,6 @@ export default function ConciliacaoCartaoPage() {
           )}
         </TabsContent>
 
-        {/* ---------------- Importações ---------------- */}
-
-        <TabsContent value="importacoes" className="mt-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Opera (XML) ou TOTVS (Excel)</CardTitle></CardHeader>
-              <CardContent>
-                <DropZone
-                  label="Enviar XML do Opera ou Excel TOTVS"
-                  hint={hotelId ? `Hotel: ${hotelName}` : "Selecione o hotel no filtro do topo antes de importar"}
-                  accept={{ "application/xml": [".xml"], "text/xml": [".xml"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
-                  busy={importOpera.isPending}
-                  onFile={(f) => {
-                    if (!hotelId) { toast.error("Selecione o hotel antes de importar o XML do Opera."); return; }
-                    importOpera.mutate({ file: f, hotelId }, {
-                      onSuccess: (r) => toast.success(
-                        `${r.inserted} transação(ões) importada(s) · ${r.skipped} fora do mapeamento` +
-                        ("skippedCodes" in r && r.skippedCodes?.length ? ` (códigos: ${r.skippedCodes.join(", ")})` : "") +
-                        ` · ${r.duplicates} já existente(s)` +
-                        ` · ${r.autoMatched} conciliada(s) automaticamente` +
-                        ("unclassified" in r && r.unclassified?.length ? ` · sem categoria: ${r.unclassified.join(", ")}` : ""),
-                      ),
-                      onError: (e: Error) => toast.error(e.message),
-                    });
-                  }}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Operadora (Rede — Excel)</CardTitle></CardHeader>
-              <CardContent>
-                <DropZone
-                  label="Enviar Excel da operadora"
-                  hint={hotelId ? `Filtra pelo CNPJ de ${hotelName}` : "Selecione o hotel no filtro do topo antes de importar"}
-                  accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
-                  busy={importAcquirer.isPending}
-                  onFile={(f) => {
-                    if (!hotelId) { toast.error("Selecione o hotel antes de importar a planilha da operadora."); return; }
-                    importAcquirer.mutate({ file: f, hotelId }, {
-                      onSuccess: (r) => toast.success(
-                        `${r.inserted} venda(s) importada(s) · ${r.otherHotels} de outros CNPJs descartada(s)` +
-                        ` · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s) automaticamente`,
-                      ),
-                      onError: (e: Error) => toast.error(e.message),
-                    });
-                  }}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Relatório B2B (Excel)</CardTitle></CardHeader>
-              <CardContent>
-                <DropZone
-                  label="Enviar Excel do B2B"
-                  hint={hotelId ? `Lançado em ${hotelName} · só status "Sucesso"` : "Selecione o hotel no filtro do topo antes de importar"}
-                  accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
-                  busy={importB2B.isPending}
-                  onFile={(f) => {
-                    if (!hotelId) { toast.error("Selecione o hotel antes de importar o relatório B2B."); return; }
-                    importB2B.mutate({ file: f, hotelId }, {
-                      onSuccess: (r) => toast.success(
-                        `${r.inserted} venda(s) B2B importada(s) · ${r.skipped} sem status "Sucesso" descartada(s)` +
-                        ` · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s) automaticamente`,
-                      ),
-                      onError: (e: Error) => toast.error(e.message),
-                    });
-                  }}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Extrato Bancário (Excel)</CardTitle></CardHeader>
-              <CardContent>
-                <DropZone
-                  label="Enviar extrato bancário"
-                  hint='Aba "Lançamentos" — hotel identificado pelo Nome da conta'
-                  accept={{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] }}
-                  busy={importBank.isPending}
-                  onFile={(f) => importBank.mutate({ file: f, hotelIdOverride: hotelId }, {
-                    onSuccess: (r) => toast.success(
-                      `${r.inserted} lançamento(s) importado(s) — ${r.accountName || r.hotelId}` +
-                      ` · ${r.duplicates} já existente(s) · ${r.autoMatched} conciliada(s) automaticamente`,
-                    ),
-                    onError: (e: Error) => toast.error(e.message),
-                  })}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Últimas importações</CardTitle></CardHeader>
-            <CardContent className="pb-3 pt-0">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={autoReconcile.isPending}
-                onClick={() => autoReconcile.mutate(hotelId, {
-                  onSuccess: (n) => toast.success(n ? `${n} par(es) conciliado(s) automaticamente` : "Nenhum par exato pendente"),
-                  onError: (e: Error) => toast.error(e.message),
-                })}
-              >
-                Rodar conciliação automática
-              </Button>
-            </CardContent>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-[11px]">
-                    <TableHead>Data</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Arquivo</TableHead>
-                    <TableHead>Hotel</TableHead>
-                    <TableHead className="text-right">Importados</TableHead>
-                    <TableHead className="text-right">Descartados</TableHead>
-                    <TableHead className="text-right">Conciliados</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(uploads.data ?? []).map((u) => (
-                    <TableRow key={u.id as string} className="text-[11px]">
-                      <TableCell>{fmtDateTime(u.uploaded_at as string)}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{String(u.kind)}</Badge></TableCell>
-                      <TableCell className="max-w-[280px] truncate">{String(u.file_name)}</TableCell>
-                      <TableCell>{uploadHotelLabel(u)}</TableCell>
-                      <TableCell className="text-right">{Number(u.parsed_count ?? 0)}</TableCell>
-                      <TableCell className="text-right">{Number(u.skipped_count ?? 0)}</TableCell>
-                      <TableCell className="text-right">
-                        {matchedByUpload.data?.get(u.id as string) ?? 0}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost" size="sm"
-                          className="h-6 text-[11px] text-destructive hover:text-destructive"
-                          disabled={deleteUpload.isPending}
-                          onClick={() => {
-                            if (!window.confirm(`Excluir a importação "${String(u.file_name)}" e todos os lançamentos dela?`)) return;
-                            deleteUpload.mutate(
-                              { id: u.id as string, kind: String(u.kind) },
-                              {
-                                onSuccess: () => toast.success("Importação excluída."),
-                                onError: (e) => toast.error((e as Error).message),
-                              },
-                            );
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" /> Excluir
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {(uploads.data ?? []).length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">
-                      Nenhuma importação ainda.
-                    </TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* ---------------- Códigos TRX ---------------- */}
         <TabsContent value="francesinha" className="mt-4">
           {needsHotel ? NoHotel : <FrancesinhaTab hotelId={hotelId!} />}
@@ -1063,6 +797,7 @@ export default function ConciliacaoCartaoPage() {
         </p>
       )}
 
+      {hotelId && <SendDivergencesDialog key={hotelId} hotelId={hotelId} open={sendOpen} onOpenChange={setSendOpen} />}
       {/* Dinheiro — marcar como pago */}
       {hotelId && <BillingDueDialog hotelId={hotelId} date={billingDueDate} onClose={() => setBillingDueDate(null)} />}
       <CashPaidDialog

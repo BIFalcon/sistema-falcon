@@ -14,19 +14,8 @@ const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : 
 
 export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
   const { data, isLoading } = useB2BBaixaData(hotelId);
-  const importer = useImportB2BReceipts();
   const auto = useB2BAutoMatch();
   const unmatch = useB2BUnmatchDeposit();
-
-  const { getRootProps, getInputProps } = useDropzone({
-    maxFiles: 1, disabled: importer.isPending,
-    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] },
-    onDrop: (files) => files[0] && importer.mutate({ file: files[0], hotelId }, {
-      onSuccess: (r) => toast.success(`${r.inserted} recebimento(s) importado(s)${r.duplicates ? `, ${r.duplicates} já existiam` : ""}. ${r.sales_linked} venda(s) ligada(s) pela reserva, ${r.deposits_matched} lote(s) baixado(s) no banco.`),
-      onError: (e) => toast.error((e as Error).message),
-    }),
-  });
-
   const receipts = data?.receipts ?? [];
   const charges = receipts.filter((r) => r.tipo_lancamento === "charge");
   const deposits = receipts.filter((r) => r.tipo_lancamento === "deposit");
@@ -50,7 +39,7 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
       })),
     },
     {
-      key: "banco", title: `Banco (${B2B_BANK_PREFIX}…) — filtro a confirmar`, subtitle: "Créditos pendentes no extrato", position: "right",
+      key: "banco", title: `Banco (${B2B_BANK_PREFIX}…)`, subtitle: "Créditos pendentes no extrato", position: "right",
       rows: (data?.bank ?? []).filter((b) => !b.matched_at).map<ReconcileRow>((b) => ({
         id: b.id, side: "bank", date: b.line_date, amount: Number(b.amount), title: b.description ?? "",
       })),
@@ -65,13 +54,6 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
-        <div {...getRootProps()} className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-accent/50">
-          <input {...getInputProps()} />
-          <div className="flex items-center justify-center gap-2 text-sm">
-            {importer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 opacity-50" />}
-            Importar “Transferência B2B Checkout” (aba transfer)
-          </div>
-        </div>
         <Button variant="outline" size="sm" disabled={auto.isPending}
           onClick={() => auto.mutate(hotelId, {
             onSuccess: (r) => toast.success(`${r.sales_linked} venda(s) ligada(s), ${r.deposits_matched} lote(s) baixado(s).`),
@@ -132,4 +114,26 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
       </Card>
     </div>
   );
+}
+
+export function B2BReceiptsImporter({ hotelId }: { hotelId: string }) {
+  const importer = useImportB2BReceipts();
+
+  const { getRootProps, getInputProps } = useDropzone({
+    maxFiles: 1, disabled: importer.isPending,
+    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"] },
+    onDrop: (files) => files[0] && importer.mutate({ file: files[0], hotelId }, {
+      onSuccess: (r) => toast.success(`${r.inserted} recebimento(s) importado(s)${r.duplicates ? `, ${r.duplicates} já existiam` : ""}. ${r.sales_linked} venda(s) ligada(s) pela reserva, ${r.deposits_matched} lote(s) baixado(s) no banco.`),
+      onError: (e) => toast.error((e as Error).message),
+    }),
+  });
+
+return (        <div {...getRootProps()} className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-accent/50">
+          <input {...getInputProps()} />
+          <div className="flex items-center justify-center gap-2 text-sm">
+            {importer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 opacity-50" />}
+            Importar “Transferência B2B Checkout” (aba transfer)
+          </div>
+        </div>
+);
 }

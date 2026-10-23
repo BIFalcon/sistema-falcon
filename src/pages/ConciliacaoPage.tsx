@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { parseRazao, parseJournal, type RazaoLine, type JournalLine } from "@/lib/conciliationParser";
 import { useConciliation, type CategoryResult } from "@/hooks/useConciliation";
 import { fmtBRL } from "@/lib/formatters";
+import { Link } from "react-router-dom";
 
 function DropZone({
   label,
@@ -239,7 +240,7 @@ function CategoryCard({ result }: { result: CategoryResult }) {
   );
 }
 
-export default function ConciliacaoPage() {
+export default function ConciliacaoPage({ importMode = false }: { importMode?: boolean }) {
   const [razaoFile, setRazaoFile] = useState<File | null>(null);
   const [journalFile, setJournalFile] = useState<File | null>(null);
   const [razaoLines, setRazaoLines] = useState<RazaoLine[]>([]);
@@ -368,7 +369,7 @@ export default function ConciliacaoPage() {
         </Card>
       )}
 
-      {!processed ? (
+      {!processed && !importMode ? <Button variant="outline" asChild><Link to="/financeiro/importacoes?tipo=totvs">Importações</Link></Button> : !processed ? (
         <Card className="p-6 shadow-soft space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
