@@ -16,8 +16,9 @@ describe("recebimentos B2B", () => {
     expect(rows[0]).toMatchObject({ tipo_lancamento: "charge", localizador_reserva: "RES-9", valor_recebivel_liquido: 470, data_operacao: "2026-10-10" });
     expect(rows[1].tipo_lancamento).toBe("deposit");
   });
-  it("filtro do banco aceita só descrições ZOP", () => {
-    expect(isB2BBankLine("ZOP VISA 123")).toBe(true);
+  it("filtro do banco aceita ZOOP, não ZOP", () => {
+    expect(isB2BBankLine("ZOOP MAST CD1359230024")).toBe(true);
+    expect(isB2BBankLine("ZOP VISA 123")).toBe(false);
     expect(isB2BBankLine("PIX RECEBIDO")).toBe(false);
   });
 });
