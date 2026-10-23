@@ -1,3 +1,4 @@
+- [ ] Criar conta transitória e fechamento diário por hotel/dia, com reversão automática das pendências e testes de criação/conciliação.
 - [x] Separar Base (direcionamento) de Categoria OMIE (etiqueta e cruzamento), atualizar lançamentos existentes sem desfazer conciliações; 18 testes passaram, classificação conferida sem divergências e aplicação sem erros.
 - [ ] Conferir conciliação por Categoria OMIE na tela com sessão real — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview.
 - [x] Corrigir composição da receita na Carta do Manhattan com as seis linhas da DRE, sem alterar os demais hotéis; planilha e valores salvos conferidos (total 1.147.436,41), nove testes passaram e página PDF renderizada sem cortes, mantendo centavos na distribuição. Geração completa com sessão real continua bloqueada pelo login abaixo.
