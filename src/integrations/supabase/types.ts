@@ -4631,11 +4631,25 @@ export type Database = {
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }
+      conc_is_pix_bank: { Args: { description: string }; Returns: boolean }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
         Returns: {
           n: number
           upload_id: string
+        }[]
+      }
+      conc_notification_items: {
+        Args: { p_hotel: string }
+        Returns: {
+          amount: number
+          date: string
+          id: string
+          kind: string
+          side: string
+          subtitle: string
+          tag: string
+          title: string
         }[]
       }
       conc_reconcile_manual: {
@@ -4653,6 +4667,10 @@ export type Database = {
       }
       conc_rede_unmatch: { Args: { p_id: string }; Returns: undefined }
       conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
+      conc_send_divergences_selected: {
+        Args: { p_hotel: string; p_keys?: string[] }
+        Returns: Json
+      }
       consolidado_has_line: {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: boolean

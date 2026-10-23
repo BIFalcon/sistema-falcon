@@ -435,6 +435,13 @@
       "when": 1792754081466,
       "tag": "0061_conciliation_divergences_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792756694354,
+      "tag": "0062_financial_selected_divergences_and_bank_filters",
+      "breakpoints": true
     }
   ]
 }
