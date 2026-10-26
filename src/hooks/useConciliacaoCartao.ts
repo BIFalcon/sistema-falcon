@@ -476,7 +476,7 @@ export function useImportAcquirer() {
       );
       const known = new Set(existing.map((e) => e.entry_key));
       // Ajustes só para linhas da Rede (B2B tem dedupe próprio).
-      const split = splitRedeReimport(parsed.rows, existing.filter((e) => !!e.nsu));
+      const split = splitRedeReimport(parsed.rows, existing);
       const deltaRows = split.deltaRows.filter((r) => !known.has(r.entry_key));
       const rows = [...split.newRows, ...deltaRows];
       const duplicates = parsed.rows.length - split.newRows.length - split.deltaRows.length;
@@ -523,7 +523,7 @@ export function useImportAcquirer() {
         adjusts_entry_id: (r as Partial<DeltaRow>).adjusts_entry_id ?? null,
         raw: r as unknown as Record<string, unknown>,
       })));
-      await fillAcquirerExtra(split.unchanged.filter((r) => known.has(r.entry_key)));
+      await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
       return { inserted: rows.length, adjustments: deltaRows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
@@ -533,6 +533,10 @@ export function useImportAcquirer() {
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
+      qc.invalidateQueries({ queryKey: ["settlement-batch"] });
     },
   });
 }

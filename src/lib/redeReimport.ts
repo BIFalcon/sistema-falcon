@@ -60,7 +60,8 @@ export function splitRedeReimport(
   }
 
   for (const [k, { total, row }] of fileTotals) {
-    const g = groups.get(k)!;
+    const g = groups.get(k);
+    if (!g) continue;
     const delta = Math.round((total - g.sum) * 100) / 100;
     if (Math.abs(delta) < 0.005) { unchanged.push(row); continue; }
     deltaRows.push({
