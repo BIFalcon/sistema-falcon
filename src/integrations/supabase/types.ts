@@ -4773,6 +4773,14 @@ export type Database = {
         Args: { p_credit_date: string; p_description: string }
         Returns: string
       }
+      conc_boleto_verified_invoices: {
+        Args: { p_ids: string[] }
+        Returns: {
+          ar_id: string
+          credit_date: string
+          hotel_id: string
+        }[]
+      }
       conc_category_key: { Args: { _value: string }; Returns: string }
       conc_daily_closing: {
         Args: {
