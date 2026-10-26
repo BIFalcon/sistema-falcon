@@ -4732,6 +4732,28 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_closing_interactions: {
+        Args: { p_month: number; p_year: number }
+        Returns: {
+          gg_antes_previa: boolean
+          gg_depois_gop: boolean
+          h_desde_ultimo: number
+          h_gg_gop: number
+          h_gop_fer: number
+          h_prev_gg: number
+          h_total: number
+          hotel: string
+          hotel_id: string
+          is_historical: boolean
+          t_fer: string
+          t_gg: string
+          t_gop: string
+          t_prev: string
+          tipo_fer: string
+          tipo_gop: string
+          ultimo_marco: string
+        }[]
+      }
       get_dre_history: { Args: { _hotel_id: string }; Returns: Json }
       get_financeiro_subrole: { Args: { _user_id: string }; Returns: string }
       get_hotel_financial: {
@@ -4903,6 +4925,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      horas_uteis_24: { Args: { a: string; b: string }; Returns: number }
       hotel_slug: { Args: { _name: string }; Returns: string }
       import_rh_monthly: {
         Args: {
