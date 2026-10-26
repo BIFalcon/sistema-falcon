@@ -1,0 +1,1 @@
+DO $$ DECLARE def text; BEGIN SELECT pg_get_functiondef('public.conc_boleto_candidates(text)'::regprocedure) INTO def; def:=replace(def,'ON b.hotel_id=p_hotel AND b.amount>0','ON b.hotel_id=p_hotel AND b.amount>0 AND b.matched_at IS NULL'); IF def NOT LIKE '%b.matched_at IS NULL%' THEN RAISE EXCEPTION 'Unexpected candidate definition'; END IF; EXECUTE def; END $$;
