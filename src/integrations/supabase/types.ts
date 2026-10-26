@@ -2237,6 +2237,41 @@ export type Database = {
           },
         ]
       }
+      conc_settlement_rechecks: {
+        Row: {
+          bank_id: string
+          created_at: string
+          hotel_id: string
+          id: string
+          previous_state: Json
+          reason: string
+        }
+        Insert: {
+          bank_id: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          previous_state: Json
+          reason: string
+        }
+        Update: {
+          bank_id?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          previous_state?: Json
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_settlement_rechecks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_settlement_transitions: {
         Row: {
           amount: number
@@ -4768,6 +4803,10 @@ export type Database = {
           tag: string
           title: string
         }[]
+      }
+      conc_recheck_settlements: {
+        Args: { p_hotel: string }
+        Returns: undefined
       }
       conc_reconcile_manual: {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }

@@ -484,6 +484,13 @@
       "when": 1793026093065,
       "tag": "0068_settlement_complete_opera",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793026201249,
+      "tag": "0069_settlement_gate_lifecycle",
+      "breakpoints": true
     }
   ]
 }
