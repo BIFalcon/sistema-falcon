@@ -2237,6 +2237,41 @@ export type Database = {
           },
         ]
       }
+      conc_settlement_rechecks: {
+        Row: {
+          bank_id: string
+          created_at: string
+          hotel_id: string
+          id: string
+          previous_state: Json
+          reason: string
+        }
+        Insert: {
+          bank_id: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          previous_state: Json
+          reason: string
+        }
+        Update: {
+          bank_id?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          previous_state?: Json
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_settlement_rechecks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_settlement_transitions: {
         Row: {
           amount: number
@@ -4679,6 +4714,34 @@ export type Database = {
         Args: { p_deposit: string }
         Returns: undefined
       }
+      conc_bank_batches: {
+        Args: { p_bank: string }
+        Returns: {
+          entry_id: string
+          source: string
+        }[]
+      }
+      conc_batch_ready: {
+        Args: { p_id: string; p_source: string }
+        Returns: boolean
+      }
+      conc_batch_rows: {
+        Args: { p_id: string; p_source: string }
+        Returns: {
+          acquirer_id: string
+          gross: number
+          net: number
+          nsu: string
+          opera: Json
+          payment_id: string
+          sale_date: string
+          status: string
+        }[]
+      }
+      conc_batch_summary: {
+        Args: { p_id: string; p_source: string }
+        Returns: Json
+      }
       conc_category_key: { Args: { _value: string }; Returns: string }
       conc_daily_closing: {
         Args: {
@@ -4741,6 +4804,10 @@ export type Database = {
           title: string
         }[]
       }
+      conc_recheck_settlements: {
+        Args: { p_hotel: string }
+        Returns: undefined
+      }
       conc_reconcile_manual: {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
         Returns: string
@@ -4758,6 +4825,10 @@ export type Database = {
       conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
       conc_send_divergences_selected: {
         Args: { p_hotel: string; p_keys?: string[] }
+        Returns: Json
+      }
+      conc_settlement_batch_details: {
+        Args: { p_hotel: string; p_id: string; p_source: string }
         Returns: Json
       }
       conc_settlement_items: {

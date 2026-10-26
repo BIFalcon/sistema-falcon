@@ -304,6 +304,9 @@ export function useAutoReconcile() {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
       qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
+      qc.invalidateQueries({ queryKey: ["settlement-batch"] });
+      qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
     },
   });
 }
@@ -786,6 +789,10 @@ export function useUndoReconcile() {
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
+      qc.invalidateQueries({ queryKey: ["settlement-batch"] });
+      qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
+      qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
     },
   });
 }
