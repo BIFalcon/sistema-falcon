@@ -470,6 +470,13 @@
       "when": 1793024043141,
       "tag": "0066_settlement_cutoff_transition_and_rede_at",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793024899676,
+      "tag": "0067_daily_bank_balance_account_resolution",
+      "breakpoints": true
     }
   ]
 }
