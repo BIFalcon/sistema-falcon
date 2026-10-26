@@ -428,8 +428,8 @@ export function useImportOpera() {
  *  em vendas que já estavam no sistema, sem mexer no resto. */
 async function fillAcquirerExtra(rows: import("@/lib/conciliacaoParsers").AcquirerRow[]) {
   const withData = rows.filter((r) => r.valor_liquido != null || r.valor_original != null || r.nsu || r.prazo_recebimento || r.codigo_reserva);
-  for (let i = 0; i < withData.length; i += 500) {
-    const chunk = withData.slice(i, i + 500).map((r) => ({
+  for (let i = 0; i < withData.length; i += 50) {
+    const chunk = withData.slice(i, i + 50).map((r) => ({
       entry_key: r.entry_key, valor_liquido: r.valor_liquido ?? null, valor_original: r.valor_original ?? null,
       nsu: r.nsu ?? null, prazo_recebimento: r.prazo_recebimento ?? null, codigo_reserva: r.codigo_reserva ?? null,
     }));
