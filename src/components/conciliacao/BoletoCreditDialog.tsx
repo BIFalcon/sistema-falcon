@@ -16,9 +16,10 @@ export function BoletoCreditDialog({ hotelId, target, onClose }: { hotelId: stri
     queryKey: ["boleto-credit", hotelId, target?.day, target?.amount],
     enabled: !!target,
     queryFn: async () => {
+      if (!target) throw new Error("Selecione um crédito bancário");
       const { data, error } = await supabase.from("conc_francesinha_entries")
-        .select("id, data_movimento, pagador, nosso_numero, seu_numero, vencimento, valor_final, descricao_operacao, matched_ar_id")
-        .eq("hotel_id", hotelId).eq("acao", "liquidacao").gte("data_movimento", shift(target!.day, -5)).lte("data_movimento", target!.day)
+        .select("id, data_movimento, pagador, nosso_numero, seu_numero, vencimento, valor_final, descricao_operacao, matched_ar_id, matched_bank_id")
+        .eq("hotel_id", hotelId).eq("acao", "liquidacao").gte("data_movimento", shift(target.day, -5)).lte("data_movimento", target.day)
         .order("data_movimento", { ascending: false }).limit(300);
       if (error) throw error;
       const ids = [...new Set((data ?? []).map(r => r.matched_ar_id).filter(Boolean) as string[])];

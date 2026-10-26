@@ -16,7 +16,7 @@ export function useFrancesinhaEntries(hotelId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase.from("conc_francesinha_entries")
         .select("id, data_movimento, pagador, nosso_numero, seu_numero, vencimento, valor_inicial, descricao_operacao, operacoes_valor, valor_final, acao, result, matched_ar_id")
-        .eq("hotel_id", hotelId!).order("data_movimento", { ascending: false }).order("id").limit(5000);
+         .eq("hotel_id", hotelId ?? "").order("data_movimento", { ascending: false }).order("id").limit(5000);
       if (error) throw error;
       return (data ?? []) as FrancesinhaEntry[];
     },
@@ -28,11 +28,12 @@ export function useImportFrancesinha() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
+      if (!user) throw new Error("Entre novamente no sistema");
       const rows = await parseFrancesinhaExcel(file, hotelId);
       if (!rows.length) throw new Error("Nenhuma movimentação detalhada encontrada na francesinha.");
       const { data: up, error: upErr } = await supabase.from("conc_uploads").insert({
         hotel_id: hotelId, kind: "francesinha", file_name: file.name, file_size: file.size,
-        parsed_count: rows.length, skipped_count: 0, uploaded_by: user!.id, metadata: { source: "francesinha", hotel_ids: [hotelId] },
+        parsed_count: rows.length, skipped_count: 0, uploaded_by: user.id, metadata: { source: "francesinha", hotel_ids: [hotelId] },
       }).select("id").single();
       if (upErr) throw upErr;
       const { data, error } = await supabase.from("conc_francesinha_entries")
@@ -46,6 +47,7 @@ export function useImportFrancesinha() {
       qc.invalidateQueries({ queryKey: ["conc-francesinha"] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
       qc.invalidateQueries({ queryKey: ["ar-billing-due"] });
+      for (const key of ["conc-bank", "conc-bank-all", "conc-daily-closing", "boleto-credit", "boleto-verified-invoices", "ar-to-invoice", "ar-ti-rows", "ar-ti-totals", "ar-ti-status-counts", "conc-matches"]) qc.invalidateQueries({ queryKey: [key] });
     },
   });
 }
