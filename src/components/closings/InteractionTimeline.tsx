@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { INTERVALS, calendarDays, formatDuration, formatInteractionDate, intervalReason, intervalValue, quartile, type ClosingInteraction, type IntervalKey, type TimeUnit } from '@/lib/closingInteractions';
+import { INTERVALS, calendarDays, formatDuration, formatInteractionDate, intervalReason, intervalValue, milestonePosition, quartile, type ClosingInteraction, type IntervalKey, type TimeUnit } from '@/lib/closingInteractions';
 
 export function Hint({ text, children }: {text:string;children:ReactNode}) {
   return <Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-flex min-w-0">{children}</span></TooltipTrigger><TooltipContent className="max-w-xs">{text}</TooltipContent></Tooltip>;
@@ -22,11 +22,7 @@ export function HotelHeading({row}:{row:ClosingInteraction}) {
 }
 export default function InteractionTimeline({row,rows,unit,scale,ongoing}:{row:ClosingInteraction;rows:ClosingInteraction[];unit:TimeUnit;scale:number;ongoing:boolean}) {
   const other=unit==='business'?'calendar':'business';
-  const elapsed=(date:string|null) => {
-    if (!date||!row.t_prev) return 0;
-    // Use the same shared month scale; calendar positions preserve the chronological order even for anomalies.
-    return Math.max(0, (Date.parse(date)-Date.parse(row.t_prev))/3600000);
-  };
+  const elapsed=(date:string|null) => milestonePosition(row.t_prev,date,unit);
   const pos=(date:string|null)=>Math.min(100,elapsed(date)/Math.max(scale,1)*96);
   const registered=milestones.map((m,i)=>({m,i,date:row[m.key]})).filter(e=>e.date);
   const last=registered.reduce((a,e)=>Math.max(a,pos(e.date)),0);
@@ -35,7 +31,7 @@ export default function InteractionTimeline({row,rows,unit,scale,ongoing}:{row:C
   return <article className="rounded-md border bg-card p-4 sm:p-5" data-hotel={row.hotel}>
     <div className="flex items-start justify-between gap-3"><HotelHeading row={row}/><div className="shrink-0 text-right"><div className="text-xs text-muted-foreground">Total</div><div className="text-lg font-bold"><Duration row={row} interval="h_total" unit={unit}/></div><div className="text-xs text-muted-foreground">{formatDuration(intervalValue(row,'h_total',other),other)}</div></div></div>
     <div className="interaction-ruler" aria-label={`Primeiras interações de ${row.hotel}`}>
-      {registered.slice(1).map((e,j)=>{const prev=registered[j];if(!prev)return null;const left=pos(prev.date),right=pos(e.date);const interval=INTERVALS[e.i-1];const values=interval?rows.filter(r=>r.t_prev).map(r=>intervalValue(r,interval.key,'business')).filter((v):v is number=>v!=null):[];const q=interval?quartile(intervalValue(row,interval.key,'business'),values):0;return <span key={e.m.key} className={`interaction-segment interaction-segment-${q}`} style={{left:`${Math.min(left,right)}%`,width:`${Math.abs(right-left)}%`} as CSSProperties}/>;})}
+      {registered.slice(1).map((e,j)=>{const prev=registered[j];if(!prev)return null;const left=pos(prev.date),right=pos(e.date);const interval=prev.i===e.i-1?INTERVALS[e.i-1]:undefined;const values=interval?rows.filter(r=>r.t_prev).map(r=>intervalValue(r,interval.key,unit)).filter((v):v is number=>v!=null):[];const q=interval?quartile(intervalValue(row,interval.key,unit),values):0;return <span key={e.m.key} className={`interaction-segment interaction-segment-${q}`} style={{left:`${Math.min(left,right)}%`,width:`${Math.abs(right-left)}%`} as CSSProperties}/>;})}
       {!row.t_fer&&<span className="absolute top-[23px] h-px border-t border-dashed border-warning" style={{left:`${last}%`,width:`${100-last}%`}}/>}
       {registered.map(e=><span key={e.m.key} title={`${e.m.label}: ${formatInteractionDate(e.date,true)}`} aria-label={`${e.m.label}: ${formatInteractionDate(e.date,true)}`} className={`interaction-marker ${e.i===0?'interaction-marker-preview':(e.i===2?row.tipo_gop:e.i===3?row.tipo_fer:null)==='Aprovação'?'interaction-marker-approval':''}`} style={{left:`${pos(e.date)}%`}}/>)}
       {!row.t_fer&&<span className="interaction-marker interaction-marker-missing" style={{left:'100%'}}/>}

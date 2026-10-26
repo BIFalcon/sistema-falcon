@@ -10,7 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useClosingInteractions, useClosingPeriods } from '@/hooks/useClosingInteractions';
-import { INTERVALS, formatDuration, formatInteractionDate, intervalValue, recentPeriods, summary, type ClosingInteraction, type IntervalKey, type TimeUnit } from '@/lib/closingInteractions';
+import { INTERVALS, formatDuration, formatInteractionDate, intervalValue, milestonePosition, recentPeriods, summary, type IntervalKey, type TimeUnit } from '@/lib/closingInteractions';
 import { MONTHS_PT } from '@/lib/constants';
 import InteractionTimeline, { Duration, Hint, HotelHeading, InteractionDates } from '@/components/closings/InteractionTimeline';
 import InteractionChart from '@/components/closings/InteractionChart';
@@ -33,7 +33,10 @@ export default function PerformanceSlaPage() {
   const error=available.error??queries.find(q=>q.error)?.error;
   const active=rows.filter(r=>r.t_prev);
   const noFlow=rows.filter(r=>!r.t_prev);
-  const ongoing=active.some(r=>!r.t_fer);
+  const now=new Date();
+  const currentYear=Number(new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric'}).format(now));
+  const currentMonth=Number(new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',month:'numeric'}).format(now));
+  const ongoing=selected?.year===currentYear&&selected.month===currentMonth&&active.some(r=>!r.t_fer);
   const visible=active.filter(r=>r.hotel.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))).sort((a,b)=>{
     const av=sort.startsWith('h_')?intervalValue(a,sort as IntervalKey,unit):a[sort];
     const bv=sort.startsWith('h_')?intervalValue(b,sort as IntervalKey,unit):b[sort];
@@ -42,7 +45,7 @@ export default function PerformanceSlaPage() {
     const result=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv));
     return (ascending?1:-1)*result||a.hotel.localeCompare(b.hotel);
   });
-  const scale=Math.max(1,...active.flatMap(r=>[r.t_gg,r.t_gop,r.t_fer].filter((d):d is string=>!!d).map(d=>(Date.parse(d)-Date.parse(r.t_prev??d))/3600000)));
+  const scale=Math.max(1,...active.flatMap(r=>[r.t_gg,r.t_gop,r.t_fer].filter((d):d is string=>!!d).map(d=>milestonePosition(r.t_prev,d,unit))));
   const gg=active.filter(r=>r.t_gg).length;
   const changeSort=(key:SortKey)=>{setAscending(sort===key?!ascending:key==='hotel');setSort(key);};
   const move=(delta:number)=>{if(!selected)return;const d=new Date(selected.year,selected.month-1+delta,1);setSelection({month:d.getMonth()+1,year:d.getFullYear()});};

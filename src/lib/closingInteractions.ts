@@ -19,6 +19,17 @@ export function calendarDays(start: string | null, end: string | null): number |
   const ms = Date.parse(end) - Date.parse(start);
   return Number.isFinite(ms) && ms > 0 ? ms / 86400000 : null;
 }
+/** Visualization only: mirrors the RPC's hourly ticks in São Paulo; never used for summary metrics. */
+export function milestonePosition(start: string | null, end: string | null, unit: TimeUnit): number {
+  if (!start || !end) return 0;
+  const a=Date.parse(start), b=Date.parse(end);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b<=a) return 0;
+  if (unit==='calendar') return (b-a)/86400000;
+  const weekday=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',weekday:'short'});
+  let hours=0;
+  for(let t=a;t<=b-1;t+=3600000) {const day=weekday.format(t);if(day!=='Sat'&&day!=='Sun')hours++;}
+  return hours;
+}
 export function intervalValue(row: ClosingInteraction, key: IntervalKey, unit: TimeUnit): number | null {
   const interval = INTERVALS.find(i => i.key === key);
   if (!interval) return null;
