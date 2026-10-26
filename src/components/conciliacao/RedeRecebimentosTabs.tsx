@@ -12,6 +12,8 @@ import { buildTarifas, isAntecipacao, REDE_BANK_PREFIX } from "@/lib/redeRecebim
 import { SettlementCutoffPanel } from "@/components/conciliacao/SettlementCutoffPanel";
 import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
 import { excludedSettlementIds } from "@/lib/settlementCutoff";
+import { SettlementBatchDialog } from "@/components/conciliacao/SettlementBatchDialog";
+import type { BatchTarget } from "@/hooks/useSettlementBatch";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-"); return `${m}/${y}`; };
@@ -36,6 +38,7 @@ export function RedeReceiptsImporter({ hotelId }: { hotelId: string }) {
 }
 
 export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
+  const [batchTarget, setBatchTarget] = useState<BatchTarget | null>(null);
   const { data, isLoading } = useRedeRecebimentosData(hotelId);
   const auto = useRedeAutoMatch();
   const unmatch = useRedeUnmatch();
@@ -49,6 +52,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-4">
+      <SettlementBatchDialog hotelId={hotelId} target={batchTarget} onClose={() => setBatchTarget(null)} />
       <SettlementCutoffPanel key={hotelId} hotelId={hotelId} provider="rede" />
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
         <Button size="sm" variant="outline" disabled={auto.isPending} onClick={() => auto.mutate(hotelId, {
@@ -68,7 +72,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
             <CardContent className="p-0 max-h-[420px] overflow-y-auto">
               <Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Bandeira</TableHead><TableHead>Modalidade</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
                 <TableBody>{pend.map((r) => (
-                  <TableRow key={r.id}><TableCell className="text-xs">{day(r.data)}</TableCell><TableCell className="text-xs">{r.bandeira}</TableCell><TableCell className="text-xs">{r.modalidade}</TableCell><TableCell className="text-right text-xs"><Money value={Number(r.valor_depositado)} /></TableCell></TableRow>
+                  <TableRow key={r.id}><TableCell className="text-xs">{day(r.data)}</TableCell><TableCell className="text-xs"><Button variant="link" className="h-auto p-0 text-xs" onClick={() => setBatchTarget({ source: "rede", id: r.id, label: `${day(r.data)} · ${r.bandeira} ${r.modalidade}` })}>{r.bandeira}</Button></TableCell><TableCell className="text-xs">{r.modalidade}</TableCell><TableCell className="text-right text-xs"><Money value={Number(r.valor_depositado)} /></TableCell></TableRow>
                 ))}</TableBody></Table>
             </CardContent>
           </Card>
@@ -77,7 +81,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
             <CardContent className="p-0 max-h-[420px] overflow-y-auto">
               <Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Descrição</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
                 <TableBody>{bankPend.map((b) => (
-                  <TableRow key={b.id}><TableCell className="text-xs">{day(b.line_date)}</TableCell><TableCell className="text-xs">{b.description}</TableCell><TableCell className="text-right text-xs"><Money value={b.amount} /></TableCell></TableRow>
+                  <TableRow key={b.id}><TableCell className="text-xs">{day(b.line_date)}</TableCell><TableCell className="text-xs"><Button variant="link" className="h-auto p-0 text-xs text-left whitespace-normal" onClick={() => setBatchTarget({ source: "bank", id: b.id, label: b.description ?? "Crédito bancário" })}>{b.description}</Button></TableCell><TableCell className="text-right text-xs"><Money value={b.amount} /></TableCell></TableRow>
                 ))}</TableBody></Table>
             </CardContent>
           </Card>
@@ -91,7 +95,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
                     <TableRow key={r.id}>
                       <TableCell className="text-xs">{day(r.data)}</TableCell>
                       <TableCell className="text-xs">{r.bandeira} · {r.modalidade}</TableCell>
-                      <TableCell className="text-xs">{b ? `${day(b.line_date)} · ${b.description}` : "—"}</TableCell>
+                      <TableCell className="text-xs"><Button variant="link" className="h-auto p-0 text-xs text-left whitespace-normal" onClick={() => setBatchTarget({ source: "rede", id: r.id, label: b?.description ?? `${r.bandeira} · ${r.modalidade}` })}>{b ? `${day(b.line_date)} · ${b.description}` : "Ver lote"}</Button></TableCell>
                       <TableCell className="text-right text-xs"><Money value={Number(r.valor_depositado)} /></TableCell>
                       <TableCell><Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={unmatch.isPending} onClick={() => unmatch.mutate(r.id)}><Undo2 className="h-3 w-3 mr-1" />Desfazer</Button></TableCell>
                     </TableRow>

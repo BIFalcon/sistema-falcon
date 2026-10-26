@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, Undo2, Upload } from "lucide-react";
@@ -12,10 +12,13 @@ import { B2B_BANK_PREFIX } from "@/lib/b2bBaixa";
 import { SettlementCutoffPanel } from "@/components/conciliacao/SettlementCutoffPanel";
 import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
 import { excludedSettlementIds, isSaleInScope } from "@/lib/settlementCutoff";
+import { SettlementBatchDialog } from "@/components/conciliacao/SettlementBatchDialog";
+import type { BatchTarget } from "@/hooks/useSettlementBatch";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 
 export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
+  const [batchTarget, setBatchTarget] = useState<BatchTarget | null>(null);
   const { data, isLoading } = useB2BBaixaData(hotelId);
   const auto = useB2BAutoMatch();
   const unmatch = useB2BUnmatchDeposit();
@@ -58,6 +61,7 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-4">
+      <SettlementBatchDialog hotelId={hotelId} target={batchTarget} onClose={() => setBatchTarget(null)} />
       <SettlementCutoffPanel key={hotelId} hotelId={hotelId} provider="b2b" />
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
         <Button variant="outline" size="sm" disabled={auto.isPending}
@@ -96,7 +100,7 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
                 return (
                   <TableRow key={d.id} className="text-xs">
                     <TableCell>{day(d.data_operacao)}</TableCell>
-                    <TableCell>{d.descricao ?? "—"}</TableCell>
+                    <TableCell><Button variant="link" className="p-0 h-auto text-xs text-left whitespace-normal" onClick={() => setBatchTarget({ source: "b2b", id: d.id, label: d.descricao ?? "Lote B2B" })}>{d.descricao ?? "Ver lote"}</Button></TableCell>
                     <TableCell className="text-right tabular-nums">{chargesByDeposit.get(d.id) ?? 0}</TableCell>
                     <TableCell className="text-right"><Money value={Number(d.valor_recebivel_liquido ?? 0)} /></TableCell>
                     <TableCell>
