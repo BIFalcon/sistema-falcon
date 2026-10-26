@@ -1,4 +1,4 @@
-- [ ] Corrigir percepção de Resolver nos alertas: total real, data de cada alerta e confirmação de salvamento; testar persistência e erros.
+- [x] Corrigir percepção de Resolver nos alertas: total real, data de cada alerta e confirmação de salvamento; cinco testes de persistência/erros passaram e aplicação sem erros; 51 pendentes/28 resolvidos confirmados, sem reenvio ou remoção de bloqueios de e-mail.
 - [ ] Conferir Resolver pela tela autenticada — bloqueado: preview sem sessão; conta Babi não disponível para acesso automático.
 - [x] Vincular créditos de boletos à soma diária da Francesinha e marcar faturamentos validados como pagos na data bancária; 9 créditos/34 boletos de Serra Talhada baixados, inclusive R$253,26; 15 testes e teste integrado de lote incompleto/data bancária passaram.
 - [ ] Conferir baixa e avisos dos boletos pela tela autenticada — bloqueado: não existe conta correspondente ao solicitante; requer login no preview.
