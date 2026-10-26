@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
-import { buildTarifas, isAntecipacao, parseRedeRecebimentosSheets } from "@/lib/redeRecebimentos";
+import { buildTarifas, isAntecipacao, matchesRedeModality, parseRedeRecebimentosSheets } from "@/lib/redeRecebimentos";
 import { parseB2BReceivablesGrid } from "@/lib/conciliacaoParsers";
 
 const grids = (p: string) => {
@@ -10,6 +10,11 @@ const grids = (p: string) => {
 };
 
 describe("relatório de recebimentos Rede (arquivo real, set/2026)", () => {
+  it("crédito admite antecipação AT, débito não", () => {
+    expect(matchesRedeModality("RECEBIMENTO REDE MAST AT0087158159", "Crédito")).toBe(true);
+    expect(matchesRedeModality("RECEBIMENTO REDE MAST CD0087158159", "Crédito")).toBe(true);
+    expect(matchesRedeModality("RECEBIMENTO REDE MAST AT0087158159", "Débito")).toBe(false);
+  });
   const p = parseRedeRecebimentosSheets(grids("src/test/fixtures/rede_recebimentos_sample.xlsx"), "h1");
   it("lê as quatro abas prioritárias", () => {
     expect(p.pagamentos).toHaveLength(886);
