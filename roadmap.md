@@ -1,4 +1,5 @@
-- [ ] Vincular créditos de boletos à soma diária da Francesinha, corrigir correspondência no extrato e marcar faturamentos validados como pagos na data bancária; validar regras e fluxo disponível.
+- [x] Vincular créditos de boletos à soma diária da Francesinha e marcar faturamentos validados como pagos na data bancária; 9 créditos/34 boletos de Serra Talhada baixados, inclusive R$253,26; 15 testes e teste integrado de lote incompleto/data bancária passaram.
+- [ ] Conferir baixa e avisos dos boletos pela tela autenticada — bloqueado: não existe conta correspondente ao solicitante; requer login no preview.
 - [x] Travar baixa Rede/B2B até composição integral e 100% das vendas conciliadas no Ópera; detalhes clicáveis nas baixas e pendências, reabertura ao desfazer vendas e transição preservada. 57 baixas antigas reabertas com histórico; conta transitória conferida; lote real R$2.480,70 com 17/17 vendas verificado; 22 testes passaram.
 - [ ] Conferir detalhes dos lotes e baixa automática pela tela com sessão real — bloqueado: solicitante sem conta correspondente; preview retorna ao login.
 - [x] Compatibilizar saldos sem nome de conta com a conta única do hotel e usar o último saldo real anterior, preservando contas distintas, saldos manuais e autorizações; Serra Talhada 19–22/10 sem lacunas e quatro cenários de banco passaram.
