@@ -1,5 +1,6 @@
-- [ ] Executar passagem completa de conciliação N:1 após importações B2B/Opera e testar.
-- [ ] Corrigir PIX com categoria expirada nas próximas importações e nos lançamentos existentes; testar preservação dos valores e conciliações.
+- [x] Executar passagens completas da RPC de conciliação até zero mudanças após importações B2B/Opera; falhas agora avisam sem invalidar upload salvo. Testes de repetição e falha passaram.
+- [x] Impedir importação de cobranças PIX expiradas mesmo canceladas pela Rede; manter PIX pagos e ajustes de cartão. Removidos 23 expirados pendentes de cinco hotéis, arquivados em seus uploads; um já conciliado preservado. 22 testes passaram, aplicação sem erros.
+- [ ] Conferir novos uploads B2B/Opera e PIX pela tela com sessão real autorizada — bloqueado: não há conta correspondente ao solicitante; conferência autenticada indisponível nesta sessão.
 - [x] Corrigir identidade da importação Opera por hotel/TRX_NO; importação inteira serializada, reaproveitamento de antigos compatíveis e rejeição atômica de ambiguidades; 19 testes passaram, aplicação sem erros.
 - [x] Mesclar 21 duplicidades confirmadas (13 Divinópolis, 8 Caruaru), preservando 14 conciliações e marcações B2B; cópias arquivadas no registro mantido. Redução indevida removida: R$10.425,44. Divinópolis 03/09 9142: 5 linhas/R$2.029,86; 04/09 9152: 1 linha/R$242,07. Histórico de todos os hotéis sem pares antigos/novos sobrepostos; 13 grupos semelhantes no mesmo arquivo mantidos por não serem duplicações de reimportação confirmadas.
 - [ ] Validar reimportação Opera pela tela com sessão real autorizada — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview.
