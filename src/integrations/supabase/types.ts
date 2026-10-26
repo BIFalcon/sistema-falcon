@@ -1563,6 +1563,7 @@ export type Database = {
           hotel_id: string
           id: string
           matched_ar_id: string | null
+          matched_bank_id: string | null
           nosso_numero: string | null
           operacoes_valor: string | null
           pagador: string | null
@@ -1586,6 +1587,7 @@ export type Database = {
           hotel_id: string
           id?: string
           matched_ar_id?: string | null
+          matched_bank_id?: string | null
           nosso_numero?: string | null
           operacoes_valor?: string | null
           pagador?: string | null
@@ -1609,6 +1611,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           matched_ar_id?: string | null
+          matched_bank_id?: string | null
           nosso_numero?: string | null
           operacoes_valor?: string | null
           pagador?: string | null
@@ -1634,6 +1637,13 @@ export type Database = {
             columns: ["matched_ar_id"]
             isOneToOne: false
             referencedRelation: "ar_to_invoice_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_francesinha_entries_matched_bank_id_fkey"
+            columns: ["matched_bank_id"]
+            isOneToOne: false
+            referencedRelation: "conc_bank_entries"
             referencedColumns: ["id"]
           },
           {
@@ -4741,6 +4751,35 @@ export type Database = {
       conc_batch_summary: {
         Args: { p_id: string; p_source: string }
         Returns: Json
+      }
+      conc_boleto_auto_match: { Args: { p_hotel: string }; Returns: number }
+      conc_boleto_auto_match_impl: {
+        Args: { p_hotel: string }
+        Returns: number
+      }
+      conc_boleto_candidates: {
+        Args: { p_hotel: string }
+        Returns: {
+          ar_ids: string[]
+          bank_id: string
+          credit_date: string
+          entry_ids: string[]
+          movement_date: string
+          ready: boolean
+          total: number
+        }[]
+      }
+      conc_boleto_movement_date: {
+        Args: { p_credit_date: string; p_description: string }
+        Returns: string
+      }
+      conc_boleto_verified_invoices: {
+        Args: { p_ids: string[] }
+        Returns: {
+          ar_id: string
+          credit_date: string
+          hotel_id: string
+        }[]
       }
       conc_category_key: { Args: { _value: string }; Returns: string }
       conc_daily_closing: {

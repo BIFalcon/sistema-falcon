@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { reconcileUntilStable } from "@/lib/autoReconcile";
+import { missingBankPayments } from "@/lib/paidBankVerification";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
 import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
@@ -307,6 +308,7 @@ export function useAutoReconcile() {
       qc.invalidateQueries({ queryKey: ["settlement-batch"] });
       qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
       qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
+      for (const key of ["conc-bank-all", "conc-francesinha", "boleto-credit", "boleto-verified-invoices", "ar-to-invoice", "ar-ti-rows", "ar-ti-totals", "ar-ti-status-counts", "ar-billing-due"]) qc.invalidateQueries({ queryKey: [key] });
     },
   });
 }
@@ -678,6 +680,7 @@ export function useImportBankStatement() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-bank-all"] });
+      for (const key of ["conc-daily-closing", "conc-francesinha", "boleto-credit", "boleto-verified-invoices", "ar-to-invoice", "ar-ti-rows", "ar-ti-totals", "ar-ti-status-counts", "ar-billing-due"]) qc.invalidateQueries({ queryKey: [key] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
@@ -866,35 +869,22 @@ export interface PaidVerificationInput {
  */
 export function usePaidBankVerification(entries: PaidVerificationInput[], enabled: boolean) {
   const bank = useAllBankEntries(enabled);
-
-  const missing = new Set<string>();
-  if (enabled && bank.data) {
-    const byHotel = new Map<string, { dates: Set<string>; min: string; max: string; amounts: Map<string, number> }>();
-    for (const b of bank.data) {
-      if (!b.hotel_id || !b.line_date) continue;
-      let h = byHotel.get(b.hotel_id);
-      if (!h) {
-        h = { dates: new Set(), min: b.line_date, max: b.line_date, amounts: new Map() };
-        byHotel.set(b.hotel_id, h);
+  const ids = entries.filter(e => e.paid_date).map(e => e.id).sort();
+  const verified = useQuery({
+    queryKey: ["boleto-verified-invoices", ids], enabled: enabled && ids.length > 0,
+    queryFn: async () => {
+      const rows: { ar_id: string; hotel_id: string; credit_date: string }[] = [];
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data, error } = await supabase.rpc("conc_boleto_verified_invoices", { p_ids: ids.slice(i, i + 200) });
+        if (error) throw error;
+        rows.push(...(data ?? []));
       }
-      h.dates.add(b.line_date);
-      if (b.line_date < h.min) h.min = b.line_date;
-      if (b.line_date > h.max) h.max = b.line_date;
-      const key = `${b.line_date}|${Number(b.amount).toFixed(2)}`;
-      h.amounts.set(key, (h.amounts.get(key) ?? 0) + 1);
-    }
-
-    for (const e of entries) {
-      if (!e.hotel_id || !e.paid_date || e.amount == null) continue;
-      const h = byHotel.get(e.hotel_id);
-      if (!h) continue; // sem extrato importado para esse hotel
-      if (e.paid_date < h.min || e.paid_date > h.max) continue; // fora do período coberto
-      const key = `${e.paid_date}|${Math.abs(Number(e.amount)).toFixed(2)}`;
-      if (!h.amounts.has(key)) missing.add(e.id);
-    }
-  }
-
-  return { missing, isLoading: bank.isLoading, enabled };
+      return rows;
+    },
+  });
+  const waiting = ids.length > 0 && (verified.isLoading || verified.isError);
+  const missing = enabled && bank.data && !waiting ? missingBankPayments(entries, bank.data, verified.data ?? []) : new Set<string>();
+  return { missing, isLoading: bank.isLoading || verified.isLoading, enabled };
 }
 
 /* ------------------------------------------------------------------ */

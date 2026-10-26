@@ -505,6 +505,34 @@
       "when": 1793027686074,
       "tag": "0071_batch_summary_twins_anticipation",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793032563349,
+      "tag": "0072_boleto_bank_settlement",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793032584721,
+      "tag": "0073_boleto_payment_after_bank_validation",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793032605281,
+      "tag": "0074_boleto_verified_invoice_lookup",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793032731244,
+      "tag": "0075_boleto_unmatched_bank_guard",
+      "breakpoints": true
     }
   ]
 }

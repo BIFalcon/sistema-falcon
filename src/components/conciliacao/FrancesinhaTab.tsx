@@ -11,6 +11,7 @@ import { useBillingDue, useFrancesinhaEntries, useImportFrancesinha } from "@/ho
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 const RESULT: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   baixa_dada: { label: "Pago — baixa dada", variant: "default" },
+  aguardando_credito_bancario: { label: "Liquidado — aguardando crédito validado", variant: "outline" },
   liquidado_sem_faturamento: { label: "Liquidado — faturamento não encontrado", variant: "outline" },
   pendencia: { label: "Pendência — boleto novo", variant: "destructive" },
   baixa_apos_liquidacao: { label: "Baixa após liquidação", variant: "secondary" },
