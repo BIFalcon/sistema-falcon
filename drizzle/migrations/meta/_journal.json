@@ -477,6 +477,13 @@
       "when": 1793024899676,
       "tag": "0067_daily_bank_balance_account_resolution",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1793026093065,
+      "tag": "0068_settlement_complete_opera",
+      "breakpoints": true
     }
   ]
 }

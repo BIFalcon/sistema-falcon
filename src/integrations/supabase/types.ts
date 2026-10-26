@@ -4679,6 +4679,34 @@ export type Database = {
         Args: { p_deposit: string }
         Returns: undefined
       }
+      conc_bank_batches: {
+        Args: { p_bank: string }
+        Returns: {
+          entry_id: string
+          source: string
+        }[]
+      }
+      conc_batch_ready: {
+        Args: { p_id: string; p_source: string }
+        Returns: boolean
+      }
+      conc_batch_rows: {
+        Args: { p_id: string; p_source: string }
+        Returns: {
+          acquirer_id: string
+          gross: number
+          net: number
+          nsu: string
+          opera: Json
+          payment_id: string
+          sale_date: string
+          status: string
+        }[]
+      }
+      conc_batch_summary: {
+        Args: { p_id: string; p_source: string }
+        Returns: Json
+      }
       conc_category_key: { Args: { _value: string }; Returns: string }
       conc_daily_closing: {
         Args: {
@@ -4758,6 +4786,10 @@ export type Database = {
       conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
       conc_send_divergences_selected: {
         Args: { p_hotel: string; p_keys?: string[] }
+        Returns: Json
+      }
+      conc_settlement_batch_details: {
+        Args: { p_hotel: string; p_id: string; p_source: string }
         Returns: Json
       }
       conc_settlement_items: {
