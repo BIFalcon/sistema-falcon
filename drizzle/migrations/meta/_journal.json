@@ -505,6 +505,13 @@
       "when": 1793027686074,
       "tag": "0071_batch_summary_twins_anticipation",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793032563349,
+      "tag": "0072_boleto_bank_settlement",
+      "breakpoints": true
     }
   ]
 }
