@@ -498,6 +498,13 @@
       "when": 1793026276740,
       "tag": "0070_settlement_scope_and_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793027686074,
+      "tag": "0071_batch_summary_twins_anticipation",
+      "breakpoints": true
     }
   ]
 }
