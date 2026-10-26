@@ -1,4 +1,4 @@
-- [ ] Corrigir reimportação Rede sem NSU, completar NSUs de Manhuaçu pelo arquivo enviado sem alterar conciliações e verificar lote de R$233,79.
+- [x] Corrigir reimportação Rede sem NSU e otimizar preenchimento sob permissões existentes; arquivo real completou 1.271 NSUs de Manhuaçu sem novas vendas. Baixa autorizada confirmou 88 lotes, inclusive R$233,79 de 02/09, exibido em Baixados e com 1/1 vendas (100%) no detalhe. Permanecem 45 vendas sem NSU não completadas pelo arquivo; travas mantidas.
 - [x] Corrigir percepção de Resolver nos alertas: total real, data de cada alerta e confirmação de salvamento; cinco testes de persistência/erros passaram e aplicação sem erros; 51 pendentes/28 resolvidos confirmados, sem reenvio ou remoção de bloqueios de e-mail.
 - [ ] Conferir Resolver pela tela autenticada — bloqueado: preview sem sessão; conta Babi não disponível para acesso automático.
 - [x] Vincular créditos de boletos à soma diária da Francesinha e marcar faturamentos validados como pagos na data bancária; 9 créditos/34 boletos de Serra Talhada baixados, inclusive R$253,26; 15 testes e teste integrado de lote incompleto/data bancária passaram.

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { reconcileUntilStable } from "@/lib/autoReconcile";
 import { missingBankPayments } from "@/lib/paidBankVerification";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
+import { REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
 import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
   parseAcquirerExcel,
@@ -428,8 +429,8 @@ export function useImportOpera() {
  *  em vendas que já estavam no sistema, sem mexer no resto. */
 async function fillAcquirerExtra(rows: import("@/lib/conciliacaoParsers").AcquirerRow[]) {
   const withData = rows.filter((r) => r.valor_liquido != null || r.valor_original != null || r.nsu || r.prazo_recebimento || r.codigo_reserva);
-  for (let i = 0; i < withData.length; i += 500) {
-    const chunk = withData.slice(i, i + 500).map((r) => ({
+  for (let i = 0; i < withData.length; i += 50) {
+    const chunk = withData.slice(i, i + 50).map((r) => ({
       entry_key: r.entry_key, valor_liquido: r.valor_liquido ?? null, valor_original: r.valor_original ?? null,
       nsu: r.nsu ?? null, prazo_recebimento: r.prazo_recebimento ?? null, codigo_reserva: r.codigo_reserva ?? null,
     }));
@@ -526,6 +527,13 @@ export function useImportAcquirer() {
       await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
+      const { error: settlementError } = await supabase.rpc("conc_rede_auto_match", {
+        p_hotel: hotelId, p_bank_prefix: REDE_BANK_PREFIX,
+        p_brand_map: REDE_BRAND_CODES, p_mod_map: REDE_MOD_CODES,
+      });
+      if (settlementError) {
+        toast.warning("Vendas importadas, mas a baixa Rede não foi concluída. Tente Baixar automaticamente na aba Rede.");
+      }
       return { inserted: rows.length, adjustments: deltaRows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
     },
     onSuccess: () => {
