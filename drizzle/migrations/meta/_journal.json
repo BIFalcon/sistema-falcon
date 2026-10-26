@@ -512,6 +512,13 @@
       "when": 1793032563349,
       "tag": "0072_boleto_bank_settlement",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793032584721,
+      "tag": "0073_boleto_payment_after_bank_validation",
+      "breakpoints": true
     }
   ]
 }
