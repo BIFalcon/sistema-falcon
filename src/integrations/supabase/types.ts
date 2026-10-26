@@ -2205,6 +2205,91 @@ export type Database = {
           },
         ]
       }
+      conc_settlement_cutoffs: {
+        Row: {
+          cutoff_date: string
+          hotel_id: string
+          provider: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cutoff_date: string
+          hotel_id: string
+          provider: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          cutoff_date?: string
+          hotel_id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_settlement_cutoffs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_settlement_transitions: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          cutoff_date: string
+          entry_id: string
+          hotel_id: string
+          id: string
+          note: string
+          provider: string
+          source: string
+          undone_at: string | null
+          undone_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          cutoff_date: string
+          entry_id: string
+          hotel_id: string
+          id?: string
+          note: string
+          provider: string
+          source: string
+          undone_at?: string | null
+          undone_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          cutoff_date?: string
+          entry_id?: string
+          hotel_id?: string
+          id?: string
+          note?: string
+          provider?: string
+          source?: string
+          undone_at?: string | null
+          undone_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_settlement_transitions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_uploads: {
         Row: {
           file_name: string
@@ -4674,6 +4759,32 @@ export type Database = {
       conc_send_divergences_selected: {
         Args: { p_hotel: string; p_keys?: string[] }
         Returns: Json
+      }
+      conc_settlement_items: {
+        Args: { p_hotel: string; p_provider: string }
+        Returns: {
+          amount: number
+          eligibility: string
+          entry_id: string
+          item_date: string
+          label: string
+          original_date: string
+          source: string
+          transition_id: string
+        }[]
+      }
+      conc_settlement_transition: {
+        Args: {
+          p_hotel: string
+          p_items: Json
+          p_note: string
+          p_provider: string
+        }
+        Returns: number
+      }
+      conc_settlement_transition_undo: {
+        Args: { p_id: string }
+        Returns: undefined
       }
       consolidado_has_line: {
         Args: { _closing_id: string; _patterns: string[]; _version: number }

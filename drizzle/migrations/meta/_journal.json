@@ -463,6 +463,13 @@
       "when": 1793022013775,
       "tag": "0065_opera_atomic_identity_import",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1793024043141,
+      "tag": "0066_settlement_cutoff_transition_and_rede_at",
+      "breakpoints": true
     }
   ]
 }
