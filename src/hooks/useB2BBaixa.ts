@@ -87,6 +87,8 @@ export function useB2BAutoMatch() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["settlement-cutoff"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
     },
   });
 }
@@ -101,6 +103,8 @@ export function useB2BUnmatchDeposit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["settlement-cutoff"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
     },
   });
 }
@@ -133,6 +137,8 @@ export function useImportB2BReceipts() {
       qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
       qc.invalidateQueries({ queryKey: ["conc-uploads"] });
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
+      qc.invalidateQueries({ queryKey: ["settlement-cutoff"] });
+      qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
     },
   });
 }

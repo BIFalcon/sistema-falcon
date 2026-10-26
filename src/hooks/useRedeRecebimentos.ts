@@ -59,6 +59,8 @@ const invalidate = (qc: ReturnType<typeof useQueryClient>) => {
   qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
   qc.invalidateQueries({ queryKey: ["conc-bank"] });
   qc.invalidateQueries({ queryKey: ["conc-uploads"] });
+  qc.invalidateQueries({ queryKey: ["settlement-cutoff"] });
+  qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });
 };
 
 export function useRedeAutoMatch() {
