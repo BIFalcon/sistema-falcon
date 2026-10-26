@@ -1,3 +1,5 @@
+- [ ] Corrigir identidade da importação Opera por TRX_NO e aproveitar registros antigos compatíveis sem duplicar.
+- [ ] Mesclar as 21 duplicidades confirmadas de Divinópolis/Caruaru preservando conciliações e conferir todo o histórico.
 - [x] Redesenhar Performance SLA para primeiras interações, RPC somente leitura, quatro tempos, comparação de três meses, tabela e Excel; 14 testes passaram, visual e exportação conferidos em amostra sem login. Dados reais: Itaperuna 26/337/100/462h; GOP registrado às 18:49 (documento dizia 18:39); médias julho 148h, agosto 262,75h, setembro 168,40h.
 - [ ] Conferir Performance SLA e RPC com sessão real autorizada — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview. Nenhuma permissão existente alterada; consulta de aceite reproduzida somente leitura nos dados originais.
 - [x] Permitir selecionar divergências antes do envio e informar quantidade/valor total no e-mail. Sessão autorizada de José selecionou 2 itens (R$36), enfileirou 5 e-mails; conteúdo e seleção exata conferidos, IDs inválidos rejeitados. Entrega na caixa de entrada não verificada.
