@@ -1,4 +1,5 @@
-- [ ] Travar baixa bancária de cartão até 100% das vendas conciliadas no Ópera e abrir detalhes do lote nas baixas/pendências; preservar transição explícita e validar regras e tela.
+- [x] Travar baixa Rede/B2B até composição integral e 100% das vendas conciliadas no Ópera; detalhes clicáveis nas baixas e pendências, reabertura ao desfazer vendas e transição preservada. 57 baixas antigas reabertas com histórico; conta transitória conferida; lote real R$2.480,70 com 17/17 vendas verificado; 22 testes passaram.
+- [ ] Conferir detalhes dos lotes e baixa automática pela tela com sessão real — bloqueado: solicitante sem conta correspondente; preview retorna ao login.
 - [x] Compatibilizar saldos sem nome de conta com a conta única do hotel e usar o último saldo real anterior, preservando contas distintas, saldos manuais e autorizações; Serra Talhada 19–22/10 sem lacunas e quatro cenários de banco passaram.
 - [ ] Conferir Fechamento diário pela tela com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
 - [x] Permitir inserir corte por hotel/provedor nas baixas Rede/B2B; classificação pela venda original, transição selecionada com justificativa/confirmação, histórico e desfazer. Nenhuma data inventada ou baixa real executada. Estruturas e controles de acesso conferidos; 19 testes passaram.
