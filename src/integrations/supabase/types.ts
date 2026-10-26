@@ -4631,6 +4631,10 @@ export type Database = {
       conc_fill_acquirer_extra: { Args: { _rows: Json }; Returns: number }
       conc_fill_opera_trx_no: { Args: { _rows: Json }; Returns: number }
       conc_francesinha_apply: { Args: { p_hotel: string }; Returns: Json }
+      conc_import_opera: {
+        Args: { _hotel_id: string; _rows: Json; _upload_id: string }
+        Returns: Json
+      }
       conc_is_pix_bank: { Args: { description: string }; Returns: boolean }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
