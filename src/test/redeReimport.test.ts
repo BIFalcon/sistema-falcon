@@ -10,6 +10,17 @@ const row = (over: Partial<AcquirerRow>): AcquirerRow => ({
 const original = { id: "orig", entry_key: "k-orig", nsu: "123", bandeira: "Visa", amount: 100, created_at: "2026-10-02" };
 
 describe("splitRedeReimport", () => {
+  it("reimportação reconhece venda existente sem NSU e preserva sua identidade para completar os dados", () => {
+    const saved = { ...original, nsu: null, amount: 237.93 };
+    const parsed = row({ entry_key: "k-orig", nsu: "181235762", bandeira: "Elo", modalidade: "Débito", amount: 237.93, sale_date: "2026-09-01" });
+    const result = splitRedeReimport([parsed], [saved]);
+    expect(result.newRows).toHaveLength(0);
+    expect(result.deltaRows).toHaveLength(0);
+    expect(result.unchanged).toEqual([parsed]);
+    expect(saved.nsu).toBeNull();
+    expect(saved.id).toBe("orig");
+  });
+
   it("valor reduzido gera linha de ajuste negativa com data do cancelamento e não duplica a original", () => {
     const r = splitRedeReimport([row({ amount: 60, data_cancelamento: "2026-10-05" })], [original]);
     expect(r.newRows).toHaveLength(0);
