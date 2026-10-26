@@ -9,6 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ReconcilePanel, Money, type BoxConfig, type ReconcileRow } from "@/components/conciliacao/ReconcilePanel";
 import { useB2BAutoMatch, useB2BBaixaData, useB2BUnmatchDeposit, useImportB2BReceipts } from "@/hooks/useB2BBaixa";
 import { B2B_BANK_PREFIX } from "@/lib/b2bBaixa";
+import { SettlementCutoffPanel } from "@/components/conciliacao/SettlementCutoffPanel";
+import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
+import { excludedSettlementIds, isSaleInScope } from "@/lib/settlementCutoff";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 
@@ -16,7 +19,9 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
   const { data, isLoading } = useB2BBaixaData(hotelId);
   const auto = useB2BAutoMatch();
   const unmatch = useB2BUnmatchDeposit();
-  const receipts = data?.receipts ?? [];
+  const cutoff = useSettlementCutoff(hotelId, "b2b");
+  const excluded = excludedSettlementIds(cutoff.data?.items ?? [], cutoff.data?.cutoff);
+  const receipts = (data?.receipts ?? []).filter((r) => !excluded.has(`b2b:${r.id}`));
   const charges = receipts.filter((r) => r.tipo_lancamento === "charge");
   const deposits = receipts.filter((r) => r.tipo_lancamento === "deposit");
   const linkedSaleIds = new Set(charges.map((c) => c.matched_acquirer_id).filter(Boolean) as string[]);
@@ -24,7 +29,7 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
   const boxes: BoxConfig[] = useMemo(() => [
     {
       key: "vendas", title: "B2B Vendas", subtitle: "Já conciliadas com o Opera, ainda sem recebimento", position: "left",
-      rows: (data?.sales ?? []).filter((s) => !linkedSaleIds.has(s.id)).map<ReconcileRow>((s) => ({
+      rows: (data?.sales ?? []).filter((s) => !linkedSaleIds.has(s.id) && isSaleInScope(s.sale_date, cutoff.data?.cutoff)).map<ReconcileRow>((s) => ({
         id: s.id, side: "acquirer", date: s.sale_date, amount: Number(s.amount),
         title: s.bandeira ?? "B2B", subtitle: s.codigo_reserva ? `Reserva ${s.codigo_reserva}` : "Sem código de reserva", origin: "B2B",
       })),
@@ -40,12 +45,12 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
     },
     {
       key: "banco", title: `Banco (${B2B_BANK_PREFIX}…)`, subtitle: "Créditos pendentes no extrato", position: "right",
-      rows: (data?.bank ?? []).filter((b) => !b.matched_at).map<ReconcileRow>((b) => ({
+      rows: (data?.bank ?? []).filter((b) => !b.matched_at && !excluded.has(`bank:${b.id}`)).map<ReconcileRow>((b) => ({
         id: b.id, side: "bank", date: b.line_date, amount: Number(b.amount), title: b.description ?? "",
       })),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [data]);
+  ], [data, cutoff.data]);
 
   const bankById = new Map((data?.bank ?? []).map((b) => [b.id, b]));
   const chargesByDeposit = new Map<string, number>();
@@ -53,6 +58,7 @@ export function B2BBaixaTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-4">
+      <SettlementCutoffPanel key={hotelId} hotelId={hotelId} provider="b2b" />
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
         <Button variant="outline" size="sm" disabled={auto.isPending}
           onClick={() => auto.mutate(hotelId, {

@@ -9,6 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Money } from "@/components/conciliacao/ReconcilePanel";
 import { useImportRedeRecebimentos, useRedeAutoMatch, useRedeRecebimentosData, useRedeUnmatch } from "@/hooks/useRedeRecebimentos";
 import { buildTarifas, isAntecipacao, REDE_BANK_PREFIX } from "@/lib/redeRecebimentos";
+import { SettlementCutoffPanel } from "@/components/conciliacao/SettlementCutoffPanel";
+import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
+import { excludedSettlementIds } from "@/lib/settlementCutoff";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-"); return `${m}/${y}`; };
@@ -36,14 +39,17 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
   const { data, isLoading } = useRedeRecebimentosData(hotelId);
   const auto = useRedeAutoMatch();
   const unmatch = useRedeUnmatch();
+  const cutoff = useSettlementCutoff(hotelId, "rede");
+  const excluded = excludedSettlementIds(cutoff.data?.items ?? [], cutoff.data?.cutoff);
   const bankById = new Map((data?.bank ?? []).map((b) => [b.id, b]));
   const recebidos = (data?.recebidos ?? []).filter((r) => Number(r.valor_depositado ?? 0) > 0);
-  const pend = recebidos.filter((r) => !r.matched_bank_id);
+  const pend = recebidos.filter((r) => !r.matched_bank_id && !excluded.has(`rede:${r.id}`));
   const done = recebidos.filter((r) => r.matched_bank_id);
   const bankPend = (data?.bank ?? []).filter((b) => !b.matched_at && b.amount > 0);
 
   return (
     <div className="space-y-4">
+      <SettlementCutoffPanel key={hotelId} hotelId={hotelId} provider="rede" />
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
         <Button size="sm" variant="outline" disabled={auto.isPending} onClick={() => auto.mutate(hotelId, {
           onSuccess: (r) => toast.success(`${r.matched} recebimento(s) baixado(s) no banco.`),
@@ -80,7 +86,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
             <CardContent className="p-0 max-h-[420px] overflow-y-auto">
               <Table><TableHeader><TableRow><TableHead>Data Rede</TableHead><TableHead>Bandeira / modalidade</TableHead><TableHead>Banco</TableHead><TableHead className="text-right">Valor</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>{done.map((r) => {
-                  const b = bankById.get(r.matched_bank_id!);
+                  const b = r.matched_bank_id ? bankById.get(r.matched_bank_id) : undefined;
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="text-xs">{day(r.data)}</TableCell>
