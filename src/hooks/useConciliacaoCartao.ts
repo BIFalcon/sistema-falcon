@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { reconcileUntilStable } from "@/lib/autoReconcile";
 import { missingBankPayments } from "@/lib/paidBankVerification";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
+import { REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
 import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
   parseAcquirerExcel,
@@ -526,6 +527,13 @@ export function useImportAcquirer() {
       await fillAcquirerExtra(parsed.rows.filter((r) => known.has(r.entry_key)));
 
       const autoMatched = await runAutoReconcile(hotelId);
+      const { error: settlementError } = await supabase.rpc("conc_rede_auto_match", {
+        p_hotel: hotelId, p_bank_prefix: REDE_BANK_PREFIX,
+        p_brand_map: REDE_BRAND_CODES, p_mod_map: REDE_MOD_CODES,
+      });
+      if (settlementError) {
+        toast.warning("Vendas importadas, mas a baixa Rede não foi concluída. Tente Baixar automaticamente na aba Rede.");
+      }
       return { inserted: rows.length, adjustments: deltaRows.length, skipped, unmatched, autoMatched, duplicates, otherHotels };
     },
     onSuccess: () => {
