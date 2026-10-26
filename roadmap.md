@@ -1,4 +1,5 @@
-- [ ] Compatibilizar saldos sem nome de conta com a conta única do hotel e usar o último saldo real anterior, preservando contas distintas, saldos manuais e autorizações; testar e conferir leitura.
+- [x] Compatibilizar saldos sem nome de conta com a conta única do hotel e usar o último saldo real anterior, preservando contas distintas, saldos manuais e autorizações; Serra Talhada 19–22/10 sem lacunas e quatro cenários de banco passaram.
+- [ ] Conferir Fechamento diário pela tela com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
 - [x] Permitir inserir corte por hotel/provedor nas baixas Rede/B2B; classificação pela venda original, transição selecionada com justificativa/confirmação, histórico e desfazer. Nenhuma data inventada ou baixa real executada. Estruturas e controles de acesso conferidos; 19 testes passaram.
 - [x] Corrigir reconhecimento de antecipação AT para crédito Rede sem aceitar AT para débito; 15 candidatos pendentes confirmados na base, liberados para a próxima baixa automática. Aplicação sem erros.
 - [ ] Conferir salvamento do corte e transição/desfazer pela tela com sessão autorizada — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview. Não foi registrada nenhuma transição em dados reais.
