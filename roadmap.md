@@ -1,3 +1,5 @@
+- [x] Corrigir percepção de Resolver nos alertas: total real, data de cada alerta e confirmação de salvamento; cinco testes de persistência/erros passaram e aplicação sem erros; 51 pendentes/28 resolvidos confirmados, sem reenvio ou remoção de bloqueios de e-mail.
+- [ ] Conferir Resolver pela tela autenticada — bloqueado: preview sem sessão; conta Babi não disponível para acesso automático.
 - [x] Vincular créditos de boletos à soma diária da Francesinha e marcar faturamentos validados como pagos na data bancária; 9 créditos/34 boletos de Serra Talhada baixados, inclusive R$253,26; 15 testes e teste integrado de lote incompleto/data bancária passaram.
 - [ ] Conferir baixa e avisos dos boletos pela tela autenticada — bloqueado: não existe conta correspondente ao solicitante; requer login no preview.
 - [x] Travar baixa Rede/B2B até composição integral e 100% das vendas conciliadas no Ópera; detalhes clicáveis nas baixas e pendências, reabertura ao desfazer vendas e transição preservada. 57 baixas antigas reabertas com histórico; conta transitória conferida; lote real R$2.480,70 com 17/17 vendas verificado; 22 testes passaram.

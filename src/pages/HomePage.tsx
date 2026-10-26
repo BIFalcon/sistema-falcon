@@ -1,6 +1,4 @@
 import { useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useNavigate, Navigate } from "react-router-dom";
 import {
@@ -22,6 +20,7 @@ import { useRhCalendarDates } from "@/hooks/useRh";
 import { CalendarDays } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { DRE_INDICATOR_ROLES } from "@/lib/dreAccess";
+import { useSystemAlerts } from "@/hooks/useSystemAlerts";
 
 interface TodoItem {
   dot: "red" | "amber" | "blue" | "green";
@@ -155,21 +154,9 @@ export default function HomePage() {
   const { data: divergences = [] } = useConcDivergenceSummary();
   const { data: calendarDates = [] } = useRhCalendarDates();
 
-  const queryClient = useQueryClient();
-  const { data: systemAlerts = [] } = useQuery({
-    queryKey: ["system-alerts"],
-    enabled: isMaster,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("system_alerts")
-        .select("id, type, message, created_at")
-        .eq("resolved", false)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      return data ?? [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: alertData, resolve: resolveAlert } = useSystemAlerts(isMaster);
+  const systemAlerts = alertData?.alerts ?? [];
+  const totalAlerts = alertData?.total ?? 0;
 
   const upcomingDates = useMemo(() => {
     const now = new Date();
@@ -395,22 +382,28 @@ export default function HomePage() {
       {isMaster && systemAlerts.length > 0 && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
           <p className="text-sm font-semibold text-destructive mb-2">
-            ⚠️ {systemAlerts.length} alerta(s) do sistema
+            ⚠️ {totalAlerts} alerta(s) do sistema
           </p>
+          {totalAlerts > systemAlerts.length && (
+            <p className="text-xs text-destructive/80 mb-2">{systemAlerts.length} mais recentes · {totalAlerts - systemAlerts.length} outros pendentes</p>
+          )}
           <div className="space-y-1">
             {systemAlerts.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-3 text-xs text-destructive/80">
-                <span className="truncate">{a.message}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate" title={a.message}>{a.message}</span>
+                  <span className="block text-[10px] text-muted-foreground">
+                    {new Date(a.created_at).toLocaleString("pt-BR")}
+                  </span>
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 text-[10px] shrink-0"
-                  onClick={async () => {
-                    await supabase.from("system_alerts").update({ resolved: true }).eq("id", a.id);
-                    queryClient.invalidateQueries({ queryKey: ["system-alerts"] });
-                  }}
+                  disabled={resolveAlert.isPending}
+                  onClick={() => resolveAlert.mutate(a.id)}
                 >
-                  Resolver
+                  {resolveAlert.isPending && resolveAlert.variables === a.id ? "Resolvendo…" : "Resolver"}
                 </Button>
               </div>
             ))}
