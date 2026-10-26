@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
-import { operaClassification, type ConciliationBase } from "@/lib/conciliationCategory";
+import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
   parseAcquirerExcel,
   parseB2BExcel,
