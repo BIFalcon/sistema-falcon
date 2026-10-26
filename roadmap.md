@@ -1,3 +1,4 @@
+- [ ] Redesenhar Performance SLA para primeiras interações, RPC somente leitura, quatro tempos, comparação de três meses, tabela e Excel; validar Itaperuna e médias julho–setembro.
 - [x] Permitir selecionar divergências antes do envio e informar quantidade/valor total no e-mail. Sessão autorizada de José selecionou 2 itens (R$36), enfileirou 5 e-mails; conteúdo e seleção exata conferidos, IDs inválidos rejeitados. Entrega na caixa de entrada não verificada.
 - [x] Retornar B2B classificados aos não conciliados mantendo identificação, remover aba antiga e corrigir prefixo ZOOP no cliente e servidor. Histórico/conciliações preservados; Baixas B2B exibe créditos ZOOP.
 - [x] Separar Baixas e Cadastros TRX em Contas a Receber. Navegação autenticada conferida, sem controles de upload nessas seções.
