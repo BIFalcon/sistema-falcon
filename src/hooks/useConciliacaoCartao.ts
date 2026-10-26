@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
-import { operaClassification, type ConciliationBase } from "@/lib/conciliationCategory";
+import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
   parseAcquirerExcel,
   parseB2BExcel,
@@ -368,32 +368,6 @@ export function useImportOpera() {
 
       const parsedOpera = await parseOperaXml(file, hotelId, active);
       const { skipped, total } = parsedOpera;
-      // Relatório acumulado (MTD): descarta o que já existe.
-      const knownOpera = await existingKeys("conc_opera_entries", hotelId);
-      // TRX_NO é o identificador único do Opera: evita duplicar quando o
-      // relatório muda a grafia do hóspede entre exportações.
-      const knownTrx = new Set(
-        (await fetchAllPaged<{ id: string; trx_no: string | null }>(() =>
-          supabase
-            .from("conc_opera_entries")
-            .select("id, trx_no")
-            .eq("hotel_id", hotelId)
-            .not("trx_no", "is", null)
-            .order("id", { ascending: true }),
-        )).map((r) => String(r.trx_no).trim()),
-      );
-      const seenTrx = new Set<string>();
-      const rows = parsedOpera.rows.filter((r) => {
-        if (knownOpera.has(r.entry_key)) return false;
-        const t = r.trx_no ? String(r.trx_no).trim() : "";
-        if (t) {
-          if (knownTrx.has(t) || seenTrx.has(t)) return false;
-          seenTrx.add(t);
-        }
-        return true;
-      });
-      const duplicates = parsedOpera.rows.length - rows.length;
-
       const { data: up, error: upErr } = await supabase
         .from("conc_uploads")
         .insert({
@@ -401,39 +375,30 @@ export function useImportOpera() {
           kind: "opera",
           file_name: file.name,
           file_size: file.size,
-          parsed_count: rows.length,
-          skipped_count: skipped + duplicates,
+          parsed_count: 0,
+          skipped_count: skipped,
           uploaded_by: user.id,
-          metadata: { total_rows: total, duplicates },
+          metadata: { total_rows: total },
         })
         .select("id")
         .single();
       if (upErr) throw upErr;
 
-      await upsertChunks("conc_opera_entries", rows.map((r) => ({
-        hotel_id: hotelId,
-        upload_id: up.id,
-        entry_key: r.entry_key,
-        trx_code: r.trx_code,
-        trx_desc: r.trx_desc,
-        ...operaClassification(byCode.get(r.trx_code.trim()) ?? { categoria: null, categoria_omie: null }),
-        amount: r.amount,
-        business_date: r.business_date || null,
-        room: r.room,
-        guest_full_name: r.guest_full_name,
-        receipt_no: r.receipt_no,
-        trx_no: r.trx_no ?? null,
-        raw: r as unknown as Record<string, unknown>,
-      })));
-      // Completa o TRX_NO dos lançamentos já importados antes (não sobrescreve).
-      const fill = parsedOpera.rows.filter((r) => r.trx_no && knownOpera.has(r.entry_key)).map((r) => ({ entry_key: r.entry_key, trx_no: r.trx_no }));
-      for (let i = 0; i < fill.length; i += 500) {
-        const { error } = await supabase.rpc("conc_fill_opera_trx_no", { _rows: fill.slice(i, i + 500) as never });
-        if (error) throw error;
+      // Uma única operação serializada evita corrida entre uploads e resolve
+      // registros antigos sem mudar conciliações, justificativas ou baixas.
+      const { data: imported, error: importErr } = await supabase.rpc("conc_import_opera", {
+        _hotel_id: hotelId,
+        _upload_id: up.id,
+        _rows: parsedOpera.rows as never,
+      });
+      if (importErr) {
+        await supabase.from("conc_uploads").delete().eq("id", up.id);
+        throw importErr;
       }
+      const result = imported as { inserted: number; duplicates: number; updated: number };
 
       const autoMatched = await runAutoReconcile(hotelId);
-      return { inserted: rows.length, skipped, autoMatched, duplicates, skippedCodes: parsedOpera.skippedCodes };
+      return { inserted: result.inserted, skipped, autoMatched, duplicates: result.duplicates, skippedCodes: parsedOpera.skippedCodes };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });

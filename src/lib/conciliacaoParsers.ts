@@ -151,6 +151,8 @@ async function readArrayBuffer(file: File): Promise<ArrayBuffer> {
 
 export interface OperaRow {
   entry_key: string;
+  /** Chave anterior para reconhecer importações feitas antes do TRX_NO. */
+  legacy_entry_key?: string;
   trx_code: string;
   trx_desc: string;
   amount: number;
@@ -206,12 +208,15 @@ export async function parseOperaXml(
     const room = tagValue(el, "ROOM");
     const guest = tagValue(el, "GUEST_FULL_NAME");
     const receipt = tagValue(el, "RECEIPT_NO");
+    const trxNo = tagValue(el, "TRX_NO").replace(/\.0+$/, "") || undefined;
+    const legacyKey = hashKey([
+      hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2),
+      occ([hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2)].join("|")),
+    ]);
 
     rows.push({
-      entry_key: hashKey([
-        hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2),
-        occ([hotelId, trxCode, businessDate, receipt, room, guest, amount.toFixed(2)].join("|")),
-      ]),
+      entry_key: trxNo ? `${hotelId}|opera|trx|${trxNo}` : legacyKey,
+      legacy_entry_key: legacyKey,
       trx_code: trxCode,
       trx_desc: tagValue(el, "TRX_DESC"),
       amount,
@@ -219,7 +224,7 @@ export async function parseOperaXml(
       room,
       guest_full_name: guest,
       receipt_no: receipt,
-      trx_no: tagValue(el, "TRX_NO").replace(/\.0+$/, "") || undefined,
+      trx_no: trxNo,
     });
   }
 
