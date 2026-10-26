@@ -1,3 +1,4 @@
+- [ ] Travar baixa bancária de cartão até 100% das vendas conciliadas no Ópera e abrir detalhes do lote nas baixas/pendências; preservar transição explícita e validar regras e tela.
 - [x] Compatibilizar saldos sem nome de conta com a conta única do hotel e usar o último saldo real anterior, preservando contas distintas, saldos manuais e autorizações; Serra Talhada 19–22/10 sem lacunas e quatro cenários de banco passaram.
 - [ ] Conferir Fechamento diário pela tela com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
 - [x] Permitir inserir corte por hotel/provedor nas baixas Rede/B2B; classificação pela venda original, transição selecionada com justificativa/confirmação, histórico e desfazer. Nenhuma data inventada ou baixa real executada. Estruturas e controles de acesso conferidos; 19 testes passaram.
