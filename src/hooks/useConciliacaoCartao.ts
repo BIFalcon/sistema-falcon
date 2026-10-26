@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { reconcileUntilStable } from "@/lib/autoReconcile";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
 import { type ConciliationBase } from "@/lib/conciliationCategory";
 import {
@@ -271,12 +273,13 @@ export function useConcUploads(hotelId?: string | null) {
 
 const CHUNK = 500;
 
-/** Conciliação automática: casa pares exatos 1:1 (data + categoria + valor).
- *  Não substitui a conciliação manual — só resolve os casos óbvios. */
+/** Executa todas as etapas, inclusive soma N:1, até não haver novos matches. */
 async function runAutoReconcileStrict(hotelId?: string | null) {
-  const { data, error } = await supabase.rpc("conc_auto_reconcile", hotelId ? { _hotel_id: hotelId } : {});
-  if (error) throw error;
-  return (data ?? 0) as number;
+  return reconcileUntilStable(async () => {
+    const { data, error } = await supabase.rpc("conc_auto_reconcile", hotelId ? { _hotel_id: hotelId } : {});
+    if (error) throw error;
+    return data ?? 0;
+  });
 }
 
 /** Usado após importações: o arquivo já foi gravado, então uma falha/lentidão
@@ -286,6 +289,7 @@ async function runAutoReconcile(hotelId?: string | null) {
     return await runAutoReconcileStrict(hotelId);
   } catch (err) {
     console.warn("Conciliação automática pós-importação falhou:", err);
+    toast.warning("Arquivo importado, mas a conciliação automática não foi concluída. Tente Rodar conciliação automática.");
     return 0;
   }
 }
@@ -293,12 +297,13 @@ async function runAutoReconcile(hotelId?: string | null) {
 export function useAutoReconcile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (hotelId?: string | null) => runAutoReconcile(hotelId),
+    mutationFn: async (hotelId?: string | null) => runAutoReconcileStrict(hotelId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
       qc.invalidateQueries({ queryKey: ["conc-acquirer"] });
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
+      qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
     },
   });
 }
@@ -533,6 +538,7 @@ export function useImportB2B() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
+      if (!user) throw new Error("Entre no sistema para importar.");
       const parsed = await parseB2BExcel(file, hotelId);
       const { skipped } = parsed;
       if (parsed.rows.length === 0 && skipped === 0) {
@@ -553,7 +559,7 @@ export function useImportB2B() {
           file_size: file.size,
           parsed_count: rows.length,
           skipped_count: skipped + duplicates,
-          uploaded_by: user!.id,
+          uploaded_by: user.id,
           metadata: { source: "b2b", hotel_ids: [hotelId], duplicates },
         })
         .select("id")
