@@ -13,6 +13,11 @@ export const REDE_BRAND_CODES: Record<string, string> = {
 };
 export const REDE_MOD_CODES: Record<string, string> = { CREDITO: "CD", DEBITO: "DB", ANTECIPADO: "AT" };
 
+export function matchesRedeModality(description: string, modality: string) {
+  const code = REDE_MOD_CODES[normText(modality)];
+  return !code || new RegExp(` (${code === "CD" ? "CD|AT" : code})[0-9]`).test(description.toUpperCase());
+}
+
 export const ANTECIPACAO_MOTIVO = "TAXA DE ANTECIPACAO";
 export const isAntecipacao = (motivo: string | null | undefined) => normText(motivo) === ANTECIPACAO_MOTIVO;
 
