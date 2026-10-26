@@ -1,5 +1,6 @@
-- [ ] Permitir inserir corte por hotel nas baixas Rede/B2B e registrar/desfazer baixas de transição sem excluir histórico.
-- [ ] Corrigir reconhecimento de antecipação AT na baixa Rede e validar regras, dados e tela autorizada.
+- [x] Permitir inserir corte por hotel/provedor nas baixas Rede/B2B; classificação pela venda original, transição selecionada com justificativa/confirmação, histórico e desfazer. Nenhuma data inventada ou baixa real executada. Estruturas e controles de acesso conferidos; 19 testes passaram.
+- [x] Corrigir reconhecimento de antecipação AT para crédito Rede sem aceitar AT para débito; 15 candidatos pendentes confirmados na base, liberados para a próxima baixa automática. Aplicação sem erros.
+- [ ] Conferir salvamento do corte e transição/desfazer pela tela com sessão autorizada — bloqueado: solicitante sem conta correspondente para sessão automática; requer login no preview. Não foi registrada nenhuma transição em dados reais.
 - [x] Executar passagens completas da RPC de conciliação até zero mudanças após importações B2B/Opera; falhas agora avisam sem invalidar upload salvo. Testes de repetição e falha passaram.
 - [x] Impedir importação de cobranças PIX expiradas mesmo canceladas pela Rede; manter PIX pagos e ajustes de cartão. Removidos 23 expirados pendentes de cinco hotéis, arquivados em seus uploads; um já conciliado preservado. 22 testes passaram, aplicação sem erros.
 - [ ] Conferir novos uploads B2B/Opera e PIX pela tela com sessão real autorizada — bloqueado: não há conta correspondente ao solicitante; conferência autenticada indisponível nesta sessão.
