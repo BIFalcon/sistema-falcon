@@ -361,6 +361,15 @@ export async function parseAcquirerExcel(
     }
 
     const cancelada = iCancelada !== -1 ? parseSimNao(r[iCancelada]) : null;
+    // Cobrança PIX expirada não representa dinheiro recebido. A flag de
+    // cancelamento não pode reintroduzi-la como venda para conciliação.
+    const bandeira = String(r[iBandeira] ?? "").trim();
+    const modalidade = String(r[iModalidade] ?? "").trim();
+    const isPix = !normText(bandeira) || normText(bandeira) === "PIX" || normText(modalidade) === "PIX";
+    if (isPix && status.includes("EXPIRAD")) {
+      skipped++;
+      continue;
+    }
     // Vendas canceladas pelo estabelecimento entram para gerar o ajuste do NSU na reimportação.
     if (!(status.includes("APROVADA") || status.includes("PAGO") || cancelada)) {
       skipped++;
@@ -374,10 +383,8 @@ export async function parseAcquirerExcel(
 
     const amount = parseMoney(r[iAmount]);
     const saleDate = toIso(r[iDate]);
-    const bandeira = String(r[iBandeira] ?? "").trim();
-    const modalidade = String(r[iModalidade] ?? "").trim();
     // Bandeira vazia = PIX; senão bandeira + modalidade formam a categoria.
-    const categoria = bandeira
+    const categoria = !isPix
       ? normCategoria(`${bandeira} ${modalidade}`)
       : "PIX";
 
