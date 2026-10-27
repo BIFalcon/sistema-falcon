@@ -12,7 +12,7 @@ async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> 
 
 export type DataStatus = "completo" | "parcial" | "pendente";
 
-export interface InvestorAccess { can_access: boolean; can_edit: boolean; is_finance: boolean; can_view_full: boolean }
+export interface InvestorAccess { can_access: boolean; can_edit: boolean; is_finance: boolean; can_view_full: boolean; can_pay?: boolean; can_send?: boolean }
 
 export function useInvestorAccess() {
   const { user } = useAuth();
@@ -176,3 +176,42 @@ export async function fetchExistingUnitCodes(hotelId: string): Promise<Set<strin
 }
 
 export const STATUS_LABEL: Record<DataStatus, string> = { completo: "Completo", parcial: "Parcial", pendente: "Pendente" };
+
+// ===== Distribuição & Pagamentos =====
+export type PaymentStatus = "pronto" | "bloqueado" | "enviado" | "agendado" | "pago" | "rejeitado";
+export interface PaymentItem {
+  id: string; unit_id: string; codigo_uh: string; investidor_nome: string | null; favorecido_nome: string | null; percentual: number | null;
+  valor: number; status: PaymentStatus; motivo: string | null; forma: string | null; ocorrencias: string | null; valor_pago: number | null; data_pago: string | null;
+}
+export interface DistributionOverview {
+  dre_valor_por_uh: number | null; uhs_pool: number; can_send: boolean; payer_ok: boolean;
+  batch: { id: string; valor_por_uh: number; valor_fonte: "dre" | "manual"; data_pagamento: string; remessas: number; last_remessa_at: string | null } | null;
+  items: PaymentItem[];
+}
+
+export function useDistribution(hotelId: string | null, month: number, year: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inv-dist", hotelId, month, year],
+    enabled: enabled && !!hotelId,
+    queryFn: () => rpc<DistributionOverview>("inv_distribution_overview", { _hotel_id: hotelId, _month: month, _year: year }),
+  });
+}
+
+export interface PayerAccount { razao_social: string; cnpj: string; agencia: string; conta: string; dac: string; endereco: string | null; numero: string | null; complemento: string | null; cidade: string | null; cep: string | null; uf: string | null }
+
+export function usePayerAccount(hotelId: string | null, enabled: boolean) {
+  return useQuery({ queryKey: ["inv-payer", hotelId], enabled: enabled && !!hotelId, queryFn: () => rpc<PayerAccount | null>("inv_payer_get", { _hotel_id: hotelId }) });
+}
+
+export function useDistributionMutations() {
+  const qc = useQueryClient();
+  const inv = () => { qc.invalidateQueries({ queryKey: ["inv-dist"] }); qc.invalidateQueries({ queryKey: ["inv-payer"] }); };
+  return {
+    createBatch: useMutation({ onSuccess: inv, mutationFn: (a: { hotelId: string; month: number; year: number; valor: number; data: string }) =>
+      rpc<string>("inv_create_batch", { _hotel_id: a.hotelId, _month: a.month, _year: a.year, _valor_por_uh: a.valor, _data_pagamento: a.data }) }),
+    remessaData: useMutation({ onSuccess: inv, mutationFn: (batchId: string) => rpc<{ payer: PayerAccount; data_pagamento: string; lote: number; items: import("@/lib/cnab240Itau").RemessaItem[] }>("inv_remessa_data", { _batch_id: batchId }) }),
+    applyReturn: useMutation({ onSuccess: inv, mutationFn: (a: { rows: unknown[]; fileName: string }) =>
+      rpc<{ pagos: number; agendados: number; rejeitados: number; nao_encontrados: number }>("inv_apply_return", { _rows: a.rows, _file_name: a.fileName }) }),
+    savePayer: useMutation({ onSuccess: inv, mutationFn: (a: { hotelId: string; data: Record<string, string> }) => rpc<void>("inv_payer_save", { _hotel_id: a.hotelId, _d: a.data }) }),
+  };
+}

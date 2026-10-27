@@ -14,6 +14,8 @@ import { useModuleFilters } from "@/contexts/FilterContext";
 import { fetchFullExport, fetchPendingExport, useInvestorAccess, useInvestorMutations, useInvestorStats, useInvestorUnits } from "@/hooks/useInvestors";
 import { StatusSelo, fmtDate } from "@/components/investidores/StatusSelo";
 import { ImportInvestorsDialog } from "@/components/investidores/ImportInvestorsDialog";
+import { DistribuicaoTab } from "@/components/investidores/DistribuicaoTab";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewUnitDialog } from "@/components/investidores/NewUnitDialog";
 import { logSensitiveExport } from "@/hooks/useRhPayroll";
 import { formatDocumento, formatTelefone } from "@/lib/brValidation";
@@ -36,6 +38,7 @@ export default function InvestidoresPage() {
   const [page, setPage] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [newUnitOpen, setNewUnitOpen] = useState(false);
+  const [tab, setTab] = useState<"cadastro" | "pagamentos">(params.get("aba") === "pagamentos" ? "pagamentos" : "cadastro");
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [obsOpen, setObsOpen] = useState(false);
@@ -94,14 +97,21 @@ export default function InvestidoresPage() {
           <h1 className="text-2xl font-semibold">Investidores</h1>
           <p className="text-sm text-muted-foreground">Unidades, investidores e dados de recebimento</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        {tab === "cadastro" && <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={exportPend}><Download className="h-4 w-4 mr-2" />Exportar pendências</Button>
           <Button variant="outline" disabled={exporting} onClick={exportFull}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar base completa</Button>
           {access.can_edit && <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar planilha</Button>}
           {access.can_edit && <Button onClick={() => setNewUnitOpen(true)}><Plus className="h-4 w-4 mr-2" />Nova UH</Button>}
-        </div>
+        </div>}
       </div>
 
+      {access.can_pay && (
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList><TabsTrigger value="cadastro">Cadastro de UHs</TabsTrigger><TabsTrigger value="pagamentos">Distribuição & Pagamentos</TabsTrigger></TabsList>
+        </Tabs>
+      )}
+
+      {tab === "pagamentos" && access.can_pay ? <DistribuicaoTab hotelId={hotelId} canSend={!!access.can_send} /> : (<>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[["Total de UHs", stats?.total_uhs], ["Investidores distintos", stats?.investidores], ["UHs Pool", stats?.uhs_pool], ["Dados pendentes ou parciais", stats?.pendentes_parciais]].map(([l, v]) => (
           <Card key={String(l)}><CardContent className="p-4"><div className="text-2xl font-semibold">{v ?? "—"}</div><div className="text-xs text-muted-foreground">{l}</div></CardContent></Card>
@@ -169,6 +179,8 @@ export default function InvestidoresPage() {
       </div>
 
       <NewUnitDialog open={newUnitOpen} onOpenChange={setNewUnitOpen} defaultHotelId={hotelId} />
+      </>)}
+
       {importOpen && <ImportInvestorsDialog open={importOpen} onOpenChange={setImportOpen} defaultHotelId={hotelId} />}
 
       <Dialog open={obsOpen} onOpenChange={setObsOpen}>
