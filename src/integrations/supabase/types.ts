@@ -2798,6 +2798,44 @@ export type Database = {
           },
         ]
       }
+      dre_view_log: {
+        Row: {
+          closing_id: string
+          first_viewed_at: string
+          id: string
+          last_viewed_at: string
+          user_id: string
+          version_number: number
+          view_count: number
+        }
+        Insert: {
+          closing_id: string
+          first_viewed_at?: string
+          id?: string
+          last_viewed_at?: string
+          user_id: string
+          version_number: number
+          view_count?: number
+        }
+        Update: {
+          closing_id?: string
+          first_viewed_at?: string
+          id?: string
+          last_viewed_at?: string
+          user_id?: string
+          version_number?: number
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_view_log_closing_id_fkey"
+            columns: ["closing_id"]
+            isOneToOne: false
+            referencedRelation: "closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -4711,6 +4749,14 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      closing_stage_can_act: {
+        Args: {
+          _stage: string
+          _status: Database["public"]["Enums"]["closing_status"]
+          _uid: string
+        }
+        Returns: boolean
+      }
       conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
@@ -5347,6 +5393,10 @@ export type Database = {
           rh_only: boolean
           show_in_closing: boolean
         }[]
+      }
+      log_dre_view: {
+        Args: { p_closing: string; p_version: number }
+        Returns: undefined
       }
       mark_envio_sent: {
         Args: { _closing_id: string; _sent: boolean }
