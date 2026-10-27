@@ -74,7 +74,7 @@ export function buildRemessa(p: { payer: Payer; items: RemessaItem[]; dataPagame
         + dataPg + "REA" + "00000000" + ident + "00000" + money(it.valor, 15) + B(20) + "0".repeat(8) + "0".repeat(15) + B(20)
         + "000000" + N(it.documento, 14) + "  01.3      5" + B(10)));
       if (forma === "pix") {
-        seq += 1;
+        // Itaú: o segmento B repete o sequencial do segmento A.
         const doc = digits(it.documento);
         lines.push(check("341" + L + "3" + N(seq, 5) + "B" + (PIX_TIPO[it.tipo_chave_pix ?? ""] ?? "04") + " " + (doc.length === 14 ? "2" : "1") + N(doc, 14)
           + B(95) + pixKey(it.tipo_chave_pix, it.chave_pix).slice(0, 100).padEnd(100, " ") + B(13)));
