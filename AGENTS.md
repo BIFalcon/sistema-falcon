@@ -32,3 +32,4 @@
 - Closing stage approvals are enforced by closing_stage_can_act (DB trigger) mirrored by canActOnStage on the client; a user with the fernando role (or the CEO e-mail) only acts at aguardando_fernando, even when also Master.
 - DRE views are recorded only through the log_dre_view RPC (once per closing/version per session, counted again after 30 min).
 - Hotel-specific net profit in Indicadores DRE comes only from NET_PROFIT_OVERRIDES (hotelNetProfit.ts, keyed by hotel_id) applied at dataset/history source, so every indicator view stays consistent; the DRE parser and Consolidado keep their own rules.
+- RH Custo e Folha consolidated tab reads only the aggregated get_rh_payroll_consolidated RPC (reuses get_rh_payroll_summary per authorized hotel, gated by can_view_rh_consolidated mirrored by canViewRhConsolidated) so per-person costs never leave the per-hotel manager view.
