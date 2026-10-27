@@ -46,14 +46,14 @@ export function ClosingTable({ hotelId, month, year, statusFilter = "all" }: Pro
   async function startClosing(hid: string) {
     try {
       const c = await ensure.mutateAsync({ hotelId: hid, month, year });
-      navigate(`/fechamento/dre?closing=${c.id}`);
+      navigate(`/fechamento/dre?closing=${c.id}`, { state: { from: "/fechamento" } });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao iniciar fechamento");
     }
   }
 
   function openStage(c: ClosingRow, stage: "dre" | "carta" | "financeiro" | "envio") {
-    navigate(`/fechamento/${stage}?closing=${c.id}`);
+    navigate(`/fechamento/${stage}?closing=${c.id}`, { state: { from: "/fechamento" } });
   }
 
   const stageButton = (c: ClosingRow, stage: "dre" | "carta" | "financeiro" | "envio", status: ClosingRow["status_dre"]) => (
