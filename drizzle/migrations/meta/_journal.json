@@ -540,6 +540,13 @@
       "when": 1793050468327,
       "tag": "0076_acquirer_extra_indexed_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793102527298,
+      "tag": "0077_closing_stage_guard_and_dre_view_log",
+      "breakpoints": true
     }
   ]
 }

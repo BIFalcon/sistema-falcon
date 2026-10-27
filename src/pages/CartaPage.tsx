@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -140,6 +140,10 @@ function initialPct(n: number | null | undefined): string {
 export default function CartaPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = (location.state as { from?: string } | null)?.from;
+  const backTo = fromState ?? "/fechamento";
+  const backLabel = backTo === "/fechamento" ? "Voltar à Visão Geral" : "Voltar";
   const qc = useQueryClient();
   const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster, isPatronos } = useAuth();
@@ -472,8 +476,8 @@ export default function CartaPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4" /> Voltar ao Dashboard
+          <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2" onClick={() => navigate(backTo)}>
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
           </Button>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Carta ao Investidor</p>
           <h1 className="text-2xl font-semibold">{hotel?.name ?? closing.hotel_id}</h1>

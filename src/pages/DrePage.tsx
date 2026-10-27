@@ -1,6 +1,6 @@
 import { validateDreFileName } from "@/lib/dreFileName";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClosing, useEnsureClosing } from "@/hooks/useClosings";
-import { useDreVersions, useUploadDre, getDreSignedUrl, logDreDownload, useDreDownloadLog } from "@/hooks/useDre";
+import { useDreVersions, useUploadDre, getDreSignedUrl, logDreDownload, useDreDownloadLog, useDreViewLog, useLogDreView } from "@/hooks/useDre";
 import { CommentsThread } from "@/components/closings/CommentsThread";
 import { ApprovalActions } from "@/components/closings/ApprovalActions";
 import { DreStageStepper } from "@/components/closings/DreStageStepper";
@@ -24,6 +24,10 @@ import { supabase } from "@/integrations/supabase/client";
 export default function DrePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = (location.state as { from?: string } | null)?.from;
+  const backTo = fromState ?? "/fechamento";
+  const backLabel = backTo === "/fechamento" ? "Voltar à Visão Geral" : "Voltar";
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
   const readOnlyBusiness = hasRole("novos_negocios") && !isMaster;
@@ -68,10 +72,13 @@ export default function DrePage() {
 
   const { data: closing } = useClosing(resolvedId);
   const { data: versions = [] } = useDreVersions(resolvedId);
+  const latestVersionNumber = versions.length ? Math.max(...versions.map((v) => v.version_number)) : null;
+  useLogDreView(resolvedId, latestVersionNumber);
 
   // Somente Master/Controladoria/Patronos/Viewer conseguem consultar (via RLS).
   const canSeeDownloaders = isMaster || hasRole("controladoria") || hasRole("patronos") || hasRole("viewer");
   const { data: downloadLog = [] } = useDreDownloadLog(canSeeDownloaders ? resolvedId : null);
+  const { data: viewLog } = useDreViewLog(canSeeDownloaders ? resolvedId : null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const dreLocked = closing?.status_dre === "aprovado" && !(closing as { is_historical?: boolean } | undefined)?.is_historical;
@@ -175,8 +182,8 @@ export default function DrePage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4" /> Voltar ao Dashboard
+          <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2" onClick={() => navigate(backTo)}>
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
           </Button>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">DRE</p>
           <h1 className="text-2xl font-semibold text-foreground">{hotel?.name ?? closing.hotel_id}</h1>
@@ -286,6 +293,7 @@ export default function DrePage() {
           )}
 
           {canSeeDownloaders && (
+            <div className="grid gap-6 xl:grid-cols-2">
             <Card className="p-5 shadow-soft">
               <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">
                 Quem baixou a DRE
@@ -326,6 +334,44 @@ export default function DrePage() {
                 </Table>
               )}
             </Card>
+            <Card className="p-5 shadow-soft">
+              <h3 className="text-sm font-semibold uppercase tracking-wider mb-1">
+                Quem visualizou a DRE
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Registro de visualizações a partir de {viewLog?.since ?? "27/10/2026"}
+              </p>
+              {!viewLog || viewLog.rows.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Nenhuma visualização registrada ainda.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                      <TableHead className="text-xs uppercase tracking-wider">Usuário</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Versão</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Primeira</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">Última</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-right">Acessos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewLog.rows.map((v) => (
+                      <TableRow key={v.id}>
+                        <TableCell className="text-sm">
+                          <div className="font-medium">{v.name || v.email || "—"}</div>
+                          {v.name && v.email && <div className="text-xs text-muted-foreground">{v.email}</div>}
+                        </TableCell>
+                        <TableCell className="text-sm">v{v.version_number}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{fmtSp(v.first_viewed_at)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{fmtSp(v.last_viewed_at)}</TableCell>
+                        <TableCell className="text-sm text-right">{v.view_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+            </div>
           )}
         </div>
 
@@ -344,4 +390,7 @@ export default function DrePage() {
       />
     </div>
   );
+}
+function fmtSp(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }

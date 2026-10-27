@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
@@ -1123,4 +1124,60 @@ export async function insertDreParsedRows(rows: ReturnType<typeof buildDreParsed
     const { error } = await supabase.from("dre_parsed_lines").insert(rows.slice(i, i + 500));
     if (error) throw new Error(`Falha ao gravar linhas da DRE: ${error.message}`);
   }
+}
+
+export interface DreViewLogRow {
+  id: string;
+  version_number: number;
+  user_id: string;
+  first_viewed_at: string;
+  last_viewed_at: string;
+  view_count: number;
+  name: string | null;
+  email: string | null;
+}
+
+/** Registra a visualização uma vez por fechamento/versão ao abrir a DRE. */
+const loggedDreViews = new Set<string>();
+export function useLogDreView(closingId: string | null | undefined, versionNumber: number | null) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!closingId || versionNumber == null) return;
+    const key = `${closingId}:${versionNumber}`;
+    if (loggedDreViews.has(key)) return;
+    loggedDreViews.add(key);
+    supabase
+      .rpc("log_dre_view", { p_closing: closingId, p_version: versionNumber })
+      .then(({ error }) => {
+        if (error) loggedDreViews.delete(key);
+        else qc.invalidateQueries({ queryKey: ["dre-view-log", closingId] });
+      });
+  }, [closingId, versionNumber, qc]);
+}
+
+export function useDreViewLog(closingId?: string | null) {
+  return useQuery({
+    enabled: !!closingId,
+    queryKey: ["dre-view-log", closingId],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<{ rows: DreViewLogRow[]; since: string }> => {
+      const { data, error } = await supabase
+        .from("dre_view_log")
+        .select("id, version_number, user_id, first_viewed_at, last_viewed_at, view_count")
+        .eq("closing_id", closingId!)
+        .order("last_viewed_at", { ascending: false });
+      const since = "27/10/2026";
+      if (error || !data?.length) return { rows: [], since };
+      const { data: profs } = await supabase.rpc("get_profile_names", {
+        _user_ids: [...new Set(data.map((d) => d.user_id))],
+      });
+      const map = new Map(
+        ((profs ?? []) as Array<{ user_id: string; display_name: string | null; email: string | null }>).map((p) => [p.user_id, p]),
+      );
+      return {
+        since,
+        rows: data.map((d) => ({ ...d, name: map.get(d.user_id)?.display_name ?? null, email: map.get(d.user_id)?.email ?? null })),
+      };
+    },
+  });
 }

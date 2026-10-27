@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,8 @@ import {
   CARTA_PREV_STATUS,
   CARTA_STAGE_APPROVER,
 } from "@/lib/constants";
+import { canActOnStage, STAGE_OWNER_LABEL } from "@/lib/closingStageAccess";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   closingId: string;
@@ -42,7 +45,7 @@ interface Props {
  * - Verifica role do usuário antes de habilitar.
  */
 export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: Props) {
-  const { user, roles, isMaster } = useAuth();
+  const { user, roles, isMaster, isFernandoCEO } = useAuth();
   const updateStatus = useUpdateClosingStatus();
   const recordApproval = useRecordApproval();
 
@@ -56,13 +59,9 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
   const FIELD = isCarta ? "status_carta" : "status_dre";
 
   const requiredRole = APPROVER[currentStatus];
-  const canApprove =
-    isMaster ||
-    (!isCarta && currentStatus === "aguardando_comentarios" &&
-      (roles.includes("gg" as AppRole) || roles.includes("gop" as AppRole))) ||
-    (requiredRole !== null && roles.includes(requiredRole)) ||
-    // Patronos atuam como Controladoria em todos os estágios que exigem essa role.
-    (requiredRole === "controladoria" && roles.includes("patronos" as AppRole));
+  void isMaster;
+  const canApprove = canActOnStage(isCarta ? "carta" : "dre", currentStatus, roles, isFernandoCEO);
+  const waitingFor = STAGE_OWNER_LABEL[currentStatus];
 
   const nextStatus = NEXT[currentStatus];
   const prevStatus = PREV[currentStatus];
@@ -130,31 +129,35 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     <>
       <div className="flex flex-wrap gap-2">
         {showApprove && (
-          <Button
-            onClick={handleApprove}
-            disabled={!canApprove || updateStatus.isPending || recordApproval.isPending}
-            className="gap-2"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            Aprovar
-          </Button>
+          <Gate blocked={!canApprove} label={waitingFor}>
+            <Button
+              onClick={handleApprove}
+              disabled={!canApprove || updateStatus.isPending || recordApproval.isPending}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Aprovar
+            </Button>
+          </Gate>
         )}
         {prevStatus && (
-          <Button
-            variant="outline"
-            onClick={() => setReturnOpen(true)}
-            disabled={!canReturn}
-            className="gap-2"
-          >
-            <Undo2 className="h-4 w-4" />
-            Devolver
-          </Button>
+          <Gate blocked={!canReturn} label={waitingFor}>
+            <Button
+              variant="outline"
+              onClick={() => setReturnOpen(true)}
+              disabled={!canReturn}
+              className="gap-2"
+            >
+              <Undo2 className="h-4 w-4" />
+              Devolver
+            </Button>
+          </Gate>
         )}
       </div>
 
       {!canApprove && !canUnapprove && requiredRole && (
         <p className="text-xs text-muted-foreground mt-2">
-          Apenas usuários com papel <strong>{STATUS_LABELS[currentStatus]}</strong> podem aprovar este estágio.
+          Esta etapa ainda não está com você{waitingFor ? <> — aguardando <strong>{waitingFor}</strong></> : null}.
         </p>
       )}
 
@@ -189,5 +192,16 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+function Gate({ blocked, label, children }: { blocked: boolean; label?: string; children: ReactNode }) {
+  if (!blocked || !label) return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild><span tabIndex={0}>{children}</span></TooltipTrigger>
+        <TooltipContent>Aguardando {label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
