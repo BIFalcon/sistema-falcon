@@ -3039,6 +3039,231 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_payer_accounts: {
+        Row: {
+          agencia: string
+          cep: string | null
+          cidade: string | null
+          cnpj: string
+          complemento: string | null
+          conta: string
+          dac: string
+          endereco: string | null
+          hotel_id: string
+          numero: string | null
+          razao_social: string
+          uf: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          agencia: string
+          cep?: string | null
+          cidade?: string | null
+          cnpj: string
+          complemento?: string | null
+          conta: string
+          dac: string
+          endereco?: string | null
+          hotel_id: string
+          numero?: string | null
+          razao_social: string
+          uf?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          agencia?: string
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string
+          complemento?: string | null
+          conta?: string
+          dac?: string
+          endereco?: string | null
+          hotel_id?: string
+          numero?: string | null
+          razao_social?: string
+          uf?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_payer_accounts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: true
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_payment_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_pagamento: string
+          hotel_id: string
+          id: string
+          last_remessa_at: string | null
+          month: number
+          remessas: number
+          valor_fonte: string
+          valor_por_uh: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_pagamento: string
+          hotel_id: string
+          id?: string
+          last_remessa_at?: string | null
+          month: number
+          remessas?: number
+          valor_fonte?: string
+          valor_por_uh: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string
+          hotel_id?: string
+          id?: string
+          last_remessa_at?: string | null
+          month?: number
+          remessas?: number
+          valor_fonte?: string
+          valor_por_uh?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_payment_batches_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_payment_items: {
+        Row: {
+          batch_id: string
+          codigo_uh: string
+          data_pago: string | null
+          favorecido_nome: string | null
+          forma: string | null
+          id: string
+          investidor_nome: string | null
+          investor_id: string | null
+          link_id: string | null
+          motivo: string | null
+          ocorrencias: string | null
+          payee_id: string | null
+          percentual: number | null
+          seu_numero: string | null
+          status: string
+          unit_id: string
+          updated_at: string
+          valor: number
+          valor_pago: number | null
+        }
+        Insert: {
+          batch_id: string
+          codigo_uh: string
+          data_pago?: string | null
+          favorecido_nome?: string | null
+          forma?: string | null
+          id?: string
+          investidor_nome?: string | null
+          investor_id?: string | null
+          link_id?: string | null
+          motivo?: string | null
+          ocorrencias?: string | null
+          payee_id?: string | null
+          percentual?: number | null
+          seu_numero?: string | null
+          status?: string
+          unit_id: string
+          updated_at?: string
+          valor: number
+          valor_pago?: number | null
+        }
+        Update: {
+          batch_id?: string
+          codigo_uh?: string
+          data_pago?: string | null
+          favorecido_nome?: string | null
+          forma?: string | null
+          id?: string
+          investidor_nome?: string | null
+          investor_id?: string | null
+          link_id?: string | null
+          motivo?: string | null
+          ocorrencias?: string | null
+          payee_id?: string | null
+          percentual?: number | null
+          seu_numero?: string | null
+          status?: string
+          unit_id?: string
+          updated_at?: string
+          valor?: number
+          valor_pago?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_payment_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "inv_payment_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "unit_investor_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "v_pool_units_current"
+            referencedColumns: ["link_id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "investor_payees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_payment_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_pool_units_current"
+            referencedColumns: ["unit_id"]
+          },
+        ]
+      }
       investor_letters: {
         Row: {
           ai_closing: string | null
@@ -5271,8 +5496,14 @@ export type Database = {
         }
         Returns: Json
       }
+      inv_apply_return: {
+        Args: { _file_name: string; _rows: Json }
+        Returns: Json
+      }
       inv_can_access: { Args: { _uid: string }; Returns: boolean }
       inv_can_edit: { Args: { _uid: string }; Returns: boolean }
+      inv_can_pay: { Args: { _uid: string }; Returns: boolean }
+      inv_can_send: { Args: { _uid: string }; Returns: boolean }
       inv_can_view_full: { Args: { _uid: string }; Returns: boolean }
       inv_change_link: {
         Args: {
@@ -5284,6 +5515,16 @@ export type Database = {
         }
         Returns: string
       }
+      inv_create_batch: {
+        Args: {
+          _data_pagamento: string
+          _hotel_id: string
+          _month: number
+          _valor_por_uh: number
+          _year: number
+        }
+        Returns: string
+      }
       inv_create_unit: {
         Args: {
           _codigo_uh: string
@@ -5292,6 +5533,14 @@ export type Database = {
           _modalidade: string
         }
         Returns: string
+      }
+      inv_distribution_overview: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: Json
+      }
+      inv_dre_valor_por_uh: {
+        Args: { _hotel_id: string; _month: number; _year: number }
+        Returns: number
       }
       inv_full_export: {
         Args: { _hotel_id?: string }
@@ -5390,9 +5639,18 @@ export type Database = {
         }
         Returns: Json
       }
+      inv_payee_payment_check: {
+        Args: { p: Database["public"]["Tables"]["investor_payees"]["Row"] }
+        Returns: Record<string, unknown>
+      }
       inv_payee_status: {
         Args: { _agencia: string; _banco: string; _conta: string; _pix: string }
         Returns: string
+      }
+      inv_payer_get: { Args: { _hotel_id: string }; Returns: Json }
+      inv_payer_save: {
+        Args: { _d: Json; _hotel_id: string }
+        Returns: undefined
       }
       inv_pending_export: {
         Args: { _hotel_id?: string }
@@ -5406,6 +5664,7 @@ export type Database = {
           status_dados: string
         }[]
       }
+      inv_remessa_data: { Args: { _batch_id: string }; Returns: Json }
       inv_require_edit: { Args: never; Returns: undefined }
       inv_save_investor: {
         Args: {
