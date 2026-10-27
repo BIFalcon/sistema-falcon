@@ -34,7 +34,7 @@ export function InvestorFormDialog({ open, onOpenChange, investor }: { open: boo
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2 space-y-1"><Label>Nome</Label><Input value={f.nome} onChange={set("nome")} /></div>
           <div className="space-y-1"><Label>CPF/CNPJ</Label><Input value={f.documento} onChange={set("documento")} /></div>
-          <div className="space-y-1"><Label>Código externo</Label><Input value={f.codigo} onChange={set("codigo")} /></div>
+          <div className="space-y-1"><Label>Matrícula do imóvel (opcional)</Label><Input value={f.codigo} onChange={set("codigo")} /></div>
           <div className="space-y-1"><Label>E-mail</Label><Input value={f.email} onChange={set("email")} /></div>
           <div className="space-y-1"><Label>Telefone</Label><Input value={f.telefone} onChange={set("telefone")} /></div>
         </div>

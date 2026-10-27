@@ -62,7 +62,7 @@ export function ChangeInvestorDialog({ open, onOpenChange, unitId, currentInvest
             <div className="grid grid-cols-2 gap-2">
               <div className="col-span-2"><Label>Nome</Label><Input value={ni.nome} onChange={(e) => setNi({ ...ni, nome: e.target.value })} /></div>
               <div><Label>CPF/CNPJ</Label><Input value={ni.documento} onChange={(e) => setNi({ ...ni, documento: e.target.value })} /></div>
-              <div><Label>Código externo</Label><Input value={ni.codigo} onChange={(e) => setNi({ ...ni, codigo: e.target.value })} /></div>
+              <div><Label>Matrícula do imóvel (opcional)</Label><Input value={ni.codigo} onChange={(e) => setNi({ ...ni, codigo: e.target.value })} /></div>
               <div><Label>E-mail</Label><Input value={ni.email} onChange={(e) => setNi({ ...ni, email: e.target.value })} /></div>
               <div><Label>Telefone</Label><Input value={ni.telefone} onChange={(e) => setNi({ ...ni, telefone: e.target.value })} /></div>
               <p className="col-span-2 text-xs text-muted-foreground">Depois de vincular, cadastre o favorecido no detalhe do investidor.</p>
