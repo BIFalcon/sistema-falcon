@@ -7,6 +7,7 @@ import { parseDreExcel } from "@/lib/dreParser";
 import { INDICATOR_LABELS, getDreLineCategory, getDreLineCategorization } from "@/lib/dreParser";
 import type { IndicatorKey } from "@/lib/dreParser";
 import { DRE_FIXED_TREE, INDICATORS, type DreTreeNode } from "@/lib/dreParser";
+import { applyNetProfitOverride } from "@/lib/hotelNetProfit";
 import { mergeDreDatasets, type DreAnalyticsDataset, type DreLineNode } from "@/lib/dreAnalytics";
 import { buildAliasIndex } from "@/lib/dreLabelAliases";
 import {
@@ -871,6 +872,7 @@ function useDreAnalyticsImpl(input: {
           for (const n of [...nodes, ...fixedRootNodes]) scrubNode(n);
 
           if (nodes.length || fixedRootNodes.length) {
+            applyNetProfitOverride(allFlat, hotelId);
             return {
               tree: [...nodes, ...fixedRootNodes],
               flat: allFlat,

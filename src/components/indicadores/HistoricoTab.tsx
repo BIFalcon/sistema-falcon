@@ -1,3 +1,4 @@
+import { applyNetProfitOverrideToRow } from "@/lib/hotelNetProfit";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -69,8 +70,9 @@ export function HistoricoTab({ hotels, defaultHotelId, months }: { hotels: Hotel
         gr.set(g, (gr.get(g) ?? 0) + Math.abs(Number(value)));
       }
     }
+    for (const row of store.values()) applyNetProfitOverrideToRow(row, hotelId, NET_PROFIT_LABELS, cleanLabel);
     return { store, years: [...years].sort(), groupStore };
-  }, [data]);
+  }, [data, hotelId]);
 
   const allYm = useMemo(() => [...store.keys()].map((k) => k.split("-").map(Number) as [number, number]).sort((a, b) => a[0] - b[0] || a[1] - b[1]), [store]);
   const monthly = allYm.length > 0 && allYm.length < 13;
