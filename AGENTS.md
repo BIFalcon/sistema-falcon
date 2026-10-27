@@ -31,3 +31,4 @@
 - Rede reimports deduplicate against every existing entry, including missing NSUs, and enrich all stable-key matches independently of delta classification; this preserves original identities and Opera matches while repairing missing report fields.
 - Closing stage approvals are enforced by closing_stage_can_act (DB trigger) mirrored by canActOnStage on the client; a user with the fernando role (or the CEO e-mail) only acts at aguardando_fernando, even when also Master.
 - DRE views are recorded only through the log_dre_view RPC (once per closing/version per session, counted again after 30 min).
+- Hotel-specific net profit in Indicadores DRE comes only from NET_PROFIT_OVERRIDES (hotelNetProfit.ts, keyed by hotel_id) applied at dataset/history source, so every indicator view stays consistent; the DRE parser and Consolidado keep their own rules.
