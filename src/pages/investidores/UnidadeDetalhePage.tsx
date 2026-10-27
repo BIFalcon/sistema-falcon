@@ -48,7 +48,7 @@ export default function UnidadeDetalhePage() {
           <CardHeader><CardTitle className="text-base">Investidor vigente</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-1">
             {current ? (<>
-              <Link to={`/investidores/investidor/${current.investor_id}`} className="font-medium text-primary hover:underline">{current.codigo_externo ? `${current.codigo_externo} - ` : ""}{current.investor_nome}</Link>
+              <Link to={`/investidores/investidor/${current.investor_id}`} className="font-medium text-primary hover:underline">{current.investor_nome}</Link>
               <div className="text-muted-foreground">{current.investor_documento ?? "sem documento"}{!current.ativo && " · inativo"}</div>
               <div>Vigente desde {fmtDate(current.data_inicio)}</div>
             </>) : <p className="text-muted-foreground">Sem investidor vinculado.</p>}

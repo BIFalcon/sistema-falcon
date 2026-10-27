@@ -51,7 +51,7 @@ export function ChangeInvestorDialog({ open, onOpenChange, unitId, currentInvest
                 {found.map((i) => (
                   <button key={i.id} type="button" onClick={() => { setInvestorId(i.id); setPayeeId("none"); }}
                     className={`w-full text-left p-2 text-sm hover:bg-muted ${investorId === i.id ? "bg-muted" : ""}`}>
-                    {i.codigo_externo ? `${i.codigo_externo} - ` : ""}{i.nome} <span className="text-muted-foreground">{i.documento}</span>{!i.ativo && " (inativo)"}
+                    {i.nome} <span className="text-muted-foreground">{i.documento}</span>{!i.ativo && " (inativo)"}
                   </button>
                 ))}
               </div>
