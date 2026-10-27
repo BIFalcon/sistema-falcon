@@ -55,3 +55,10 @@
 - [x] Aplicar classificação aprovada de cargos aos departamentos nos custos atuais e futuras importações; reservas/comercial em Hospedagem e Serviços Gerais em Governança.
 - [x] Mostrar percentuais após as barras do Ranking e permitir baixar o gráfico completo como imagem.
 - [ ] Conferir download de imagem no Ranking com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
+## Alterações Gerais (3 blocos)
+- [ ] 1.1 Voltar à Visão Geral (DRE e Carta)
+- [ ] 1.2 Quem visualizou a DRE (dre_view_log + RPC)
+- [ ] 1.3 Fernando aprovando fora da vez (diagnóstico + regra front e servidor)
+- [ ] 1.4 Performance SLA só com filtro global
+- [ ] 2 Indicadores DRE Jaboatão: lucro = -(Aluguel Variável), checar Petrópolis
+- [ ] 3 RH Custo e Folha: aba Consolidado + RPC agregada + gráficos + export
