@@ -27,7 +27,7 @@ export default function DrePage() {
   const location = useLocation();
   const fromState = (location.state as { from?: string } | null)?.from;
   const backTo = fromState ?? "/fechamento";
-  const backLabel = fromState === "/fechamento" ? "Voltar à Visão Geral" : "Voltar ao Fechamento";
+  const backLabel = backTo === "/fechamento" ? "Voltar à Visão Geral" : "Voltar";
   const { hotelId, month, year } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster } = useAuth();
   const readOnlyBusiness = hasRole("novos_negocios") && !isMaster;

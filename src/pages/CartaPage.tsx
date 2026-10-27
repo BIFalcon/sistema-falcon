@@ -143,7 +143,7 @@ export default function CartaPage() {
   const location = useLocation();
   const fromState = (location.state as { from?: string } | null)?.from;
   const backTo = fromState ?? "/fechamento";
-  const backLabel = fromState === "/fechamento" ? "Voltar à Visão Geral" : "Voltar ao Fechamento";
+  const backLabel = backTo === "/fechamento" ? "Voltar à Visão Geral" : "Voltar";
   const qc = useQueryClient();
   const { hotelId, month, year, setHotelId, setMonth, setYear } = useModuleFilters("fechamento");
   const { user, allowedHotels, hasRole, isMaster, isPatronos } = useAuth();
