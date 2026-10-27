@@ -1,3 +1,4 @@
+import { getNetProfitOverride } from "@/lib/hotelNetProfit";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, LineChart as LineChartIcon, Upload, BarChart2, Table as TableIcon } from "lucide-react";
@@ -887,6 +888,9 @@ export default function IndicadoresDrePage() {
               return (
                 <Card key={card.title} className="p-3 shadow-soft">
                   <h3 className="text-xs font-semibold mb-2 truncate">{card.title}</h3>
+                  {(card.title === "Lucro Líquido" || card.title === "Margem Líquida") && hotelIds.some((h) => getNetProfitOverride(h)) && (
+                    <p className="text-[10px] text-muted-foreground -mt-1 mb-1">{hotelIds.map((h) => getNetProfitOverride(h)?.hint).find(Boolean)}</p>
+                  )}
                   <div className="grid grid-cols-3 gap-1 text-[11px]">
                     <div>
                       <p className="text-muted-foreground">Realizado</p>
