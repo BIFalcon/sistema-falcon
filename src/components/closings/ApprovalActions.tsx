@@ -56,13 +56,9 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
   const FIELD = isCarta ? "status_carta" : "status_dre";
 
   const requiredRole = APPROVER[currentStatus];
-  const canApprove =
-    isMaster ||
-    (!isCarta && currentStatus === "aguardando_comentarios" &&
-      (roles.includes("gg" as AppRole) || roles.includes("gop" as AppRole))) ||
-    (requiredRole !== null && roles.includes(requiredRole)) ||
-    // Patronos atuam como Controladoria em todos os estágios que exigem essa role.
-    (requiredRole === "controladoria" && roles.includes("patronos" as AppRole));
+  void isMaster;
+  const canApprove = canActOnStage(isCarta ? "carta" : "dre", currentStatus, roles, isFernandoCEO);
+  const waitingFor = STAGE_OWNER_LABEL[currentStatus];
 
   const nextStatus = NEXT[currentStatus];
   const prevStatus = PREV[currentStatus];
