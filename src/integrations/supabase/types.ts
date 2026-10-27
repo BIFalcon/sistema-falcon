@@ -3149,12 +3149,15 @@ export type Database = {
           conta: string | null
           created_at: string
           documento_favorecido: string | null
+          email: string | null
           id: string
           investor_id: string
           nome_favorecido: string
           observacao: string | null
           status_dados: string
+          telefone: string | null
           tipo_chave_pix: string | null
+          tipo_conta: string | null
           updated_at: string
         }
         Insert: {
@@ -3165,12 +3168,15 @@ export type Database = {
           conta?: string | null
           created_at?: string
           documento_favorecido?: string | null
+          email?: string | null
           id?: string
           investor_id: string
           nome_favorecido: string
           observacao?: string | null
           status_dados?: string
+          telefone?: string | null
           tipo_chave_pix?: string | null
+          tipo_conta?: string | null
           updated_at?: string
         }
         Update: {
@@ -3181,12 +3187,15 @@ export type Database = {
           conta?: string | null
           created_at?: string
           documento_favorecido?: string | null
+          email?: string | null
           id?: string
           investor_id?: string
           nome_favorecido?: string
           observacao?: string | null
           status_dados?: string
+          telefone?: string | null
           tipo_chave_pix?: string | null
+          tipo_conta?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4495,12 +4504,59 @@ export type Database = {
           },
         ]
       }
+      unit_payee_shares: {
+        Row: {
+          created_at: string
+          id: string
+          link_id: string
+          payee_id: string
+          percentual: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link_id: string
+          payee_id: string
+          percentual: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link_id?: string
+          payee_id?: string
+          percentual?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_payee_shares_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "unit_investor_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_payee_shares_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "v_pool_units_current"
+            referencedColumns: ["link_id"]
+          },
+          {
+            foreignKeyName: "unit_payee_shares_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "investor_payees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           codigo_uh: string
           created_at: string
           hotel_id: string
           id: string
+          matricula: string | null
           modalidade: string
           updated_at: string
         }
@@ -4509,6 +4565,7 @@ export type Database = {
           created_at?: string
           hotel_id: string
           id?: string
+          matricula?: string | null
           modalidade?: string
           updated_at?: string
         }
@@ -4517,6 +4574,7 @@ export type Database = {
           created_at?: string
           hotel_id?: string
           id?: string
+          matricula?: string | null
           modalidade?: string
           updated_at?: string
         }
@@ -5226,6 +5284,43 @@ export type Database = {
         }
         Returns: string
       }
+      inv_create_unit: {
+        Args: {
+          _codigo_uh: string
+          _hotel_id: string
+          _matricula: string
+          _modalidade: string
+        }
+        Returns: string
+      }
+      inv_full_export: {
+        Args: { _hotel_id?: string }
+        Returns: {
+          agencia: string
+          banco_codigo: string
+          banco_nome: string
+          chave_pix: string
+          codigo_uh: string
+          conta: string
+          favorecido: string
+          favorecido_documento: string
+          favorecido_email: string
+          favorecido_telefone: string
+          hotel_name: string
+          investidor: string
+          investidor_documento: string
+          investidor_email: string
+          investidor_telefone: string
+          matricula: string
+          modalidade: string
+          observacao: string
+          percentual: number
+          status_dados: string
+          tipo_chave_pix: string
+          tipo_conta: string
+          vigente_desde: string
+        }[]
+      }
       inv_import: {
         Args: {
           _file_name?: string
@@ -5348,6 +5443,14 @@ export type Database = {
       inv_set_observacao: {
         Args: { _observacao: string; _payee_ids: string[] }
         Returns: number
+      }
+      inv_set_payee_shares: {
+        Args: { _shares: Json; _unit_id: string }
+        Returns: undefined
+      }
+      inv_set_unit_matricula: {
+        Args: { _matricula: string; _unit_id: string }
+        Returns: undefined
       }
       inv_stats: {
         Args: { _hotel_id?: string; _modalidade?: string }
