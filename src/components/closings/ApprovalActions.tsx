@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -193,7 +194,7 @@ export function ApprovalActions({ closingId, stage, currentStatus, onChanged }: 
     </>
   );
 }
-function Gate({ blocked, label, children }: { blocked: boolean; label?: string; children: React.ReactNode }) {
+function Gate({ blocked, label, children }: { blocked: boolean; label?: string; children: ReactNode }) {
   if (!blocked || !label) return <>{children}</>;
   return (
     <TooltipProvider delayDuration={150}>
