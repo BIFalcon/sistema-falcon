@@ -45,13 +45,13 @@ export function ChangeInvestorDialog({ open, onOpenChange, unitId, currentInvest
         <div className="space-y-3">
           {mode === "investor" && !newInv && (
             <div className="space-y-1">
-              <Label>Buscar investidor (nome, CPF/CNPJ ou código)</Label>
+              <Label>Buscar investidor (nome ou CPF/CNPJ)</Label>
               <Input value={q} onChange={(e) => setQ(e.target.value)} />
               <div className="max-h-40 overflow-auto rounded border divide-y">
                 {found.map((i) => (
                   <button key={i.id} type="button" onClick={() => { setInvestorId(i.id); setPayeeId("none"); }}
                     className={`w-full text-left p-2 text-sm hover:bg-muted ${investorId === i.id ? "bg-muted" : ""}`}>
-                    {i.codigo_externo ? `${i.codigo_externo} - ` : ""}{i.nome} <span className="text-muted-foreground">{i.documento}</span>{!i.ativo && " (inativo)"}
+                    {i.nome} <span className="text-muted-foreground">{i.documento}</span>{!i.ativo && " (inativo)"}
                   </button>
                 ))}
               </div>
@@ -62,7 +62,6 @@ export function ChangeInvestorDialog({ open, onOpenChange, unitId, currentInvest
             <div className="grid grid-cols-2 gap-2">
               <div className="col-span-2"><Label>Nome</Label><Input value={ni.nome} onChange={(e) => setNi({ ...ni, nome: e.target.value })} /></div>
               <div><Label>CPF/CNPJ</Label><Input value={ni.documento} onChange={(e) => setNi({ ...ni, documento: e.target.value })} /></div>
-              <div><Label>Matrícula do imóvel (opcional)</Label><Input value={ni.codigo} onChange={(e) => setNi({ ...ni, codigo: e.target.value })} /></div>
               <div><Label>E-mail</Label><Input value={ni.email} onChange={(e) => setNi({ ...ni, email: e.target.value })} /></div>
               <div><Label>Telefone</Label><Input value={ni.telefone} onChange={(e) => setNi({ ...ni, telefone: e.target.value })} /></div>
               <p className="col-span-2 text-xs text-muted-foreground">Depois de vincular, cadastre o favorecido no detalhe do investidor.</p>

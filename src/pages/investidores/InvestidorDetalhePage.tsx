@@ -30,7 +30,7 @@ export default function InvestidorDetalhePage() {
       <Link to="/investidores" className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:underline"><ArrowLeft className="h-4 w-4" />Investidores</Link>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{investor.codigo_externo ? `${investor.codigo_externo} - ` : ""}{investor.nome}</h1>
+          <h1 className="text-2xl font-semibold">{investor.nome}</h1>
           <p className="text-sm text-muted-foreground">{investor.documento ?? "sem documento"} · {investor.email ?? "sem e-mail"} · {investor.telefone ?? "sem telefone"}{!investor.ativo && " · INATIVO"}</p>
         </div>
         <div className="flex gap-2">

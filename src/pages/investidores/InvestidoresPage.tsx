@@ -8,12 +8,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Upload, Search } from "lucide-react";
+import { Download, Upload, Search, Plus, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { fetchPendingExport, useInvestorAccess, useInvestorMutations, useInvestorStats, useInvestorUnits } from "@/hooks/useInvestors";
+import { fetchFullExport, fetchPendingExport, useInvestorAccess, useInvestorMutations, useInvestorStats, useInvestorUnits } from "@/hooks/useInvestors";
 import { StatusSelo, fmtDate } from "@/components/investidores/StatusSelo";
 import { ImportInvestorsDialog } from "@/components/investidores/ImportInvestorsDialog";
+import { NewUnitDialog } from "@/components/investidores/NewUnitDialog";
+import { logSensitiveExport } from "@/hooks/useRhPayroll";
+import { formatDocumento, formatTelefone } from "@/lib/brValidation";
 
 const ALL = "__all";
 const PAGE = 50;
@@ -32,6 +35,8 @@ export default function InvestidoresPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [newUnitOpen, setNewUnitOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [obsOpen, setObsOpen] = useState(false);
   const [obs, setObs] = useState("aguardando termo de adesão ao pool assinado");
@@ -57,6 +62,28 @@ export default function InvestidoresPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao exportar"); }
   };
 
+  const exportFull = async () => {
+    setExporting(true);
+    try {
+      await logSensitiveExport({ module: "investidores_base_completa", format: "xlsx", hotelId: hotelId ?? undefined, details: { dados_completos: access.can_view_full } });
+      const data = await fetchFullExport(hotelId);
+      const conta = (t: string | null) => (t === "corrente" ? "Corrente" : t === "poupanca" ? "Poupança" : "");
+      const ws = XLSX.utils.json_to_sheet(data.map((r) => ({
+        Hotel: r.hotel_name, UH: r.codigo_uh, "Matrícula do imóvel": r.matricula ?? "", Modalidade: r.modalidade === "pool" ? "Pool" : "Condo",
+        Investidor: r.investidor ?? "", "CPF/CNPJ investidor": access.can_view_full ? formatDocumento(r.investidor_documento) : r.investidor_documento ?? "",
+        "E-mail investidor": r.investidor_email ?? "", "Telefone investidor": formatTelefone(r.investidor_telefone), "Vigente desde": fmtDate(r.vigente_desde),
+        Favorecido: r.favorecido ?? "", "Fração (%)": r.percentual != null ? Number(r.percentual) : "",
+        "CPF/CNPJ favorecido": access.can_view_full ? formatDocumento(r.favorecido_documento) : r.favorecido_documento ?? "",
+        "E-mail favorecido": r.favorecido_email ?? "", "Telefone favorecido": formatTelefone(r.favorecido_telefone),
+        "Banco (código)": r.banco_codigo ?? "", Banco: r.banco_nome ?? "", Agência: r.agencia ?? "", Conta: r.conta ?? "", "Tipo de conta": conta(r.tipo_conta),
+        "Tipo chave PIX": r.tipo_chave_pix ?? "", "Chave PIX": r.chave_pix ?? "", Status: r.status_dados, Observação: r.observacao ?? "",
+      })));
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Base completa");
+      XLSX.writeFile(wb, `base-investidores-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao exportar"); }
+    finally { setExporting(false); }
+  };
+
   const selectedPayees = rows.filter((r) => selected.has(r.unit_id) && r.payee_id).map((r) => r.payee_id!) ;
   const selectedUnits = Array.from(selected);
 
@@ -67,9 +94,11 @@ export default function InvestidoresPage() {
           <h1 className="text-2xl font-semibold">Investidores</h1>
           <p className="text-sm text-muted-foreground">Unidades, investidores e dados de recebimento</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={exportPend}><Download className="h-4 w-4 mr-2" />Exportar pendências</Button>
-          {access.can_edit && <Button onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar planilha</Button>}
+          <Button variant="outline" disabled={exporting} onClick={exportFull}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar base completa</Button>
+          {access.can_edit && <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar planilha</Button>}
+          {access.can_edit && <Button onClick={() => setNewUnitOpen(true)}><Plus className="h-4 w-4 mr-2" />Nova UH</Button>}
         </div>
       </div>
 
@@ -90,7 +119,7 @@ export default function InvestidoresPage() {
         </Select>
         <div className="relative flex-1 min-w-[220px]">
           <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Buscar UH, investidor, favorecido ou documento" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+          <Input className="pl-8" placeholder="Buscar UH, matrícula, investidor, favorecido ou documento" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
         </div>
       </div>
 
@@ -139,6 +168,7 @@ export default function InvestidoresPage() {
         <Button size="sm" variant="outline" disabled={(page + 1) * PAGE >= total} onClick={() => setPage((p) => p + 1)}>Próxima</Button>
       </div>
 
+      <NewUnitDialog open={newUnitOpen} onOpenChange={setNewUnitOpen} defaultHotelId={hotelId} />
       {importOpen && <ImportInvestorsDialog open={importOpen} onOpenChange={setImportOpen} defaultHotelId={hotelId} />}
 
       <Dialog open={obsOpen} onOpenChange={setObsOpen}>
