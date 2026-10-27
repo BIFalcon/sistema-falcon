@@ -9,6 +9,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { canUploadRh } from "@/lib/rhAccess";
+import { canViewRhConsolidated } from "@/lib/rhConsolidated";
+import { RhConsolidatedTab } from "@/components/rh/RhConsolidatedTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sortPayrollEntries, type PayrollSort, type PayrollSortKey } from "@/lib/payrollSort";
 import { payrollCostPerRoomnight, payrollDepartmentPercentage, payrollMonthlySeries } from "@/lib/payrollMetrics";
 import type { RhMonthlyResult } from "@/lib/rhMonthlyParser";
@@ -50,6 +53,31 @@ function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: 
 }
 
 export default function CustoFolhaPage() {
+  const { roles, allowedHotels } = useAuth();
+  const { month, year } = useModuleFilters("rh");
+  if (!canViewRhConsolidated(roles, allowedHotels.length)) return <CustoFolhaPorHotel />;
+  return (
+    <Tabs defaultValue="hotel" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="hotel">Por hotel</TabsTrigger>
+        <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
+      </TabsList>
+      <TabsContent value="hotel"><CustoFolhaPorHotel /></TabsContent>
+      <TabsContent value="consolidado">
+        <div className="space-y-4" translate="no">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent mb-1">RH & People</p>
+            <h1 className="text-3xl font-semibold">Custo e Folha — Consolidado</h1>
+            <p className="text-sm text-muted-foreground mt-1">{MONTHS[month - 1]}/{year}</p>
+          </div>
+          <RhConsolidatedTab month={month} year={year} />
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function CustoFolhaPorHotel() {
   const { roles, allowedHotels } = useAuth();
   const isRhManager = canUploadRh(roles);
   const { hotelId, month, year, setMonth, setYear } = useModuleFilters("rh");

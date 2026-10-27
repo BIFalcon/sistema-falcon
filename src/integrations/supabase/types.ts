@@ -4744,6 +4744,7 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_rh_consolidated: { Args: { _user_id: string }; Returns: boolean }
       can_view_rh_directory: { Args: { _user_id: string }; Returns: boolean }
       can_view_rh_monthly_hotel: {
         Args: { _hotel_id: string; _user_id: string }
@@ -5146,6 +5147,10 @@ export type Database = {
           termination_date: string
           total_cost: number
         }[]
+      }
+      get_rh_payroll_consolidated: {
+        Args: { _month: number; _year: number }
+        Returns: Json
       }
       get_rh_payroll_history: {
         Args: { _hotel_id: string; _year: number }
