@@ -14,6 +14,7 @@ import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
 import { excludedSettlementIds } from "@/lib/settlementCutoff";
 import { SettlementBatchDialog } from "@/components/conciliacao/SettlementBatchDialog";
 import type { BatchTarget } from "@/hooks/useSettlementBatch";
+import { BankReceiptRulesPanel } from "./BankReceiptRulesPanel";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-"); return `${m}/${y}`; };
@@ -54,6 +55,7 @@ export function RedeBaixaTab({ hotelId }: { hotelId: string }) {
     <div className="space-y-4">
       <SettlementBatchDialog hotelId={hotelId} target={batchTarget} onClose={() => setBatchTarget(null)} />
       <SettlementCutoffPanel key={hotelId} hotelId={hotelId} provider="rede" />
+      <BankReceiptRulesPanel key={`rules-${hotelId}`} hotelId={hotelId} />
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
         <Button size="sm" variant="outline" disabled={auto.isPending} onClick={() => auto.mutate(hotelId, {
           onSuccess: (r) => toast.success(`${r.matched} recebimento(s) baixado(s) no banco.`),

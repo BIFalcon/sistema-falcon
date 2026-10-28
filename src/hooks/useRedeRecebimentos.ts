@@ -25,14 +25,17 @@ export function useRedeRecebimentosData(hotelId: string | null) {
     queryKey: ["conc-rede-receb", hotelId ?? "none"],
     enabled: !!hotelId,
     queryFn: async () => {
-      const h = hotelId!;
+      if (!hotelId) throw new Error("Selecione um hotel");
+      const h = hotelId;
+      const rules = await supabase.from("conc_bank_receipt_rules").select("prefix").eq("hotel_id", h).eq("enabled", true);
+      if (rules.error) throw rules.error;
       const [recebidos, chargebacks, ajustes, pagamentos, b2b, bank] = await Promise.all([
         pageAll<RecebidoRow>((a, b) => supabase.from("conc_rede_recebidos").select("id, data, bandeira, modalidade, valor_depositado, status, matched_bank_id, matched_at").eq("hotel_id", h).order("data").order("id").range(a, b)),
         pageAll<ChargebackRow>((a, b) => supabase.from("conc_rede_chargebacks").select("id, data_debito, tipo, data_original_venda, valor_original_venda, valor_descontado, motivo_cancelamento, nsu_cv, bandeira, modalidade").eq("hotel_id", h).order("data_debito").order("id").range(a, b)),
         pageAll<AjusteRow>((a, b) => supabase.from("conc_rede_ajustes").select("id, data_ajuste, motivo, valor_cobrado, bandeira").eq("hotel_id", h).order("data_ajuste").order("id").range(a, b)),
         pageAll<{ data_recebimento: string | null; valor_mdr: number | null }>((a, b) => supabase.from("conc_rede_pagamentos").select("data_recebimento, valor_mdr").eq("hotel_id", h).order("id").range(a, b)),
         pageAll<{ data_operacao: string | null; valor_taxa_adquirencia: number | null }>((a, b) => supabase.from("conc_b2b_receipts").select("data_operacao, valor_taxa_adquirencia").eq("hotel_id", h).eq("tipo_lancamento", "charge").order("id").range(a, b)),
-        pageAll<BankRow>((a, b) => supabase.from("conc_bank_entries").select("id, line_date, description, amount, matched_at").eq("hotel_id", h).ilike("description", `${REDE_BANK_PREFIX}%`).order("line_date").order("id").range(a, b)),
+        pageAll<BankRow>((a, b) => supabase.from("conc_bank_entries").select("id, line_date, description, amount, matched_at").eq("hotel_id", h).order("line_date").order("id").range(a, b)),
       ]);
       // Venda original do chargeback pelo NSU.
       const nsus = [...new Set(chargebacks.map((c) => c.nsu_cv).filter(Boolean) as string[])];
@@ -42,7 +45,8 @@ export function useRedeRecebimentosData(hotelId: string | null) {
         if (error) throw error;
         sales = data ?? [];
       }
-      return { recebidos, chargebacks, ajustes, pagamentos, b2b, bank, sales };
+      const prefixes = [REDE_BANK_PREFIX, ...rules.data.map(r => r.prefix)].map(p => p.trim().toUpperCase());
+      return { recebidos, chargebacks, ajustes, pagamentos, b2b, bank: bank.filter(b => prefixes.some(p => b.description?.trim().toUpperCase().startsWith(p))), sales };
     },
   });
 }
@@ -85,11 +89,12 @@ export function useImportRedeRecebimentos() {
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
       const p = await parseRedeRecebimentosExcel(file, hotelId);
+      if (!user) throw new Error("Entre novamente no sistema");
       const total = p.pagamentos.length + p.recebidos.length + p.ajustes.length + p.chargebacks.length;
       if (!total) throw new Error("Nenhum lançamento encontrado no relatório de recebimentos.");
       const { data: up, error: upErr } = await supabase.from("conc_uploads").insert({
         hotel_id: hotelId, kind: "rede_receipts", file_name: file.name, file_size: file.size,
-        parsed_count: total, skipped_count: 0, uploaded_by: user!.id,
+        parsed_count: total, skipped_count: 0, uploaded_by: user.id,
         metadata: { source: "rede_receipts", hotel_ids: [hotelId] },
       }).select("id").single();
       if (upErr) throw upErr;
