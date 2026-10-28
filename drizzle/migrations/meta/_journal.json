@@ -575,6 +575,13 @@
       "when": 1793190116489,
       "tag": "0081_consolidate_ar_alert_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793192663144,
+      "tag": "0082_gop_dre_indicators_all_hotels",
+      "breakpoints": true
     }
   ]
 }
