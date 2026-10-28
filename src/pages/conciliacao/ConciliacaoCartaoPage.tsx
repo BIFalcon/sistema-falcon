@@ -453,9 +453,21 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
         />
       </div>
 
-      {canSendDivergences(isMaster, roles) && ["cartao", "pix", "dinheiro"].includes(mainTab) && (
-        <div className="flex justify-end">
-          <Button variant="outline" disabled={!hotelId} onClick={() => setSendOpen(true)}><Send className="mr-2 h-4 w-4" />Enviar divergências agora</Button>
+      {["cartao", "pix", "dinheiro"].includes(mainTab) && (
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            disabled={!hotelId || autoReconcile.isPending}
+            onClick={() => autoReconcile.mutate(hotelId, {
+              onSuccess: (n: unknown) => toast.success(`Conciliação automática concluída${typeof n === "number" ? `: ${n} par(es)` : ""}`),
+              onError: (e: Error) => toast.error(e.message),
+            })}
+          >
+            <Send className="mr-2 h-4 w-4" />{autoReconcile.isPending ? "Conciliando…" : "Conciliar automaticamente"}
+          </Button>
+          {canSendDivergences(isMaster, roles) && (
+            <Button variant="outline" disabled={!hotelId} onClick={() => setSendOpen(true)}><Send className="mr-2 h-4 w-4" />Enviar divergências agora</Button>
+          )}
         </div>
       )}
       <Tabs value={mainTab} onValueChange={setMainTab}>
