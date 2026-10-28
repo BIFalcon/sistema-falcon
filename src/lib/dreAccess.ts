@@ -25,3 +25,7 @@ export function scopeDreHotelIds(selected: string[], hotelId: string | null, all
   if (!summaryOnly) return scoped;
   return scoped.length > 0 ? scoped.slice(0, 1) : allowed.slice(0, 1);
 }
+/** GOP sees every network hotel, but only inside Indicadores DRE. */
+export function usesNetworkDreHotels(roles: AppRole[], isMaster: boolean): boolean {
+  return !isMaster && roles.includes("gop") && !isDreSummaryOnly(roles, isMaster);
+}

@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useDreAnalytics } from "@/hooks/useDre";
+import { useDreIndicatorHotels } from "@/hooks/useDreIndicatorHotels";
 import { findDreLine, type DreLineNode, type DreMonthValue, type DreSeriesKey } from "@/lib/dreAnalytics";
 import { MONTHS_PT } from "@/lib/constants";
 import { fmtBRL } from "@/lib/formatters";
@@ -518,7 +519,7 @@ export default function IndicadoresDrePage() {
   const month = Math.max(...selectedMonths);
   const yearOptions = useMemo(() => { const now = new Date().getFullYear(); return Array.from({ length: now - 2019 }, (_, i) => now - i); }, []);
   const queryClient = useQueryClient();
-  const hotelOptions = allowedHotels;
+  const hotelOptions = useDreIndicatorHotels();
   const [retroOpen, setRetroOpen] = useState(false);
   const [retroHotelId, setRetroHotelId] = useState<string>("");
   const [retroYear, setRetroYear] = useState<number>(new Date().getFullYear());
@@ -862,9 +863,9 @@ export default function IndicadoresDrePage() {
       <PeriodBar year={year} setYear={setYear} months={selectedMonths} setMonths={setSelectedMonths} years={yearOptions} hideYear={tab === "historico"} />
 
       {tab === "comparativo" ? (
-        <ComparativoTab hotels={allowedHotels} year={year} months={selectedMonths} initial={hotelIds} />
+        <ComparativoTab hotels={hotelOptions} year={year} months={selectedMonths} initial={hotelIds} />
       ) : tab === "historico" ? (
-        <HistoricoTab hotels={allowedHotels} defaultHotelId={hotelIds[0] ?? null} months={selectedMonths} />
+        <HistoricoTab hotels={hotelOptions} defaultHotelId={hotelIds[0] ?? null} months={selectedMonths} />
       ) : noHotelSelected ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
           <BarChart2 className="h-12 w-12 opacity-20" />

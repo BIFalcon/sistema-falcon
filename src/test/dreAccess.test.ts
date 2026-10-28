@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRE_INDICATOR_ROLES, isDreSummaryOnly, resolveDreTab, scopeDreHotelIds, canAccessNovosNegociosPath, isNovosNegociosOnly } from "@/lib/dreAccess";
+import { DRE_INDICATOR_ROLES, isDreSummaryOnly, resolveDreTab, scopeDreHotelIds, canAccessNovosNegociosPath, isNovosNegociosOnly, usesNetworkDreHotels } from "@/lib/dreAccess";
 
 describe("ADM Indicadores DRE", () => {
   it("permits ADM access to the indicators module", () => {
@@ -41,5 +41,15 @@ describe("Novos Negócios", () => {
   });
   it("permits selection across all accessible hotels", () => {
     expect(scopeDreHotelIds(["a", "b"], null, ["a", "b"], false)).toEqual(["a", "b"]);
+  });
+});
+describe("usesNetworkDreHotels", () => {
+  it("libera todos os hotéis para GOP nos Indicadores DRE", () => {
+    expect(usesNetworkDreHotels(["gop"], false)).toBe(true);
+  });
+  it("não muda a lista de GG, ADM ou Master", () => {
+    expect(usesNetworkDreHotels(["gg"], false)).toBe(false);
+    expect(usesNetworkDreHotels(["adm"], false)).toBe(false);
+    expect(usesNetworkDreHotels(["gop"], true)).toBe(false);
   });
 });
