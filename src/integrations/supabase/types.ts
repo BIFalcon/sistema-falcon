@@ -238,6 +238,12 @@ export type Database = {
           archived_reason: string | null
           archived_upload_id: string | null
           bank_account: string | null
+          barcode: string | null
+          beneficiary_account: string | null
+          beneficiary_agency: string | null
+          beneficiary_bank: string | null
+          beneficiary_name: string | null
+          beneficiary_tax_id: string | null
           category: string | null
           category_normalized: string | null
           cnpj: string | null
@@ -266,17 +272,23 @@ export type Database = {
           original_amount: number | null
           paid_amount: number | null
           paid_interest: number | null
+          payment_document_number: string | null
           payment_marked_at: string | null
           payment_marked_by: string | null
           payment_method: string | null
           payment_paid_at: string | null
           payment_status: Database["public"]["Enums"]["ap_payment_status"]
+          pix_key: string | null
           previous_category: string | null
           primary_document_id: string | null
           raw: Json
           scheduled_date: string | null
           settled_at: string | null
           settled_by: string | null
+          source_document_type: string | null
+          source_due_date: string | null
+          source_forecast_date: string | null
+          source_registered_date: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           transfer_from_bank: string | null
@@ -290,6 +302,12 @@ export type Database = {
           archived_reason?: string | null
           archived_upload_id?: string | null
           bank_account?: string | null
+          barcode?: string | null
+          beneficiary_account?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_name?: string | null
+          beneficiary_tax_id?: string | null
           category?: string | null
           category_normalized?: string | null
           cnpj?: string | null
@@ -318,17 +336,23 @@ export type Database = {
           original_amount?: number | null
           paid_amount?: number | null
           paid_interest?: number | null
+          payment_document_number?: string | null
           payment_marked_at?: string | null
           payment_marked_by?: string | null
           payment_method?: string | null
           payment_paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
+          pix_key?: string | null
           previous_category?: string | null
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null
           settled_at?: string | null
           settled_by?: string | null
+          source_document_type?: string | null
+          source_due_date?: string | null
+          source_forecast_date?: string | null
+          source_registered_date?: string | null
           source_system: Database["public"]["Enums"]["financial_system"]
           supplier: string
           transfer_from_bank?: string | null
@@ -342,6 +366,12 @@ export type Database = {
           archived_reason?: string | null
           archived_upload_id?: string | null
           bank_account?: string | null
+          barcode?: string | null
+          beneficiary_account?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_name?: string | null
+          beneficiary_tax_id?: string | null
           category?: string | null
           category_normalized?: string | null
           cnpj?: string | null
@@ -370,17 +400,23 @@ export type Database = {
           original_amount?: number | null
           paid_amount?: number | null
           paid_interest?: number | null
+          payment_document_number?: string | null
           payment_marked_at?: string | null
           payment_marked_by?: string | null
           payment_method?: string | null
           payment_paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["ap_payment_status"]
+          pix_key?: string | null
           previous_category?: string | null
           primary_document_id?: string | null
           raw?: Json
           scheduled_date?: string | null
           settled_at?: string | null
           settled_by?: string | null
+          source_document_type?: string | null
+          source_due_date?: string | null
+          source_forecast_date?: string | null
+          source_registered_date?: string | null
           source_system?: Database["public"]["Enums"]["financial_system"]
           supplier?: string
           transfer_from_bank?: string | null

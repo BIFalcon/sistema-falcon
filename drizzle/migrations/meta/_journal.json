@@ -582,6 +582,13 @@
       "when": 1793192663144,
       "tag": "0082_gop_dre_indicators_all_hotels",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1793193785700,
+      "tag": "0083_ap_omie_payment_details",
+      "breakpoints": true
     }
   ]
 }
