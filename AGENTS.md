@@ -1,7 +1,7 @@
 
 - Indicadores DRE route, navigation and summary restrictions share dreAccess helpers; ADM-only uses one linked hotel, GOP lists all hotels only there (list_dre_indicator_hotels + can_read_dre_hotel), and DRE RPCs check hotel authorization.
 - Novos Negocios uses DRE-specific read policies and can_read_dre_hotel, never general/global data-access helpers; its layout allows only DRE, indicators and account profile, and DRE resolution reads existing closings without creating them.
-- Letter preview and download use requireLetterPdfBlob when live generation is configured; generation failures must surface instead of silently substituting a stored PDF.
+- Live letter PDFs use requireLetterPdfBlob; surface failures, never substitute stored PDFs.
 - Letter DRE revenue composition uses letterRevenue keyed by the closing hotel ID; scoped templates prevent one hotel's line mapping from changing other hotels, and PDF rows must fit through distribution.
 - Carta uses the authorized hotel list without persisted GOP scoping, defaults to a valid single hotel, and synchronizes direct closing links with shared filters; changing a filter releases the URL closing pin so the displayed letter follows the selection.
 - RH monthly imports use rh_employees as the single source and import_rh_monthly as an atomic, serialized whole-period replacement; this prevents partial imports and keeps both RH panels consistent.
@@ -12,7 +12,7 @@
 - Detailed payroll extras use nullable source columns and the versioned manager-only entries RPC; older layouts retain totals without fabricated detail. RH Roomnights uses an RH-authorized RPC reading the latest monthly DRE occupied-room indicator, not occupancy multiplied by cached availability.
 - Turnover history uses independent authorized monthly snapshots, preserving event-time fields for period charts; departure reason categories are server-side aggregates so masked individual reasons remain private.
 - Payroll sorting uses the pure payrollSort helper on copied rows, never mutating cache or export/access.
-- Sensitive exports log to sensitive_export_log before the file is generated — reuse it for every sensitive export module.
+- Sensitive exports log to sensitive_export_log before generation.
 - Consolidated RH departments are classified server-side by rh_department_for_position and a monthly-row trigger; this keeps individual and aggregate views consistent for current rows and future imports without changing legacy payroll data.
 
 - Investidores module: all reads/writes go through SECURITY DEFINER `inv_*` RPCs (tables have RLS with no direct policies) so masking, audit (audit_access_logs) and finance notifications stay server-side; access comes from user_roles (edit + full view for editor roles) and user_permissions keys (finance, extra full view), never hardcoded e-mails.
@@ -36,4 +36,5 @@
 
 - Investors: matrícula lives on units; payee fractions in unit_payee_shares (sum 100%, via inv_set_payee_shares); monthly payment batches snapshot Pool UHs × fractions and are re-checked before sending; CNAB 240 Itaú is built only by src/lib/cnab240Itau.ts (test-locked to the bank sample) and returns match by seu_numero.
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
-- Recurring AR alerts use enqueue_ar_consolidated (one e-mail per recipient, all hotels) to avoid per-hotel floods.
+- Recurring AR alerts use enqueue_ar_consolidated: one email per recipient, all hotels.
+- AP OMIE uses pure omieParser beside parse-ap-report; beneficiary fields stay separate from payer accounts and Nota Fiscal identity to preserve UI and document links.
