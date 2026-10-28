@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRE_INDICATOR_ROLES, isDreSummaryOnly, resolveDreTab, scopeDreHotelIds, canAccessNovosNegociosPath, isNovosNegociosOnly } from "@/lib/dreAccess";
+import { DRE_INDICATOR_ROLES, isDreSummaryOnly, resolveDreTab, scopeDreHotelIds, canAccessNovosNegociosPath, isNovosNegociosOnly, usesNetworkDreHotels } from "@/lib/dreAccess";
 
 describe("ADM Indicadores DRE", () => {
   it("permits ADM access to the indicators module", () => {
