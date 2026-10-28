@@ -589,6 +589,13 @@
       "when": 1793193785700,
       "tag": "0083_ap_omie_payment_details",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793199717439,
+      "tag": "0084_settlement_proven_deductions_and_bank_rules",
+      "breakpoints": true
     }
   ]
 }
