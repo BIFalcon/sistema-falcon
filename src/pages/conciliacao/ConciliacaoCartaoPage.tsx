@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { logSensitiveExport } from "@/hooks/useRhPayroll";
 import { canSendDivergences } from "@/lib/conciliationDivergences";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { fmtBRL, fmtDateTime } from "@/lib/formatters";
@@ -139,8 +140,11 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
   const aFaturar = useAFaturarDaily(hotelId, dateFrom, dateTo, specificDates, mainTab === "trx-diario");
   const justifications = useConcJustifications(hotelId);
   const loadJustifications = async () => {
+    if (!hotelId) throw new Error("Selecione um hotel.");
     const result = await justifications.refetch();
     if (result.error) throw result.error;
+    await logSensitiveExport({ module: "conciliacao", format: "xlsx", hotelId,
+      details: { kind: mainTab, dateFrom, dateTo, specificDates, includes_justifications: true } });
     return result.data ?? [];
   };
   const saveJustification = useSaveJustification();
