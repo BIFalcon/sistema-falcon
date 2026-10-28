@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth, type Hotel } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Hotel } from "@/lib/constants";
 import { usesNetworkDreHotels } from "@/lib/dreAccess";
 
 /** Hotels selectable in Indicadores DRE (GOP: whole network; others: their usual list). */
@@ -14,7 +15,7 @@ export function useDreIndicatorHotels(enabled = true): Hotel[] {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("list_dre_indicator_hotels");
       if (error) throw error;
-      return (data ?? []) as Hotel[];
+      return (data ?? []) as unknown as Hotel[];
     },
   });
   return network && data && data.length > 0 ? data : allowedHotels;

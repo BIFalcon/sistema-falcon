@@ -26,6 +26,7 @@ import { usePendingNotificationCount } from "@/hooks/useNotifications";
 import { useGopManagers } from "@/hooks/useGopManagers";
 import { DateFilterPicker } from "@/components/financeiro/DateFilterPicker";
 import { isDreSummaryOnly } from "@/lib/dreAccess";
+import { useDreIndicatorHotels } from "@/hooks/useDreIndicatorHotels";
 import { resolveCartaHotelId } from "@/lib/cartaHotelSelection";
 
 function getModuleFromPath(pathname: string): FilterModule {
@@ -49,10 +50,12 @@ export function AppHeader() {
   const { pathname, search } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
-  const { allowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz, roles } = useAuth();
+  const { allowedHotels: authAllowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz, roles } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
   const isIndicadores = pathname.startsWith("/indicadores");
+  const indicatorHotels = useDreIndicatorHotels(isIndicadores);
+  const allowedHotels = isIndicadores ? indicatorHotels : authAllowedHotels;
   const isCarta = pathname === "/fechamento/carta" || pathname === "/carta";
   const closingIdParam = new URLSearchParams(search).get("closing");
   const summaryOnly = isIndicadores && isDreSummaryOnly(roles, isMaster);
