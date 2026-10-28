@@ -1,9 +1,10 @@
 ## Revisão completa das baixas
-- [ ] Compor lotes Rede com cancelamentos e ajustes comprovados, sem duplicar taxas.
-- [ ] Explicar todos os créditos da transitória, com conferência de PIX e depósitos em dinheiro.
-- [ ] Configurar prefixos centralizadores por hotel com autorização e vínculo inequívoco.
-- [ ] Baixar rendimentos de aplicação identificados, preservando reversões e histórico.
-- [ ] Reprocessar hotéis, conferir regras, testes e fluxo autorizado.
+- [x] Compor lotes Rede com descontos explicitamente vinculados, sem duplicar cancelamento; remover taxa presumida e bloquear lotes repetidos.
+- [x] Abrir todos os ciclos transitórios por identidade; mostrar provas/candidatos e confirmar PIX/dinheiro D−1/D+1 por soma exata e justificativa.
+- [x] Disponibilizar prefixos centralizadores por hotel; nenhum prefixo inventado ou transferência presumida.
+- [x] Baixar 237 rendimentos/R$162,74, com histórico e bloqueio de reaplicação após desfazer.
+- [x] Reprocessar Rede e rever vínculos em todos os hotéis; 17 baixas sem prova reabertas. Manhuaçu mantém R$588,27 aguardando confirmação explícita; nenhum crédito operacional novo liberado.
+- [ ] Conferir confirmações e regras na tela com sessão autorizada — bloqueado: conta do solicitante não encontrada; preview no login. Exige login ou autorização para outra conta.
 
 ## Justificativas, Faturamento e Excel
 - [x] Adicionar filtros de data inicial/final e mês de referência nas Justificativas; período inclusivo, busca e limpeza testados.
