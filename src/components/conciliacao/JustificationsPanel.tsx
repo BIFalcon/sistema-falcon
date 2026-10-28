@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
-import { MessageSquarePlus, Save, Search } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { MessageSquarePlus, Save, Search, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { BrDateInput } from "@/components/ui/br-date-input";
+import { filterJustificationRows, referenceMonthRange } from "@/lib/conciliationJustifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,34 +21,45 @@ export function JustificationsPanel({
   kind,
   onSave,
   saving,
+  dateFrom,
+  dateTo,
+  onChangeRange,
 }: {
   rows: ReconcileRow[];
   justifications: ConcJustification[];
   kind: ConcKind;
   onSave: (row: ReconcileRow, note: string) => void;
   saving: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  onChangeRange?: (from: string, to: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const id = useId();
+  const [localFrom, setLocalFrom] = useState("");
+  const [localTo, setLocalTo] = useState("");
+  const from = dateFrom ?? localFrom;
+  const to = dateTo ?? localTo;
+  const monthRange = referenceMonthRange(from.slice(0, 7));
+  const month = from && from === monthRange.from && to === monthRange.to ? from.slice(0, 7) : "";
+  const changeRange = (nextFrom: string, nextTo: string) => {
+    setLocalFrom(nextFrom);
+    setLocalTo(nextTo);
+    onChangeRange?.(nextFrom, nextTo);
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   const byEntry = useMemo(() => {
     const m = new Map<string, ConcJustification>();
     for (const j of justifications) {
-      if (j.kind === kind && !m.has(j.entry_id)) m.set(j.entry_id, j);
+      const key = `${j.side}:${j.entry_id}`;
+      if (j.kind === kind && !m.has(key)) m.set(key, j);
     }
     return m;
   }, [justifications, kind]);
 
-  const visible = useMemo(() => {
-    const t = search.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((r) =>
-      [r.title, r.subtitle, r.tag, r.date, String(r.amount)]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t)),
-    );
-  }, [rows, search]);
+  const visible = useMemo(() => filterJustificationRows(rows, search, from, to), [rows, search, from, to]);
 
   return (
     <Card>
@@ -57,6 +71,25 @@ export function JustificationsPanel({
             Não é possível anexar arquivos nem conciliar por aqui.
           </p>
         </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1 w-40">
+            <Label htmlFor={`${id}-month`} className="text-xs">Mês de referência</Label>
+            <Input id={`${id}-month`} type="month" value={month} className="h-8 text-xs"
+              onChange={e => { const range = referenceMonthRange(e.target.value); changeRange(range.from, range.to); }} />
+          </div>
+          <div className="space-y-1 w-36">
+            <Label htmlFor={`${id}-from`} className="text-xs">Data inicial</Label>
+            <BrDateInput id={`${id}-from`} value={from} onChange={value => changeRange(value, to)} className="h-8 text-xs" />
+          </div>
+          <div className="space-y-1 w-36">
+            <Label htmlFor={`${id}-to`} className="text-xs">Data final</Label>
+            <BrDateInput id={`${id}-to`} value={to} onChange={value => changeRange(from, value)} className="h-8 text-xs" />
+          </div>
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setSearch(""); changeRange("", ""); }}>
+            <X className="mr-1 h-3.5 w-3.5" />Limpar filtros
+          </Button>
+        </div>
+        {from && to && from > to && <p role="alert" className="text-xs text-destructive">A data final deve ser igual ou posterior à data inicial.</p>}
         <div className="relative max-w-[320px]">
           <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input
@@ -73,7 +106,7 @@ export function JustificationsPanel({
         ) : (
           <ul className="divide-y divide-border">
             {visible.map((r) => {
-              const j = byEntry.get(r.id);
+              const j = byEntry.get(`${r.side}:${r.id}`);
               const open = openId === r.id;
               return (
                 <li key={r.id} className="p-3 space-y-2 text-[11px]">

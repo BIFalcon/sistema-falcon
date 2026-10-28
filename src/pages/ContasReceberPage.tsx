@@ -985,17 +985,17 @@ function DayBreakdown({
                   <TableCell className="font-mono text-xs">{e.invoice_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{e.confirmation_number ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-col items-start gap-1">
                       <span>{e.nota_number ?? "—"}</span>
                       {canAdmOrGg && (
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-5 w-5"
+                          size="sm"
+                          variant="outline"
+                          className="h-auto min-h-7 whitespace-normal text-left font-sans"
                           onClick={() => setEditDocFor(e)}
                           title="Corrigir número da nota/boleto/vencimento"
                         >
-                          <Pencil className="h-3 w-3" />
+                          <Pencil className="mr-1 h-3 w-3 shrink-0" /> Editar nota / boleto
                         </Button>
                       )}
                     </div>
@@ -1620,7 +1620,7 @@ function EditDocDataDialog({
     <Dialog open={!!entry} onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Corrigir dados do documento</DialogTitle>
+          <DialogTitle>Editar nota, boleto e vencimento</DialogTitle>
           <DialogDescription>
             Ajusta manualmente o que a leitura automática do arquivo capturou — útil quando o
             anexo tem vários documentos juntos (voucher, boleto e nota no mesmo arquivo).

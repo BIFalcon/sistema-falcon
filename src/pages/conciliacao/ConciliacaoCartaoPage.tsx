@@ -138,6 +138,11 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
   const cashMatches = useConcMatches(hotelId, "dinheiro", mainTab === "dinheiro");
   const aFaturar = useAFaturarDaily(hotelId, dateFrom, dateTo, specificDates, mainTab === "trx-diario");
   const justifications = useConcJustifications(hotelId);
+  const loadJustifications = async () => {
+    const result = await justifications.refetch();
+    if (result.error) throw result.error;
+    return result.data ?? [];
+  };
   const saveJustification = useSaveJustification();
 
   const reconcile = useReconcile();
@@ -480,6 +485,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   onReconcile={doReconcile("cartao")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-cartao-${hotelId}.xlsx`}
+                  kind="cartao" loadJustifications={loadJustifications}
                 />
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
@@ -487,6 +493,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   rows={[...acquirerCartao, ...operaCartao]}
                   justifications={justifications.data ?? []}
                   kind="cartao"
+                  dateFrom={dateFrom} dateTo={dateTo} onChangeRange={setRange}
                   onSave={saveNote("cartao")}
                   saving={saveJustification.isPending}
                 />
@@ -524,6 +531,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   onReconcile={doReconcile("pix_extrato")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-pix-${hotelId}.xlsx`}
+                  kind="pix_extrato" loadJustifications={loadJustifications}
                   compareMode="equal-boxes"
                 />
               </TabsContent>
@@ -532,6 +540,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   rows={[...acquirerPix, ...operaPix, ...bankPix]}
                   justifications={justifications.data ?? []}
                   kind="pix_extrato"
+                  dateFrom={dateFrom} dateTo={dateTo} onChangeRange={setRange}
                   onSave={saveNote("pix_extrato")}
                   saving={saveJustification.isPending}
                 />
@@ -585,6 +594,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   onReconcile={doReconcile("dinheiro")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-dinheiro-${hotelId}.xlsx`}
+                  kind="dinheiro" loadJustifications={loadJustifications}
                 />
               </TabsContent>
               <TabsContent value="justificativa" className="mt-4">
@@ -592,6 +602,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                   rows={operaCash}
                   justifications={justifications.data ?? []}
                   kind="dinheiro"
+                  dateFrom={dateFrom} dateTo={dateTo} onChangeRange={setRange}
                   onSave={saveNote("dinheiro")}
                   saving={saveJustification.isPending}
                 />
