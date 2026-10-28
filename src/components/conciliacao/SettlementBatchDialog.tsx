@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { fmtBRL } from "@/lib/formatters";
 import { batchProgress } from "@/lib/settlementBatch";
 import { useSettlementBatch, type BatchTarget } from "@/hooks/useSettlementBatch";
+import { BatchDeductionEditor } from "./BatchDeductionEditor";
 
 const day = (d: string | null) => d ? d.split("-").reverse().join("/") : "—";
 const money = (n: number | null) => n === null ? "Sem dado" : fmtBRL(n);
@@ -24,13 +25,14 @@ export function SettlementBatchDialog({ hotelId, target, onClose }: { hotelId: s
       {query.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : query.isError ? <p role="alert" className="text-destructive">Não foi possível conferir o lote: {query.error.message}</p> : <>
         {query.data?.transition && <Badge variant="outline">Baixa de transição — não representa conciliação de vendas</Badge>}
         {query.data?.ambiguous && <p role="alert" className="text-destructive text-sm">Há mais de um lote candidato para este crédito. O vínculo não está comprovado e a baixa permanece bloqueada.</p>}
-        {!query.data?.batches.length && <p className="text-sm text-muted-foreground">Não foi encontrado relatório correspondente a este crédito. Sem composição comprovada, a baixa normal fica bloqueada.</p>}
+        {!query.data?.batches.length && <p className="text-sm text-muted-foreground">Nenhum lote com data, valor e identificação compatíveis. Confira o relatório de recebimentos do período do crédito, a bandeira/modalidade da descrição e a regra bancária deste hotel. A baixa permanece bloqueada.</p>}
         {query.data?.batches.map(batch => <section key={batch.id} className="space-y-3 border-t border-border pt-4">
           <div className="flex flex-wrap justify-between gap-3">
             <div><h3 className="font-semibold">{day(batch.date)} · {batch.label}</h3><p className="text-sm">Lote {money(batch.amount)} · Parcelas líquidas {money(batch.net)}</p></div>
-            <Badge variant={batch.ready && !query.data?.ambiguous ? "secondary" : "destructive"}>{batch.reconciled}/{batch.total} vendas · {batchProgress(batch)}% conciliado</Badge>
+            <div className="flex flex-col gap-1 items-end"><Badge variant="outline">Ópera: {batch.reconciled}/{batch.total} vendas · {batchProgress(batch)}%</Badge><Badge variant={batch.ready && !query.data?.ambiguous ? "secondary" : "destructive"}>{batch.ready && !query.data?.ambiguous ? "Composição pronta" : "Baixa bloqueada"}</Badge></div>
           </div>
           <p className={batch.ready ? "text-sm text-muted-foreground" : "text-sm text-destructive"}>{batch.reason}</p>
+          <BatchDeductionEditor hotelId={hotelId} batch={batch} />
           <Table><TableHeader><TableRow><TableHead>Venda / NSU</TableHead><TableHead className="text-right">Bruto</TableHead><TableHead className="text-right">Líquido</TableHead><TableHead>Conciliação</TableHead><TableHead>Ópera — data, hóspede, UH, recibo e valor</TableHead></TableRow></TableHeader>
             <TableBody>{batch.sales.filter(s => !onlyPending || s.status !== "Conciliado").map(s => <TableRow key={s.payment_id} className={s.status !== "Conciliado" ? "bg-destructive/5" : ""}>
               <TableCell className="text-xs whitespace-nowrap">{day(s.sale_date)}<br /><span className="font-mono">{s.nsu ?? "Sem NSU"}</span></TableCell>

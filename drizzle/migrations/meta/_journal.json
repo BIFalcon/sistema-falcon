@@ -589,6 +589,48 @@
       "when": 1793193785700,
       "tag": "0083_ap_omie_payment_details",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793199717439,
+      "tag": "0084_settlement_proven_deductions_and_bank_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1793199758504,
+      "tag": "0085_transit_diagnostics_income_and_rechecks",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1793199798445,
+      "tag": "0086_transit_detail_and_composition_trigger_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793199923511,
+      "tag": "0087_transit_candidate_confirmation_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1793200102868,
+      "tag": "0088_rede_service_reprocess_and_receipt_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793200154107,
+      "tag": "0089_receipt_link_guard_disambiguation",
+      "breakpoints": true
     }
   ]
 }

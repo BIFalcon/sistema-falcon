@@ -1489,6 +1489,7 @@ export type Database = {
           entry_key: string
           hotel_id: string
           id: string
+          income_auto_excluded: boolean
           line_date: string | null
           matched_at: string | null
           raw: Json
@@ -1505,6 +1506,7 @@ export type Database = {
           entry_key: string
           hotel_id: string
           id?: string
+          income_auto_excluded?: boolean
           line_date?: string | null
           matched_at?: string | null
           raw?: Json
@@ -1521,6 +1523,7 @@ export type Database = {
           entry_key?: string
           hotel_id?: string
           id?: string
+          income_auto_excluded?: boolean
           line_date?: string | null
           matched_at?: string | null
           raw?: Json
@@ -1539,6 +1542,44 @@ export type Database = {
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_bank_receipt_rules: {
+        Row: {
+          enabled: boolean
+          hotel_id: string
+          id: string
+          prefix: string
+          provider: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          enabled?: boolean
+          hotel_id: string
+          id?: string
+          prefix: string
+          provider?: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          enabled?: boolean
+          hotel_id?: string
+          id?: string
+          prefix?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_bank_receipt_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
         ]
@@ -2096,6 +2137,57 @@ export type Database = {
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "conc_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conc_rede_deduction_links: {
+        Row: {
+          amount: number
+          component_id: string
+          created_at: string
+          created_by: string
+          hotel_id: string
+          id: string
+          kind: string
+          note: string
+          receipt_id: string
+        }
+        Insert: {
+          amount: number
+          component_id: string
+          created_at?: string
+          created_by: string
+          hotel_id: string
+          id?: string
+          kind: string
+          note: string
+          receipt_id: string
+        }
+        Update: {
+          amount?: number
+          component_id?: string
+          created_at?: string
+          created_by?: string
+          hotel_id?: string
+          id?: string
+          kind?: string
+          note?: string
+          receipt_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_rede_deduction_links_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_rede_deduction_links_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "conc_rede_recebidos"
             referencedColumns: ["id"]
           },
         ]
@@ -5077,6 +5169,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      conc_allocate_rede_deductions: {
+        Args: {
+          p_components: string[]
+          p_hotel: string
+          p_note: string
+          p_receipt: string
+        }
+        Returns: undefined
+      }
       conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
@@ -5096,6 +5197,10 @@ export type Database = {
           entry_id: string
           source: string
         }[]
+      }
+      conc_bank_transit_details: {
+        Args: { p_hotel: string; p_pending: string }
+        Returns: Json
       }
       conc_batch_ready: {
         Args: { p_id: string; p_source: string }
@@ -5148,6 +5253,15 @@ export type Database = {
         }[]
       }
       conc_category_key: { Args: { _value: string }; Returns: string }
+      conc_confirm_transit_candidates: {
+        Args: {
+          p_bank: string
+          p_hotel: string
+          p_note: string
+          p_opera: string[]
+        }
+        Returns: string
+      }
       conc_daily_closing: {
         Args: {
           p_dates?: string[]
@@ -5188,7 +5302,16 @@ export type Database = {
         Args: { _hotel_id: string; _rows: Json; _upload_id: string }
         Returns: Json
       }
+      conc_income_auto_match: { Args: { p_hotel: string }; Returns: number }
+      conc_is_financial_income: {
+        Args: { p_description: string }
+        Returns: boolean
+      }
       conc_is_pix_bank: { Args: { description: string }; Returns: boolean }
+      conc_is_rede_bank: {
+        Args: { p_description: string; p_hotel: string }
+        Returns: boolean
+      }
       conc_matched_counts_by_upload: {
         Args: { p_upload_ids: string[] }
         Returns: {
@@ -5226,6 +5349,8 @@ export type Database = {
         }
         Returns: Json
       }
+      conc_rede_deduction_allocation: { Args: { p_id: string }; Returns: Json }
+      conc_rede_match_proven: { Args: { p_hotel: string }; Returns: Json }
       conc_rede_unmatch: { Args: { p_id: string }; Returns: undefined }
       conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
       conc_send_divergences_selected: {

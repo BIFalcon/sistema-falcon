@@ -20,8 +20,14 @@ export interface SettlementBatch {
   reconciled: number;
   net: number | null;
   reason: string;
+  deduction_total?: number;
+  settlement_net?: number | null;
+  difference?: number | null;
+  deductions?: BatchDeduction[];
+  deduction_candidates?: BatchDeduction[];
   sales: BatchSale[];
 }
+export interface BatchDeduction { id: string; kind: string; dt: string; amount: number; label: string; nsu: string | null; allocated?: boolean; note?: string }
 export interface BatchDetails { batches: SettlementBatch[]; ambiguous?: boolean; transition?: boolean }
 export const batchProgress = (batch: Pick<SettlementBatch, "total" | "reconciled">) =>
   batch.total > 0 ? Math.floor(batch.reconciled / batch.total * 100) : 0;

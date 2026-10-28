@@ -11,9 +11,8 @@ import { fmtBRL, fmtDateTime } from "@/lib/formatters";
 import { fmtDay } from "@/components/conciliacao/ReconcilePanel";
 import { useDailyBankClosing, useSaveDailyBalance } from "@/hooks/useDailyBankClosing";
 import type { DailyClosingRow } from "@/lib/dailyBankClosing";
-import { SettlementBatchDialog } from "@/components/conciliacao/SettlementBatchDialog";
-import type { BatchTarget } from "@/hooks/useSettlementBatch";
-import { BoletoCreditDialog, type BoletoTarget } from "@/components/conciliacao/BoletoCreditDialog";
+import { BankTransitDialog } from "./BankTransitDialog";
+import type { BankPending } from "@/hooks/useDailyBankClosing";
 
 const money = (n: number | null) => n === null ? "Sem dado" : fmtBRL(n);
 export function DailyBankClosingTab({ hotelId, dateFrom, dateTo, dates }: {
@@ -26,16 +25,14 @@ export function DailyBankClosingTab({ hotelId, dateFrom, dateTo, dates }: {
   const [real, setReal] = useState("");
   const [day, setDay] = useState("");
   const [pendingDay, setPendingDay] = useState<string | null>(null);
-  const [batchTarget, setBatchTarget] = useState<BatchTarget | null>(null);
-  const [boleto, setBoleto] = useState<BoletoTarget | null>(null);
+  const [transit, setTransit] = useState<BankPending | null>(null);
   const pending = (query.data?.pending ?? []).filter(p => !pendingDay || p.day === pendingDay);
   const openEdit = (row?: DailyClosingRow) => {
     const value = row ?? { day: dateFrom || new Date().toISOString().slice(0, 10), initial: null, real: null, credits: 0, received: 0, paid: 0, pending: 0, final: null, difference: null };
     setEditing(value); setDay(value.day); setInitial(value.initial === null ? "" : String(value.initial)); setReal(value.real === null ? "" : String(value.real));
   };
   return <section className="space-y-5">
-    <SettlementBatchDialog hotelId={hotelId} target={batchTarget} onClose={() => setBatchTarget(null)} />
-    <BoletoCreditDialog hotelId={hotelId} target={boleto} onClose={() => setBoleto(null)} />
+    <BankTransitDialog key={transit?.id ?? "none"} hotelId={hotelId} pending={transit} onClose={() => setTransit(null)} />
     <div className="flex items-center justify-between gap-3 flex-wrap">
       <h2 className="font-semibold">Fechamento diário</h2>
       <div className="flex gap-2">
@@ -63,7 +60,7 @@ export function DailyBankClosingTab({ hotelId, dateFrom, dateTo, dates }: {
     <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">Conta transitória {pendingDay ? `— ${fmtDay(pendingDay)}` : ""}</h3>{pendingDay && <Button variant="ghost" size="sm" onClick={() => setPendingDay(null)}>Todos os dias</Button>}</div>
     <Table><TableHeader><TableRow><TableHead>Dia</TableHead><TableHead>Lançamento</TableHead><TableHead className="text-right">Valor</TableHead><TableHead>Status</TableHead><TableHead>Aberta em</TableHead><TableHead>Revertida em</TableHead><TableHead>Conciliação</TableHead></TableRow></TableHeader>
       <TableBody>{!pending.length && <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">Nenhuma pendência no período.</TableCell></TableRow>}{pending.map(p => <TableRow key={p.id}>
-        <TableCell className="text-xs whitespace-nowrap">{fmtDay(p.day)}</TableCell><TableCell className="text-xs max-w-xs break-words">{/^(RECEBIMENTO REDE|ZOOP)/i.test(p.description?.trim() ?? "") ? <Button variant="link" className="h-auto p-0 text-xs whitespace-normal text-left" onClick={() => setBatchTarget({ source: "bank", id: p.entry_id, label: p.description ?? "Crédito bancário" })}>{p.description}</Button> : /BOLETO|COBRANCA|COBRANÇA|LIQUIDACAO|LIQUIDAÇÃO/i.test(p.description ?? "") ? <Button variant="link" className="h-auto p-0 text-xs whitespace-normal text-left" onClick={() => setBoleto({ day: p.day, amount: Number(p.valor), description: p.description ?? "Boleto" })}>{p.description}</Button> : p.description || "—"}</TableCell><TableCell className="text-right text-xs whitespace-nowrap">{fmtBRL(p.valor)}</TableCell><TableCell><Badge variant={p.status === "aberta" ? "destructive" : "secondary"}>{p.status === "aberta" ? "Aberta" : "Revertida"}</Badge></TableCell><TableCell className="text-xs">{fmtDateTime(p.aberta_em)}</TableCell><TableCell className="text-xs">{p.revertida_em ? fmtDateTime(p.revertida_em) : "—"}</TableCell><TableCell className="text-xs font-mono" title={p.match_id ?? undefined}>{p.match_id?.slice(0, 8) ?? "—"}</TableCell>
+        <TableCell className="text-xs whitespace-nowrap">{fmtDay(p.day)}</TableCell><TableCell className="text-xs max-w-xs break-words"><Button variant="link" className="h-auto p-0 text-xs whitespace-normal text-left" onClick={() => setTransit(p)}>{p.description || "Crédito sem descrição"}</Button></TableCell><TableCell className="text-right text-xs whitespace-nowrap">{fmtBRL(p.valor)}</TableCell><TableCell><Badge variant={p.status === "aberta" ? "destructive" : "secondary"}>{p.status === "aberta" ? "Aberta" : "Revertida"}</Badge></TableCell><TableCell className="text-xs">{fmtDateTime(p.aberta_em)}</TableCell><TableCell className="text-xs">{p.revertida_em ? fmtDateTime(p.revertida_em) : "—"}</TableCell><TableCell className="text-xs font-mono" title={p.match_id ?? undefined}>{p.match_id?.slice(0, 8) ?? "—"}</TableCell>
       </TableRow>)}</TableBody></Table>
     <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}><DialogContent><DialogHeader><DialogTitle>Informar saldos</DialogTitle></DialogHeader>
       <div className="space-y-4"><div><Label htmlFor="closing-day">Dia</Label><Input id="closing-day" type="date" value={day} onChange={e => setDay(e.target.value)} /></div><div><Label htmlFor="initial-balance">Saldo inicial (R$)</Label><Input id="initial-balance" type="number" step="0.01" value={initial} onChange={e => setInitial(e.target.value)} /></div><div><Label htmlFor="real-balance">Saldo real do extrato (R$)</Label><Input id="real-balance" type="number" step="0.01" value={real} onChange={e => setReal(e.target.value)} /></div></div>
