@@ -2,32 +2,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import * as XLSX from "npm:xlsx@0.18.5";
 import JSZip from "npm:jszip@3.10.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-type ParsedEntry = {
-  entry_key: string;
-  supplier: string;
-  cnpj: string | null;
-  document_number: string | null;
-  description: string | null;
-  due_date: string | null;
-  amount: number;
-  payment_method: string | null;
-  category: string | null;
-  observation: string | null;
-  interest_fees: number | null;
-  omie_situation: string | null;
-  is_distribution: boolean;
-  raw: Record<string, any>;
-};
-
-type SkippedCounters = {
+import { parseOmieRows, type SkippedCounters = {
   other_bank: number;
   no_amount: number;
   no_supplier: number;
@@ -231,119 +206,11 @@ function normalizeBank(account: string | null | undefined): string | null {
   return null;
 }
 
-function parseOmieXlsx(buf: ArrayBuffer, hotelId: string): {
-  entries: ParsedEntry[];
-  skipped: SkippedCounters;
-  my_company_cnpj: string | null;
-} {
+function parseOmieXlsx(buf: ArrayBuffer, _hotelId: string) {
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  // OMIE real (planilha padrão de exportação):
-  // linha 0 = título "Contas a Pagar"
-  // linha 1 = cabeçalho com 9 colunas: Situação, CNPJ/CPF, Razão Social, Vencimento,
-  //           Categoria, Nota Fiscal, A Pagar ou Receber, Observação da Conta, Conta Corrente
-  // linha 2 = totalizador geral (sem fornecedor — será ignorado pelo filtro de supplier vazio)
-  // linhas 3+ = dados reais. Valores de "A Pagar ou Receber" são sempre negativos — usar Math.abs().
-  if (rows.length < 3) return { entries: [], skipped: emptySkipped(), my_company_cnpj: null };
-  let headerIdx = 1;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
-    const row = (rows[i] ?? []).map((c: any) => toAscii(normalize(c)));
-    // Detecta cabeçalho pela presença de 'vencimento' E ('razao social' OU 'situacao')
-    if (row.includes("vencimento") && (
-      row.some((c) => c.includes("razao social")) ||
-      row.some((c) => c.includes("situacao"))
-    )) {
-      headerIdx = i;
-      break;
-    }
-  }
-  const headerArr = (rows[headerIdx] ?? []).map((h: any) => normalize(h));
-  // CNPJ da empresa que exportou (próprio hotel) — usado para validar se o
-  // arquivo é do hotel selecionado.
-  const colMyCnpj = (() => {
-    const norm = headerArr.map((h: string) => toAscii(h));
-    return norm.findIndex((h) => h.includes("minha empresa") && h.includes("cnpj"));
-  })();
-  // Colunas reais do OMIE (115 cols). Pulamos as variantes "Minha Empresa (...)".
-  const colSit = findCol(headerArr, "situacao");
-  const colSitVenc = findCol(headerArr, "situacao do vencimento");
-  // CNPJ do fornecedor — preferimos 'CNPJ/CPF' e evitamos 'Minha Empresa (CNPJ)'.
-  let colCnpj = findCol(headerArr, "cnpj/cpf");
-  if (colCnpj < 0) {
-    // fallback: primeiro 'cnpj' que NÃO seja 'minha empresa'
-    const norm = headerArr.map((h: string) => toAscii(h));
-    colCnpj = norm.findIndex((h) => h.includes("cnpj") && !h.includes("minha empresa"));
-  }
-  // Razão Social do fornecedor — evitar 'Minha Empresa (Razão Social)'.
-  let colSupplier = -1;
-  {
-    const norm = headerArr.map((h: string) => toAscii(h));
-    colSupplier = norm.findIndex((h) => h === "razao social");
-    if (colSupplier < 0) colSupplier = norm.findIndex((h) => h.includes("razao social") && !h.includes("minha empresa"));
-    if (colSupplier < 0) colSupplier = findCol(headerArr, "fornecedor");
-  }
-  const colDue = findCol(headerArr, "vencimento");
-  const colCategory = findCol(headerArr, "categoria");
-  const colDoc = findCol(headerArr, "nota fiscal", "documento");
-  // Planilha real: "A Pagar ou Receber". Manter fallbacks para compatibilidade.
-  const colAmount = findCol(headerArr, "a pagar ou receber", "a pagar", "valor", "receber");
-  const colObs = findCol(headerArr, "observacao da conta", "observacao", "observa");
-  const colBank = findCol(headerArr, "conta corrente");
-  const colPayMethod = findCol(headerArr, "forma de pagamento");
-
-  const out: ParsedEntry[] = [];
-  const skipped = emptySkipped();
-  let myCompanyCnpj: string | null = null;
-  const keyCount = new Map<string, number>();
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length === 0) continue;
-    const supplier = normalize(row[colSupplier] ?? "");
-    if (!supplier) { skipped.no_supplier++; continue; }
-    const lower = toAscii(supplier);
-    if (lower.includes("total") || lower === "razao social") continue;
-    if (!myCompanyCnpj && colMyCnpj >= 0) {
-      const v = normalize(row[colMyCnpj] ?? "").replace(/\D/g, "");
-      if (v.length >= 11) myCompanyCnpj = v;
-    }
-    // Filtro de banco
-    const bank = colBank >= 0 ? normalize(row[colBank] ?? "") : "";
-    if (bank && !isAllowedBank(bank)) {
-      skipped.other_bank++;
-      continue;
-    }
-    const amountRaw = row[colAmount];
-    const amount = Math.abs(parseNumber(amountRaw));
-    if (amount <= 0) { skipped.no_amount++; continue; }
-    const docNumber = normalize(row[colDoc] ?? "");
-    const due = parseDate(row[colDue]);
-    const sitVenc = colSitVenc >= 0 ? normalize(row[colSitVenc] ?? "") : "";
-    const sit = colSit >= 0 ? normalize(row[colSit] ?? "") : "";
-    // Block 3: duplicatas legítimas (mesmo fornecedor/doc/data/valor)
-    // recebem sufixo |dup1, |dup2... para serem todas importadas.
-    const rawKey = makeKey(supplier, docNumber, due, amount);
-    const count = keyCount.get(rawKey) ?? 0;
-    keyCount.set(rawKey, count + 1);
-    const entryKey = makeKey(supplier, docNumber, due, amount, count);
-    out.push({
-      entry_key: entryKey,
-      supplier,
-      cnpj: normalize(row[colCnpj] ?? "") || null,
-      document_number: docNumber || null,
-      description: null,
-      due_date: due,
-      amount,
-      payment_method: colPayMethod >= 0 ? normalize(row[colPayMethod] ?? "") || null : null,
-      category: normalize(row[colCategory] ?? "") || null,
-      observation: normalize(row[colObs] ?? "") || null,
-      interest_fees: null,
-      omie_situation: sit || null,
-      is_distribution: isDistributionEntry(normalize(row[colCategory] ?? ""), null),
-      raw: { row, header: headerArr, situacao_vencimento: sitVenc, conta_corrente: bank },
-    });
-  }
-  return { entries: out, skipped, my_company_cnpj: myCompanyCnpj };
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+  return parseOmieRows(rows);
 }
 
 async function extractFromZip(buf: ArrayBuffer): Promise<{
@@ -545,6 +412,18 @@ Deno.serve(async (req) => {
         approvalDefault = omieApprovalFromSituation(p.omie_situation);
       }
       const baseFields = {
+        barcode: p.barcode ?? null,
+        pix_key: p.pix_key ?? null,
+        beneficiary_bank: p.beneficiary_bank ?? null,
+        beneficiary_agency: p.beneficiary_agency ?? null,
+        beneficiary_account: p.beneficiary_account ?? null,
+        beneficiary_name: p.beneficiary_name ?? null,
+        beneficiary_tax_id: p.beneficiary_tax_id ?? null,
+        payment_document_number: p.payment_document_number ?? null,
+        source_document_type: p.source_document_type ?? null,
+        source_registered_date: p.source_registered_date ?? null,
+        source_forecast_date: p.source_forecast_date ?? null,
+        source_due_date: p.source_due_date ?? null,
         hotel_id: hotelId,
         upload_id: uploadRow.id,
         source_system: sourceSystem,
