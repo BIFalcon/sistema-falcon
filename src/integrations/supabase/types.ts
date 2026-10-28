@@ -5253,6 +5253,15 @@ export type Database = {
         }[]
       }
       conc_category_key: { Args: { _value: string }; Returns: string }
+      conc_confirm_transit_candidates: {
+        Args: {
+          p_bank: string
+          p_hotel: string
+          p_note: string
+          p_opera: string[]
+        }
+        Returns: string
+      }
       conc_daily_closing: {
         Args: {
           p_dates?: string[]

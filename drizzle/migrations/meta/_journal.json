@@ -610,6 +610,13 @@
       "when": 1793199798445,
       "tag": "0086_transit_detail_and_composition_trigger_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793199923511,
+      "tag": "0087_transit_candidate_confirmation_guards",
+      "breakpoints": true
     }
   ]
 }
