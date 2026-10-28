@@ -1,3 +1,10 @@
+## Revisão completa das baixas
+- [ ] Compor lotes Rede com cancelamentos e ajustes comprovados, sem duplicar taxas.
+- [ ] Explicar todos os créditos da transitória, com conferência de PIX e depósitos em dinheiro.
+- [ ] Configurar prefixos centralizadores por hotel com autorização e vínculo inequívoco.
+- [ ] Baixar rendimentos de aplicação identificados, preservando reversões e histórico.
+- [ ] Reprocessar hotéis, conferir regras, testes e fluxo autorizado.
+
 ## Justificativas, Faturamento e Excel
 - [x] Adicionar filtros de data inicial/final e mês de referência nas Justificativas; período inclusivo, busca e limpeza testados.
 - [x] Destacar edição de nota, boleto e vencimento mantendo permissões existentes.
