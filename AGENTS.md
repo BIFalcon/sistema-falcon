@@ -36,3 +36,4 @@
 
 - Investors: matrícula lives on units; payee fractions in unit_payee_shares (sum 100%, via inv_set_payee_shares); monthly payment batches snapshot Pool UHs × fractions and are re-checked before sending; CNAB 240 Itaú is built only by src/lib/cnab240Itau.ts (test-locked to the bank sample) and returns match by seu_numero.
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
+- Recurring multi-hotel AR alerts enqueue through enqueue_ar_consolidated: one e-mail per recipient listing all their hotels, so routines never multiply e-mails by hotel count.
