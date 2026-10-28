@@ -20,9 +20,11 @@ export interface SendRawEmailArgs {
   text: string
   label: string
   idempotencyKey: string
+  /** Quando true, 429 é relançado imediatamente (o chamador reagenda). */
+  noRetryOnRateLimit?: boolean
 }
 
-function isRateLimited(error: unknown): error is EmailAPIError {
+export function isRateLimited(error: unknown): error is EmailAPIError {
   return error instanceof EmailAPIError && error.status === 429
 }
 
@@ -61,7 +63,7 @@ export async function sendRawEmail(args: SendRawEmailArgs): Promise<SendRawEmail
       return { sent: false, reason: 'recipient_suppressed' }
     }
     // 429: aguarda o intervalo indicado antes de uma única nova tentativa.
-    if (isRateLimited(error)) {
+    if (isRateLimited(error) && !args.noRetryOnRateLimit) {
       const waitSeconds = error.retryAfterSeconds ?? 60
       await new Promise((r) => setTimeout(r, waitSeconds * 1000))
       try {

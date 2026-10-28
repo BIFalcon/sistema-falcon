@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import {
   logEmailFailureAlert,
+  isRateLimited,
   logEmailSend,
   sendRawEmail,
 } from "../_shared/email/send-raw-email.ts";
@@ -14,6 +15,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// Lote pequeno e cadenciado: evita rajadas que estouram o limite do provedor.
+const BATCH_SIZE = 25;
+const PACE_MS = 1500;
 
 const APP_BASE_URL =
   Deno.env.get("APP_BASE_URL") ?? "https://sistema-falcon.lovable.app";
@@ -76,7 +81,7 @@ Deno.serve(async (req) => {
     .eq("status", "pending")
     .lte("scheduled_at", new Date().toISOString())
     .order("scheduled_at", { ascending: true })
-    .limit(200);
+    .limit(BATCH_SIZE);
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
@@ -106,7 +111,10 @@ Deno.serve(async (req) => {
 
 
 
+  let rateLimitedUntil: string | null = null;
+
   for (const item of pending) {
+    if (enqueued > 0) await new Promise((r) => setTimeout(r, PACE_MS));
     try {
       // Defensivo: aceita recipient_email com múltiplos endereços (separados
       // por ; , espaço ou contendo nome). Cada destinatário vira um job
@@ -160,6 +168,7 @@ Deno.serve(async (req) => {
             text,
             label,
             idempotencyKey: messageId,
+            noRetryOnRateLimit: true,
           });
           await logEmailSend(supabase, {
             message_id: messageId,
@@ -168,6 +177,7 @@ Deno.serve(async (req) => {
             status: result.sent ? "sent" : "suppressed",
           });
         } catch (sendErr) {
+          if (isRateLimited(sendErr)) throw sendErr;
           const sendMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
           await logEmailSend(supabase, {
             message_id: messageId,
@@ -197,6 +207,19 @@ Deno.serve(async (req) => {
         .eq("id", item.id);
       enqueued++;
     } catch (err) {
+      if (isRateLimited(err)) {
+        // Limite do provedor: mantém pendente e reagenda a fila inteira para
+        // depois da janela, sem marcar falha nem segurar a função dormindo.
+        const waitSec = (err.retryAfterSeconds ?? 60) + 5;
+        rateLimitedUntil = new Date(Date.now() + waitSec * 1000).toISOString();
+        await supabase
+          .from("notification_queue")
+          .update({ scheduled_at: rateLimitedUntil })
+          .eq("status", "pending")
+          .lt("scheduled_at", rateLimitedUntil);
+        console.warn(`rate limited; queue rescheduled to ${rateLimitedUntil}`);
+        break;
+      }
       failed++;
       await supabase
         .from("notification_queue")
@@ -209,7 +232,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ processed: pending.length, enqueued, failed }),
+    JSON.stringify({ processed: pending.length, enqueued, failed, rateLimitedUntil }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
