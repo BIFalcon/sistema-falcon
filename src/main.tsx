@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { installDomTranslationGuard } from "./lib/domTranslationGuard";
 
 // Alguns usuários (proxies corporativos / antivírus / cache heurístico do
 // navegador) recebiam respostas antigas da API mesmo após F5, fazendo a tela
@@ -23,4 +24,7 @@ if (typeof window !== "undefined" && !(window as any).__noStoreFetchPatched) {
   }) as typeof window.fetch;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const root = document.getElementById("root");
+if (!root) throw new Error("Falcon root element is missing");
+installDomTranslationGuard(root);
+createRoot(root).render(<App />);
