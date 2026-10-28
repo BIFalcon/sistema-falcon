@@ -1489,6 +1489,7 @@ export type Database = {
           entry_key: string
           hotel_id: string
           id: string
+          income_auto_excluded: boolean
           line_date: string | null
           matched_at: string | null
           raw: Json
@@ -1505,6 +1506,7 @@ export type Database = {
           entry_key: string
           hotel_id: string
           id?: string
+          income_auto_excluded?: boolean
           line_date?: string | null
           matched_at?: string | null
           raw?: Json
@@ -1521,6 +1523,7 @@ export type Database = {
           entry_key?: string
           hotel_id?: string
           id?: string
+          income_auto_excluded?: boolean
           line_date?: string | null
           matched_at?: string | null
           raw?: Json
@@ -5285,6 +5288,11 @@ export type Database = {
       conc_import_opera: {
         Args: { _hotel_id: string; _rows: Json; _upload_id: string }
         Returns: Json
+      }
+      conc_income_auto_match: { Args: { p_hotel: string }; Returns: number }
+      conc_is_financial_income: {
+        Args: { p_description: string }
+        Returns: boolean
       }
       conc_is_pix_bank: { Args: { description: string }; Returns: boolean }
       conc_is_rede_bank: {
