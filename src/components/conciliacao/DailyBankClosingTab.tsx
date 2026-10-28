@@ -32,7 +32,7 @@ export function DailyBankClosingTab({ hotelId, dateFrom, dateTo, dates }: {
     setEditing(value); setDay(value.day); setInitial(value.initial === null ? "" : String(value.initial)); setReal(value.real === null ? "" : String(value.real));
   };
   return <section className="space-y-5">
-    <BankTransitDialog hotelId={hotelId} pending={transit} onClose={() => setTransit(null)} />
+    <BankTransitDialog key={transit?.id ?? "none"} hotelId={hotelId} pending={transit} onClose={() => setTransit(null)} />
     <div className="flex items-center justify-between gap-3 flex-wrap">
       <h2 className="font-semibold">Fechamento diário</h2>
       <div className="flex gap-2">
