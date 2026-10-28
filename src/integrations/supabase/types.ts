@@ -5350,6 +5350,7 @@ export type Database = {
         Returns: Json
       }
       conc_rede_deduction_allocation: { Args: { p_id: string }; Returns: Json }
+      conc_rede_match_proven: { Args: { p_hotel: string }; Returns: Json }
       conc_rede_unmatch: { Args: { p_id: string }; Returns: undefined }
       conc_send_divergences: { Args: { p_hotel: string }; Returns: Json }
       conc_send_divergences_selected: {

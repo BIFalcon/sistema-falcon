@@ -617,6 +617,13 @@
       "when": 1793199923511,
       "tag": "0087_transit_candidate_confirmation_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1793200102868,
+      "tag": "0088_rede_service_reprocess_and_receipt_guards",
+      "breakpoints": true
     }
   ]
 }
