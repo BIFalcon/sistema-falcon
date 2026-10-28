@@ -43,3 +43,13 @@ describe("Novos Negócios", () => {
     expect(scopeDreHotelIds(["a", "b"], null, ["a", "b"], false)).toEqual(["a", "b"]);
   });
 });
+describe("usesNetworkDreHotels", () => {
+  it("libera todos os hotéis para GOP nos Indicadores DRE", () => {
+    expect(usesNetworkDreHotels(["gop"], false)).toBe(true);
+  });
+  it("não muda a lista de GG, ADM ou Master", () => {
+    expect(usesNetworkDreHotels(["gg"], false)).toBe(false);
+    expect(usesNetworkDreHotels(["adm"], false)).toBe(false);
+    expect(usesNetworkDreHotels(["gop"], true)).toBe(false);
+  });
+});
