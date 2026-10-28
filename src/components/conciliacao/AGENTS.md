@@ -1,5 +1,7 @@
 # Conciliação rules (also apply to related hooks, lib and SQL)
 
+- Justification filters and Excel projection use conciliationJustifications; export reloads authorized hotel notes and joins by kind/side/entry ID so stale caches and unrelated notes cannot silently produce misleading spreadsheets.
+
 - Rede receipts report (10 tabs) loads into conc_rede_pagamentos/recebidos/ajustes/chargebacks; bank settlement runs in conc_rede_auto_match against the aggregated recebidos, with bank prefix and brand/modality codes centralized in src/lib/redeRecebimentos.ts so the statement filter is adjusted in one place.
 - Settlement cutoffs are hotel/provider-scoped; original-sale classification and explicit reversible transitions use authorized server RPCs, with bank confirmations reusing transit triggers so history and daily balances remain consistent. Unknown-origin credits are never excluded by settlement date alone.
 - Francesinha (bank boleto report) loads into conc_francesinha_entries; the operation→action mapping lives only in classifyFrancesinha (src/lib/francesinha.ts) and conc_francesinha_apply settles ar_to_invoice_entries by document number + amount, so a changed mapping needs no SQL change. Spreadsheet reads go through fixSheetRef because some bank exports declare a wrong sheet range.
