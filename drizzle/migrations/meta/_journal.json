@@ -603,6 +603,13 @@
       "when": 1793199758504,
       "tag": "0085_transit_diagnostics_income_and_rechecks",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1793199798445,
+      "tag": "0086_transit_detail_and_composition_trigger_scope",
+      "breakpoints": true
     }
   ]
 }

@@ -5198,6 +5198,10 @@ export type Database = {
           source: string
         }[]
       }
+      conc_bank_transit_details: {
+        Args: { p_hotel: string; p_pending: string }
+        Returns: Json
+      }
       conc_batch_ready: {
         Args: { p_id: string; p_source: string }
         Returns: boolean
