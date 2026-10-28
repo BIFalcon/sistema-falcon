@@ -40,6 +40,18 @@ export interface ApEntry {
   due_date: string | null;
   amount: number;
   payment_method: string | null;
+  barcode?: string | null;
+  pix_key?: string | null;
+  beneficiary_bank?: string | null;
+  beneficiary_agency?: string | null;
+  beneficiary_account?: string | null;
+  beneficiary_name?: string | null;
+  beneficiary_tax_id?: string | null;
+  payment_document_number?: string | null;
+  source_document_type?: string | null;
+  source_registered_date?: string | null;
+  source_forecast_date?: string | null;
+  source_due_date?: string | null;
   category: string | null;
   observation: string | null;
   interest_fees: number | null;

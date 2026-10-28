@@ -2,7 +2,15 @@
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import * as XLSX from "npm:xlsx@0.18.5";
 import JSZip from "npm:jszip@3.10.1";
-import { parseOmieRows, type SkippedCounters = {
+import { parseOmieRows, type ParsedEntry } from "./omieParser.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+type SkippedCounters = {
   other_bank: number;
   no_amount: number;
   no_supplier: number;
