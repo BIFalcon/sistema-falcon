@@ -1,5 +1,5 @@
 
-- Indicadores DRE route, navigation and summary restrictions share dreAccess helpers; ADM-only access uses one linked hotel at a time and server DRE RPCs independently check hotel authorization.
+- Indicadores DRE route, navigation and summary restrictions share dreAccess helpers; ADM-only uses one linked hotel, GOP lists all hotels only there (list_dre_indicator_hotels + can_read_dre_hotel), and DRE RPCs check hotel authorization.
 - Novos Negocios uses DRE-specific read policies and can_read_dre_hotel, never general/global data-access helpers; its layout allows only DRE, indicators and account profile, and DRE resolution reads existing closings without creating them.
 - Letter preview and download use requireLetterPdfBlob when live generation is configured; generation failures must surface instead of silently substituting a stored PDF.
 - Letter DRE revenue composition uses letterRevenue keyed by the closing hotel ID; scoped templates prevent one hotel's line mapping from changing other hotels, and PDF rows must fit through distribution.
