@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Download, Link2, Loader2, Search } from "lucide-react";
 import { fmtBRL } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import type { ConcSide } from "@/hooks/useConciliacaoCartao";
+import type { ConcSide, ConcKind, ConcJustification } from "@/hooks/useConciliacaoCartao";
+import { justificationSheetRows } from "@/lib/conciliationJustifications";
+import { toast } from "sonner";
 
 export interface ReconcileRow {
   id: string;
@@ -54,15 +56,8 @@ const fmtDay = (iso: string | null) =>
 
 type SortState = { field: "date" | "amount"; dir: "asc" | "desc" };
 
-function sheetRows(rows: ReconcileRow[]) {
-  return rows.map((r) => ({
-    Data: fmtDay(r.date),
-    Descrição: r.title,
-    Detalhe: r.subtitle ?? "",
-    Categoria: r.tag ?? "",
-    Origem: r.origin ?? "",
-    Valor: r.amount,
-  }));
+function sheetRows(rows: ReconcileRow[], notes: ConcJustification[] = [], kind?: ConcKind) {
+  return justificationSheetRows(rows, notes, kind);
 }
 
 function exportRows(rows: ReconcileRow[], fileName: string, extraSummary?: Record<string, number>) {
@@ -80,12 +75,12 @@ function exportRows(rows: ReconcileRow[], fileName: string, extraSummary?: Recor
 }
 
 /** Exporta todos os quadros da tela num único arquivo, uma aba por quadro. */
-function exportBoxes(boxes: { title: string; rows: ReconcileRow[] }[], fileName: string) {
+function exportBoxes(boxes: { title: string; rows: ReconcileRow[] }[], fileName: string, notes: ConcJustification[] = [], kind?: ConcKind) {
   const wb = XLSX.utils.book_new();
   for (const b of boxes) {
-    const rows = sheetRows(b.rows);
+    const rows = sheetRows(b.rows, notes, kind);
     const total = b.rows.reduce((s, r) => s + r.amount, 0);
-    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Origem: "", Valor: total });
+    rows.push({ Data: "", Descrição: "TOTAL", Detalhe: "", Categoria: "", Origem: "", Valor: total, Justificativa: "" });
     const name = b.title.replace(/[\\/?*[\]:]/g, "").slice(0, 28) || "Quadro";
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
   }
@@ -260,6 +255,8 @@ export function ReconcilePanel({
   isReconciling,
   exportName,
   compareMode = "sides",
+  kind,
+  loadJustifications,
 }: {
   boxes: BoxConfig[];
   onReconcile: (left: ReconcileRow[], right: ReconcileRow[]) => void;
@@ -268,7 +265,10 @@ export function ReconcilePanel({
   /** "sides": esquerda − direita = 0. "equal-boxes": todos os quadros
    *  selecionados precisam ter exatamente o mesmo total (ex.: PIX, 3 quadros). */
   compareMode?: "sides" | "equal-boxes";
+  kind?: ConcKind;
+  loadJustifications?: () => Promise<ConcJustification[]>;
 }) {
+  const [exporting, setExporting] = useState(false);
   const [selection, setSelection] = useState<Record<string, Set<string>>>({});
   const [searches, setSearches] = useState<Record<string, string>>({});
   const [sorts, setSorts] = useState<Record<string, SortState>>({});
@@ -352,7 +352,16 @@ export function ReconcilePanel({
           variant="outline"
           size="sm"
           className="h-7 text-[11px]"
-          onClick={() => exportBoxes(visible.map((b) => ({ title: b.title, rows: b.rows })), exportName)}
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true);
+            try {
+              const notes = loadJustifications ? await loadJustifications() : [];
+              exportBoxes(visible.map((b) => ({ title: b.title, rows: b.rows })), exportName, notes, kind);
+            } catch {
+              toast.error("Não foi possível carregar as justificativas. Tente exportar novamente.");
+            } finally { setExporting(false); }
+          }}
         >
           <Download className="h-3 w-3 mr-1" /> Exportar tudo (Excel)
         </Button>
