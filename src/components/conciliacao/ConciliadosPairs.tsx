@@ -35,15 +35,10 @@ export function ConciliadosPairs({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // O período é definido pelo lançamento do Opera; sem Opera, vale qualquer lado.
+  // O par entra no período se qualquer lado (Opera, adquirente ou banco) estiver no filtro.
   const inPeriod = periodIds ?? rowById;
   const groups = matches
-    .filter((m) => {
-      const op = m.conc_match_items.filter((i) => i.side === "opera");
-      return op.length
-        ? op.some((i) => inPeriod.has(i.entry_id))
-        : m.conc_match_items.some((i) => inPeriod.has(i.entry_id));
-    })
+    .filter((m) => m.conc_match_items.some((i) => inPeriod.has(i.entry_id)))
     .map((m) => {
       const items = m.conc_match_items.map((i) => ({
         side: i.side as string,

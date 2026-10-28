@@ -191,7 +191,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
     () => (acquirer.data ?? []).map((e) => ({
       id: e.id, side: "acquirer" as const, date: e.sale_date, amount: Number(e.amount),
       title: e.categoria || e.bandeira || "—",
-      subtitle: [e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
+      subtitle: [e.nsu && `NSU ${e.nsu}`, e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
       tag: e.categoria ?? undefined,
       origin: e.source === "b2b" || e.b2b ? "B2B" : "Rede",
     })),
@@ -214,17 +214,14 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
     return m;
   }, [operaRows, acquirerRows, bankRows]);
 
-  // Conciliados: a data do Opera define o período. Busca os pares fora do filtro.
+  // Conciliados: o par aparece se qualquer lado (Opera, adquirente ou banco) estiver no período.
+  // Busca os lados que ficaram fora do filtro (ex.: Opera D-1 pela auditoria noturna).
   const activeMatches = mainTab === "cartao" ? cardMatches.data : mainTab === "pix" ? pixMatches.data : mainTab === "dinheiro" ? cashMatches.data : undefined;
   const missingIds = useMemo(() => {
     const out: string[] = [];
     for (const m of activeMatches ?? []) {
       const items = m.conc_match_items;
-      const operaItems = items.filter((i) => i.side === "opera");
-      const inPeriod = operaItems.length
-        ? operaItems.some((i) => rowById.has(i.entry_id))
-        : items.some((i) => rowById.has(i.entry_id));
-      if (!inPeriod) continue;
+      if (!items.some((i) => rowById.has(i.entry_id))) continue;
       for (const i of items) if (!rowById.has(i.entry_id)) out.push(i.entry_id);
     }
     return out;
@@ -237,7 +234,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
     for (const e of d.acq) m.set(e.id, {
       id: e.id, side: "acquirer", date: e.sale_date, amount: Number(e.amount),
       title: e.categoria || e.bandeira || "—",
-      subtitle: [e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
+      subtitle: [e.nsu && `NSU ${e.nsu}`, e.modalidade, e.status, e.establishment_raw].filter(Boolean).join(" · "),
     });
     for (const e of d.bank) m.set(e.id, {
       id: e.id, side: "bank", date: e.line_date, amount: Number(e.amount),

@@ -178,7 +178,7 @@ export function useAcquirerEntries(hotelId: string | null, dateFrom?: string, da
       const build = () => {
         let q = supabase
           .from("conc_acquirer_entries")
-          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at, source")
+          .select("id, hotel_id, establishment_raw, sale_date, amount, bandeira, modalidade, categoria, status, matched_at, b2b, b2b_at, source, nsu")
           .eq("hotel_id", hotelId!)
           .order("sale_date", { ascending: true })
           .order("id", { ascending: true });
