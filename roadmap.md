@@ -55,6 +55,11 @@
 - [x] Aplicar classificação aprovada de cargos aos departamentos nos custos atuais e futuras importações; reservas/comercial em Hospedagem e Serviços Gerais em Governança.
 - [x] Mostrar percentuais após as barras do Ranking e permitir baixar o gráfico completo como imagem.
 - [ ] Conferir download de imagem no Ranking com sessão real — bloqueado: solicitante sem conta correspondente; requer login no preview.
+## Nova planilha OMIE — Contas a Pagar
+- [ ] Aceitar o novo layout, priorizar previsão com fallback para vencimento e preservar a apresentação atual.
+- [ ] Persistir dados estruturados de pagamento e testar leitura/reimportação.
+- [ ] Validar importação com sessão autorizada, sem gerar remessas nesta etapa.
+
 ## Alterações Gerais (3 blocos)
 - [x] 1.1 Voltar à Visão Geral (DRE e Carta)
 - [x] 1.2 Quem visualizou a DRE (dre_view_log + RPC)
