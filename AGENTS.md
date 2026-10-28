@@ -11,7 +11,7 @@
 - Use rhMonthlyParser for all new RH file reads and rhAccess for client permissions; server RPCs independently enforce permissions.
 - Detailed payroll extras use nullable source columns and the versioned manager-only entries RPC; older layouts retain totals without fabricated detail. RH Roomnights uses an RH-authorized RPC reading the latest monthly DRE occupied-room indicator, not occupancy multiplied by cached availability.
 - Turnover history uses independent authorized monthly snapshots, preserving event-time fields for period charts; departure reason categories are server-side aggregates so masked individual reasons remain private.
-- Payroll table sorting uses a pure client-side payrollSort helper on copied rows; ordering never mutates cached data or changes export/access behavior.
+- Payroll sorting uses the pure payrollSort helper on copied rows, never mutating cache or export/access.
 - Sensitive exports log to sensitive_export_log before the file is generated — reuse it for every sensitive export module.
 - Consolidated RH departments are classified server-side by rh_department_for_position and a monthly-row trigger; this keeps individual and aggregate views consistent for current rows and future imports without changing legacy payroll data.
 
@@ -36,3 +36,4 @@
 
 - Investors: matrícula lives on units; payee fractions in unit_payee_shares (sum 100%, via inv_set_payee_shares); monthly payment batches snapshot Pool UHs × fractions and are re-checked before sending; CNAB 240 Itaú is built only by src/lib/cnab240Itau.ts (test-locked to the bank sample) and returns match by seu_numero.
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
+- Recurring AR alerts use enqueue_ar_consolidated (one e-mail per recipient, all hotels) to avoid per-hotel floods.

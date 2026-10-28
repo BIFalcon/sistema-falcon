@@ -5247,6 +5247,18 @@ export type Database = {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: number
       }
+      enqueue_ar_consolidated: {
+        Args: {
+          _event: Database["public"]["Enums"]["notification_event"]
+          _groups: Json
+          _intro: string
+          _link_url: string
+          _roles_for_hotel: Database["public"]["Enums"]["app_role"][]
+          _roles_global: Database["public"]["Enums"]["app_role"][]
+          _title: string
+        }
+        Returns: number
+      }
       enqueue_ar_missing_docs_alerts: { Args: never; Returns: number }
       enqueue_ar_missing_due_date_weekly: { Args: never; Returns: number }
       enqueue_ar_notification: {
