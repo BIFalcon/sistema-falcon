@@ -18,11 +18,6 @@
 - Investidores module: all reads/writes go through SECURITY DEFINER `inv_*` RPCs (tables have RLS with no direct policies) so masking, audit (audit_access_logs) and finance notifications stay server-side; access comes from user_roles (edit + full view for editor roles) and user_permissions keys (finance, extra full view), never hardcoded e-mails.
 - B2B uses conc_b2b_receipts and conc_b2b_auto_match; bank prefixes use b2bBaixa. Rede deductions require unique explicit allocations; transit details and PIX/cash confirmations use hotel-authorized identity RPCs. Income automation is bank-only and respects undo exclusions.
 - Subdirectories have their own AGENTS.md (e.g. src/components/conciliacao) — read it before changing files there.
-- Boleto settlement validates complete daily Francesinha totals through authorized server RPCs, stores invoice-to-bank lineage, and uses the bank credit date for automatic payment; paid verification accepts this lineage rather than comparing each invoice with an aggregated credit.
-- Opera classification stores routing separately from the OMIE label and normalized matching key; database triggers synchronize TRX mapping changes and the reconciliation RPC independently uses routing to isolate card, PIX and cash flows.
-- Post-import reconciliation repeats the complete authorized RPC until a zero-change pass, including receipt N:1; failures remain visible without marking the saved upload as failed.
-- Rede sales parsing rejects expired PIX before the cancellation exception, so unpaid expired requests cannot become reconciliation sales while card adjustment imports remain intact.
-- Daily bank closing uses server-maintained credit transit cycles and account/date snapshots; unnamed accounts alias only a hotel's sole named account, named snapshots take precedence without double counting, and initial balances use the latest earlier real snapshot.
 - Conciliation divergence items and Home counts use authorized hotel-scoped RPCs; email enqueues reuse enqueue_ar_notification for linked GG/ADM, while their direct-link view exposes only conc_justifications, not reconciliation writes.
 - Financial report upload controls live exclusively under the dedicated financial imports route, reusing existing ingestion hooks and per-report permissions; AR exposes settlement and TRX views separately to avoid duplicate ingestion paths.
 - Selected divergence emails validate origin-qualified item IDs and derive all details and totals through authorized server RPCs; bank PIX detection stays equivalent in the shared client helper and server predicate to keep reconciliation, divergence lists and counts consistent.
@@ -40,4 +35,3 @@
 - AP OMIE: omieParser beside parse-ap-report; beneficiary, payer, invoice stay separate.
 - Financial overview uses hotel-authorized financial_overview aggregates and financialOverview scope/period/term helpers; aging ignores period, exact days override ranges, AP writes unchanged.
 - Anticipation: protected ap_* RPCs serialized per hotel; anticipationSimulation shares rules, DRE untouched.
-- Card auto-reconcile checks both sides are unmatched before writing; never write provisional matched_at then undo, because undos fire settlement rechecks and caused statement timeouts.
