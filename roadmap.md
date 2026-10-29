@@ -1,3 +1,9 @@
+## Antecipações — três etapas
+- [ ] Estender antecipações e proteger criação, edição e confirmação; preservar lançamentos antigos.
+- [ ] Adicionar simulação e saldo projetado no Contas a Pagar.
+- [ ] Conciliar relatório Rede, mostrar recebimento/taxa separados e incluir taxa nas Tarifas.
+- [ ] Testar regras, permissões e fluxo autorizado.
+
 ## Revisão completa das baixas
 - [x] Compor lotes Rede com descontos explicitamente vinculados, sem duplicar cancelamento; remover taxa presumida e bloquear lotes repetidos.
 - [x] Abrir todos os ciclos transitórios por identidade; mostrar provas/candidatos e confirmar PIX/dinheiro D−1/D+1 por soma exata e justificativa.
