@@ -4,15 +4,15 @@
 - Live letter PDFs use requireLetterPdfBlob; surface failures, never substitute stored PDFs.
 - Letter DRE revenue composition uses letterRevenue keyed by the closing hotel ID; scoped templates prevent one hotel's line mapping from changing other hotels, and PDF rows must fit through distribution.
 - Carta uses the authorized hotel list without persisted GOP scoping, defaults to a valid single hotel, and synchronizes direct closing links with shared filters; changing a filter releases the URL closing pin so the displayed letter follows the selection.
-- RH imports use rh_employees and atomic import_rh_monthly whole-period replacement to keep panels consistent.
-- Legacy payroll tables remain read-only historical fallbacks for periods without a consolidated upload; never combine both sources in the same period.
+- RH imports: rh_employees via atomic import_rh_monthly period replacement.
+- Legacy payroll: read-only fallback only without consolidated upload; never combine sources within a period.
 - Payroll RPCs retain the total_cost alias for compatibility, while consolidated values come from net_earnings; separate summary fields and an authorized overtime-history RPC preserve legacy/missing monetary data as NULL. payrollMetrics shares null-safe monthly series and ratio calculations with tests.
 - RH payroll individual values are RH/Master-only through RLS and manager-checked RPCs; other authorized roles receive aggregates, never per-person costs.
 - Use rhMonthlyParser for all new RH file reads and rhAccess for client permissions; server RPCs independently enforce permissions.
 - Detailed payroll extras use nullable source columns and the versioned manager-only entries RPC; older layouts retain totals without fabricated detail. RH Roomnights uses an RH-authorized RPC reading the latest monthly DRE occupied-room indicator, not occupancy multiplied by cached availability.
 - Turnover history uses independent authorized monthly snapshots, preserving event-time fields for period charts; departure reason categories are server-side aggregates so masked individual reasons remain private.
-- Payroll sorting uses the pure payrollSort helper on copied rows, never mutating cache or export/access.
-- Sensitive exports log to sensitive_export_log before generation.
+- Payroll sorting uses payrollSort on copies; never mutate cache.
+- Log sensitive exports to sensitive_export_log before generation.
 - Consolidated RH departments are classified server-side by rh_department_for_position and a monthly-row trigger; this keeps individual and aggregate views consistent for current rows and future imports without changing legacy payroll data.
 
 - Investidores module: all reads/writes go through SECURITY DEFINER `inv_*` RPCs (tables have RLS with no direct policies) so masking, audit (audit_access_logs) and finance notifications stay server-side; access comes from user_roles (edit + full view for editor roles) and user_permissions keys (finance, extra full view), never hardcoded e-mails.
@@ -36,6 +36,7 @@
 
 - Investors: matrícula lives on units; payee fractions in unit_payee_shares (sum 100%, via inv_set_payee_shares); monthly payment batches snapshot Pool UHs × fractions and are re-checked before sending; CNAB 240 Itaú is built only by src/lib/cnab240Itau.ts (test-locked to the bank sample) and returns match by seu_numero.
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
-- Recurring AR alerts use enqueue_ar_consolidated: one email per recipient, all hotels.
-- AP OMIE uses omieParser beside parse-ap-report; beneficiary, payer and invoice identities stay separate.
-- Anticipation uses ap_anticipation and protected ap_* RPCs serialized per hotel; anticipationSimulation shares projection/charge rules, leaving DRE untouched.
+- AR recurring alerts: enqueue_ar_consolidated, one email/recipient.
+- AP OMIE: omieParser beside parse-ap-report; beneficiary, payer, invoice stay separate.
+- Financial overview uses hotel-authorized financial_overview aggregates and financialOverview scope/period/term helpers; aging ignores period, exact days override ranges, AP writes unchanged.
+- Anticipation: protected ap_* RPCs serialized per hotel; anticipationSimulation shares rules, DRE untouched.
