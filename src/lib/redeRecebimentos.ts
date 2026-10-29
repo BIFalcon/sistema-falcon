@@ -134,7 +134,7 @@ export async function parseRedeRecebimentosExcel(file: File, hotelId: string) {
 }
 
 /** Linha de tarifa diária: MDR da Rede + taxa de adquirência B2B + demais ajustes da Rede. */
-export interface TarifaDia { date: string; rede_mdr: number; b2b: number; ajustes: number; total: number }
+export interface TarifaDia { date: string; rede_mdr: number; b2b: number; ajustes: number; antecipacao: number; total: number }
 
 export function buildTarifas(
   pagamentos: { data_recebimento: string | null; valor_mdr: number | null }[],
@@ -142,14 +142,14 @@ export function buildTarifas(
   ajustes: { data_ajuste: string | null; motivo: string | null; valor_cobrado: number | null }[],
 ): TarifaDia[] {
   const m = new Map<string, TarifaDia>();
-  const add = (d: string | null, f: "rede_mdr" | "b2b" | "ajustes", v: number | null) => {
+  const add = (d: string | null, f: "rede_mdr" | "b2b" | "ajustes" | "antecipacao", v: number | null) => {
     if (!d || v == null) return;
-    const r = m.get(d) ?? { date: d, rede_mdr: 0, b2b: 0, ajustes: 0, total: 0 };
+    const r = m.get(d) ?? { date: d, rede_mdr: 0, b2b: 0, ajustes: 0, antecipacao: 0, total: 0 };
     r[f] += Math.abs(Number(v)); r.total += Math.abs(Number(v));
     m.set(d, r);
   };
   pagamentos.forEach((p) => add(p.data_recebimento, "rede_mdr", p.valor_mdr));
   b2b.forEach((b) => add(b.data_operacao, "b2b", b.valor_taxa_adquirencia));
-  ajustes.filter((a) => !isAntecipacao(a.motivo)).forEach((a) => add(a.data_ajuste, "ajustes", a.valor_cobrado));
+  ajustes.forEach((a) => add(a.data_ajuste, isAntecipacao(a.motivo) ? "antecipacao" : "ajustes", a.valor_cobrado));
   return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
 }

@@ -49,3 +49,10 @@ describe("transferência B2B (arquivo real)", () => {
     expect(rows.find((r) => r.localizador_reserva === "24535191")?.valor_taxa_adquirencia).toBe(6.53);
   });
 });
+
+ describe("tarifas com antecipação", () => {
+ it("taxa de 150 entra no total uma vez e não nos outros ajustes", () => {
+ const rows=buildTarifas([{data_recebimento:"2026-10-29",valor_mdr:20}],[],[{data_ajuste:"2026-10-29",motivo:"taxa de antecipação",valor_cobrado:150},{data_ajuste:"2026-10-29",motivo:"outro",valor_cobrado:5}]);
+ expect(rows[0]).toMatchObject({antecipacao:150,ajustes:5,total:175});
+ });
+ });

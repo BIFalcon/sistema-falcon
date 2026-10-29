@@ -4,7 +4,7 @@
 - Live letter PDFs use requireLetterPdfBlob; surface failures, never substitute stored PDFs.
 - Letter DRE revenue composition uses letterRevenue keyed by the closing hotel ID; scoped templates prevent one hotel's line mapping from changing other hotels, and PDF rows must fit through distribution.
 - Carta uses the authorized hotel list without persisted GOP scoping, defaults to a valid single hotel, and synchronizes direct closing links with shared filters; changing a filter releases the URL closing pin so the displayed letter follows the selection.
-- RH monthly imports use rh_employees as the single source and import_rh_monthly as an atomic, serialized whole-period replacement; this prevents partial imports and keeps both RH panels consistent.
+- RH imports use rh_employees and atomic import_rh_monthly whole-period replacement to keep panels consistent.
 - Legacy payroll tables remain read-only historical fallbacks for periods without a consolidated upload; never combine both sources in the same period.
 - Payroll RPCs retain the total_cost alias for compatibility, while consolidated values come from net_earnings; separate summary fields and an authorized overtime-history RPC preserve legacy/missing monetary data as NULL. payrollMetrics shares null-safe monthly series and ratio calculations with tests.
 - RH payroll individual values are RH/Master-only through RLS and manager-checked RPCs; other authorized roles receive aggregates, never per-person costs.
@@ -37,4 +37,5 @@
 - Investors: matrícula lives on units; payee fractions in unit_payee_shares (sum 100%, via inv_set_payee_shares); monthly payment batches snapshot Pool UHs × fractions and are re-checked before sending; CNAB 240 Itaú is built only by src/lib/cnab240Itau.ts (test-locked to the bank sample) and returns match by seu_numero.
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
 - Recurring AR alerts use enqueue_ar_consolidated: one email per recipient, all hotels.
-- AP OMIE uses pure omieParser beside parse-ap-report; beneficiary fields stay separate from payer accounts and Nota Fiscal identity to preserve UI and document links.
+- AP OMIE uses omieParser beside parse-ap-report; beneficiary, payer and invoice identities stay separate.
+- Anticipation uses ap_anticipation and protected ap_* RPCs serialized per hotel; anticipationSimulation shares projection/charge rules, leaving DRE untouched.

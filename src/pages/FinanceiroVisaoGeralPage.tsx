@@ -32,7 +32,7 @@ export default function FinanceiroVisaoGeralPage() {
   const { user, hasRole, isMaster, userHotels } = useAuth();
   const seesAllHotels =
     isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
-  const canEditAnticipation = isMaster || hasRole("financeiro");
+  const canEditAnticipation = !hasRole("fernando") && (isMaster || hasRole("patronos") || hasRole("controladoria"));
   const restrictedHotelIds: string[] | null = seesAllHotels
     ? null
     : userHotels.map((h) => h.id);
@@ -384,7 +384,8 @@ function AnticipationSection({
       const { data, error } = await supabase
         .from("ap_anticipation")
         .select("id,hotel_id,anticipated_amount,valor_liquido,valor_descontado,data_antecipacao")
-        .eq("hotel_id", hotelId!)
+        .eq("hotel_id", hotelId ?? "")
+        .or("status.is.null,status.eq.confirmada")
         .order("data_antecipacao", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as ApAnticipationRow[];
