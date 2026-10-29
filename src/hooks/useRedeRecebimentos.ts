@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import type { AnticipatedPayment } from "@/lib/anticipationSimulation";
 import { parseRedeRecebimentosExcel, REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
 
 async function pageAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>) {
@@ -33,7 +34,7 @@ export function useRedeRecebimentosData(hotelId: string | null) {
         pageAll<RecebidoRow>((a, b) => supabase.from("conc_rede_recebidos").select("id, data, bandeira, modalidade, valor_depositado, status, matched_bank_id, matched_at").eq("hotel_id", h).order("data").order("id").range(a, b)),
         pageAll<ChargebackRow>((a, b) => supabase.from("conc_rede_chargebacks").select("id, data_debito, tipo, data_original_venda, valor_original_venda, valor_descontado, motivo_cancelamento, nsu_cv, bandeira, modalidade").eq("hotel_id", h).order("data_debito").order("id").range(a, b)),
         pageAll<AjusteRow>((a, b) => supabase.from("conc_rede_ajustes").select("id, data_ajuste, motivo, valor_cobrado, bandeira").eq("hotel_id", h).order("data_ajuste").order("id").range(a, b)),
-        pageAll<{ data_recebimento: string | null; valor_mdr: number | null }>((a, b) => supabase.from("conc_rede_pagamentos").select("data_recebimento, valor_mdr").eq("hotel_id", h).order("id").range(a, b)),
+        pageAll<AnticipatedPayment & { valor_mdr: number | null }>((a, b) => supabase.from("conc_rede_pagamentos").select("data_recebimento, data_original_vencimento, valor_liquido_parcela, valor_mdr").eq("hotel_id", h).order("id").range(a, b)),
         pageAll<{ data_operacao: string | null; valor_taxa_adquirencia: number | null }>((a, b) => supabase.from("conc_b2b_receipts").select("data_operacao, valor_taxa_adquirencia").eq("hotel_id", h).eq("tipo_lancamento", "charge").order("id").range(a, b)),
         pageAll<BankRow>((a, b) => supabase.from("conc_bank_entries").select("id, line_date, description, amount, matched_at").eq("hotel_id", h).order("line_date").order("id").range(a, b)),
       ]);
@@ -61,6 +62,8 @@ async function runMatch(hotelId: string) {
 
 const invalidate = (qc: ReturnType<typeof useQueryClient>) => {
   qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
+  qc.invalidateQueries({ queryKey: ["ap-simulations"] });
+  qc.invalidateQueries({ queryKey: ["ap-anticipation-list"] });
   qc.invalidateQueries({ queryKey: ["conc-bank"] });
   qc.invalidateQueries({ queryKey: ["conc-uploads"] });
   qc.invalidateQueries({ queryKey: ["settlement-cutoff"] });
@@ -115,6 +118,12 @@ export function useImportRedeRecebimentos() {
         ajustes: await ins("conc_rede_ajustes", p.ajustes),
         chargebacks: await ins("conc_rede_chargebacks", p.chargebacks),
       };
+      const { data: allowed, error: accessError } = await supabase.rpc("can_manage_anticipation", { p_user: user.id });
+      if (accessError) throw accessError;
+      if (allowed) {
+        const { error } = await supabase.rpc("ap_reconcile_simulations", { p_hotel: hotelId });
+        if (error) throw error;
+      }
       const match = await runMatch(hotelId);
       return { ...counts, ...match };
     },

@@ -111,6 +111,9 @@ import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 import { useMemo } from "react";
 import { BrDateInput } from "@/components/ui/br-date-input";
+import { AnticipationSimulations } from "@/components/accounts-payable/AnticipationSimulations";
+import { useAnticipationSimulations } from "@/hooks/useAnticipationSimulations";
+import { canSimulateAnticipation, simulatedNet } from "@/lib/anticipationSimulation";
 
 export default function ContasPagarPage() {
   const {
@@ -122,6 +125,7 @@ export default function ContasPagarPage() {
     isFernando,
   } = useAuth();
   const qc = useQueryClient();
+  const canSimulate = canSimulateAnticipation(isMaster, ["fernando", "patronos", "controladoria"].filter(r => hasRole(r as "fernando" | "patronos" | "controladoria")));
   const canManage = !isFernando && (isMaster || hasRole("financeiro"));
   // Marcações em lote — equipe pode marcar Agendado; só coordenadora/master pode Pago.
   const canMarkInsertedAgendado =
@@ -147,6 +151,7 @@ export default function ContasPagarPage() {
     setDateTo,
     setSpecificDates,
   } = useModuleFilters("financeiro");
+  const simulations = useAnticipationSimulations(hotelId, canSimulate);
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
     [hotels, hotelId],
@@ -563,6 +568,9 @@ export default function ContasPagarPage() {
 
   // Diferença = saldo bancário - total exibido (mesma base do card "Total a pagar").
   const balanceDiffComputed = hasAnyBalance ? balanceTotal - displayedTotalToPay : null;
+
+  const simulatedAmount = simulatedNet(simulations.data ?? [], dateFrom, dateTo, specificDates, period);
+  const projectedBalance = balanceTotal + simulatedAmount - displayedTotalToPay;
 
   // Indica se há lançamento vencido (due_date < hoje) entre os selecionados.
   const selectionHasOverdue = useMemo(() => {
@@ -1047,6 +1055,15 @@ export default function ContasPagarPage() {
           </Card>
           </div>
 
+          {canSimulate && <>
+            <div className="py-3 border-b border-border">
+              <p className="text-xs text-muted-foreground">Saldo projetado</p>
+              <p className={cn("text-lg font-semibold", projectedBalance < 0 ? "text-destructive" : "text-success")}>{hasAnyBalance && !simulations.isLoading && !simulations.isError ? fmtBRL(projectedBalance) : "—"}</p>
+              <p className="text-xs text-muted-foreground" title="Confirmadas e lançamentos antigos não entram na projeção.">Saldo {fmtBRL(balanceTotal)} + antecipação simulada {fmtBRL(simulatedAmount)} − a pagar {fmtBRL(displayedTotalToPay)}</p>
+              {simulations.isError && <p className="text-xs text-destructive">Não foi possível carregar as simulações.</p>}
+            </div>
+            <AnticipationSimulations key={hotelId} hotelId={hotelId} rows={simulations.data ?? []} userId={user?.id} master={isMaster}/>
+          </>}
           <Dialog open={balanceExpanded} onOpenChange={setBalanceExpanded}>
             <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
