@@ -1,3 +1,8 @@
+## Visão Geral Financeiro — blocos 1 a 3
+- [ ] Acesso somente leitura GOP/ADM, seleção multi-hotel exclusiva da Visão Geral e período compartilhado.
+- [ ] Cartão automático nos dez hotéis definidos, com fallback manual nos demais.
+- [ ] Inadimplência, Open Folio e AP atrasado atuais com faixas de valores; testes e validação.
+
 ## Antecipações — três etapas
 - [x] Estender antecipações e proteger criação, edição e confirmação; preservar lançamentos antigos.
 - [x] Adicionar simulação e saldo projetado no Contas a Pagar.
