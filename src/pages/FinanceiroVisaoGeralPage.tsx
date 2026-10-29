@@ -1,6 +1,6 @@
 // GG pode ver esta página (somente leitura — sem botões de ação).
 // Dados já são filtrados pelo hotel do GG via allowedHotels no AuthContext.
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
-import { useAllHotels } from "@/hooks/useHotelAssets";
-import { useAllApEntries } from "@/hooks/useAccountsPayable";
-import { useToInvoiceEntries, useOpenFolioEntries } from "@/hooks/useAccountsReceivable";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useGopManagers } from "@/hooks/useGopManagers";
+import { useFinancialOverview } from "@/hooks/useFinancialOverview";
+import { effectiveFinancialHotels, financialOverviewReadonly, sumFinancialRows } from "@/lib/financialOverview";
+import { FinancialAging } from "@/components/financeiro/FinancialAging";
+
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -29,39 +32,27 @@ import { BrDateInput } from "@/components/ui/br-date-input";
 
 export default function FinanceiroVisaoGeralPage() {
   const navigate = useNavigate();
-  const { user, hasRole, isMaster, userHotels } = useAuth();
-  const seesAllHotels =
-    isMaster || hasRole("financeiro") || hasRole("controladoria") || hasRole("ri");
-  const canEditAnticipation = !hasRole("fernando") && (isMaster || hasRole("patronos") || hasRole("controladoria"));
-  const restrictedHotelIds: string[] | null = seesAllHotels
-    ? null
-    : userHotels.map((h) => h.id);
+  const { user, hasRole, roles, allowedHotels, isGg, isAdm } = useAuth();
+  const { hotelId, hotelIds, gopId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
+  const { data: gopManagers = [] } = useGopManagers();
+  const portfolio = gopId ? gopManagers.find(g => g.user_id === gopId)?.hotel_ids ?? [] : null;
+  const effectiveHotelIds = effectiveFinancialHotels(allowedHotels.map(h => h.id), hotelIds, hotelId, portfolio, isGg || isAdm);
+  const period = { dateFrom, dateTo, specificDates };
+  const overview = useFinancialOverview(effectiveHotelIds, period, user?.id);
+  const rows = overview.data ?? [];
+  const sum = (field: Parameters<typeof sumFinancialRows>[1]) => sumFinancialRows(rows, field);
+  const hotelFilter = effectiveHotelIds.length === 1 ? effectiveHotelIds[0] : "all";
+  const canEditAnticipation = !financialOverviewReadonly(roles) && (hasRole("processos") || hasRole("patronos") || hasRole("controladoria"));
+  const totalAPagar = sum("payable");
+  const totalVencido = sum("overdue");
+  const totalGeralAPagar = totalAPagar + totalVencido;
+  const totalAFaturar = sum("to_invoice");
+  const totalOpenFolio = sum("open_folio");
+  const saldoConta = sum("bank_balance");
+  const saldoLiquido = saldoConta - totalGeralAPagar + totalOpenFolio;
+  const jurosPagos = sum("paid_interest");
 
-  const { data: allHotels = [] } = useAllHotels();
-  void allHotels;
-
-  // Filtros globais (header) — compartilhados com Contas a Pagar
-  const { hotelId, dateFrom, dateTo } = useModuleFilters("financeiro");
-  const hotelFilter = hotelId ?? "all";
-
-  // Dados
-  const { data: apEntries = [] } = useAllApEntries();
-  const { data: toInvoice = [] } = useToInvoiceEntries({ hotelId: null });
-  const { data: openFolio = [] } = useOpenFolioEntries();
-
-  // Juros pagos: lançamentos pagos ficam arquivados, então precisam ser
-  // buscados separadamente para somar os juros do período.
-  const { data: paidEntries = [] } = useQuery({
-    queryKey: ["ap-paid-all-juros"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ap_entries")
-        .select("hotel_id,payment_status,payment_paid_at,paid_interest")
-        .eq("payment_status", "pago")
-        .not("paid_interest", "is", null)
-        .limit(20000);
-      if (error) throw error;
-      return (data ?? []) as Array<{
+  return (data ?? []) as Array<{
         hotel_id: string | null;
         payment_status: string;
         payment_paid_at: string | null;
@@ -224,7 +215,10 @@ export default function FinanceiroVisaoGeralPage() {
         </p>
       </div>
 
-      {/* BLOCO 1 — Cards principais */}
+      {overview.isPending && effectiveHotelIds.length > 0 && <p className="text-sm text-muted-foreground">Carregando valores…</p>}
+      {overview.isError && <div role="alert" className="text-sm text-destructive flex items-center gap-3">Não foi possível carregar os valores financeiros.<Button variant="outline" size="sm" onClick={() => overview.refetch()}>Tentar novamente</Button></div>}
+      {effectiveHotelIds.length === 0 && <p className="text-sm text-muted-foreground">Selecione um hotel autorizado.</p>}
+      {/* Cards principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           icon={<Wallet className="h-4 w-4" />}
@@ -269,7 +263,7 @@ export default function FinanceiroVisaoGeralPage() {
           tone="default"
           subtitle={
             hotelFilter === "all"
-              ? "Selecione um hotel"
+              ? "Saldos mais recentes dos hotéis selecionados"
               : "Itaú + Santander (mais recente)"
           }
         />
@@ -282,62 +276,38 @@ export default function FinanceiroVisaoGeralPage() {
         />
       </div>
 
-      {/* BLOCO 2 — Recebíveis de cartão */}
       <section className="space-y-3">
-        <SectionHeader
-          icon={<CreditCard className="h-4 w-4" />}
-          title="Recebíveis de cartão"
-          subtitle="Disponível após integração com a Rede"
-        />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PlaceholderCard
-            icon={<CreditCard className="h-4 w-4" />}
-            title="Recebíveis de cartão"
-            text="Total de recebíveis de cartão no período — disponível após integração com a Rede."
-          />
-          <PlaceholderCard
-            icon={<AlertTriangle className="h-4 w-4" />}
-            title="Chargebacks"
-            text="Chargebacks no período — disponível após integração com a Rede."
-          />
+        <SectionHeader icon={<AlertTriangle className="h-4 w-4" />} title="Pendências atuais" subtitle="Posição atual · todos os períodos" />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <FinancialAging title="Inadimplência de faturamento" total={sum("defaulting")} bands={[sum("defaulting_lt7"), sum("defaulting_d7_30"), sum("defaulting_gt30")]} unknown={sum("defaulting_unknown")} />
+          <FinancialAging title="Open Folio" total={totalOpenFolio} bands={[sum("folio_lt7"), sum("folio_d7_30"), sum("folio_gt30")]} unknown={sum("folio_unknown")} />
+          <FinancialAging title="Pagamentos em atraso" total={totalVencido} bands={[sum("overdue_lt7"), sum("overdue_d7_30"), sum("overdue_gt30")]} />
         </div>
       </section>
-
-      {/* BLOCO 3 — Encargos financeiros (filtro próprio de período) */}
       <section className="space-y-3">
-        <div className="border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-accent"><TrendingUp className="h-4 w-4" /></span>
-              <h3 className="font-medium text-sm">Encargos financeiros</h3>
-              {hotelFilter === "all" && (
-                <span className="text-xs text-muted-foreground">
-                  · Antecipação: selecione um hotel para informar
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <BrDateInput placeholder="De"
- value={anticDateFrom}
- onChange={setAnticDateFrom}
- className="w-36 h-8 text-xs"
- />
-              <BrDateInput placeholder="Até"
- value={anticDateTo}
- onChange={setAnticDateTo}
- className="w-36 h-8 text-xs"
- />
-            </div>
-          </div>
+        <SectionHeader icon={<CreditCard className="h-4 w-4" />} title="Recebíveis de cartão" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <SummaryCard icon={<CreditCard className="h-4 w-4" />} label="Cartão a receber" value={fmtBRL(sum("card_receivable"))} tone="default" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {rows.some(r => r.automatic_card) && <Badge variant="secondary" title="Calculado automaticamente via Conciliação de Cartão">Calculado automaticamente via Conciliação de Cartão</Badge>}
+          {rows.some(r => !r.automatic_card) && <Badge variant="outline">Inclui valores informados manualmente</Badge>}
+        </div>
+        {sum("invalid_card_terms") > 0 && <p className="text-xs text-muted-foreground">{sum("invalid_card_terms")} venda(s) sem prazo válido não incluída(s) no cálculo.</p>}
+      </section>
+      <section className="space-y-3">
+        <SectionHeader icon={<TrendingUp className="h-4 w-4" />} title="Encargos financeiros" />
           <AnticipationSection
             hotelId={hotelFilter === "all" ? null : hotelFilter}
             canEdit={canEditAnticipation}
             userId={user?.id ?? null}
-            dateFrom={anticDateFrom}
-            dateTo={anticDateTo}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             jurosPagos={jurosPagos}
+            specificDates={specificDates}
+            totalAntecipado={sum("anticipated")}
+            totalDescontado={sum("anticipation_charge")}
           />
-        </div>
       </section>
     </div>
   );
@@ -360,6 +330,9 @@ function AnticipationSection({
   dateFrom,
   dateTo,
   jurosPagos,
+  specificDates,
+  totalAntecipado,
+  totalDescontado,
 }: {
   hotelId: string | null;
   canEdit: boolean;
@@ -367,6 +340,9 @@ function AnticipationSection({
   dateFrom: string;
   dateTo: string;
   jurosPagos: number;
+  specificDates: string[];
+  totalAntecipado: number;
+  totalDescontado: number;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -377,43 +353,9 @@ function AnticipationSection({
     data_antecipacao: "",
   });
 
-  const { data: rows = [] } = useQuery({
-    queryKey: ["ap-anticipation-list", hotelId],
-    enabled: !!hotelId,
-    queryFn: async (): Promise<ApAnticipationRow[]> => {
-      const { data, error } = await supabase
-        .from("ap_anticipation")
-        .select("id,hotel_id,anticipated_amount,valor_liquido,valor_descontado,data_antecipacao")
-        .eq("hotel_id", hotelId ?? "")
-        .or("status.is.null,status.eq.confirmada")
-        .order("data_antecipacao", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as ApAnticipationRow[];
-    },
-  });
-
-  const filtered = useMemo(
-    () =>
-      rows.filter((r) => {
-        const d = r.data_antecipacao;
-        if (dateFrom && (!d || d < dateFrom)) return false;
-        if (dateTo && (!d || d > dateTo)) return false;
-        return true;
-      }),
-    [rows, dateFrom, dateTo],
-  );
-
-  const totalAntecipado = filtered.reduce(
-    (s, r) => s + Number(r.anticipated_amount ?? 0),
-    0,
-  );
-  const totalDescontado = filtered.reduce(
-    (s, r) => s + Number(r.valor_descontado ?? 0),
-    0,
-  );
-
   const insert = useMutation({
     mutationFn: async () => {
+      if (!canEdit) throw new Error("Consulta somente leitura.");
       if (!hotelId || !userId) throw new Error("Selecione um hotel.");
       if (!form.data_antecipacao) throw new Error("Informe a data da antecipação.");
       const d = new Date(form.data_antecipacao + "T00:00:00");
@@ -434,6 +376,7 @@ function AnticipationSection({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ap-anticipation-list"] });
+      qc.invalidateQueries({ queryKey: ["financial-overview"] });
       toast.success("Antecipação registrada");
       setOpen(false);
       setForm({
@@ -573,14 +516,15 @@ function SummaryCard({
     tone === "destructive"
       ? "border-destructive/30 bg-destructive/5"
       : tone === "warning"
-        ? "border-amber-500/30 bg-amber-500/5"
+        ? "border-accent/30 bg-accent/5"
         : "";
   const valueClass = `${tone === "destructive" ? "text-destructive" : ""} ${bold ? "font-bold" : "font-semibold"}`;
-  const Wrapper: React.ElementType = onClick ? "button" : "div";
+  const Wrapper: React.ElementType = onClick ? Button : "div";
   return (
     <Wrapper
       onClick={onClick}
-      className={`text-left p-4 rounded-lg border bg-card transition-all ${onClick ? "hover:border-accent hover:shadow-soft" : ""} ${toneClass}`}
+      {...(onClick ? { variant: "outline" } : {})}
+      className={`text-left h-auto block whitespace-normal p-4 rounded-lg border bg-card transition-all ${onClick ? "hover:border-accent hover:shadow-soft" : ""} ${toneClass}`}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
         {icon} {label}
@@ -602,17 +546,5 @@ function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title
       </div>
       {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
     </div>
-  );
-}
-
-function PlaceholderCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <Card className="p-5 shadow-soft border-dashed bg-muted/30 space-y-2">
-      <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-        {icon} {title}
-        <Badge variant="outline" className="ml-auto text-[9px]">Em breve</Badge>
-      </div>
-      <p className="text-xs text-muted-foreground">{text}</p>
-    </Card>
   );
 }
