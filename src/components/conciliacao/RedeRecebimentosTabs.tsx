@@ -14,6 +14,7 @@ import { useSettlementCutoff } from "@/hooks/useSettlementCutoff";
 import { excludedSettlementIds } from "@/lib/settlementCutoff";
 import { SettlementBatchDialog } from "@/components/conciliacao/SettlementBatchDialog";
 import type { BatchTarget } from "@/hooks/useSettlementBatch";
+import { AnticipationDaily } from "./AnticipationDaily";
 import { BankReceiptRulesPanel } from "./BankReceiptRulesPanel";
 
 const day = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
@@ -154,6 +155,8 @@ export function RedeAntecipacaoTab({ hotelId }: { hotelId: string }) {
   return (
     <div className="space-y-3">
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+        <>
+        <AnticipationDaily hotelId={hotelId} payments={data?.pagamentos ?? []} fees={data?.ajustes ?? []}/>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Taxas de antecipação ({rows.length}) · <Money value={-total} /></CardTitle></CardHeader>
           <CardContent className="p-0 max-h-[520px] overflow-y-auto">
             <Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Bandeira</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">Valor cobrado</TableHead></TableRow></TableHeader>
@@ -163,6 +166,7 @@ export function RedeAntecipacaoTab({ hotelId }: { hotelId: string }) {
                 <TableRow key={r.id}><TableCell className="text-xs">{day(r.data_ajuste)}</TableCell><TableCell className="text-xs">{r.bandeira ?? "—"}</TableCell><TableCell className="text-xs">{r.motivo}</TableCell><TableCell className="text-right text-xs"><Money value={-Math.abs(Number(r.valor_cobrado ?? 0))} /></TableCell></TableRow>
               ))}</TableBody></Table>
           </CardContent></Card>
+        </>
       )}
     </div>
   );
@@ -173,11 +177,11 @@ export function TarifasTab({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const months = useMemo(() => {
     const days = buildTarifas(data?.pagamentos ?? [], data?.b2b ?? [], data?.ajustes ?? []);
-    const m = new Map<string, { ym: string; rede_mdr: number; b2b: number; ajustes: number; total: number; days: typeof days }>();
+    const m = new Map<string, { ym: string; rede_mdr: number; b2b: number; ajustes: number; antecipacao: number; total: number; days: typeof days }>();
     for (const d of days) {
       const ym = d.date.slice(0, 7);
-      const r = m.get(ym) ?? { ym, rede_mdr: 0, b2b: 0, ajustes: 0, total: 0, days: [] };
-      r.rede_mdr += d.rede_mdr; r.b2b += d.b2b; r.ajustes += d.ajustes; r.total += d.total; r.days.push(d);
+      const r = m.get(ym) ?? { ym, rede_mdr: 0, b2b: 0, ajustes: 0, antecipacao: 0, total: 0, days: [] };
+      r.rede_mdr += d.rede_mdr; r.b2b += d.b2b; r.ajustes += d.ajustes; r.antecipacao += d.antecipacao; r.total += d.total; r.days.push(d);
       m.set(ym, r);
     }
     return [...m.values()].sort((a, b) => b.ym.localeCompare(a.ym));
@@ -186,18 +190,19 @@ export function TarifasTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-muted-foreground">MDR descontado da Rede (aba pagamentos) + taxa de adquirência B2B + demais ajustes da Rede (exceto taxa de antecipação). Clique no mês para ver os dias.</p>
+      <p className="text-[11px] text-muted-foreground">MDR descontado da Rede (aba pagamentos) + taxa de adquirência B2B + taxa de antecipação + demais ajustes da Rede. Clique no mês para ver os dias.</p>
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
         <Card><CardContent className="p-0 overflow-x-auto">
-          <Table><TableHeader><TableRow><TableHead>Período</TableHead><TableHead className="text-right">MDR Rede</TableHead><TableHead className="text-right">Taxa B2B</TableHead><TableHead className="text-right">Outros ajustes Rede</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+          <Table><TableHeader><TableRow><TableHead>Período</TableHead><TableHead className="text-right">MDR Rede</TableHead><TableHead className="text-right">Taxa B2B</TableHead><TableHead className="text-right">Taxa de antecipação</TableHead><TableHead className="text-right">Outros ajustes Rede</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>{months.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">Nenhuma tarifa importada.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground">Nenhuma tarifa importada.</TableCell></TableRow>
             ) : months.map((m) => (
               <Fragment key={m.ym}>
                 <TableRow className="cursor-pointer font-medium" onClick={() => toggle(m.ym)}>
                   <TableCell className="text-xs">{open.has(m.ym) ? <ChevronDown className="inline h-3 w-3 mr-1" /> : <ChevronRight className="inline h-3 w-3 mr-1" />}{monthLabel(m.ym)}</TableCell>
                   <TableCell className="text-right text-xs"><Money value={-m.rede_mdr} /></TableCell>
                   <TableCell className="text-right text-xs"><Money value={-m.b2b} /></TableCell>
+                  <TableCell className="text-right text-xs"><Money value={-m.antecipacao} /></TableCell>
                   <TableCell className="text-right text-xs"><Money value={-m.ajustes} /></TableCell>
                   <TableCell className="text-right text-xs"><Money value={-m.total} /></TableCell>
                 </TableRow>
@@ -206,6 +211,7 @@ export function TarifasTab({ hotelId }: { hotelId: string }) {
                     <TableCell className="text-xs pl-8">{day(d.date)}</TableCell>
                     <TableCell className="text-right text-xs"><Money value={-d.rede_mdr} /></TableCell>
                     <TableCell className="text-right text-xs"><Money value={-d.b2b} /></TableCell>
+                    <TableCell className="text-right text-xs"><Money value={-d.antecipacao} /></TableCell>
                     <TableCell className="text-right text-xs"><Money value={-d.ajustes} /></TableCell>
                     <TableCell className="text-right text-xs"><Money value={-d.total} /></TableCell>
                   </TableRow>
