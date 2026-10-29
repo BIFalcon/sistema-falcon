@@ -40,3 +40,4 @@
 - AP OMIE: omieParser beside parse-ap-report; beneficiary, payer, invoice stay separate.
 - Financial overview uses hotel-authorized financial_overview aggregates and financialOverview scope/period/term helpers; aging ignores period, exact days override ranges, AP writes unchanged.
 - Anticipation: protected ap_* RPCs serialized per hotel; anticipationSimulation shares rules, DRE untouched.
+- Card auto-reconcile checks both sides are unmatched before writing; never write provisional matched_at then undo, because undos fire settlement rechecks and caused statement timeouts.
