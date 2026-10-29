@@ -1,8 +1,9 @@
 ## Antecipações — três etapas
-- [ ] Estender antecipações e proteger criação, edição e confirmação; preservar lançamentos antigos.
-- [ ] Adicionar simulação e saldo projetado no Contas a Pagar.
-- [ ] Conciliar relatório Rede, mostrar recebimento/taxa separados e incluir taxa nas Tarifas.
-- [ ] Testar regras, permissões e fluxo autorizado.
+- [x] Estender antecipações e proteger criação, edição e confirmação; preservar lançamentos antigos.
+- [x] Adicionar simulação e saldo projetado no Contas a Pagar.
+- [x] Conciliar relatório Rede, mostrar recebimento/taxa separados e incluir taxa nas Tarifas.
+- [x] Testar regras de projeção, tolerância, encargos e tarifas; conferir estruturas e políticas aplicadas.
+- [ ] Validar criação/confirmação e recusa de perfis pela tela autenticada — bloqueado: não existe conta correspondente ao solicitante; requer login no preview. Nenhuma simulação real criada neste atendimento.
 
 ## Revisão completa das baixas
 - [x] Compor lotes Rede com descontos explicitamente vinculados, sem duplicar cancelamento; remover taxa presumida e bloquear lotes repetidos.

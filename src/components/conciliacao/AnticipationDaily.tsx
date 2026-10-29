@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export function AnticipationDaily({hotelId,payments,fees}: {hotelId:string;payments:AnticipatedPayment[];fees:{data_ajuste:string|null;motivo:string|null;valor_cobrado:number|null}[]}) {
-  const {isMaster,hasRole} = useAuth();
+  const {isMaster,hasRole,user} = useAuth();
   const allowed = canSimulateAnticipation(isMaster,['fernando','patronos','controladoria'].filter(r=>hasRole(r as 'fernando'|'patronos'|'controladoria')));
   const sims = useAnticipationSimulations(hotelId,allowed);
   const {reconcile} = useSimulationActions();
@@ -27,8 +27,9 @@ export function AnticipationDaily({hotelId,payments,fees}: {hotelId:string;payme
         const rows=(sims.data ?? []).filter(s=>s.data_antecipacao===r.date);
         const total=rows.reduce((s,a)=>s+Number(a.valor_liquido ?? 0),0);
         const pending=rows.some(s=>s.status==='simulada');
+        const canAdjust=rows.filter(s=>s.status==='simulada').every(s=>isMaster || s.created_by===user?.id);
         const fee=fees.filter(f=>f.data_ajuste===r.date&&isAntecipacao(f.motivo)).reduce((s,f)=>s+Math.abs(Number(f.valor_cobrado ?? 0)),0);
-        return <TableRow key={r.date}><TableCell>{fmtDate(r.date)}</TableCell><TableCell>{fmtBRL(r.net)}</TableCell><TableCell>{fmtBRL(fee)}</TableCell>{allowed && <><TableCell>{rows.length?fmtBRL(total):'—'}</TableCell><TableCell>{rows.length?fmtBRL(r.net-total):'—'}</TableCell><TableCell>{sims.isLoading?'Conferindo…':sims.isError?'Falha na consulta':!rows.length?'Sem simulação':pending?'Divergente':'Confirmada'}</TableCell><TableCell>{pending && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={reconcile.isPending} onClick={()=>setDecision({date:r.date,decision:'confirmar'})}>Confirmar mesmo assim</Button><Button size="sm" variant="outline" disabled={reconcile.isPending} onClick={()=>setDecision({date:r.date,decision:'ajustar'})}>Ajustar simulação</Button></div>}</TableCell></>}</TableRow>;
+        return <TableRow key={r.date}><TableCell>{fmtDate(r.date)}</TableCell><TableCell>{fmtBRL(r.net)}</TableCell><TableCell>{fmtBRL(fee)}</TableCell>{allowed && <><TableCell>{rows.length?fmtBRL(total):'—'}</TableCell><TableCell>{rows.length?fmtBRL(r.net-total):'—'}</TableCell><TableCell>{sims.isLoading || reconcile.isPending?'Conferindo…':sims.isError?'Falha na consulta':!rows.length?'Sem simulação':pending?'Divergente':'Confirmada'}</TableCell><TableCell>{pending && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={reconcile.isPending} onClick={()=>setDecision({date:r.date,decision:'confirmar'})}>Confirmar mesmo assim</Button>{canAdjust && <Button size="sm" variant="outline" disabled={reconcile.isPending} onClick={()=>setDecision({date:r.date,decision:'ajustar'})}>Ajustar simulação</Button>}</div>}</TableCell></>}</TableRow>;
       })}
       {!anticipatedDaily(payments).length && <TableRow><TableCell colSpan={allowed?7:3} className="text-center text-muted-foreground">Nenhum recebimento antecipado.</TableCell></TableRow>}
     </TableBody></Table></div>
