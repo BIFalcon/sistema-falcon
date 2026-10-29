@@ -652,6 +652,13 @@
       "when": 1793275914475,
       "tag": "0092_anticipation_simulation_value_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1793276897051,
+      "tag": "0093_financial_overview_blocks_1_3",
+      "breakpoints": true
     }
   ]
 }

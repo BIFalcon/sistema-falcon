@@ -5481,6 +5481,16 @@ export type Database = {
         }
         Returns: number
       }
+      financial_card_term_days: { Args: { p_value: string }; Returns: number }
+      financial_overview: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_dates?: string[]
+          p_hotel_ids: string[]
+        }
+        Returns: Json
+      }
       get_ap_category_monthly_series: {
         Args: { _category_normalized?: string; _hotel_id: string }
         Returns: {
