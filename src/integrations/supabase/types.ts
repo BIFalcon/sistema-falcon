@@ -18,7 +18,10 @@ export type Database = {
         Row: {
           anticipated_amount: number
           anticipation_rate: number
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
+          created_by: string | null
           data_antecipacao: string | null
           hotel_id: string
           id: string
@@ -26,6 +29,8 @@ export type Database = {
           month: number
           period_end: string | null
           period_start: string | null
+          rede_reference: Json | null
+          status: string | null
           updated_at: string
           valor_descontado: number | null
           valor_liquido: number | null
@@ -34,7 +39,10 @@ export type Database = {
         Insert: {
           anticipated_amount?: number
           anticipation_rate?: number
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
+          created_by?: string | null
           data_antecipacao?: string | null
           hotel_id: string
           id?: string
@@ -42,6 +50,8 @@ export type Database = {
           month: number
           period_end?: string | null
           period_start?: string | null
+          rede_reference?: Json | null
+          status?: string | null
           updated_at?: string
           valor_descontado?: number | null
           valor_liquido?: number | null
@@ -50,7 +60,10 @@ export type Database = {
         Update: {
           anticipated_amount?: number
           anticipation_rate?: number
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
+          created_by?: string | null
           data_antecipacao?: string | null
           hotel_id?: string
           id?: string
@@ -58,6 +71,8 @@ export type Database = {
           month?: number
           period_end?: string | null
           period_start?: string | null
+          rede_reference?: Json | null
+          status?: string | null
           updated_at?: string
           valor_descontado?: number | null
           valor_liquido?: number | null
@@ -5056,6 +5071,22 @@ export type Database = {
       }
     }
     Functions: {
+      ap_delete_simulation: { Args: { p_id: string }; Returns: undefined }
+      ap_reconcile_simulations: {
+        Args: { p_date?: string; p_decision?: string; p_hotel: string }
+        Returns: number
+      }
+      ap_save_simulation: {
+        Args: {
+          p_date: string
+          p_discount: number
+          p_gross: number
+          p_hotel: string
+          p_id?: string
+          p_net: number
+        }
+        Returns: string
+      }
       ar_doc_number: { Args: { t: string }; Returns: string }
       ar_to_invoice_daily_totals: {
         Args: {
@@ -5143,6 +5174,7 @@ export type Database = {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_anticipation: { Args: { p_user: string }; Returns: boolean }
       can_read_dre_hotel: {
         Args: { _hotel_id: string; _user_id: string }
         Returns: boolean
