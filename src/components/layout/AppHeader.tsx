@@ -50,9 +50,11 @@ export function AppHeader() {
   const { pathname, search } = useLocation();
   const activeModule = getModuleFromPath(pathname);
   const { hotelId, hotelIds, gopId, month, year, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setMonth, setYear, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters(activeModule);
-  const { allowedHotels: authAllowedHotels, profile, signOut, isMaster, isGg, hasRole, matrizHotel, canSeeMatriz, roles } = useAuth();
+  const { allowedHotels: authAllowedHotels, profile, signOut, isMaster, isGg, isAdm, hasRole, matrizHotel, canSeeMatriz, roles } = useAuth();
   const navigate = useNavigate();
   const isFinanceiro = pathname.startsWith("/financeiro");
+  const isFinanceiroVisaoGeral = pathname === "/financeiro";
+  const financeSingleOnly = isFinanceiroVisaoGeral && isAdm;
   const isIndicadores = pathname.startsWith("/indicadores");
   const indicatorHotels = useDreIndicatorHotels(isIndicadores);
   const allowedHotels = isIndicadores ? indicatorHotels : authAllowedHotels;
@@ -154,12 +156,12 @@ export function AppHeader() {
           Filtros
         </span>
 
-        {(isGg || summaryOnly) && allowedHotels.length <= 1 ? (
+        {(isGg || summaryOnly || financeSingleOnly) && allowedHotels.length <= 1 ? (
           <div className="h-9 px-3 flex items-center gap-2 rounded-md border border-input bg-muted/50 text-sm font-medium min-w-[180px]">
             <Hotel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="truncate">{allowedHotels[0]?.name ?? "Hotel"}</span>
           </div>
-        ) : (isGg || summaryOnly) && allowedHotels.length > 1 ? (
+        ) : (isGg || summaryOnly || financeSingleOnly) && allowedHotels.length > 1 ? (
           <Select
             value={hotelId ?? undefined}
             onValueChange={(v) => changeCartaFilter(() => setHotelId(v))}
@@ -175,7 +177,7 @@ export function AppHeader() {
               ))}
             </SelectContent>
           </Select>
-        ) : isIndicadores ? (
+        ) : (isIndicadores || isFinanceiroVisaoGeral) ? (
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -184,7 +186,10 @@ export function AppHeader() {
               >
                 <span className="truncate text-left">
                   {hotelIds.length === 0
-                    ? selectedGop
+                    ? isFinanceiroVisaoGeral && hotelId
+                      ? visibleHotels.find(h => h.id === hotelId)?.name ?? "Selecionar hotel"
+                      : isFinanceiroVisaoGeral ? `Todos os hotéis (${visibleHotels.length})`
+                      : selectedGop
                       ? `Todos da carteira (${visibleHotels.length})`
                       : "Selecionar hotel"
                     : hotelIds.length === 1
@@ -196,24 +201,25 @@ export function AppHeader() {
             </PopoverTrigger>
             <PopoverContent align="start" className="w-[280px] p-0 bg-popover">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-primary hover:underline"
-                  onClick={() => setHotelIds(visibleHotels.map((h) => h.id))}
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-xs font-medium text-primary"
+                  onClick={() => { setHotelId(null); setHotelIds(visibleHotels.map((h) => h.id)); }}
                 >
                   Selecionar todos
-                </button>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-muted-foreground hover:underline"
-                  onClick={() => setHotelIds([])}
+                </Button>
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-xs font-medium text-muted-foreground"
+                  onClick={() => { setHotelId(null); setHotelIds([]); }}
                 >
                   Limpar
-                </button>
+                </Button>
               </div>
               <div className="max-h-[320px] overflow-y-auto py-1">
                 {visibleHotels.map((h) => {
-                  const checked = hotelIds.includes(h.id);
+                  const selection = isFinanceiroVisaoGeral && hotelIds.length === 0 && hotelId ? [hotelId] : hotelIds;
+                  const checked = selection.includes(h.id);
                   return (
                     <label
                       key={h.id}
@@ -222,8 +228,9 @@ export function AppHeader() {
                       <Checkbox
                         checked={checked}
                         onCheckedChange={(v) => {
-                          if (v) setHotelIds([...hotelIds, h.id]);
-                          else setHotelIds(hotelIds.filter((id) => id !== h.id));
+                          if (isFinanceiroVisaoGeral) setHotelId(null);
+                          if (v) setHotelIds([...selection, h.id]);
+                          else setHotelIds(selection.filter((id) => id !== h.id));
                         }}
                       />
                       <span className="truncate">{h.name}</span>

@@ -47,6 +47,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { RH_VIEW_ROLES } from "./lib/rhAccess";
 import type { AppRole } from "./lib/constants";
 import { DRE_INDICATOR_ROLES } from "./lib/dreAccess";
+import { FINANCIAL_OVERVIEW_ROLES } from "./lib/financialOverview";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -165,7 +166,7 @@ const App = () => (
               <Route path="/metas" element={<EmBreve />} />
 
               {/* Gestão — Financeiro */}
-              <Route path="/financeiro" element={<RoleGuard roles={["controladoria","patronos","gg","viewer"]}><FinanceiroVisaoGeralPage /></RoleGuard>} />
+              <Route path="/financeiro" element={<RoleGuard roles={FINANCIAL_OVERVIEW_ROLES}><FinanceiroVisaoGeralPage /></RoleGuard>} />
               <Route path="/financeiro/contas-pagar" element={<RoleGuard roles={["controladoria","patronos","viewer"]}><ContasPagarPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber" element={<RoleGuard roles={["controladoria","patronos","gg","adm","gop","operacoes","viewer"]}><ContasReceberPage /></RoleGuard>} />
               <Route path="/financeiro/contas-receber/clientes" element={<RoleGuard roles={["controladoria","patronos","gg","adm","viewer"]}><ClientesPage /></RoleGuard>} />
