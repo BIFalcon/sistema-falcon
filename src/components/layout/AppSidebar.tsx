@@ -57,6 +57,7 @@ import { ROLE_LABELS, type AppRole } from "@/lib/constants";
 import { useAvatarUrl } from "@/hooks/useProfileAvatar";
 import { useInvestorAccess } from "@/hooks/useInvestors";
 import { DRE_INDICATOR_ROLES, isNovosNegociosOnly } from "@/lib/dreAccess";
+import { FINANCIAL_OVERVIEW_ROLES } from "@/lib/financialOverview";
 
 type LeafItem = {
   title: string;
@@ -111,7 +112,7 @@ const navGroups: { label: string; items: GroupItem[] }[] = [
         icon: Wallet,
         allowedRoles: ["financeiro","gg","adm","gop","operacoes","viewer"] as AppRole[],
         children: [
-          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, allowedRoles: ["financeiro","gg","viewer"] as AppRole[] },
+          { title: "Visão Geral", url: "/financeiro", icon: LayoutGrid, end: true, allowedRoles: FINANCIAL_OVERVIEW_ROLES },
           { title: "Contas a Pagar", url: "/financeiro/contas-pagar", icon: ArrowUpCircle, allowedRoles: ["financeiro","viewer"] as AppRole[] },
           { title: "Contas a Receber", url: "/financeiro/contas-receber", icon: ArrowDownCircle, allowedRoles: ["financeiro","gg","adm","gop","operacoes","viewer"] as AppRole[] },
           { title: "Importações", url: "/financeiro/importacoes", icon: Inbox, allowedRoles: ["controladoria","patronos","financeiro","fernando"] as AppRole[] },
