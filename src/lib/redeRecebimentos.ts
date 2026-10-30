@@ -153,3 +153,45 @@ export function buildTarifas(
   ajustes.forEach((a) => add(a.data_ajuste, isAntecipacao(a.motivo) ? "antecipacao" : "ajustes", a.valor_cobrado));
   return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
+
+export interface RedeAccountScope { own: string[]; foreign: string[] }
+const digits = (v: string | null | undefined) => String(v ?? "").replace(/\D/g, "");
+
+/**
+ * Mantém só o que é do hotel da tela. Parcela com conta corrente de OUTRO hotel cadastrado sai;
+ * conta própria ou desconhecida fica. Lote (aba recebidos, sem conta) sai apenas quando o valor
+ * fecha exatamente com parcelas de uma conta de outro hotel e não com as próprias; cancelamento
+ * sai quando o NSU só existe em parcelas de outro hotel.
+ */
+export function filterRedeByAccount(p: RedeRecebimentosParsed, scope: RedeAccountScope) {
+  const own = new Set(scope.own.map(digits).filter(Boolean));
+  const foreign = new Set(scope.foreign.map(digits).filter((a) => a && !own.has(a)));
+  const isForeign = (r: RedePagamento) => foreign.has(digits(r.conta_corrente));
+  const g = (d: string | null, b: string | null, m: string | null) => [d, normText(b), normText(m)].join("|");
+  const sums = (rows: RedePagamento[]) => {
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      const k = `${g(r.data_recebimento, r.bandeira, r.modalidade)}|${digits(r.conta_corrente)}`;
+      map.set(k, (map.get(k) ?? 0) + (r.valor_liquido_parcela ?? 0));
+    }
+    const out = new Map<string, Set<number>>();
+    for (const [k, v] of map) {
+      const base = k.slice(0, k.lastIndexOf("|"));
+      if (!out.has(base)) out.set(base, new Set());
+      out.get(base)!.add(Math.round(v * 100));
+    }
+    return out;
+  };
+  const foreignRows = p.pagamentos.filter(isForeign);
+  const ownRows = p.pagamentos.filter((r) => !isForeign(r));
+  const fs = sums(foreignRows), os = sums(ownRows);
+  const recebidos = p.recebidos.filter((r) => {
+    const k = g(r.data, r.bandeira, r.modalidade), c = Math.round((r.valor_depositado ?? 0) * 100);
+    return !(fs.get(k)?.has(c) && !os.get(k)?.has(c));
+  });
+  const fNsu = new Set(foreignRows.map((r) => r.nsu_cv).filter(Boolean));
+  const oNsu = new Set(ownRows.map((r) => r.nsu_cv).filter(Boolean));
+  const chargebacks = p.chargebacks.filter((c) => !(c.nsu_cv && fNsu.has(c.nsu_cv) && !oNsu.has(c.nsu_cv)));
+  const skipped = (p.pagamentos.length - ownRows.length) + (p.recebidos.length - recebidos.length) + (p.chargebacks.length - chargebacks.length);
+  return { parsed: { ...p, pagamentos: ownRows, recebidos, chargebacks }, skipped };
+}

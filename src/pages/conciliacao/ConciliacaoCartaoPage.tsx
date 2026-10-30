@@ -12,6 +12,7 @@ import {
   FileSpreadsheet, Landmark, Loader2, Pencil, Plus, Send, Trash2, Undo2, Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AgencyPixPanel } from "@/components/conciliacao/AgencyPixPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -534,7 +535,11 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                 <TabsTrigger value="justificativa" className="text-[11px]">Justificativa</TabsTrigger>
                 <TabsTrigger value="conciliados" className="text-[11px]">PIX Conciliados</TabsTrigger>
                 <TabsTrigger value="faturamento" className="text-[11px]">Faturamento (PIX)</TabsTrigger>
+                <TabsTrigger value="agencias" className="text-[11px]">Pix de agências</TabsTrigger>
               </TabsList>
+              <TabsContent value="agencias" className="mt-4">
+                <AgencyPixPanel hotelId={hotelId} />
+              </TabsContent>
               <TabsContent value="pendentes" className="mt-4">
                 <ReconcilePanel
                   boxes={pixBoxes}

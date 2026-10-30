@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AnticipatedPayment } from "@/lib/anticipationSimulation";
-import { parseRedeRecebimentosExcel, REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
+import { filterRedeByAccount, parseRedeRecebimentosExcel, REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
 
 async function pageAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>) {
   const out: T[] = [];
@@ -91,13 +91,18 @@ export function useImportRedeRecebimentos() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ file, hotelId }: { file: File; hotelId: string }) => {
-      const p = await parseRedeRecebimentosExcel(file, hotelId);
       if (!user) throw new Error("Entre novamente no sistema");
+      const { data: scope, error: scopeErr } = await supabase.rpc("conc_rede_account_scope", { p_hotel: hotelId });
+      if (scopeErr) throw scopeErr;
+      const { parsed: p, skipped } = filterRedeByAccount(
+        await parseRedeRecebimentosExcel(file, hotelId),
+        (scope ?? { own: [], foreign: [] }) as { own: string[]; foreign: string[] },
+      );
       const total = p.pagamentos.length + p.recebidos.length + p.ajustes.length + p.chargebacks.length;
       if (!total) throw new Error("Nenhum lançamento encontrado no relatório de recebimentos.");
       const { data: up, error: upErr } = await supabase.from("conc_uploads").insert({
         hotel_id: hotelId, kind: "rede_receipts", file_name: file.name, file_size: file.size,
-        parsed_count: total, skipped_count: 0, uploaded_by: user.id,
+        parsed_count: total, skipped_count: skipped, uploaded_by: user.id,
         metadata: { source: "rede_receipts", hotel_ids: [hotelId] },
       }).select("id").single();
       if (upErr) throw upErr;
@@ -125,7 +130,7 @@ export function useImportRedeRecebimentos() {
         if (error) throw error;
       }
       const match = await runMatch(hotelId);
-      return { ...counts, ...match };
+      return { ...counts, ...match, otherHotels: skipped };
     },
     onSuccess: () => invalidate(qc),
   });

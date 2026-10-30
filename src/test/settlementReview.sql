@@ -8,4 +8,7 @@ IF (public.conc_batch_summary('rede','8296c1ab-69d4-4520-b0f2-552649c3cde0')->>'
 IF public.conc_is_rede_bank('ibis-arcoverde','TRANSFERENCIA RECEBIDA 0689.92518-8') THEN RAISE EXCEPTION 'Unconfigured centralizer assumed'; END IF;
 IF EXISTS(SELECT 1 FROM public.conc_bank_entries b JOIN public.conc_pendencias p ON p.entry_id=b.id AND p.status='aberta' WHERE b.amount>0 AND b.matched_at IS NOT NULL) THEN RAISE EXCEPTION 'Confirmed bank has open transit'; END IF;
 IF EXISTS(SELECT 1 FROM public.conc_bank_entries b JOIN public.conc_matches m ON m.hotel_id=b.hotel_id JOIN public.conc_match_items i ON i.match_id=m.id AND i.side='bank' AND i.entry_id=b.id WHERE public.conc_is_financial_income(b.description) AND m.note LIKE 'Receita financeira%' AND EXISTS(SELECT 1 FROM public.conc_match_items x WHERE x.match_id=m.id AND x.side<>'bank')) THEN RAISE EXCEPTION 'Income manufactured operational counterpart'; END IF;
+END $$;DO $$ BEGIN
+IF NOT public.conc_is_financial_income('INT RESGATE   TRUST DI') OR NOT public.conc_is_financial_income('REND PAGO APLIC AUT APR') THEN RAISE EXCEPTION 'Investment redemption not recognized'; END IF;
+IF public.conc_is_financial_income('PIX RESGATE CLIENTE') THEN RAISE EXCEPTION 'Operational credit mistaken for redemption'; END IF;
 END $$;

@@ -105,3 +105,9 @@
 - [x] 1.4 Performance SLA só com filtro global
 - [ ] 2 Indicadores DRE Jaboatão: lucro = -(Aluguel Variável), checar Petrópolis
 - [ ] 3 RH Custo e Folha: aba Consolidado + RPC agregada + gráficos + export
+
+## Rede multi-hotel, resgates e Pix de agências
+- [x] Importação da Rede ignora parcelas de contas de outros hotéis cadastrados.
+- [x] Limpeza de Divinópolis (8.494 parcelas, 345 lotes, 3 cancelamentos de outros hotéis); R$ 9,90 baixado.
+- [x] Resgates/estornos de aplicação baixados automaticamente (R$ 619 mil).
+- [x] Aba "Pix de agências": sugestões e aprovação manual com soma exata.
