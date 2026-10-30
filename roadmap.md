@@ -1,3 +1,9 @@
+## Visão Geral Financeiro — blocos 4 a 6
+- [ ] Não conciliados Opera/Adquirente: quantidade e valor por hotel/período.
+- [ ] Total a receber colapsável, quatro parcelas e nova fórmula de saldo líquido.
+- [ ] Comparação multi-hotel e links com hotel/filtros para os detalhes autorizados.
+- [ ] Testar cálculos, período e navegação com sessão autorizada.
+
 ## Desfazer e extrato incorreto — Serra Talhada
 - [x] Desfazer atômico com autorização por hotel e rechecagem somente de lotes afetados; PIX/dinheiro sem varredura de cartões. Seleção múltipla também usa uma única requisição.
 - [x] Remover o upload 8c2417c0-fca7-4943-adba-b76868bdefd6 e seus 1.134 lançamentos, 19 rendimentos e 40 saldos incorretos; duas conciliações PIX posteriores também desfeitas, preservando quatro vendas Opera, quatro adquirente e dois créditos legítimos. Cópia arquivada no histórico de auditoria; contagens dos demais dados preservadas.
