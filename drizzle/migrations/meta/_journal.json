@@ -694,6 +694,13 @@
       "when": 1793381904534,
       "tag": "0098_rede_auto_allocate_routine_deductions",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1793382804135,
+      "tag": "0099_investment_redemptions_and_rede_accounts",
+      "breakpoints": true
     }
   ]
 }

@@ -5347,6 +5347,10 @@ export type Database = {
         Args: { p_description: string }
         Returns: boolean
       }
+      conc_is_investment_redemption: {
+        Args: { p_description: string }
+        Returns: boolean
+      }
       conc_is_pix_bank: { Args: { description: string }; Returns: boolean }
       conc_is_rede_bank: {
         Args: { p_description: string; p_hotel: string }
@@ -5384,6 +5388,7 @@ export type Database = {
         Args: { _hotel_id: string; _items: Json; _kind: string; _note?: string }
         Returns: string
       }
+      conc_rede_account_scope: { Args: { p_hotel: string }; Returns: Json }
       conc_rede_auto_match: {
         Args: {
           p_bank_prefix: string
