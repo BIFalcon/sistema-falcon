@@ -1366,6 +1366,68 @@ export type Database = {
           },
         ]
       }
+      conc_agency_pix_links: {
+        Row: {
+          amount: number
+          bank_entry_id: string
+          created_at: string
+          created_by: string
+          hotel_id: string
+          id: string
+          invoice_id: string
+          match_id: string
+        }
+        Insert: {
+          amount: number
+          bank_entry_id: string
+          created_at?: string
+          created_by: string
+          hotel_id: string
+          id?: string
+          invoice_id: string
+          match_id: string
+        }
+        Update: {
+          amount?: number
+          bank_entry_id?: string
+          created_at?: string
+          created_by?: string
+          hotel_id?: string
+          id?: string
+          invoice_id?: string
+          match_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conc_agency_pix_links_bank_entry_id_fkey"
+            columns: ["bank_entry_id"]
+            isOneToOne: false
+            referencedRelation: "conc_bank_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_agency_pix_links_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_agency_pix_links_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: true
+            referencedRelation: "ar_to_invoice_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conc_agency_pix_links_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "conc_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conc_b2b_receipts: {
         Row: {
           bandeira: string | null
@@ -5204,6 +5266,14 @@ export type Database = {
       conc_affected_settlement_banks: {
         Args: { p_acquirer_ids: string[]; p_hotel: string }
         Returns: string[]
+      }
+      conc_agency_pix_confirm: {
+        Args: { p_bank_id: string; p_invoice_ids: string[] }
+        Returns: string
+      }
+      conc_agency_pix_suggestions: {
+        Args: { p_agency: string; p_hotel: string }
+        Returns: Json
       }
       conc_allocate_rede_deductions: {
         Args: {
