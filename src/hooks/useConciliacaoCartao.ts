@@ -781,9 +781,10 @@ export function useReconcile() {
 export function useUndoReconcile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (match: ConcMatch) => {
-      await undoConciliation(match.id, async (id) =>
-        await supabase.rpc("conc_undo_matches", { p_match_ids: [id] }),
+    mutationFn: async (match: ConcMatch | ConcMatch[]) => {
+      const ids = (Array.isArray(match) ? match : [match]).map((item) => item.id);
+      await undoConciliation(ids[0] ?? "", async () =>
+        await supabase.rpc("conc_undo_matches", { p_match_ids: ids }),
       );
     },
     onSuccess: () => {
