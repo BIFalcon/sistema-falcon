@@ -673,6 +673,13 @@
       "when": 1793299593026,
       "tag": "0095_auto_reconcile_no_provisional_undo",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1793362321533,
+      "tag": "0096_atomic_undo_targeted_settlement_rechecks",
+      "breakpoints": true
     }
   ]
 }
