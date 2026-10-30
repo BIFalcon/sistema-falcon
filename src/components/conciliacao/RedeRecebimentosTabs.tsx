@@ -26,7 +26,7 @@ export function RedeReceiptsImporter({ hotelId }: { hotelId: string }) {
     maxFiles: 1, disabled: importer.isPending,
     accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
     onDrop: (files) => files[0] && importer.mutate({ file: files[0], hotelId }, {
-      onSuccess: (r) => toast.success(`Recebimentos Rede: ${r.pagamentos} pagamento(s), ${r.recebidos} recebido(s), ${r.ajustes} ajuste(s), ${r.chargebacks} cancelamento(s)/chargeback(s) novos. ${r.matched} baixa(s) no banco.`),
+      onSuccess: (r) => toast.success(`Recebimentos Rede: ${r.pagamentos} pagamento(s), ${r.recebidos} recebido(s), ${r.ajustes} ajuste(s), ${r.chargebacks} cancelamento(s)/chargeback(s) novos. ${r.matched} baixa(s) no banco.${r.otherHotels ? ` ${r.otherHotels} linha(s) de contas de outros hotéis ignorada(s).` : ""}`),
       onError: (e) => toast.error((e as Error).message),
     }),
   });
