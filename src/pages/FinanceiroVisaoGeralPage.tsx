@@ -58,7 +58,7 @@ export default function FinanceiroVisaoGeralPage() {
   const [receivableOpen, setReceivableOpen] = useState(false);
   const canPayable = roles.some(r => ["processos", "controladoria", "patronos", "viewer"].includes(r));
   const openDetail = (detail: FinancialDetail, selectedHotel?: string) => {
-    const single = selectedHotel ?? (effectiveHotelIds.length === 1 ? effectiveHotelIds[0] : undefined);
+    const single = selectedHotel ?? (effectiveHotelIds.length === 1 || ["opera", "acquirer", "card"].includes(detail) ? effectiveHotelIds[0] : undefined);
     setHotelId(single ?? null);
     setHotelIds([]);
     setGopId(null);

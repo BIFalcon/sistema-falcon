@@ -491,7 +491,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
               <TabsContent value="pendentes" className="mt-4">
                 {detailParams.get("origem") && <p className="text-sm font-medium mb-3">Não conciliados — {detailParams.get("origem") === "opera" ? "Opera" : "Adquirente"}</p>}
                 <ReconcilePanel
-                  boxes={cardBoxes}
+                  boxes={detailParams.get("origem") === "opera" ? [...cardBoxes].reverse() : cardBoxes}
                   onReconcile={doReconcile("cartao")}
                   isReconciling={reconcile.isPending}
                   exportName={`conciliacao-cartao-${hotelId}.xlsx`}
