@@ -49,7 +49,7 @@ export default function FinanceiroVisaoGeralPage() {
   const totalAPagar = sum("payable");
   const totalVencido = sum("overdue");
   const totalGeralAPagar = totalAPagar + totalVencido;
-  const totalAFaturar = sum("to_invoice");
+  const totalFaturasAVencer = sum("invoice_receivable");
   const totalOpenFolio = sum("open_folio");
   const saldoConta = sum("bank_balance");
   const totalReceivable = totalFinancialReceivable({ invoice: sum("invoice_receivable"), pix: sum("pix_receivable"), card: sum("card_receivable"), cash: sum("cash_receivable") });
@@ -109,8 +109,8 @@ export default function FinanceiroVisaoGeralPage() {
         />
         <SummaryCard
           icon={<ArrowDownCircle className="h-4 w-4" />}
-          label="A faturar"
-          value={fmtBRL(totalAFaturar)}
+          label="Faturas a vencer"
+          value={fmtBRL(totalFaturasAVencer)}
           tone="default"
           onClick={() => openDetail("invoice")}
         />
@@ -134,7 +134,7 @@ export default function FinanceiroVisaoGeralPage() {
         />
         <SummaryCard
           icon={<TrendingUp className="h-4 w-4" />}
-          label="Saldo líquido"
+          label="Saldo previsto"
           value={fmtBRL(saldoLiquido)}
           tone={saldoLiquido < 0 ? "destructive" : "default"}
           subtitle="Saldo conta − Total a pagar + Open Folio + Total a receber"
@@ -157,7 +157,7 @@ export default function FinanceiroVisaoGeralPage() {
           </Button></CollapsibleTrigger>
           <CollapsibleContent className="border-t border-border p-4 space-y-2">
             {([
-              ["Faturamento a vencer", sum("invoice_receivable"), "invoice"],
+              ["Faturas a vencer", totalFaturasAVencer, "invoice"],
               ["PIX", sum("pix_receivable"), null],
               ["Cartão", sum("card_receivable"), "card"],
               ["Dinheiro", sum("cash_receivable"), null],
@@ -358,7 +358,7 @@ function AnticipationSection({
               </div>
               <p className="text-[10px] text-muted-foreground">
                 Cada registro é acumulado — não substitui os anteriores.
-                Estes valores são informativos e não entram no saldo líquido.
+                Estes valores são informativos e não entram no saldo previsto.
               </p>
             </Card>
           )}
