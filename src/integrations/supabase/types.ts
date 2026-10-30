@@ -5214,6 +5214,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      conc_auto_allocate_rede_routine: {
+        Args: { p_receipt: string }
+        Returns: boolean
+      }
       conc_auto_reconcile: { Args: { _hotel_id?: string }; Returns: number }
       conc_auto_reconcile_impl: {
         Args: { _hotel_id?: string }
