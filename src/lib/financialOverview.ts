@@ -81,5 +81,6 @@ export function financialDetailPath(detail: FinancialDetail, hotel?: string) {
     params.set("origem", detail === "card" ? "acquirer" : detail);
   }
   const path = ["payable", "overdue"].includes(detail) ? "/financeiro/contas-pagar" : "/financeiro/contas-receber";
-  return `${path}${params.size ? `?${params}` : ""}`;
+  const query = params.toString();
+  return `${path}${query ? `?${query}` : ""}`;
 }
