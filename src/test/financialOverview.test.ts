@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agingBand, AUTOMATIC_CARD_HOTELS, cardTermDays, effectiveFinancialHotels, expectedCardDate, financialOverviewReadonly, FINANCIAL_OVERVIEW_ROLES, inFinancialPeriod } from "@/lib/financialOverview";
+import { agingBand, AUTOMATIC_CARD_HOTELS, cardTermDays, effectiveFinancialHotels, expectedCardDate, financialOverviewReadonly, FINANCIAL_OVERVIEW_ROLES, inFinancialPeriod, totalFinancialReceivable, financialNetBalance, financialDetailPath } from "@/lib/financialOverview";
 
 describe("financial overview blocks 1–3", () => {
   it("allows GOP and ADM overview roles", () => {
@@ -44,4 +44,24 @@ describe("financial overview blocks 1–3", () => {
     expect(agingBand(7)).toBe("d7_30"); expect(agingBand(30)).toBe("d7_30");
   });
   it("aging over thirty starts on day thirty one", () => expect(agingBand(31)).toBe("gt30"));
+});
+
+describe("financial overview blocks 4–6", () => {
+  it("total a receber soma exatamente faturamento, PIX, cartão e dinheiro", () => {
+    expect(totalFinancialReceivable({ invoice: 100, pix: 20, card: 30, cash: 4 })).toBe(154);
+  });
+  it("saldo líquido adiciona total a receber sem duplicar Open Folio", () => {
+    expect(financialNetBalance(1000, 200, 50, 154)).toBe(1004);
+  });
+  it("inadimplência abre faturamento com hotel e filtro corretos", () => {
+    expect(financialDetailPath("defaulting", "ibis-serra-talhada")).toBe("/financeiro/contas-receber?hotel=ibis-serra-talhada&status=inadimplente");
+  });
+  it("pagamentos em atraso abre filtro de atrasados", () => {
+    expect(financialDetailPath("overdue", "ibis-serra-talhada")).toBe("/financeiro/contas-pagar?hotel=ibis-serra-talhada&status=atrasados");
+  });
+  it("Open Folio não abre faturamento", () => expect(financialDetailPath("folio")).toBe("/financeiro/contas-receber?aba=open_folio"));
+  it("origens distintas abrem conciliação sem perder o hotel", () => {
+    expect(financialDetailPath("opera", "hotel")).toBe("/financeiro/contas-receber?hotel=hotel&aba=conciliacao&origem=opera");
+    expect(financialDetailPath("acquirer", "hotel")).toBe("/financeiro/contas-receber?hotel=hotel&aba=conciliacao&origem=acquirer");
+  });
 });

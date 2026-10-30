@@ -1,4 +1,4 @@
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 /**
  * ContasPagarPage — versão refatorada.
  *
@@ -144,6 +144,7 @@ export default function ContasPagarPage() {
   const { data: hotels = [] } = useAllHotels();
   const {
     hotelId,
+    setHotelId,
     dateFrom,
     dateTo,
     specificDates,
@@ -151,6 +152,12 @@ export default function ContasPagarPage() {
     setDateTo,
     setSpecificDates,
   } = useModuleFilters("financeiro");
+  const [detailParams] = useSearchParams();
+  const linkedHotel = detailParams.get("hotel");
+  const linkedOverdue = detailParams.get("status") === "atrasados";
+  useEffect(() => {
+    if (linkedHotel && hotels.some(h => h.id === linkedHotel)) setHotelId(linkedHotel);
+  }, [linkedHotel, hotels, setHotelId]);
   const simulations = useAnticipationSimulations(hotelId, canSimulate);
   const hotel = useMemo(
     () => (hotels.find((h) => h.id === hotelId) ?? null) as HotelRow | null,
@@ -276,7 +283,7 @@ export default function ContasPagarPage() {
   // (o período do topo — dateFrom/dateTo/specificDates — é compartilhado e fica como está).
   useEffect(() => {
     setSelectedIds(new Set());
-    setPeriod("all");
+    setPeriod(linkedOverdue ? "overdue" : "all");
     setSelectedStatuses([]);
     setSelectedCategories([]);
     setSearchText("");
@@ -287,7 +294,7 @@ export default function ContasPagarPage() {
     setPaidDateTo("");
     setShowOmieRemoved(false);
     setHideTrivial(true);
-  }, [hotelId]);
+  }, [hotelId, linkedOverdue]);
   const { data: omieRemovedEntries = [] } = useApOmieRemovedEntries(
     hotelId,
     showOmieRemoved,

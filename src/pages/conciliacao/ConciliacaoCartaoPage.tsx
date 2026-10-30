@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
@@ -115,6 +116,7 @@ function ClassifiedList({ title, subtitle, rows, actionLabel, onAction, busy, ex
 /* ------------------------------------------------------------------ */
 
 export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { section?: "conciliacao" | "baixas" | "trx" }) {
+  const [detailParams] = useSearchParams();
   const { allowedHotels, isMaster, roles } = useAuth();
   const [sendOpen, setSendOpen] = useState(false);
   // Filtros globais de Contas a Receber (hotel + período) — o período também
@@ -487,6 +489,7 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
                 <TabsTrigger value="conciliados" className="text-[11px]">Cartões Conciliados</TabsTrigger>
               </TabsList>
               <TabsContent value="pendentes" className="mt-4">
+                {detailParams.get("origem") && <p className="text-sm font-medium mb-3">Não conciliados — {detailParams.get("origem") === "opera" ? "Opera" : "Adquirente"}</p>}
                 <ReconcilePanel
                   boxes={cardBoxes}
                   onReconcile={doReconcile("cartao")}
