@@ -325,16 +325,10 @@ export default function ConciliacaoCartaoPage({ section = "conciliacao" }: { sec
 
   const undoMany = (list: ConcMatch[]) => {
     if (!list.length) return;
-    let done = 0;
-    for (const m of list) {
-      undo.mutate(m, {
-        onSuccess: () => {
-          done++;
-          if (done === list.length) toast.success(`${done} conciliação(ões) desfeita(s)`);
-        },
-        onError: (e: Error) => toast.error(e.message),
-      });
-    }
+    undo.mutate(list, {
+      onSuccess: () => toast.success(`${list.length} conciliação(ões) desfeita(s)`),
+      onError: (e: Error) => toast.error(e.message),
+    });
   };
 
   const saveNote = (kind: ConcKind) => (row: ReconcileRow, note: string) => {

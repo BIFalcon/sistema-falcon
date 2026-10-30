@@ -5201,6 +5201,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      conc_affected_settlement_banks: {
+        Args: { p_acquirer_ids: string[]; p_hotel: string }
+        Returns: string[]
+      }
       conc_allocate_rede_deductions: {
         Args: {
           p_components: string[]
@@ -5364,6 +5368,10 @@ export type Database = {
           title: string
         }[]
       }
+      conc_recheck_bank_ids: {
+        Args: { p_bank_ids: string[]; p_hotel: string }
+        Returns: undefined
+      }
       conc_recheck_settlements: {
         Args: { p_hotel: string }
         Returns: undefined
@@ -5419,6 +5427,7 @@ export type Database = {
         Args: { p_id: string }
         Returns: undefined
       }
+      conc_undo_matches: { Args: { p_match_ids: string[] }; Returns: boolean }
       consolidado_has_line: {
         Args: { _closing_id: string; _patterns: string[]; _version: number }
         Returns: boolean

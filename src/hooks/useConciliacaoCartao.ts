@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { reconcileUntilStable } from "@/lib/autoReconcile";
+import { undoConciliation } from "@/lib/undoConciliation";
 import { missingBankPayments } from "@/lib/paidBankVerification";
 import { splitRedeReimport, type ExistingAcquirerEntry, type DeltaRow } from "@/lib/redeReimport";
 import { REDE_BANK_PREFIX, REDE_BRAND_CODES, REDE_MOD_CODES } from "@/lib/redeRecebimentos";
@@ -743,12 +744,6 @@ export function useDeleteConcUpload() {
   });
 }
 
-const TABLE_BY_SIDE: Record<ConcSide, "conc_opera_entries" | "conc_acquirer_entries" | "conc_bank_entries"> = {
-  opera: "conc_opera_entries",
-  acquirer: "conc_acquirer_entries",
-  bank: "conc_bank_entries",
-};
-
 export function useReconcile() {
   const qc = useQueryClient();
   return useMutation({
@@ -786,18 +781,11 @@ export function useReconcile() {
 export function useUndoReconcile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (match: ConcMatch) => {
-      for (const side of ["opera", "acquirer", "bank"] as ConcSide[]) {
-        const ids = match.conc_match_items.filter((i) => i.side === side).map((i) => i.entry_id);
-        if (!ids.length) continue;
-        const { error } = await supabase
-          .from(TABLE_BY_SIDE[side])
-          .update({ matched_at: null })
-          .in("id", ids);
-        if (error) throw error;
-      }
-      const { error } = await supabase.from("conc_matches").delete().eq("id", match.id);
-      if (error) throw error;
+    mutationFn: async (match: ConcMatch | ConcMatch[]) => {
+      const ids = (Array.isArray(match) ? match : [match]).map((item) => item.id);
+      await undoConciliation(ids[0] ?? "", async () =>
+        await supabase.rpc("conc_undo_matches", { p_match_ids: ids }),
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conc-opera"] });
@@ -805,6 +793,7 @@ export function useUndoReconcile() {
       qc.invalidateQueries({ queryKey: ["conc-bank"] });
       qc.invalidateQueries({ queryKey: ["conc-matches"] });
       qc.invalidateQueries({ queryKey: ["settlement-batch"] });
+      qc.invalidateQueries({ queryKey: ["conc-bank-all"] });
       qc.invalidateQueries({ queryKey: ["conc-rede-receb"] });
       qc.invalidateQueries({ queryKey: ["conc-b2b-baixa"] });
       qc.invalidateQueries({ queryKey: ["conc-daily-closing"] });

@@ -14,3 +14,4 @@
 - Rede sales parsing rejects expired PIX before the cancellation exception, so unpaid expired requests cannot become reconciliation sales while card adjustment imports remain intact.
 - Daily bank closing uses server-maintained credit transit cycles and account/date snapshots; unnamed accounts alias only a hotel's sole named account, named snapshots take precedence without double counting, and initial balances use the latest earlier real snapshot.
 - Card auto-reconcile checks both sides are unmatched before writing; never write provisional matched_at then undo, because undos fire settlement rechecks and caused statement timeouts.
+- Undo uses the hotel-authorized atomic conc_undo_matches RPC; capture affected active Rede/B2B bank identities before deleting lineage, recheck only those identities once, and bypass card rechecks for PIX/cash. Never replace this with client-side multi-table writes or a hotel-history sweep.

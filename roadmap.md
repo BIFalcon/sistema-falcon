@@ -1,3 +1,8 @@
+## Desfazer e extrato incorreto — Serra Talhada
+- [ ] Desfazer atômico com autorização por hotel e rechecagem somente de lotes afetados; PIX/dinheiro sem varredura de cartões.
+- [ ] Remover o upload 8c2417c0-fca7-4943-adba-b76868bdefd6 e seus 1.134 lançamentos após desfazer somente seus rendimentos; verificar ausência e preservação dos demais dados.
+- [ ] Executar testes de regressão e conferir a experiência autorizada disponível.
+
 ## Visão Geral Financeiro — blocos 1 a 3
 - [x] Acesso somente leitura GOP/ADM, seleção multi-hotel exclusiva da Visão Geral e período compartilhado.
 - [x] Cartão automático nos dez hotéis definidos, com fallback manual nos demais; prazo textual numérico validado.
