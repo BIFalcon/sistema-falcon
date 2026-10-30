@@ -54,8 +54,33 @@ export interface FinancialOverviewRow {
   open_folio: number; folio_lt7: number; folio_d7_30: number; folio_gt30: number; folio_unknown: number;
   to_invoice: number; card_receivable: number; invalid_card_terms: number;
   bank_balance: number; paid_interest: number; anticipated: number; anticipation_charge: number;
+  unmatched_opera_count: number; unmatched_opera_amount: number;
+  unmatched_acquirer_count: number; unmatched_acquirer_amount: number;
+  invoice_receivable: number; pix_receivable: number; cash_receivable: number;
 }
 
 export function sumFinancialRows(rows: FinancialOverviewRow[], field: keyof FinancialOverviewRow) {
   return rows.reduce((sum, row) => sum + (typeof row[field] === "boolean" || typeof row[field] === "string" ? 0 : Number(row[field] ?? 0)), 0);
+}
+
+export function totalFinancialReceivable(values: { invoice: number; pix: number; card: number; cash: number }) {
+  return values.invoice + values.pix + values.card + values.cash;
+}
+export function financialNetBalance(balance: number, payable: number, openFolio: number, receivable: number) {
+  return balance - payable + openFolio + receivable;
+}
+export type FinancialDetail = "payable" | "overdue" | "invoice" | "defaulting" | "folio" | "opera" | "acquirer" | "card";
+export function financialDetailPath(detail: FinancialDetail, hotel?: string) {
+  const params = new URLSearchParams();
+  if (hotel) params.set("hotel", hotel);
+  if (detail === "overdue") params.set("status", "atrasados");
+  if (detail === "defaulting") params.set("status", "inadimplente");
+  if (detail === "folio") params.set("aba", "open_folio");
+  if (["opera", "acquirer", "card"].includes(detail)) {
+    params.set("aba", "conciliacao");
+    params.set("origem", detail === "card" ? "acquirer" : detail);
+  }
+  const path = ["payable", "overdue"].includes(detail) ? "/financeiro/contas-pagar" : "/financeiro/contas-receber";
+  const query = params.toString();
+  return `${path}${query ? `?${query}` : ""}`;
 }

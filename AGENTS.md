@@ -33,5 +33,5 @@
 - Startup installs domTranslationGuard before React; recover only detached-text operations inside the app root, preserving unrelated DOM errors, because browser translation can replace React-owned text. Static HTML declares pt-BR and disables translation.
 - AR recurring alerts: enqueue_ar_consolidated, one email/recipient.
 - AP OMIE: omieParser beside parse-ap-report; beneficiary, payer, invoice stay separate.
-- Financial overview uses hotel-authorized financial_overview aggregates and financialOverview scope/period/term helpers; aging ignores period, exact days override ranges, AP writes unchanged.
+- Financial overview uses hotel-authorized financial_overview aggregates and financialOverview scope/period/term/total/detail helpers; aging ignores period, exact days override ranges, unmatched sides remain separate, PIX/cash receivables use unmatched Opera routing only, and detail links retain existing role gates. AP writes unchanged.
 - Anticipation: protected ap_* RPCs serialized per hotel; anticipationSimulation shares rules, DRE untouched.

@@ -10,8 +10,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useModuleFilters } from "@/contexts/FilterContext";
 import { useGopManagers } from "@/hooks/useGopManagers";
 import { useFinancialOverview } from "@/hooks/useFinancialOverview";
-import { effectiveFinancialHotels, financialOverviewReadonly, sumFinancialRows } from "@/lib/financialOverview";
+import { effectiveFinancialHotels, financialOverviewReadonly, sumFinancialRows, totalFinancialReceivable, financialNetBalance, financialDetailPath, type FinancialDetail } from "@/lib/financialOverview";
 import { FinancialAging } from "@/components/financeiro/FinancialAging";
+import { FinancialComparison } from "@/components/financeiro/FinancialComparison";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +28,7 @@ import {
   Clock,
   Hourglass,
   Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { fmtBRL } from "@/lib/formatters";
 import { BrDateInput } from "@/components/ui/br-date-input";
@@ -33,7 +36,7 @@ import { BrDateInput } from "@/components/ui/br-date-input";
 export default function FinanceiroVisaoGeralPage() {
   const navigate = useNavigate();
   const { user, hasRole, roles, allowedHotels, isGg, isAdm } = useAuth();
-  const { hotelId, hotelIds, gopId, dateFrom, dateTo, specificDates } = useModuleFilters("financeiro");
+  const { hotelId, hotelIds, gopId, dateFrom, dateTo, specificDates, setHotelId, setHotelIds, setGopId, setDateFrom, setDateTo, setSpecificDates } = useModuleFilters("financeiro");
   const { data: gopManagers = [] } = useGopManagers();
   const portfolio = gopId ? gopManagers.find(g => g.user_id === gopId)?.hotel_ids ?? [] : null;
   const effectiveHotelIds = effectiveFinancialHotels(allowedHotels.map(h => h.id), hotelIds, hotelId, portfolio, isGg || isAdm);
@@ -49,8 +52,21 @@ export default function FinanceiroVisaoGeralPage() {
   const totalAFaturar = sum("to_invoice");
   const totalOpenFolio = sum("open_folio");
   const saldoConta = sum("bank_balance");
-  const saldoLiquido = saldoConta - totalGeralAPagar + totalOpenFolio;
+  const totalReceivable = totalFinancialReceivable({ invoice: sum("invoice_receivable"), pix: sum("pix_receivable"), card: sum("card_receivable"), cash: sum("cash_receivable") });
+  const saldoLiquido = financialNetBalance(saldoConta, totalGeralAPagar, totalOpenFolio, totalReceivable);
   const jurosPagos = sum("paid_interest");
+  const [receivableOpen, setReceivableOpen] = useState(false);
+  const canPayable = roles.some(r => ["processos", "controladoria", "patronos", "viewer"].includes(r));
+  const openDetail = (detail: FinancialDetail, selectedHotel?: string) => {
+    const single = selectedHotel ?? (effectiveHotelIds.length === 1 || ["opera", "acquirer", "card"].includes(detail) ? effectiveHotelIds[0] : undefined);
+    setHotelId(single ?? null);
+    setHotelIds([]);
+    setGopId(null);
+    if (["overdue", "defaulting", "folio"].includes(detail)) {
+      setSpecificDates([]); setDateFrom(""); setDateTo("");
+    }
+    navigate(financialDetailPath(detail, single));
+  };
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -74,14 +90,14 @@ export default function FinanceiroVisaoGeralPage() {
           label="A pagar"
           value={fmtBRL(totalAPagar)}
           tone="default"
-          onClick={() => navigate("/financeiro/contas-pagar")}
+          onClick={canPayable ? () => openDetail("payable") : undefined}
         />
         <SummaryCard
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Em atraso"
           value={fmtBRL(totalVencido)}
           tone={totalVencido > 0 ? "destructive" : "default"}
-          onClick={() => navigate("/financeiro/contas-pagar")}
+          onClick={canPayable ? () => openDetail("overdue") : undefined}
         />
         <SummaryCard
           icon={<Wallet className="h-4 w-4" />}
@@ -96,14 +112,14 @@ export default function FinanceiroVisaoGeralPage() {
           label="A faturar"
           value={fmtBRL(totalAFaturar)}
           tone="default"
-          onClick={() => navigate("/financeiro/contas-receber")}
+          onClick={() => openDetail("invoice")}
         />
         <SummaryCard
           icon={<Hourglass className="h-4 w-4" />}
           label="Open Folio"
           value={fmtBRL(totalOpenFolio)}
           tone={totalOpenFolio > 0 ? "warning" : "default"}
-          onClick={() => navigate("/financeiro/contas-receber")}
+          onClick={() => openDetail("folio")}
         />
         <SummaryCard
           icon={<CreditCard className="h-4 w-4" />}
@@ -121,28 +137,45 @@ export default function FinanceiroVisaoGeralPage() {
           label="Saldo líquido"
           value={fmtBRL(saldoLiquido)}
           tone={saldoLiquido < 0 ? "destructive" : "default"}
-          subtitle="Saldo conta − Total a pagar + Open Folio"
+          subtitle="Saldo conta − Total a pagar + Open Folio + Total a receber"
         />
       </div>
 
       <section className="space-y-3">
         <SectionHeader icon={<AlertTriangle className="h-4 w-4" />} title="Pendências atuais" subtitle="Posição atual · todos os períodos" />
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <FinancialAging title="Inadimplência de faturamento" total={sum("defaulting")} bands={[sum("defaulting_lt7"), sum("defaulting_d7_30"), sum("defaulting_gt30")]} unknown={sum("defaulting_unknown")} />
-          <FinancialAging title="Open Folio" total={totalOpenFolio} bands={[sum("folio_lt7"), sum("folio_d7_30"), sum("folio_gt30")]} unknown={sum("folio_unknown")} />
-          <FinancialAging title="Pagamentos em atraso" total={totalVencido} bands={[sum("overdue_lt7"), sum("overdue_d7_30"), sum("overdue_gt30")]} />
+          <FinancialAging title="Inadimplência de faturamento" total={sum("defaulting")} bands={[sum("defaulting_lt7"), sum("defaulting_d7_30"), sum("defaulting_gt30")]} unknown={sum("defaulting_unknown")} onClick={() => openDetail("defaulting")} />
+          <FinancialAging title="Open Folio" total={totalOpenFolio} bands={[sum("folio_lt7"), sum("folio_d7_30"), sum("folio_gt30")]} unknown={sum("folio_unknown")} onClick={() => openDetail("folio")} />
+          <FinancialAging title="Pagamentos em atraso" total={totalVencido} bands={[sum("overdue_lt7"), sum("overdue_d7_30"), sum("overdue_gt30")]} onClick={canPayable ? () => openDetail("overdue") : undefined} />
         </div>
       </section>
       <section className="space-y-3">
-        <SectionHeader icon={<CreditCard className="h-4 w-4" />} title="Recebíveis de cartão" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SummaryCard icon={<CreditCard className="h-4 w-4" />} label="Cartão a receber" value={fmtBRL(sum("card_receivable"))} tone="default" />
-        </div>
+        <Collapsible open={receivableOpen} onOpenChange={setReceivableOpen} className="rounded-lg border border-border bg-card">
+          <CollapsibleTrigger asChild><Button variant="ghost" className="flex w-full h-auto justify-between p-4 whitespace-normal text-left" aria-label="Total a receber" aria-expanded={receivableOpen}>
+            <span><span className="block text-sm text-muted-foreground">Total a receber</span><span className="block text-2xl font-semibold mt-2">{fmtBRL(totalReceivable)}</span></span>
+            <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${receivableOpen ? "rotate-180" : ""}`} />
+          </Button></CollapsibleTrigger>
+          <CollapsibleContent className="border-t border-border p-4 space-y-2">
+            {([
+              ["Faturamento a vencer", sum("invoice_receivable"), "invoice"],
+              ["PIX", sum("pix_receivable"), null],
+              ["Cartão", sum("card_receivable"), "card"],
+              ["Dinheiro", sum("cash_receivable"), null],
+            ] as const).map(([label, value, detail]) => <div key={label} className="flex items-center justify-between gap-3 text-sm">
+              {detail ? <Button variant="link" className="h-auto p-0" onClick={() => openDetail(detail)}>{label}</Button> : <span>{label}</span>}
+              <span className="font-semibold tabular-nums">{fmtBRL(value)}</span>
+            </div>)}
         <div className="flex flex-wrap gap-2">
           {rows.some(r => r.automatic_card) && <Badge variant="secondary" title="Calculado automaticamente via Conciliação de Cartão">Calculado automaticamente via Conciliação de Cartão</Badge>}
           {rows.some(r => !r.automatic_card) && <Badge variant="outline">Inclui valores informados manualmente</Badge>}
         </div>
         {sum("invalid_card_terms") > 0 && <p className="text-xs text-muted-foreground">{sum("invalid_card_terms")} venda(s) sem prazo válido não incluída(s) no cálculo.</p>}
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SummaryCard icon={<AlertTriangle className="h-4 w-4" />} label="Não conciliados — Opera" value={fmtBRL(sum("unmatched_opera_amount"))} subtitle={`${sum("unmatched_opera_count")} lançamento(s)`} tone="warning" onClick={() => openDetail("opera")} />
+        <SummaryCard icon={<CreditCard className="h-4 w-4" />} label="Não conciliados — Adquirente" value={fmtBRL(sum("unmatched_acquirer_amount"))} subtitle={`${sum("unmatched_acquirer_count")} lançamento(s)`} tone="warning" onClick={() => openDetail("acquirer")} />
       </section>
       <section className="space-y-3">
         <SectionHeader icon={<TrendingUp className="h-4 w-4" />} title="Encargos financeiros" />
@@ -158,6 +191,7 @@ export default function FinanceiroVisaoGeralPage() {
             totalDescontado={sum("anticipation_charge")}
           />
       </section>
+      {effectiveHotelIds.length > 1 && !overview.isPending && !overview.isError && <FinancialComparison rows={rows} hotels={allowedHotels} onDetail={openDetail} canPayable={canPayable} />}
     </div>
   );
 }

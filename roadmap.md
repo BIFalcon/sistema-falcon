@@ -1,3 +1,9 @@
+## Visão Geral Financeiro — blocos 4 a 6
+- [x] Não conciliados Opera/Adquirente: quantidade e valor por hotel/período; totais conferidos contra registros de Serra Talhada e Divinópolis.
+- [x] Total a receber colapsável, quatro parcelas e nova fórmula de saldo líquido. PIX/dinheiro usam Opera pendente; faturamento usa vencimento vigente, excluindo pagos/não faturáveis/inadimplentes.
+- [x] Comparação multi-hotel e links com hotel/filtros para os detalhes autorizados; acesso AP preservado e conciliação abre um hotel válido, com origem prioritária.
+- [x] 19 testes passaram; sessão autorizada de José conferiu dois hotéis, total R$311.255,11 e saldo R$332.176,85, card fechado inicialmente, Open Folio, vencidos e Opera. Datas específicas prevalecem na RPC; aplicação sem erros.
+
 ## Desfazer e extrato incorreto — Serra Talhada
 - [x] Desfazer atômico com autorização por hotel e rechecagem somente de lotes afetados; PIX/dinheiro sem varredura de cartões. Seleção múltipla também usa uma única requisição.
 - [x] Remover o upload 8c2417c0-fca7-4943-adba-b76868bdefd6 e seus 1.134 lançamentos, 19 rendimentos e 40 saldos incorretos; duas conciliações PIX posteriores também desfeitas, preservando quatro vendas Opera, quatro adquirente e dois créditos legítimos. Cópia arquivada no histórico de auditoria; contagens dos demais dados preservadas.
@@ -7,7 +13,7 @@
 - [x] Acesso somente leitura GOP/ADM, seleção multi-hotel exclusiva da Visão Geral e período compartilhado.
 - [x] Cartão automático nos dez hotéis definidos, com fallback manual nos demais; prazo textual numérico validado.
 - [x] Inadimplência, Open Folio e AP atrasado atuais com faixas de valores; 29 testes e validações de totais/dias específicos no banco passaram.
-- [ ] Conferir seleção e indicadores na tela com conta autorizada — bloqueado: solicitante sem conta correspondente; preview retorna ao login. Blocos 4 a 6 não iniciados.
+- [x] Conferir seleção e indicadores na tela com conta autorizada — sessão de José validou dois hotéis, totais estruturais, cartão e navegação ao concluir blocos 4 a 6.
 
 ## Antecipações — três etapas
 - [x] Estender antecipações e proteger criação, edição e confirmação; preservar lançamentos antigos.
