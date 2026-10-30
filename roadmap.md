@@ -1,7 +1,7 @@
 ## Desfazer e extrato incorreto — Serra Talhada
-- [ ] Desfazer atômico com autorização por hotel e rechecagem somente de lotes afetados; PIX/dinheiro sem varredura de cartões.
-- [ ] Remover o upload 8c2417c0-fca7-4943-adba-b76868bdefd6 e seus 1.134 lançamentos após desfazer somente seus rendimentos; verificar ausência e preservação dos demais dados.
-- [ ] Executar testes de regressão e conferir a experiência autorizada disponível.
+- [x] Desfazer atômico com autorização por hotel e rechecagem somente de lotes afetados; PIX/dinheiro sem varredura de cartões. Seleção múltipla também usa uma única requisição.
+- [x] Remover o upload 8c2417c0-fca7-4943-adba-b76868bdefd6 e seus 1.134 lançamentos, 19 rendimentos e 40 saldos incorretos; duas conciliações PIX posteriores também desfeitas, preservando quatro vendas Opera, quatro adquirente e dois créditos legítimos. Cópia arquivada no histórico de auditoria; contagens dos demais dados preservadas.
+- [x] Cinco testes passaram, aplicação sem erros; sessão autorizada de José desfez conciliação PIX temporária pela tela (RPC 200/true, toast e remoção confirmados, banco liberado). Registro temporário removido. Cartões reais não foram desfeitos para teste.
 
 ## Visão Geral Financeiro — blocos 1 a 3
 - [x] Acesso somente leitura GOP/ADM, seleção multi-hotel exclusiva da Visão Geral e período compartilhado.
